@@ -1,0 +1,97 @@
+/* =========================================================
+   Loading.css
+   Full page: background gelap polos + logo pudar (grayscale)
+   di tengah, dengan efek "napas" (fade + scale) pelan.
+   ========================================================= */
+
+:root {
+  --color-600: #B52809; /* dipakai untuk varian inline spinner */
+}
+
+/* ---------- FULL PAGE LOADER ---------- */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #202125; /* dark, sesuai referensi */
+}
+
+.loading-screen__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.loading-screen__logo {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  /* dibikin abu-abu & agak redup supaya senada dengan background gelap */
+  filter: grayscale(1) brightness(1.6);
+  opacity: 0.55;
+  animation: loadingBreathe 1.8s ease-in-out infinite;
+}
+
+.loading-screen__text {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #9a9ba0;
+}
+
+/* ---------- INLINE LOADER (dipakai di dalam section/card) ---------- */
+.loading-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 0;
+}
+
+.loading-inline__text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-600);
+}
+
+.loading-ring {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    #f3deda 0deg,
+    #dd9e90 90deg,
+    var(--color-600) 180deg,
+    #871e06 270deg,
+    #f3deda 360deg
+  );
+  animation: loadingSpin 1s linear infinite;
+}
+.loading-ring::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: #ffffff;
+  border-radius: 50%;
+}
+.loading-ring--sm { width: 26px; height: 26px; }
+
+/* ---------- ANIMATIONS ---------- */
+
+/* efek "napas": logo membesar-mengecil & lebih terang-redup pelan-pelan,
+   persis kayak referensi (logo diam di tempat, cuma opacity/scale-nya
+   yang halus berubah) */
+@keyframes loadingBreathe {
+  0%, 100% { opacity: 0.4; transform: scale(0.96); }
+  50%      { opacity: 0.75; transform: scale(1.04); }
+}
+
+@keyframes loadingSpin {
+  to { transform: rotate(360deg); }
+}
