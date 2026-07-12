@@ -9,50 +9,90 @@ use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\EventController;
 
-// Public routes
+/*
+|--------------------------------------------------------------------------
+| Public Routes (Bisa diakses tanpa login)
+|--------------------------------------------------------------------------
+*/
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
+
 Route::get('businesses', [BusinessController::class, 'index']);
 Route::get('businesses/{id}', [BusinessController::class, 'show']);
+
 Route::get('categories', [CategoryController::class, 'index']);
+
 Route::get('advertisements', [AdvertisementController::class, 'index']);
 Route::get('advertisements/{id}', [AdvertisementController::class, 'show']);
+
 Route::get('events', [EventController::class, 'index']);
 Route::get('events/{id}', [EventController::class, 'show']);
+
 Route::get('subscription-plans', [SubscriptionController::class, 'plans']);
 
-// Protected routes
+
+/*
+|--------------------------------------------------------------------------
+| Protected Routes (Wajib Login / Menggunakan Token Sanctum)
+|--------------------------------------------------------------------------
+*/
 Route::middleware('auth:sanctum')->group(function () {
+    
+    // Auth & Profile
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('profile', [AuthController::class, 'profile']);
     
-    // User business management
+    // -------------------------------------------------------------
+    // Fitur User Biasa / Pemilik Bisnis
+    // -------------------------------------------------------------
     Route::get('my-businesses', [BusinessController::class, 'myBusinesses']);
     Route::post('businesses', [BusinessController::class, 'store']);
-    Route::post('businesses/{id}', [BusinessController::class, 'update']); // Using POST to allow multipart form data with images
+    Route::post('businesses/{id}', [BusinessController::class, 'update']); // POST untuk support multipart form-data (gambar)
     Route::delete('businesses/{id}', [BusinessController::class, 'destroy']);
 
-    // User advertisement management
     Route::post('advertisements', [AdvertisementController::class, 'store']);
     Route::put('advertisements/{id}', [AdvertisementController::class, 'update']);
     Route::delete('advertisements/{id}', [AdvertisementController::class, 'destroy']);
 
-    // Subscriptions / invoices (langganan premium per bisnis)
     Route::get('subscriptions', [SubscriptionController::class, 'index']);
     Route::post('subscriptions', [SubscriptionController::class, 'store']);
     Route::get('subscriptions/{id}', [SubscriptionController::class, 'show']);
 
-    // Reseller
+    // Jalur khusus untuk user bertipe Reseller melihat bisnisnya
     Route::get('reseller/businesses', [UserController::class, 'resellerBusinesses']);
 
-    // Admin routes
-    Route::apiResource('users', UserController::class);
-    Route::post('categories', [CategoryController::class, 'store']);
-    Route::put('categories/{id}', [CategoryController::class, 'update']);
-    Route::delete('categories/{id}', [CategoryController::class, 'destroy']);
-    Route::post('businesses/{id}/approve', [BusinessController::class, 'approve']);
-    Route::post('businesses/{id}/toggle-premium', [BusinessController::class, 'togglePremium']);
-    Route::post('events', [EventController::class, 'store']);
-    Route::put('events/{id}', [EventController::class, 'update']);
-    Route::delete('events/{id}', [EventController::class, 'destroy']);
+    // -------------------------------------------------------------
+    // Fitur Khusus ADMIN (Grouped & Prefixed dengan 'admin/')
+    // -------------------------------------------------------------
+    Route::prefix('admin')->group(function () {
+        
+        // 1. CRUD Users (Otomatis mencakup index, store, show, update, destroy)
+        Route::apiResource('users', UserController::class);
+
+        // 2. CRUD Kategori Bisnis (Index menggunakan route public di atas)
+        Route::post('categories', [CategoryController::class, 'store']);
+        Route::put('categories/{id}', [CategoryController::class, 'update']);
+        Route::delete('categories/{id}', [CategoryController::class, 'destroy']);
+
+        // 3. CRUD & Manajemen Bisnis oleh Admin
+        Route::get('businesses', [BusinessController::class, 'index']); // Melihat semua bisnis untuk moderasi
+        Route::post('businesses/{id}/approve', [BusinessController::class, 'approve']);
+        Route::post('businesses/{id}/toggle-premium', [BusinessController::class, 'togglePremium']);
+        Route::delete('businesses/{id}', [BusinessController::class, 'destroy']); // Admin bisa hapus bisnis melanggar
+
+        // 4. CRUD Event
+        Route::post('events', [EventController::class, 'store']);
+        Route::put('events/{id}', [EventController::class, 'update']);
+        Route::delete('events/{id}', [EventController::class, 'destroy']);
+
+        // 5. CRUD Iklan (Admin Control)
+        Route::get('advertisements', [AdvertisementController::class, 'index']);
+        Route::put('advertisements/{id}/verify', [AdvertisementController::class, 'verify']); // Contoh status tayang iklan
+        Route::delete('advertisements/{id}', [AdvertisementController::class, 'destroy']);
+
+        // 6. CRUD / Manajemen Reseller oleh Admin
+        Route::get('resellers', [UserController::class, 'indexResellers']); // Melihat daftar semua reseller
+        Route::post('resellers/{id}/toggle-status', [UserController::class, 'toggleResellerStatus']); // Aktif/nonaktifkan reseller
+    });
+
 });
