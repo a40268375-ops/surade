@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin; // Diubah agar sesuai folder admin
 
+use App\Http\Controllers\Controller; // Ditambahkan agar bisa extend Controller utama
 use App\Models\Event;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;

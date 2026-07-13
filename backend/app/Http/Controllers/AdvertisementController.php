@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin; // DIUBAH: Sesuai struktur folder admin
 
+use App\Http\Controllers\Controller; // DITAMBAHKAN: Supaya bisa extend Controller utama
 use App\Models\Advertisement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -17,17 +18,12 @@ class AdvertisementController extends Controller
         } elseif ($request->has('status') && $request->user()) {
             $query->where('status', $request->status)->where('user_id', $request->user()->id);
         } else {
-            $query->where('status', 'approved');
+            // DIUBAH: Di api.php kamu menggunakan status 'verified' untuk iklan tayang
+            $query->where('status', 'verified'); 
         }
 
         $ads = $query->latest()->get();
 
-        // Free users have no ads: an ad only stays visible on the public
-        // website as long as the owner still has an active (non-expired)
-        // premium business subscription. Once it expires, the ad disappears
-        // automatically ("websitenya ilang sendiri") without any manual step.
-        // This filter only applies to the public listing (no ?status= param) -
-        // owners and admins managing ads in the dashboard still see everything.
         if (!$request->has('status')) {
             $ads = $ads->filter(fn ($ad) => $ad->user && $ad->user->hasActivePremiumBusiness())->values();
         }
@@ -51,8 +47,6 @@ class AdvertisementController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Gate: only businesses with an active premium subscription can
-        // post iklan. Free (non-premium / expired) users are blocked here.
         if ($request->user()->role !== 'admin' && !$request->user()->hasActivePremiumBusiness()) {
             return response()->json([
                 'message' => 'Hanya bisnis dengan langganan Premium aktif yang bisa memasang iklan. Silakan berlangganan premium terlebih dahulu.',
@@ -79,6 +73,25 @@ class AdvertisementController extends Controller
         return response()->json($advertisement);
     }
 
+    // DITAMBAHKAN: Fungsi verify untuk memenuhi Route::put('advertisements/{id}/verify') di api.php kamu
+    public function verify(Request $request, $id)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $advertisement = Advertisement::find($id);
+
+        if (!$advertisement) {
+            return response()->json(['message' => 'Advertisement not found'], 404);
+        }
+
+        $advertisement->status = 'verified'; // Status disetujui admin agar tayang ke publik
+        $advertisement->save();
+
+        return response()->json($advertisement->load('category'));
+    }
+
     public function update(Request $request, $id)
     {
         $advertisement = Advertisement::find($id);
@@ -99,7 +112,7 @@ class AdvertisementController extends Controller
             'location' => 'sometimes|required|string|max:255',
             'phone' => 'nullable|string',
             'website' => 'nullable|string',
-            'status' => 'nullable|string|in:pending,approved,rejected',
+            'status' => 'nullable|string|in:pending,verified,rejected', // Diubah dari approved ke verified sesuai sistem api.php
         ]);
 
         if ($validator->fails()) {

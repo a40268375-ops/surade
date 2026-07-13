@@ -14,10 +14,20 @@ import Profile from "../pages/Profile";
 import SmartCity from "../pages/SmartCity";
 import Dashboard from "../pages/Dashboard";
 
+// === IMPORT COMPONENT ADMIN ===
+import UserManagement from '../pages/admin/UserManagement';
+import ResellerManagement from '../pages/admin/ResellerManagement';
+import CategoryManagement from '../pages/admin/CategoryManagement'; 
+import EventManagement from '../pages/admin/EventManagement'; // <- Ditambahkan
+
+// === IMPORT LAYOUT NAVIGASI ADMIN ===
+import AdminLayout from '../pages/admin/AdminLayout'; // <- Ditambahkan
+
 function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* RUTE PUBLIC / UMUM */}
         <Route path="/" element={<Home />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:id" element={<BlogDetail />} />
@@ -32,6 +42,12 @@ function AppRouter() {
         <Route path="/profile/:id" element={<Profile />} />
         <Route path="/smart-city/:id" element={<SmartCity />} />
         <Route path="/dashboard" element={<Dashboard />} />
+
+        {/* RUTE ADMIN (Semua dibungkus AdminLayout agar menu sidebar muncul) */}
+        <Route path="/admin/categories" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
+        <Route path="/admin/users" element={<AdminLayout><UserManagement /></AdminLayout>} />
+        <Route path="/admin/resellers" element={<AdminLayout><ResellerManagement /></AdminLayout>} />
+        <Route path="/admin/events" element={<AdminLayout><EventManagement /></AdminLayout>} />
       </Routes>
     </BrowserRouter>
   );

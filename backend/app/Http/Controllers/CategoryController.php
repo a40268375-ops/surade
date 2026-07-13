@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+// DIUBAH: Ditambahkan \Admin sesuai dengan struktur folder tempat menyimpannya
+namespace App\Http\Controllers\Admin; 
 
+use App\Http\Controllers\Controller; // Ditambahkan agar bisa extend Controller utama
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -11,6 +13,7 @@ class CategoryController extends Controller
 {
     public function index()
     {
+        // Mengambil kategori sekalian menghitung jumlah bisnis di dalamnya
         return response()->json(Category::withCount('businesses')->get());
     }
 
