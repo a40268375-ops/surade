@@ -463,7 +463,20 @@ import { useState, useRef, useEffect } from "react";
         <section className="home-hero">
           <div className="home-hero__bg" />
           <div className="home-hero__content">
-            <h1 className="home-hero__title">Surade.co.id</h1>
+            <h1 
+              className="home-hero__title" 
+              style={{
+                background: 'linear-gradient(100deg, #fff0ed 0%, #fff0ed 32%, #B52809 44%, #d6380c 52%, #8f1a06 60%, #fff0ed 72%, #fff0ed 100%)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                color: '#B52809',
+                backgroundSize: '260% 100%',
+                animation: 'home-hero-shimmer 4.5s linear infinite'
+              }}
+            >
+              Surade.co.id
+            </h1>
             <p className="home-hero__subtitle">Semua Ada Disini</p>
 
             {/* Search Bar */}
@@ -947,11 +960,6 @@ import { useState, useRef, useEffect } from "react";
               <p className="footer-copyright">
                 &copy; 2024 Surade.co.id. All rights reserved.
               </p>
-              <div className="footer-bottom-links">
-                <a href="#">Privasi</a>
-                <Link to="/terms">Syarat &amp; Ketentuan</Link>
-                <a href="#">Sitemap</a>
-              </div>
             </div>
           </div>
         </footer>

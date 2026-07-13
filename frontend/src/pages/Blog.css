@@ -61,13 +61,18 @@ body { background: #f5f6fa; }
 
 .home-nav__button {
   display: inline-flex; align-items: center; gap: 6px;
-  border: none; border-radius: 6px; padding: 9px 18px;
-  background: #007570; color: #fff;
+  border: 2px solid #007570; border-radius: 6px; padding: 9px 18px;
+  background: transparent; color: #007570;
   font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 0.875rem;
   cursor: pointer; white-space: nowrap;
-  transition: background 0.18s, transform 0.18s;
+  transition: background 0.18s, transform 0.18s, border-color 0.18s, color 0.18s;
 }
-.home-nav__button:hover { background: #005a58; transform: translateY(-1px); }
+.home-nav__button:hover {
+  background: #B52809;
+  border-color: #B52809;
+  color: #fff;
+  transform: translateY(-1px);
+}
 
 /* ─────────────────────────────────────────────
    BLOG HERO (Indonesian Culture Background)

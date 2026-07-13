@@ -106,6 +106,35 @@
   flex-shrink: 0;
 }
 
+.login-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  color: #606770;
+  background: #f0f2f5;
+  border: 1px solid #dddfe2;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 16px;
+}
+
+.login-back-btn:hover {
+  background: #e4e6eb;
+  color: #1c1e21;
+  border-color: #c0c4cc;
+}
+
+.login-back-btn:active {
+  transform: scale(0.98);
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -397,6 +426,10 @@
 .login-footer__inner {
   max-width: 1100px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .login-footer__links {
@@ -404,6 +437,7 @@
   flex-wrap: wrap;
   gap: 8px 20px;
   margin-bottom: 12px;
+  justify-content: center;
 }
 
 .login-footer__links a {
@@ -421,6 +455,7 @@
 .login-footer__copy {
   font-size: 0.75rem;
   color: #bec3c9;
+  text-align: center;
 }
 
 /* ─────────────────────────────────────────────

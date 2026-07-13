@@ -12,6 +12,8 @@ import {
   AlertCircle,
   X,
   UserPlus,
+  Home,
+  ArrowLeft,
 } from "lucide-react";
 
 export default function Login() {
@@ -133,6 +135,16 @@ export default function Login() {
 
           {/* ── Right: Login Card ── */}
           <div className="login-card">
+            {/* Back to Website Button */}
+            <button
+              type="button"
+              className="login-back-btn"
+              onClick={() => navigate("/")}
+            >
+              <ArrowLeft size={18} />
+              <span>Kembali ke Website</span>
+            </button>
+
             <form className="login-form" onSubmit={handleLogin} noValidate>
               {/* Error */}
               {error && (
@@ -235,8 +247,6 @@ export default function Login() {
             <Link to="/terms">Syarat & Ketentuan</Link>
             <Link to="/vision-mission">Visi & Misi</Link>
             <Link to="/partnership-career">Karir</Link>
-            <Link to="/terms">Privasi</Link>
-            <Link to="/terms">Cookie</Link>
             <Link to="/contact">Bantuan</Link>
           </div>
           <p className="login-footer__copy">
