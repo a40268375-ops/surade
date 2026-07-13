@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../utils/api";
 import "./Dashboard.css";
-import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
 import {
   Building2,
@@ -31,6 +30,8 @@ import {
   Receipt,
   Gift,
   Lock,
+  Home,
+  ArrowLeft,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -565,8 +566,6 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-page">
-      <Navbar />
-      
       <div className="dashboard-container">
         {/* Sidebar */}
         <aside className="db-sidebar">
@@ -649,6 +648,11 @@ export default function Dashboard() {
                 </button>
               </>
             )}
+
+            <button className="db-menu-btn" onClick={() => navigate("/")}>
+              <Home size={18} />
+              <span>Kembali ke Website</span>
+            </button>
 
             <button className="db-menu-btn db-menu-btn--logout" onClick={logout}>
               <LogOut size={18} />

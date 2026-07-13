@@ -12,6 +12,10 @@ import {
   AlertCircle,
   X,
   UserPlus,
+<<<<<<< HEAD
+=======
+  Home,
+>>>>>>> c97deaff077b66f621ee2f82c55155155fc52c45
   ArrowLeft,
 } from "lucide-react";
 
@@ -134,6 +138,16 @@ export default function Login() {
 
           {/* ── Right: Login Card ── */}
           <div className="login-card">
+            {/* Back to Website Button */}
+            <button
+              type="button"
+              className="login-back-btn"
+              onClick={() => navigate("/")}
+            >
+              <ArrowLeft size={18} />
+              <span>Kembali ke Website</span>
+            </button>
+
             <form className="login-form" onSubmit={handleLogin} noValidate>
               {/* Error */}
               {error && (
@@ -232,6 +246,7 @@ export default function Login() {
         </div>
       </main>
 
+<<<<<<< HEAD
 {/* ── Footer ── */}
 <footer className="login-footer">
   <div className="login-footer__inner">
@@ -249,6 +264,25 @@ export default function Login() {
     </p>
   </div>
 </footer>
+=======
+      {/* ── Footer ── */}
+      <footer className="login-footer">
+        <div className="login-footer__inner">
+          <div className="login-footer__links">
+            <Link to="/about">Tentang</Link>
+            <Link to="/contact">Hubungi Kami</Link>
+            <Link to="/blog">Blog</Link>
+            <Link to="/terms">Syarat & Ketentuan</Link>
+            <Link to="/vision-mission">Visi & Misi</Link>
+            <Link to="/partnership-career">Karir</Link>
+            <Link to="/contact">Bantuan</Link>
+          </div>
+          <p className="login-footer__copy">
+            &copy; 2024 Surade.co.id. All rights reserved.
+          </p>
+        </div>
+      </footer>
+>>>>>>> c97deaff077b66f621ee2f82c55155155fc52c45
 
       {/* ── Register Modal ── */}
       {showRegister && (

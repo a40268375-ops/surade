@@ -226,11 +226,6 @@ export default function About() {
             <p className="footer-copyright">
               &copy; 2024 Surade.co.id. All rights reserved.
             </p>
-            <div className="footer-bottom-links">
-              <a href="#">Privasi</a>
-              <Link to="/terms">Syarat &amp; Ketentuan</Link>
-              <a href="#">Sitemap</a>
-            </div>
           </div>
         </div>
       </footer>
