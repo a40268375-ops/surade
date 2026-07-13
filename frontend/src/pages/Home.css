@@ -1569,7 +1569,7 @@ body { background: #f5f6fa; }
   padding: 0 28px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 16px;
   flex-wrap: wrap;
 }

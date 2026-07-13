@@ -27,7 +27,7 @@
 
 .login-container {
   display: flex;
-  align-items: center;
+  align-items: center;    
   justify-content: center;
   gap: 48px;
   max-width: 980px;
@@ -351,6 +351,30 @@
   box-shadow: none;
 }
 
+/* ── Back to website button ── */
+.login-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  color: #1c1e21;
+  background: #f0f2f5;
+  border: 1px solid #dddfe2;
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.login-back-btn:hover {
+  background: #e4e6e9;
+}
+
 /* ── Info text below card ── */
 .login-info {
   text-align: center;
@@ -394,9 +418,14 @@
   padding: 20px 24px;
 }
 
+/* frontend/src/pages/Login.css — baris 426-441 */
 .login-footer__inner {
   max-width: 1100px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .login-footer__links {
@@ -404,6 +433,7 @@
   flex-wrap: wrap;
   gap: 8px 20px;
   margin-bottom: 12px;
+  justify-content: center;
 }
 
 .login-footer__links a {

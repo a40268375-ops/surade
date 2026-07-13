@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ChevronDown, ChevronRight, Plus, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import logoImg from "../assets/logo.png";
 import { INFO_MENU } from "../data/infoMenu";
@@ -8,7 +8,13 @@ import "./Navbar.css";
 export { INFO_MENU };
 
 export default function Navbar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
+  };
 
   return (
     <header className="home-header">
@@ -58,7 +64,17 @@ export default function Navbar() {
           <Link to="/blog" className="home-nav__link">Blog</Link>
           <Link to="/contact" className="home-nav__link">Hubungi Kami</Link>
           {user ? (
-            <Link to="/dashboard" className="home-nav__link home-nav__link--login">Dashboard</Link>
+            <>
+              <Link to="/dashboard" className="home-nav__link home-nav__link--login">Dashboard</Link>
+              <button
+                type="button"
+                className="home-nav__link home-nav__link--logout"
+                onClick={handleLogout}
+              >
+                <LogOut size={15} />
+                <span>Keluar</span>
+              </button>
+            </>
           ) : (
             <Link to="/login" className="home-nav__link home-nav__link--login">Login</Link>
           )}

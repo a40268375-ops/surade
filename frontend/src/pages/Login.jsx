@@ -12,6 +12,7 @@ import {
   AlertCircle,
   X,
   UserPlus,
+  ArrowLeft,
 } from "lucide-react";
 
 export default function Login() {
@@ -198,7 +199,7 @@ export default function Login() {
                 <span className="login-divider__line" />
               </div>
 
-              {/* Create Account */}
+            {/* Create Account */}
               <button
                 id="login-create-account"
                 type="button"
@@ -208,6 +209,12 @@ export default function Login() {
                 <UserPlus size={18} />
                 Buat Akun Baru
               </button>
+
+              {/* Back to Website */}
+              <Link to="/" className="login-back-btn">
+                <ArrowLeft size={18} />
+                Kembali ke Website
+              </Link>
             </form>
 
             {/* Info text */}
@@ -225,25 +232,23 @@ export default function Login() {
         </div>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="login-footer">
-        <div className="login-footer__inner">
-          <div className="login-footer__links">
-            <Link to="/about">Tentang</Link>
-            <Link to="/contact">Hubungi Kami</Link>
-            <Link to="/blog">Blog</Link>
-            <Link to="/terms">Syarat & Ketentuan</Link>
-            <Link to="/vision-mission">Visi & Misi</Link>
-            <Link to="/partnership-career">Karir</Link>
-            <Link to="/terms">Privasi</Link>
-            <Link to="/terms">Cookie</Link>
-            <Link to="/contact">Bantuan</Link>
-          </div>
-          <p className="login-footer__copy">
-            &copy; 2024 Surade.co.id. All rights reserved.
-          </p>
-        </div>
-      </footer>
+{/* ── Footer ── */}
+<footer className="login-footer">
+  <div className="login-footer__inner">
+    <div className="login-footer__links">
+      <Link to="/about">Tentang</Link>
+      <Link to="/contact">Hubungi Kami</Link>
+      <Link to="/blog">Blog</Link>
+      <Link to="/terms">Syarat & Ketentuan</Link>
+      <Link to="/vision-mission">Visi & Misi</Link>
+      <Link to="/partnership-career">Karir</Link>
+      <Link to="/contact">Bantuan</Link>
+    </div>
+    <p className="login-footer__copy">
+      &copy; 2024 Surade.co.id. All rights reserved.
+    </p>
+  </div>
+</footer>
 
       {/* ── Register Modal ── */}
       {showRegister && (

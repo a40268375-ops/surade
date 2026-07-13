@@ -1384,3 +1384,247 @@
 [stacktrace]
 #0 {main}
 "} 
+[2026-07-13 03:34:19] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:34:19] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:34:22] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:34:22] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:34:53] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:34:53] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:35:04] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:35:04] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:35:26] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:35:26] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:36:04] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:36:04] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:36:10] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:36:11] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:37:03] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:37:03] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:43:00] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:43:00] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:43:03] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:43:03] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:43:09] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:43:09] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:43:26] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 03:43:27] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:17] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:17] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:23] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:23] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:23] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:25] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:25] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:26] local.ERROR: Cannot declare class App\Http\Controllers\Admin\EventController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\EventController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/EventController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:28] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:40] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:25:40] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:35:16] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:35:17] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:36:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:36:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:43:57] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:43:57] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:43:57] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:44:30] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:44:30] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:56:12] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:56:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:56:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:56:33] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:56:34] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:56:47] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:56:47] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:59:17] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 07:59:17] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 08:02:53] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 08:02:54] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 08:03:05] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 08:03:05] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 08:14:01] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 08:14:01] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 08:23:40] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-13 08:23:40] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
