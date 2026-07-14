@@ -15,3 +15,20 @@ Route::get('/', function () {
 Route::get('/login', function () {
     return response()->json(['message' => 'Unauthenticated.'], 401);
 })->name('login');
+
+// Serve files from storage/app/public directly, bypassing the public/storage
+// symlink entirely. The symlink php artisan storage:link creates is
+// unreliable on Windows when php artisan serve doesn't have permission to
+// create a real symlink (falls back to a broken junction/copy), so images
+// uploaded to storage/app/public/... 404 even though the file exists on
+// disk. This route reads the file straight from disk instead, so it works
+// regardless of whether the symlink itself is healthy.
+Route::get('/storage/{path}', function ($path) {
+    $fullPath = storage_path('app/public/' . $path);
+
+    if (!file_exists($fullPath) || !is_file($fullPath)) {
+        abort(404);
+    }
+
+    return response()->file($fullPath);
+})->where('path', '.*');

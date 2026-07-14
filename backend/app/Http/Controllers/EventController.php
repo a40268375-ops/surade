@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Admin; // Diubah agar sesuai folder admin
+// FIX: File ini secara fisik ada di app/Http/Controllers/ (bukan Controllers/Admin/),
+// dan routes/api.php mengimpornya sebagai App\Http\Controllers\EventController.
+// Namespace harus cocok dengan lokasi folder aslinya.
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller; // Ditambahkan agar bisa extend Controller utama
 use App\Models\Event;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;

@@ -14,14 +14,27 @@ class Subscription extends Model
         'plan',
         'duration_days',
         'amount',
+        'payment_method',
+        'proof_path',
         'status',
+        'verified_by',
+        'verified_at',
+        'rejection_reason',
         'starts_at',
         'expires_at',
     ];
 
+    protected $appends = ['proof_url'];
+
+    public function getProofUrlAttribute(): ?string
+    {
+        return $this->proof_path ? asset('storage/' . $this->proof_path) : null;
+    }
+
     protected $casts = [
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
+        'verified_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

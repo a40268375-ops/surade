@@ -35,12 +35,16 @@ class SubscriptionController extends Controller
         return response()->json($query->latest()->get());
     }
 
-    // User berlangganan premium untuk salah satu bisnisnya
+    // User berlangganan premium untuk salah satu bisnisnya.
+    // Tidak langsung aktif - status jadi 'pending' sampai admin verifikasi
+    // bukti pembayarannya lewat verify().
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'business_id' => 'required|exists:businesses,id',
             'plan' => 'required|string|in:monthly,quarterly,yearly',
+            'payment_method' => 'required|string|in:dana,bni,bca',
+            'proof' => 'required|image|max:5120', // max 5MB
         ]);
 
         if ($validator->fails()) {
@@ -54,13 +58,7 @@ class SubscriptionController extends Controller
         }
 
         $plan = self::PLANS[$request->plan];
-
-        // Extend from current expiry if still active, otherwise start from now
-        $start = ($business->premium_expires_at && $business->premium_expires_at->isFuture())
-            ? $business->premium_expires_at
-            : Carbon::now();
-
-        $expiresAt = (clone $start)->addDays($plan['days']);
+        $proofPath = $request->file('proof')->store('payment-proofs', 'public');
 
         $subscription = Subscription::create([
             'invoice_number' => 'INV-' . strtoupper(Str::random(8)),
@@ -69,20 +67,13 @@ class SubscriptionController extends Controller
             'plan' => $request->plan,
             'duration_days' => $plan['days'],
             'amount' => $plan['amount'],
-            'status' => 'paid',
-            'starts_at' => Carbon::now(),
-            'expires_at' => $expiresAt,
-        ]);
-
-        $business->update([
-            'is_premium' => true,
-            'premium_expires_at' => $expiresAt,
-            'premium_plan' => $request->plan,
+            'payment_method' => $request->payment_method,
+            'proof_path' => $proofPath,
+            'status' => 'pending',
         ]);
 
         return response()->json([
             'subscription' => $subscription,
-            'business' => $business->fresh(),
         ], 201);
     }
 
@@ -99,5 +90,78 @@ class SubscriptionController extends Controller
         }
 
         return response()->json($subscription);
+    }
+
+    // Admin: menyetujui bukti pembayaran -> baru sekarang premium bisnisnya diaktifkan.
+    public function verify(Request $request, $id)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $subscription = Subscription::with('business')->find($id);
+
+        if (!$subscription) {
+            return response()->json(['message' => 'Invoice not found'], 404);
+        }
+
+        if ($subscription->status !== 'pending') {
+            return response()->json(['message' => 'Invoice ini sudah diproses sebelumnya.'], 422);
+        }
+
+        $business = $subscription->business;
+
+        // Extend from current expiry if still active, otherwise start from now
+        $start = ($business->premium_expires_at && $business->premium_expires_at->isFuture())
+            ? $business->premium_expires_at
+            : Carbon::now();
+
+        $expiresAt = (clone $start)->addDays($subscription->duration_days);
+
+        $subscription->update([
+            'status' => 'paid',
+            'starts_at' => Carbon::now(),
+            'expires_at' => $expiresAt,
+            'verified_by' => $request->user()->id,
+            'verified_at' => Carbon::now(),
+        ]);
+
+        $business->update([
+            'is_premium' => true,
+            'premium_expires_at' => $expiresAt,
+            'premium_plan' => $subscription->plan,
+        ]);
+
+        return response()->json([
+            'subscription' => $subscription->fresh(),
+            'business' => $business->fresh(),
+        ]);
+    }
+
+    // Admin: menolak bukti pembayaran (misalnya nominal tidak sesuai / bukti tidak jelas).
+    public function reject(Request $request, $id)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $subscription = Subscription::find($id);
+
+        if (!$subscription) {
+            return response()->json(['message' => 'Invoice not found'], 404);
+        }
+
+        if ($subscription->status !== 'pending') {
+            return response()->json(['message' => 'Invoice ini sudah diproses sebelumnya.'], 422);
+        }
+
+        $subscription->update([
+            'status' => 'rejected',
+            'verified_by' => $request->user()->id,
+            'verified_at' => Carbon::now(),
+            'rejection_reason' => $request->input('reason'),
+        ]);
+
+        return response()->json($subscription->fresh());
     }
 }

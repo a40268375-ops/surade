@@ -37,11 +37,19 @@ class BusinessController extends Controller
             $query->where('address', 'like', "%{$request->location}%");
         }
 
-        if ($request->has('status') && $request->status != '') {
+       $isAdminRequest = $request->user() && $request->user()->role === 'admin';
+
+        if ($request->has('status') && $request->status === 'all') {
+            if (!$isAdminRequest) {
+                // Only admins may see every status; everyone else still only sees approved.
+                $query->where('status', 'approved');
+            }
+            // else: admin + status=all -> intentionally no filter, returns every status
+        } elseif ($request->has('status') && $request->status != '') {
             $query->where('status', $request->status);
         } else {
-            // By default, public only sees approved businesses
-            if (!$request->user() || $request->user()->role !== 'admin') {
+            // No status param at all -> public default (approved only)
+            if (!$isAdminRequest) {
                 $query->where('status', 'approved');
             }
         }

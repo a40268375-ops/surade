@@ -93,6 +93,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // 6. CRUD / Manajemen Reseller oleh Admin
         Route::get('resellers', [UserController::class, 'indexResellers']); // Melihat daftar semua reseller
         Route::post('resellers/{id}/toggle-status', [UserController::class, 'toggleResellerStatus']); // Aktif/nonaktifkan reseller
+        // 7. Verifikasi Pembayaran Premium (Admin Control)
+        Route::put('subscriptions/{id}/verify', [SubscriptionController::class, 'verify']);
+        Route::put('subscriptions/{id}/reject', [SubscriptionController::class, 'reject']);
     });
 
 });
