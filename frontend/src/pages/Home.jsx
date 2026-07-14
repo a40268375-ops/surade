@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
   import { Link, useNavigate } from "react-router-dom";
-  import api from "../utils/api";
+  import api, { getImageUrl } from "../utils/api";
   import "./Home.css";
   import Navbar from "../components/Navbar";
   import { SMART_CITIES } from "../data/smartCities";
@@ -366,7 +366,7 @@ import { useState, useRef, useEffect } from "react";
       location: b.address,
       views: "Pratinjau",
       status: b.status === "approved" ? "Buka Sekarang" : "Pending",
-      img: b.image || "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
+      img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
       is_premium: b.is_premium_active,
       categoryColor: "#159c60"
     })) : (apiError ? [...TEMUKAN_DATA, ...BISNIS_DATA] : []);

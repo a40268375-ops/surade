@@ -1,6 +1,6 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import api from "../utils/api";
+import api, { getImageUrl } from "../utils/api";
 import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
 import {
@@ -160,7 +160,7 @@ export default function Category() {
         location: b.address,
         views: "Pratinjau",
         status: b.status === "approved" ? "Buka Sekarang" : "Pending",
-        img: b.image || "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
+        img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
         rating: null,
       }))
     : (apiError ? BISNIS_DATA : []);

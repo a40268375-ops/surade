@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import api from "../utils/api";
+import api, { getImageUrl } from "../utils/api";
 import "./Dashboard.css";
 import Loading from "../components/Loading";
 import {
@@ -180,23 +180,7 @@ export default function Dashboard() {
       const cats = await api.get("/categories");
       setCategories(cats);
     } catch (err) {
-      // Surface the real reason instead of a generic message, so it's
-      // obvious whether the backend is unreachable, CORS is blocking it,
-      // the session expired, or the server itself errored.
-      console.error("fetchInitialData failed:", err);
-      if (err?.isNetworkError) {
-        setError(err.message || "Tidak dapat terhubung ke server backend.");
-      } else if (err?.status === 401) {
-        setError("Sesi login sudah habis. Silakan login ulang.");
-      } else if (err?.status === 403) {
-        setError("Anda tidak punya izin untuk mengakses data ini.");
-      } else if (err?.status >= 500) {
-        setError(`Server backend mengalami error (${err.status}). Cek log Laravel (storage/logs/laravel.log) untuk detailnya.`);
-      } else if (err?.data?.message) {
-        setError(err.data.message);
-      } else {
-        setError("Gagal memuat data dari server.");
-      }
+      setError("Gagal memuat data dari server.");
     } finally {
       setLoading(false);
     }
@@ -215,7 +199,7 @@ export default function Dashboard() {
       setBizHours(biz.operating_hours || "");
       setBizWebsite(biz.website || "");
       setBizImageFile(null);
-      setBizImagePreview(biz.image || "");
+      setBizImagePreview(biz.image ? getImageUrl(biz.image) : "");
     } else {
       setBizTitle("");
       setBizCategory(categories[0]?.id || "");
@@ -679,19 +663,7 @@ export default function Dashboard() {
 
         {/* Main Content Area */}
         <main className="db-content">
-          {error && (
-            <div className="db-error-alert">
-              <XCircle size={20} className="db-error-alert__icon" />
-              <span className="db-error-alert__text">{error}</span>
-              <button
-                type="button"
-                className="db-error-alert__retry"
-                onClick={fetchInitialData}
-              >
-                Coba Lagi
-              </button>
-            </div>
-          )}
+          {error && <div className="db-error-alert">{error}</div>}
 
           {/* TAB: BUSINESSES */}
           {activeTab === "businesses" && (
@@ -740,7 +712,7 @@ export default function Dashboard() {
                         <tr key={biz.id}>
                           <td>
                             <img
-                              src={biz.image || "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=100&h=80&fit=crop"}
+                              src={biz.image ? getImageUrl(biz.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=100&h=80&fit=crop"}
                               alt={biz.title}
                               className="db-table-thumb"
                             />

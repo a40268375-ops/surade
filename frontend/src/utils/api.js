@@ -1,4 +1,18 @@
 const BASE_URL = 'http://127.0.0.1:8000/api';
+const SERVER_ORIGIN = BASE_URL.replace(/\/api\/?$/, '');
+
+// Business/category images are stored on the Laravel backend and come back
+// as relative paths like "/storage/businesses/xxx.jpg". Since the frontend
+// (Vite, port 5173) and backend (Laravel, port 8000) run on different
+// origins in development, a relative path resolves against the WRONG
+// origin unless we prefix it with the backend's own origin here.
+export function getImageUrl(path) {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) {
+    return path; // already an absolute/external URL, e.g. an Unsplash fallback or local preview blob
+  }
+  return `${SERVER_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
+}
 
 const api = {
   getHeaders() {
