@@ -1720,3 +1720,1104 @@
 [stacktrace]
 #0 {main}
 "} 
+[2026-07-14 01:28:48] local.ERROR: SQLSTATE[HY000]: General error: 1005 Can't create table `surade_db`.`advertisements` (errno: 150 "Foreign key constraint is incorrectly formed") (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: surade_db, SQL: alter table `advertisements` add constraint `advertisements_category_id_foreign` foreign key (`category_id`) references `categories` (`id`) on delete cascade) {"exception":"[object] (Illuminate\\Database\\QueryException(code: HY000): SQLSTATE[HY000]: General error: 1005 Can't create table `surade_db`.`advertisements` (errno: 150 \"Foreign key constraint is incorrectly formed\") (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: surade_db, SQL: alter table `advertisements` add constraint `advertisements_category_id_foreign` foreign key (`category_id`) references `categories` (`id`) on delete cascade) at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate/Database/Connection->runQueryCallback('alter table `ad...', Array, Object(Closure))
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(573): Illuminate/Database/Connection->run('alter table `ad...', Array, Object(Closure))
+#2 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Blueprint.php(121): Illuminate/Database/Connection->statement('alter table `ad...')
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Builder.php(686): Illuminate/Database/Schema/Blueprint->build()
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Builder.php(506): Illuminate/Database/Schema/Builder->build(Object(Illuminate/Database/Schema/Blueprint))
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate/Database/Schema/Builder->create('advertisements', Object(Closure))
+#6 C:/Users/a4026/Documents/surade/backend/database/migrations/2026_07_06_013019_create_advertisements_table.php(14): Illuminate/Support/Facades/Facade::__callStatic('create', Array)
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(517): Illuminate/Database/Migrations/Migration@anonymous->up()
+#8 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(442): Illuminate/Database/Migrations/Migrator->runMethod(Object(Illuminate/Database/MySqlConnection), Object(Illuminate/Database/Migrations/Migration@anonymous), 'up')
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(451): Illuminate/Database/Migrations/Migrator->Illuminate/Database/Migrations/{closure}()
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(253): Illuminate/Database/Migrations/Migrator->runMigration(Object(Illuminate/Database/Migrations/Migration@anonymous), 'up')
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/View/Components/Task.php(41): Illuminate/Database/Migrations/Migrator->Illuminate/Database/Migrations/{closure}()
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(814): Illuminate/Console/View/Components/Task->render('2026_07_06_0130...', Object(Closure))
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(253): Illuminate/Database/Migrations/Migrator->write('Illuminate//Cons...', '2026_07_06_0130...', Object(Closure))
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(211): Illuminate/Database/Migrations/Migrator->runUp('C://Users//a4026//...', 1, false)
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(138): Illuminate/Database/Migrations/Migrator->runPending(Array, Array)
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(116): Illuminate/Database/Migrations/Migrator->run(Array, Array)
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(671): Illuminate/Database/Console/Migrations/MigrateCommand->Illuminate/Database/Console/Migrations/{closure}()
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(109): Illuminate/Database/Migrations/Migrator->usingConnection(NULL, Object(Closure))
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(88): Illuminate/Database/Console/Migrations/MigrateCommand->runMigrations()
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate/Database/Console/Migrations/MigrateCommand->handle()
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate/Container/BoundMethod::Illuminate/Container/{closure}()
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate/Container/Util::unwrapIfClosure(Object(Closure))
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate/Container/BoundMethod::callBoundMethod(Object(Illuminate/Foundation/Application), Array, Object(Closure))
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate/Container/BoundMethod::call(Object(Illuminate/Foundation/Application), Array, Array, NULL)
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(211): Illuminate/Container/Container->call(Array)
+#26 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Command/Command.php(341): Illuminate/Console/Command->execute(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(180): Symfony/Component/Console/Command/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#28 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(1117): Illuminate/Console/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(356): Symfony/Component/Console/Application->doRunCommand(Object(Illuminate/Database/Console/Migrations/MigrateCommand), Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(195): Symfony/Component/Console/Application->doRun(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#31 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony/Component/Console/Application->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#32 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1235): Illuminate/Foundation/Console/Kernel->handle(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#33 C:/Users/a4026/Documents/surade/backend/artisan(16): Illuminate/Foundation/Application->handleCommand(Object(Symfony/Component/Console/Input/ArgvInput))
+#34 {main}
+
+[previous exception] [object] (PDOException(code: HY000): SQLSTATE[HY000]: General error: 1005 Can't create table `surade_db`.`advertisements` (errno: 150 \"Foreign key constraint is incorrectly formed\") at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php:584)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(584): PDOStatement->execute()
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate/Database/Connection->Illuminate/Database/{closure}('alter table `ad...', Array)
+#2 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate/Database/Connection->runQueryCallback('alter table `ad...', Array, Object(Closure))
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(573): Illuminate/Database/Connection->run('alter table `ad...', Array, Object(Closure))
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Blueprint.php(121): Illuminate/Database/Connection->statement('alter table `ad...')
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Builder.php(686): Illuminate/Database/Schema/Blueprint->build()
+#6 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Builder.php(506): Illuminate/Database/Schema/Builder->build(Object(Illuminate/Database/Schema/Blueprint))
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate/Database/Schema/Builder->create('advertisements', Object(Closure))
+#8 C:/Users/a4026/Documents/surade/backend/database/migrations/2026_07_06_013019_create_advertisements_table.php(14): Illuminate/Support/Facades/Facade::__callStatic('create', Array)
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(517): Illuminate/Database/Migrations/Migration@anonymous->up()
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(442): Illuminate/Database/Migrations/Migrator->runMethod(Object(Illuminate/Database/MySqlConnection), Object(Illuminate/Database/Migrations/Migration@anonymous), 'up')
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(451): Illuminate/Database/Migrations/Migrator->Illuminate/Database/Migrations/{closure}()
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(253): Illuminate/Database/Migrations/Migrator->runMigration(Object(Illuminate/Database/Migrations/Migration@anonymous), 'up')
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/View/Components/Task.php(41): Illuminate/Database/Migrations/Migrator->Illuminate/Database/Migrations/{closure}()
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(814): Illuminate/Console/View/Components/Task->render('2026_07_06_0130...', Object(Closure))
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(253): Illuminate/Database/Migrations/Migrator->write('Illuminate//Cons...', '2026_07_06_0130...', Object(Closure))
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(211): Illuminate/Database/Migrations/Migrator->runUp('C://Users//a4026//...', 1, false)
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(138): Illuminate/Database/Migrations/Migrator->runPending(Array, Array)
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(116): Illuminate/Database/Migrations/Migrator->run(Array, Array)
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(671): Illuminate/Database/Console/Migrations/MigrateCommand->Illuminate/Database/Console/Migrations/{closure}()
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(109): Illuminate/Database/Migrations/Migrator->usingConnection(NULL, Object(Closure))
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(88): Illuminate/Database/Console/Migrations/MigrateCommand->runMigrations()
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate/Database/Console/Migrations/MigrateCommand->handle()
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate/Container/BoundMethod::Illuminate/Container/{closure}()
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate/Container/Util::unwrapIfClosure(Object(Closure))
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate/Container/BoundMethod::callBoundMethod(Object(Illuminate/Foundation/Application), Array, Object(Closure))
+#26 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate/Container/BoundMethod::call(Object(Illuminate/Foundation/Application), Array, Array, NULL)
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(211): Illuminate/Container/Container->call(Array)
+#28 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Command/Command.php(341): Illuminate/Console/Command->execute(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(180): Symfony/Component/Console/Command/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(1117): Illuminate/Console/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#31 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(356): Symfony/Component/Console/Application->doRunCommand(Object(Illuminate/Database/Console/Migrations/MigrateCommand), Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#32 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(195): Symfony/Component/Console/Application->doRun(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#33 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony/Component/Console/Application->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#34 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1235): Illuminate/Foundation/Console/Kernel->handle(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#35 C:/Users/a4026/Documents/surade/backend/artisan(16): Illuminate/Foundation/Application->handleCommand(Object(Symfony/Component/Console/Input/ArgvInput))
+#36 {main}
+"} 
+[2026-07-14 01:30:24] local.ERROR: SQLSTATE[42000]: Syntax error or access violation: 1067 Invalid default value for 'expires_at' (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: surade_db, SQL: create table `subscriptions` (`id` bigint unsigned not null auto_increment primary key, `invoice_number` varchar(255) not null, `user_id` bigint unsigned not null, `business_id` bigint unsigned not null, `plan` varchar(255) not null, `duration_days` int unsigned not null, `amount` bigint unsigned not null, `status` varchar(255) not null default 'paid', `starts_at` timestamp not null, `expires_at` timestamp not null, `created_at` timestamp null, `updated_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci') {"exception":"[object] (Illuminate\\Database\\QueryException(code: 42000): SQLSTATE[42000]: Syntax error or access violation: 1067 Invalid default value for 'expires_at' (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: surade_db, SQL: create table `subscriptions` (`id` bigint unsigned not null auto_increment primary key, `invoice_number` varchar(255) not null, `user_id` bigint unsigned not null, `business_id` bigint unsigned not null, `plan` varchar(255) not null, `duration_days` int unsigned not null, `amount` bigint unsigned not null, `status` varchar(255) not null default 'paid', `starts_at` timestamp not null, `expires_at` timestamp not null, `created_at` timestamp null, `updated_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci') at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate/Database/Connection->runQueryCallback('create table `s...', Array, Object(Closure))
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(573): Illuminate/Database/Connection->run('create table `s...', Array, Object(Closure))
+#2 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Blueprint.php(121): Illuminate/Database/Connection->statement('create table `s...')
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Builder.php(686): Illuminate/Database/Schema/Blueprint->build()
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Builder.php(506): Illuminate/Database/Schema/Builder->build(Object(Illuminate/Database/Schema/Blueprint))
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate/Database/Schema/Builder->create('subscriptions', Object(Closure))
+#6 C:/Users/a4026/Documents/surade/backend/database/migrations/2026_07_09_000000_add_premium_subscriptions_and_events.php(17): Illuminate/Support/Facades/Facade::__callStatic('create', Array)
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(517): Illuminate/Database/Migrations/Migration@anonymous->up()
+#8 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(442): Illuminate/Database/Migrations/Migrator->runMethod(Object(Illuminate/Database/MySqlConnection), Object(Illuminate/Database/Migrations/Migration@anonymous), 'up')
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(451): Illuminate/Database/Migrations/Migrator->Illuminate/Database/Migrations/{closure}()
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(253): Illuminate/Database/Migrations/Migrator->runMigration(Object(Illuminate/Database/Migrations/Migration@anonymous), 'up')
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/View/Components/Task.php(41): Illuminate/Database/Migrations/Migrator->Illuminate/Database/Migrations/{closure}()
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(814): Illuminate/Console/View/Components/Task->render('2026_07_09_0000...', Object(Closure))
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(253): Illuminate/Database/Migrations/Migrator->write('Illuminate//Cons...', '2026_07_09_0000...', Object(Closure))
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(211): Illuminate/Database/Migrations/Migrator->runUp('C://Users//a4026//...', 1, false)
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(138): Illuminate/Database/Migrations/Migrator->runPending(Array, Array)
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(116): Illuminate/Database/Migrations/Migrator->run(Array, Array)
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(671): Illuminate/Database/Console/Migrations/MigrateCommand->Illuminate/Database/Console/Migrations/{closure}()
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(109): Illuminate/Database/Migrations/Migrator->usingConnection(NULL, Object(Closure))
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(88): Illuminate/Database/Console/Migrations/MigrateCommand->runMigrations()
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate/Database/Console/Migrations/MigrateCommand->handle()
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate/Container/BoundMethod::Illuminate/Container/{closure}()
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate/Container/Util::unwrapIfClosure(Object(Closure))
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate/Container/BoundMethod::callBoundMethod(Object(Illuminate/Foundation/Application), Array, Object(Closure))
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate/Container/BoundMethod::call(Object(Illuminate/Foundation/Application), Array, Array, NULL)
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(211): Illuminate/Container/Container->call(Array)
+#26 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Command/Command.php(341): Illuminate/Console/Command->execute(Object(Symfony/Component/Console/Input/ArrayInput), Object(Illuminate/Console/OutputStyle))
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(180): Symfony/Component/Console/Command/Command->run(Object(Symfony/Component/Console/Input/ArrayInput), Object(Illuminate/Console/OutputStyle))
+#28 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Concerns/CallsCommands.php(68): Illuminate/Console/Command->run(Object(Symfony/Component/Console/Input/ArrayInput), Object(Illuminate/Console/OutputStyle))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Concerns/CallsCommands.php(29): Illuminate/Console/Command->runCommand('migrate', Array, Object(Illuminate/Console/OutputStyle))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/FreshCommand.php(88): Illuminate/Console/Command->call('migrate', Array)
+#31 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate/Database/Console/Migrations/FreshCommand->handle()
+#32 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate/Container/BoundMethod::Illuminate/Container/{closure}()
+#33 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate/Container/Util::unwrapIfClosure(Object(Closure))
+#34 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate/Container/BoundMethod::callBoundMethod(Object(Illuminate/Foundation/Application), Array, Object(Closure))
+#35 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate/Container/BoundMethod::call(Object(Illuminate/Foundation/Application), Array, Array, NULL)
+#36 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(211): Illuminate/Container/Container->call(Array)
+#37 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Command/Command.php(341): Illuminate/Console/Command->execute(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#38 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(180): Symfony/Component/Console/Command/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#39 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(1117): Illuminate/Console/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#40 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(356): Symfony/Component/Console/Application->doRunCommand(Object(Illuminate/Database/Console/Migrations/FreshCommand), Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#41 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(195): Symfony/Component/Console/Application->doRun(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#42 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony/Component/Console/Application->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#43 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1235): Illuminate/Foundation/Console/Kernel->handle(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#44 C:/Users/a4026/Documents/surade/backend/artisan(16): Illuminate/Foundation/Application->handleCommand(Object(Symfony/Component/Console/Input/ArgvInput))
+#45 {main}
+
+[previous exception] [object] (PDOException(code: 42000): SQLSTATE[42000]: Syntax error or access violation: 1067 Invalid default value for 'expires_at' at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php:584)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(584): PDOStatement->execute()
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(827): Illuminate/Database/Connection->Illuminate/Database/{closure}('create table `s...', Array)
+#2 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(794): Illuminate/Database/Connection->runQueryCallback('create table `s...', Array, Object(Closure))
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Connection.php(573): Illuminate/Database/Connection->run('create table `s...', Array, Object(Closure))
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Blueprint.php(121): Illuminate/Database/Connection->statement('create table `s...')
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Builder.php(686): Illuminate/Database/Schema/Blueprint->build()
+#6 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Schema/Builder.php(506): Illuminate/Database/Schema/Builder->build(Object(Illuminate/Database/Schema/Blueprint))
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php(363): Illuminate/Database/Schema/Builder->create('subscriptions', Object(Closure))
+#8 C:/Users/a4026/Documents/surade/backend/database/migrations/2026_07_09_000000_add_premium_subscriptions_and_events.php(17): Illuminate/Support/Facades/Facade::__callStatic('create', Array)
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(517): Illuminate/Database/Migrations/Migration@anonymous->up()
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(442): Illuminate/Database/Migrations/Migrator->runMethod(Object(Illuminate/Database/MySqlConnection), Object(Illuminate/Database/Migrations/Migration@anonymous), 'up')
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(451): Illuminate/Database/Migrations/Migrator->Illuminate/Database/Migrations/{closure}()
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(253): Illuminate/Database/Migrations/Migrator->runMigration(Object(Illuminate/Database/Migrations/Migration@anonymous), 'up')
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/View/Components/Task.php(41): Illuminate/Database/Migrations/Migrator->Illuminate/Database/Migrations/{closure}()
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(814): Illuminate/Console/View/Components/Task->render('2026_07_09_0000...', Object(Closure))
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(253): Illuminate/Database/Migrations/Migrator->write('Illuminate//Cons...', '2026_07_09_0000...', Object(Closure))
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(211): Illuminate/Database/Migrations/Migrator->runUp('C://Users//a4026//...', 1, false)
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(138): Illuminate/Database/Migrations/Migrator->runPending(Array, Array)
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(116): Illuminate/Database/Migrations/Migrator->run(Array, Array)
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(671): Illuminate/Database/Console/Migrations/MigrateCommand->Illuminate/Database/Console/Migrations/{closure}()
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(109): Illuminate/Database/Migrations/Migrator->usingConnection(NULL, Object(Closure))
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(88): Illuminate/Database/Console/Migrations/MigrateCommand->runMigrations()
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate/Database/Console/Migrations/MigrateCommand->handle()
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate/Container/BoundMethod::Illuminate/Container/{closure}()
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate/Container/Util::unwrapIfClosure(Object(Closure))
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate/Container/BoundMethod::callBoundMethod(Object(Illuminate/Foundation/Application), Array, Object(Closure))
+#26 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate/Container/BoundMethod::call(Object(Illuminate/Foundation/Application), Array, Array, NULL)
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(211): Illuminate/Container/Container->call(Array)
+#28 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Command/Command.php(341): Illuminate/Console/Command->execute(Object(Symfony/Component/Console/Input/ArrayInput), Object(Illuminate/Console/OutputStyle))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(180): Symfony/Component/Console/Command/Command->run(Object(Symfony/Component/Console/Input/ArrayInput), Object(Illuminate/Console/OutputStyle))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Concerns/CallsCommands.php(68): Illuminate/Console/Command->run(Object(Symfony/Component/Console/Input/ArrayInput), Object(Illuminate/Console/OutputStyle))
+#31 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Concerns/CallsCommands.php(29): Illuminate/Console/Command->runCommand('migrate', Array, Object(Illuminate/Console/OutputStyle))
+#32 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/FreshCommand.php(88): Illuminate/Console/Command->call('migrate', Array)
+#33 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate/Database/Console/Migrations/FreshCommand->handle()
+#34 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate/Container/BoundMethod::Illuminate/Container/{closure}()
+#35 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate/Container/Util::unwrapIfClosure(Object(Closure))
+#36 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate/Container/BoundMethod::callBoundMethod(Object(Illuminate/Foundation/Application), Array, Object(Closure))
+#37 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate/Container/BoundMethod::call(Object(Illuminate/Foundation/Application), Array, Array, NULL)
+#38 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(211): Illuminate/Container/Container->call(Array)
+#39 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Command/Command.php(341): Illuminate/Console/Command->execute(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#40 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Console/Command.php(180): Symfony/Component/Console/Command/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#41 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(1117): Illuminate/Console/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#42 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(356): Symfony/Component/Console/Application->doRunCommand(Object(Illuminate/Database/Console/Migrations/FreshCommand), Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#43 C:/Users/a4026/Documents/surade/backend/vendor/symfony/console/Application.php(195): Symfony/Component/Console/Application->doRun(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#44 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony/Component/Console/Application->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#45 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1235): Illuminate/Foundation/Console/Kernel->handle(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#46 C:/Users/a4026/Documents/surade/backend/artisan(16): Illuminate/Foundation/Application->handleCommand(Object(Symfony/Component/Console/Input/ArgvInput))
+#47 {main}
+"} 
+[2026-07-14 01:36:58] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:36:58] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:36:58] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:38:05] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:38:05] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:38:05] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:20] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:20] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:20] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:24] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:24] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:25] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:28] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:29] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:40] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:41] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:41] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:47] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:47] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:40:48] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:41:44] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:41:44] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:41:45] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:44:20] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:44:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:44:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:45:45] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:45:46] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:45:47] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:45:49] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:45:49] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:45:49] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:46:40] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:46:41] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:46:41] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:37] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:37] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:38] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:40] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:41] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:41] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:49] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:50] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:51] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:55] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:55] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:54:55] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:55:00] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:55:01] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:55:02] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:55:31] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:55:31] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:56:35] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:56:36] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 01:56:36] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:00:31] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:00:31] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:00:31] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:00:53] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:06:56] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:06:56] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:06:56] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:08:11] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:08:11] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:08:12] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:08:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:08:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:08:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:11:18] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:11:18] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:11:18] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:14:26] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:14:26] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:14:26] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:14:48] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:15:19] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:15:19] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:15:19] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:15:22] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:15:22] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:15:23] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:07] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:07] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:07] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:10] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:10] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:11] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:13] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:16:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:17:11] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:17:11] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:17:11] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:17:36] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:17:36] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:17:36] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:18:36] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:18:36] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:18:36] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:19:03] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:19:03] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:19:03] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:35:45] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:35:45] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:46:46] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:46:46] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:53:38] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:53:38] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:54:27] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:54:27] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:54:32] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:54:32] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:56:57] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 02:56:58] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:00:23] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:00:23] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:13:37] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:13:37] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:13:44] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:13:44] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:13:52] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:13:52] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:14:34] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:14:34] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:09] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:10] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:18] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:18] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:25] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:25] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:38] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:21:38] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:27:41] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:27:41] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:27:42] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:29:40] local.ERROR: Route [login] not defined. {"exception":"[object] (Symfony\\Component\\Routing\\Exception\\RouteNotFoundException(code: 0): Route [login] not defined. at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/UrlGenerator.php:534)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/helpers.php(870): Illuminate/Routing/UrlGenerator->route('login', Array, true)
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php(278): route('login')
+#2 [internal function]: Illuminate/Foundation/Configuration/ApplicationBuilder->Illuminate/Foundation/Configuration/{closure}(Object(Illuminate/Http/Request))
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(117): call_user_func(Object(Closure), Object(Illuminate/Http/Request))
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(104): Illuminate/Auth/Middleware/Authenticate->redirectTo(Object(Illuminate/Http/Request))
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(87): Illuminate/Auth/Middleware/Authenticate->unauthenticated(Object(Illuminate/Http/Request), Array)
+#6 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(61): Illuminate/Auth/Middleware/Authenticate->authenticate(Object(Illuminate/Http/Request), Array)
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Auth/Middleware/Authenticate->handle(Object(Illuminate/Http/Request), Object(Closure), 'sanctum')
+#8 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate/Routing/Router->runRouteWithinStack(Object(Illuminate/Routing/Route), Object(Illuminate/Http/Request))
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate/Routing/Router->runRoute(Object(Illuminate/Http/Request), Object(Illuminate/Routing/Route))
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate/Routing/Router->dispatchToRoute(Object(Illuminate/Http/Request))
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate/Routing/Router->dispatch(Object(Illuminate/Http/Request))
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate/Foundation/Http/Kernel->Illuminate/Foundation/Http/{closure}(Object(Illuminate/Http/Request))
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull->handle(Object(Illuminate/Http/Request), Object(Closure))
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/TrimStrings->handle(Object(Illuminate/Http/Request), Object(Closure))
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePostSize->handle(Object(Illuminate/Http/Request), Object(Closure))
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance->handle(Object(Illuminate/Http/Request), Object(Closure))
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(74): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#26 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/HandleCors->handle(Object(Illuminate/Http/Request), Object(Closure))
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#28 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/TrustProxies->handle(Object(Illuminate/Http/Request), Object(Closure))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks->handle(Object(Illuminate/Http/Request), Object(Closure))
+#31 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#32 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePathEncoding->handle(Object(Illuminate/Http/Request), Object(Closure))
+#33 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#34 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#35 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate/Foundation/Http/Kernel->sendRequestThroughRouter(Object(Illuminate/Http/Request))
+#36 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate/Foundation/Http/Kernel->handle(Object(Illuminate/Http/Request))
+#37 C:/Users/a4026/Documents/surade/backend/public/index.php(20): Illuminate/Foundation/Application->handleRequest(Object(Illuminate/Http/Request))
+#38 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('C://Users//a4026//...')
+#39 {main}
+"} 
+[2026-07-14 03:34:14] local.ERROR: Route [login] not defined. {"exception":"[object] (Symfony\\Component\\Routing\\Exception\\RouteNotFoundException(code: 0): Route [login] not defined. at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/UrlGenerator.php:534)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/helpers.php(870): Illuminate/Routing/UrlGenerator->route('login', Array, true)
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php(278): route('login')
+#2 [internal function]: Illuminate/Foundation/Configuration/ApplicationBuilder->Illuminate/Foundation/Configuration/{closure}(Object(Illuminate/Http/Request))
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(117): call_user_func(Object(Closure), Object(Illuminate/Http/Request))
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(104): Illuminate/Auth/Middleware/Authenticate->redirectTo(Object(Illuminate/Http/Request))
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(87): Illuminate/Auth/Middleware/Authenticate->unauthenticated(Object(Illuminate/Http/Request), Array)
+#6 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(61): Illuminate/Auth/Middleware/Authenticate->authenticate(Object(Illuminate/Http/Request), Array)
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Auth/Middleware/Authenticate->handle(Object(Illuminate/Http/Request), Object(Closure), 'sanctum')
+#8 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate/Routing/Router->runRouteWithinStack(Object(Illuminate/Routing/Route), Object(Illuminate/Http/Request))
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate/Routing/Router->runRoute(Object(Illuminate/Http/Request), Object(Illuminate/Routing/Route))
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate/Routing/Router->dispatchToRoute(Object(Illuminate/Http/Request))
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate/Routing/Router->dispatch(Object(Illuminate/Http/Request))
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate/Foundation/Http/Kernel->Illuminate/Foundation/Http/{closure}(Object(Illuminate/Http/Request))
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull->handle(Object(Illuminate/Http/Request), Object(Closure))
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/TrimStrings->handle(Object(Illuminate/Http/Request), Object(Closure))
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePostSize->handle(Object(Illuminate/Http/Request), Object(Closure))
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance->handle(Object(Illuminate/Http/Request), Object(Closure))
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(74): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#26 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/HandleCors->handle(Object(Illuminate/Http/Request), Object(Closure))
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#28 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/TrustProxies->handle(Object(Illuminate/Http/Request), Object(Closure))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks->handle(Object(Illuminate/Http/Request), Object(Closure))
+#31 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#32 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePathEncoding->handle(Object(Illuminate/Http/Request), Object(Closure))
+#33 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#34 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#35 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate/Foundation/Http/Kernel->sendRequestThroughRouter(Object(Illuminate/Http/Request))
+#36 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate/Foundation/Http/Kernel->handle(Object(Illuminate/Http/Request))
+#37 C:/Users/a4026/Documents/surade/backend/public/index.php(20): Illuminate/Foundation/Application->handleRequest(Object(Illuminate/Http/Request))
+#38 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('C://Users//a4026//...')
+#39 {main}
+"} 
+[2026-07-14 03:34:45] local.ERROR: Route [login] not defined. {"exception":"[object] (Symfony\\Component\\Routing\\Exception\\RouteNotFoundException(code: 0): Route [login] not defined. at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/UrlGenerator.php:534)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/helpers.php(870): Illuminate/Routing/UrlGenerator->route('login', Array, true)
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php(278): route('login')
+#2 [internal function]: Illuminate/Foundation/Configuration/ApplicationBuilder->Illuminate/Foundation/Configuration/{closure}(Object(Illuminate/Http/Request))
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(117): call_user_func(Object(Closure), Object(Illuminate/Http/Request))
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(104): Illuminate/Auth/Middleware/Authenticate->redirectTo(Object(Illuminate/Http/Request))
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(87): Illuminate/Auth/Middleware/Authenticate->unauthenticated(Object(Illuminate/Http/Request), Array)
+#6 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(61): Illuminate/Auth/Middleware/Authenticate->authenticate(Object(Illuminate/Http/Request), Array)
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Auth/Middleware/Authenticate->handle(Object(Illuminate/Http/Request), Object(Closure), 'sanctum')
+#8 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate/Routing/Router->runRouteWithinStack(Object(Illuminate/Routing/Route), Object(Illuminate/Http/Request))
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate/Routing/Router->runRoute(Object(Illuminate/Http/Request), Object(Illuminate/Routing/Route))
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate/Routing/Router->dispatchToRoute(Object(Illuminate/Http/Request))
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate/Routing/Router->dispatch(Object(Illuminate/Http/Request))
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate/Foundation/Http/Kernel->Illuminate/Foundation/Http/{closure}(Object(Illuminate/Http/Request))
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull->handle(Object(Illuminate/Http/Request), Object(Closure))
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/TrimStrings->handle(Object(Illuminate/Http/Request), Object(Closure))
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePostSize->handle(Object(Illuminate/Http/Request), Object(Closure))
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance->handle(Object(Illuminate/Http/Request), Object(Closure))
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(74): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#26 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/HandleCors->handle(Object(Illuminate/Http/Request), Object(Closure))
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#28 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/TrustProxies->handle(Object(Illuminate/Http/Request), Object(Closure))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks->handle(Object(Illuminate/Http/Request), Object(Closure))
+#31 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#32 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePathEncoding->handle(Object(Illuminate/Http/Request), Object(Closure))
+#33 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#34 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#35 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate/Foundation/Http/Kernel->sendRequestThroughRouter(Object(Illuminate/Http/Request))
+#36 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate/Foundation/Http/Kernel->handle(Object(Illuminate/Http/Request))
+#37 C:/Users/a4026/Documents/surade/backend/public/index.php(20): Illuminate/Foundation/Application->handleRequest(Object(Illuminate/Http/Request))
+#38 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('C://Users//a4026//...')
+#39 {main}
+"} 
+[2026-07-14 03:36:07] local.ERROR: Route [login] not defined. {"exception":"[object] (Symfony\\Component\\Routing\\Exception\\RouteNotFoundException(code: 0): Route [login] not defined. at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/UrlGenerator.php:534)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/helpers.php(870): Illuminate/Routing/UrlGenerator->route('login', Array, true)
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php(278): route('login')
+#2 [internal function]: Illuminate/Foundation/Configuration/ApplicationBuilder->Illuminate/Foundation/Configuration/{closure}(Object(Illuminate/Http/Request))
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(117): call_user_func(Object(Closure), Object(Illuminate/Http/Request))
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(104): Illuminate/Auth/Middleware/Authenticate->redirectTo(Object(Illuminate/Http/Request))
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(87): Illuminate/Auth/Middleware/Authenticate->unauthenticated(Object(Illuminate/Http/Request), Array)
+#6 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(61): Illuminate/Auth/Middleware/Authenticate->authenticate(Object(Illuminate/Http/Request), Array)
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Auth/Middleware/Authenticate->handle(Object(Illuminate/Http/Request), Object(Closure), 'sanctum')
+#8 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate/Routing/Router->runRouteWithinStack(Object(Illuminate/Routing/Route), Object(Illuminate/Http/Request))
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate/Routing/Router->runRoute(Object(Illuminate/Http/Request), Object(Illuminate/Routing/Route))
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate/Routing/Router->dispatchToRoute(Object(Illuminate/Http/Request))
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate/Routing/Router->dispatch(Object(Illuminate/Http/Request))
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate/Foundation/Http/Kernel->Illuminate/Foundation/Http/{closure}(Object(Illuminate/Http/Request))
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull->handle(Object(Illuminate/Http/Request), Object(Closure))
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/TrimStrings->handle(Object(Illuminate/Http/Request), Object(Closure))
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePostSize->handle(Object(Illuminate/Http/Request), Object(Closure))
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance->handle(Object(Illuminate/Http/Request), Object(Closure))
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(74): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#26 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/HandleCors->handle(Object(Illuminate/Http/Request), Object(Closure))
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#28 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/TrustProxies->handle(Object(Illuminate/Http/Request), Object(Closure))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks->handle(Object(Illuminate/Http/Request), Object(Closure))
+#31 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#32 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePathEncoding->handle(Object(Illuminate/Http/Request), Object(Closure))
+#33 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#34 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#35 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate/Foundation/Http/Kernel->sendRequestThroughRouter(Object(Illuminate/Http/Request))
+#36 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate/Foundation/Http/Kernel->handle(Object(Illuminate/Http/Request))
+#37 C:/Users/a4026/Documents/surade/backend/public/index.php(20): Illuminate/Foundation/Application->handleRequest(Object(Illuminate/Http/Request))
+#38 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('C://Users//a4026//...')
+#39 {main}
+"} 
+[2026-07-14 03:36:21] local.ERROR: Route [login] not defined. {"exception":"[object] (Symfony\\Component\\Routing\\Exception\\RouteNotFoundException(code: 0): Route [login] not defined. at C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/UrlGenerator.php:534)
+[stacktrace]
+#0 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/helpers.php(870): Illuminate/Routing/UrlGenerator->route('login', Array, true)
+#1 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php(278): route('login')
+#2 [internal function]: Illuminate/Foundation/Configuration/ApplicationBuilder->Illuminate/Foundation/Configuration/{closure}(Object(Illuminate/Http/Request))
+#3 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(117): call_user_func(Object(Closure), Object(Illuminate/Http/Request))
+#4 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(104): Illuminate/Auth/Middleware/Authenticate->redirectTo(Object(Illuminate/Http/Request))
+#5 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(87): Illuminate/Auth/Middleware/Authenticate->unauthenticated(Object(Illuminate/Http/Request), Array)
+#6 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(61): Illuminate/Auth/Middleware/Authenticate->authenticate(Object(Illuminate/Http/Request), Array)
+#7 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Auth/Middleware/Authenticate->handle(Object(Illuminate/Http/Request), Object(Closure), 'sanctum')
+#8 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#9 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#10 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate/Routing/Router->runRouteWithinStack(Object(Illuminate/Routing/Route), Object(Illuminate/Http/Request))
+#11 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate/Routing/Router->runRoute(Object(Illuminate/Http/Request), Object(Illuminate/Routing/Route))
+#12 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate/Routing/Router->dispatchToRoute(Object(Illuminate/Http/Request))
+#13 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate/Routing/Router->dispatch(Object(Illuminate/Http/Request))
+#14 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate/Foundation/Http/Kernel->Illuminate/Foundation/Http/{closure}(Object(Illuminate/Http/Request))
+#15 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#16 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#17 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull->handle(Object(Illuminate/Http/Request), Object(Closure))
+#18 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#19 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate/Foundation/Http/Middleware/TransformsRequest->handle(Object(Illuminate/Http/Request), Object(Closure))
+#20 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/TrimStrings->handle(Object(Illuminate/Http/Request), Object(Closure))
+#21 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#22 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePostSize->handle(Object(Illuminate/Http/Request), Object(Closure))
+#23 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#24 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance->handle(Object(Illuminate/Http/Request), Object(Closure))
+#25 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(74): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#26 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/HandleCors->handle(Object(Illuminate/Http/Request), Object(Closure))
+#27 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#28 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/TrustProxies->handle(Object(Illuminate/Http/Request), Object(Closure))
+#29 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#30 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks->handle(Object(Illuminate/Http/Request), Object(Closure))
+#31 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#32 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate/Http/Middleware/ValidatePathEncoding->handle(Object(Illuminate/Http/Request), Object(Closure))
+#33 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate/Pipeline/Pipeline->Illuminate/Pipeline/{closure}(Object(Illuminate/Http/Request))
+#34 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate/Pipeline/Pipeline->then(Object(Closure))
+#35 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate/Foundation/Http/Kernel->sendRequestThroughRouter(Object(Illuminate/Http/Request))
+#36 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate/Foundation/Http/Kernel->handle(Object(Illuminate/Http/Request))
+#37 C:/Users/a4026/Documents/surade/backend/public/index.php(20): Illuminate/Foundation/Application->handleRequest(Object(Illuminate/Http/Request))
+#38 C:/Users/a4026/Documents/surade/backend/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('C://Users//a4026//...')
+#39 {main}
+"} 
+[2026-07-14 03:43:05] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:05] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:10] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:10] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:13] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:16] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:17] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:20] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:43:20] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:49:04] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:49:04] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:49:30] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:49:33] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 03:49:33] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:11:56] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:11:56] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:16:09] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:16:09] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:16:10] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:16:10] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:17:00] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:17:01] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:17:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:17:21] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:17:32] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:21:45] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:21:45] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:21:45] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:26:13] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:26:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:26:14] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:27:15] local.ERROR: Cannot declare class App\Http\Controllers\Admin\CategoryController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\CategoryController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/CategoryController.php:12)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:33:39] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:33:39] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:33:40] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:33:53] local.ERROR: Cannot declare class App\Http\Controllers\Admin\EventController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\EventController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/EventController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:34:02] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-07-14 04:34:02] local.ERROR: Cannot declare class App\Http\Controllers\Admin\AdvertisementController, because the name is already in use {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot declare class App\\Http\\Controllers\\Admin\\AdvertisementController, because the name is already in use at C:/Users/a4026/Documents/surade/backend/app/Http/Controllers/AdvertisementController.php:10)
+[stacktrace]
+#0 {main}
+"} 

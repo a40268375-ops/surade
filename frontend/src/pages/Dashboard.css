@@ -551,9 +551,48 @@
   background-color: #fef2f2;
   color: #b91c1c;
   border: 1px solid #fca5a5;
-  padding: 1rem;
+  padding: 0.9rem 1rem;
   border-radius: 8px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.db-error-alert__icon {
+  flex-shrink: 0;
+}
+
+.db-error-alert__text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.db-error-alert__retry {
+  flex-shrink: 0;
+  background-color: #fff;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.db-error-alert__retry:hover {
+  background-color: #fee2e2;
+}
+
+@media (max-width: 560px) {
+  .db-error-alert {
+    flex-wrap: wrap;
+  }
+  .db-error-alert__retry {
+    margin-left: 1.85rem;
+  }
 }
 
 /* ── New: Ads / Premium / Events / Reseller additions ── */

@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./Login.css";
-import logoImg from "../assets/logo.png";
-import codingIllustration from "../assets/coding-illustration.svg";
+import businessIllustration from "../assets/business-illustration.svg";
 import Loading from "../components/Loading";
 import { usePageLoading } from "../hooks/usePageLoading";
 import {
@@ -12,10 +11,6 @@ import {
   AlertCircle,
   X,
   UserPlus,
-<<<<<<< HEAD
-=======
-  Home,
->>>>>>> c97deaff077b66f621ee2f82c55155155fc52c45
   ArrowLeft,
 } from "lucide-react";
 
@@ -116,38 +111,17 @@ export default function Login() {
       <main className="login-main">
         <div className="login-container">
 
-          {/* ── Left: Image panel with embedded text ── */}
+          {/* ── Left: Brand illustration (logo + tagline baked into image) ── */}
           <div className="login-visual">
             <img
-              src={codingIllustration}
-              alt="Ilustrasi coding dengan logo Surade.co.id"
+              src={businessIllustration}
+              alt="Surade.co.id — Temukan toko yang kamu cari"
               className="login-visual__image"
             />
-            <div className="login-visual__overlay">
-              <img
-                src={logoImg}
-                alt="Surade.co.id"
-                className="login-visual__logo"
-              />
-              <p className="login-visual__tagline">
-                <strong>Surade.co.id</strong> membantu Anda menemukan informasi
-                bisnis, toko, dan layanan terpercaya di seluruh Indonesia.
-              </p>
-            </div>
           </div>
 
           {/* ── Right: Login Card ── */}
           <div className="login-card">
-            {/* Back to Website Button */}
-            <button
-              type="button"
-              className="login-back-btn"
-              onClick={() => navigate("/")}
-            >
-              <ArrowLeft size={18} />
-              <span>Kembali ke Website</span>
-            </button>
-
             <form className="login-form" onSubmit={handleLogin} noValidate>
               {/* Error */}
               {error && (
@@ -246,25 +220,6 @@ export default function Login() {
         </div>
       </main>
 
-<<<<<<< HEAD
-{/* ── Footer ── */}
-<footer className="login-footer">
-  <div className="login-footer__inner">
-    <div className="login-footer__links">
-      <Link to="/about">Tentang</Link>
-      <Link to="/contact">Hubungi Kami</Link>
-      <Link to="/blog">Blog</Link>
-      <Link to="/terms">Syarat & Ketentuan</Link>
-      <Link to="/vision-mission">Visi & Misi</Link>
-      <Link to="/partnership-career">Karir</Link>
-      <Link to="/contact">Bantuan</Link>
-    </div>
-    <p className="login-footer__copy">
-      &copy; 2024 Surade.co.id. All rights reserved.
-    </p>
-  </div>
-</footer>
-=======
       {/* ── Footer ── */}
       <footer className="login-footer">
         <div className="login-footer__inner">
@@ -282,7 +237,6 @@ export default function Login() {
           </p>
         </div>
       </footer>
->>>>>>> c97deaff077b66f621ee2f82c55155155fc52c45
 
       {/* ── Register Modal ── */}
       {showRegister && (

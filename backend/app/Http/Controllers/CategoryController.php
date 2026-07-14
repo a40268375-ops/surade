@@ -1,9 +1,13 @@
 <?php
 
-// DIUBAH: Ditambahkan \Admin sesuai dengan struktur folder tempat menyimpannya
-namespace App\Http\Controllers\Admin; 
+// FIX: File ini secara fisik ada di app/Http/Controllers/ (bukan Controllers/Admin/),
+// dan routes/api.php mengimpornya sebagai App\Http\Controllers\CategoryController
+// (untuk endpoint publik /categories). Namespace harus cocok dengan lokasi folder
+// aslinya, kalau tidak akan bentrok dengan controller lain yang benar-benar
+// berada di folder Admin/ dan memakai nama class yang sama - itu penyebab
+// "Cannot declare class ... because the name is already in use".
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller; // Ditambahkan agar bisa extend Controller utama
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;

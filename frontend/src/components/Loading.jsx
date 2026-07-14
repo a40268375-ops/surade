@@ -1,5 +1,5 @@
 import "./Loading.css";
-import logo from "../assets/logo.png";
+import logo from "../assets/logo-color.png";
 
 /**
  * Loading.jsx

@@ -23,8 +23,8 @@ return new class extends Migration {
             $table->unsignedInteger('duration_days');
             $table->unsignedBigInteger('amount'); // in Rupiah
             $table->string('status')->default('paid'); // pending, paid, cancelled
-            $table->timestamp('starts_at');
-            $table->timestamp('expires_at');
+            $table->timestamp('starts_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
             $table->timestamps();
         });
 

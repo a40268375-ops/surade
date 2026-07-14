@@ -180,7 +180,23 @@ export default function Dashboard() {
       const cats = await api.get("/categories");
       setCategories(cats);
     } catch (err) {
-      setError("Gagal memuat data dari server.");
+      // Surface the real reason instead of a generic message, so it's
+      // obvious whether the backend is unreachable, CORS is blocking it,
+      // the session expired, or the server itself errored.
+      console.error("fetchInitialData failed:", err);
+      if (err?.isNetworkError) {
+        setError(err.message || "Tidak dapat terhubung ke server backend.");
+      } else if (err?.status === 401) {
+        setError("Sesi login sudah habis. Silakan login ulang.");
+      } else if (err?.status === 403) {
+        setError("Anda tidak punya izin untuk mengakses data ini.");
+      } else if (err?.status >= 500) {
+        setError(`Server backend mengalami error (${err.status}). Cek log Laravel (storage/logs/laravel.log) untuk detailnya.`);
+      } else if (err?.data?.message) {
+        setError(err.data.message);
+      } else {
+        setError("Gagal memuat data dari server.");
+      }
     } finally {
       setLoading(false);
     }
@@ -663,7 +679,19 @@ export default function Dashboard() {
 
         {/* Main Content Area */}
         <main className="db-content">
-          {error && <div className="db-error-alert">{error}</div>}
+          {error && (
+            <div className="db-error-alert">
+              <XCircle size={20} className="db-error-alert__icon" />
+              <span className="db-error-alert__text">{error}</span>
+              <button
+                type="button"
+                className="db-error-alert__retry"
+                onClick={fetchInitialData}
+              >
+                Coba Lagi
+              </button>
+            </div>
+          )}
 
           {/* TAB: BUSINESSES */}
           {activeTab === "businesses" && (

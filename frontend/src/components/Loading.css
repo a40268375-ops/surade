@@ -30,9 +30,6 @@
   width: 90px;
   height: 90px;
   object-fit: contain;
-  /* dibikin abu-abu & agak redup supaya senada dengan background gelap */
-  filter: grayscale(1) brightness(1.6);
-  opacity: 0.55;
   animation: loadingBreathe 1.8s ease-in-out infinite;
 }
 
@@ -88,8 +85,8 @@
    persis kayak referensi (logo diam di tempat, cuma opacity/scale-nya
    yang halus berubah) */
 @keyframes loadingBreathe {
-  0%, 100% { opacity: 0.4; transform: scale(0.96); }
-  50%      { opacity: 0.75; transform: scale(1.04); }
+  0%, 100% { opacity: 0.85; transform: scale(0.96); }
+  50%      { opacity: 1; transform: scale(1.04); }
 }
 
 @keyframes loadingSpin {
