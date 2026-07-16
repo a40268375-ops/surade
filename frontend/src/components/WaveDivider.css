@@ -1,0 +1,31 @@
+.wave-divider {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 70px;
+  line-height: 0;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.wave-divider--top {
+  top: -1px;
+}
+
+.wave-divider--bottom {
+  bottom: -1px;
+  transform: rotate(180deg);
+}
+
+.wave-divider svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  .wave-divider {
+    height: 40px;
+  }
+}

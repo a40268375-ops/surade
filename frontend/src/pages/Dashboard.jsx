@@ -47,7 +47,8 @@ export default function Dashboard() {
   const [events, setEvents] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
   const [plans, setPlans] = useState({});
-  const [resellerData, setResellerData] = useState({ referral_code: null, referred_businesses: [], benefit: { total_referrals: 0, premium_referrals: 0, estimated_commission: 0 } });
+  const [resellerData, setResellerData] = useState(null); // legacy, unused now that Reseller tab is removed
+  const [bookings, setBookings] = useState([]);
 
   // Loading/Error states
   const [loading, setLoading] = useState(true);
@@ -88,6 +89,13 @@ export default function Dashboard() {
   const [bizWebsite, setBizWebsite] = useState("");
   const [bizImageFile, setBizImageFile] = useState(null);
   const [bizImagePreview, setBizImagePreview] = useState("");
+  const [bizGalleryFiles, setBizGalleryFiles] = useState([]); // newly-selected File objects
+  const [bizGalleryPreviews, setBizGalleryPreviews] = useState([]); // { url, isExisting, path? }
+  const [bizVideoUrl, setBizVideoUrl] = useState("");
+  const [bizClosedDays, setBizClosedDays] = useState([]);
+  const [bizTags, setBizTags] = useState("");
+
+  const HARI_LIST = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 
   // Cat Form state
   const [catName, setCatName] = useState("");
@@ -171,9 +179,9 @@ export default function Dashboard() {
         setBusinesses(myBiz);
         setSubscriptions(subs);
         setPlans(planData);
-      } else if (activeTab === "reseller") {
-        const data = await api.get("/reseller/businesses");
-        setResellerData(data);
+      } else if (activeTab === "booking") {
+        const data = await api.get("/my-bookings");
+        setBookings(data);
       }
       
       // Always prefetch categories for select dropdown
@@ -200,6 +208,13 @@ export default function Dashboard() {
       setBizWebsite(biz.website || "");
       setBizImageFile(null);
       setBizImagePreview(biz.image ? getImageUrl(biz.image) : "");
+      setBizGalleryFiles([]);
+      setBizGalleryPreviews(
+        (biz.images || []).map((path) => ({ url: getImageUrl(path), isExisting: true, path }))
+      );
+      setBizVideoUrl(biz.video_url || "");
+      setBizClosedDays(biz.closed_days || []);
+      setBizTags((biz.tags || []).join(", "));
     } else {
       setBizTitle("");
       setBizCategory(categories[0]?.id || "");
@@ -211,8 +226,39 @@ export default function Dashboard() {
       setBizWebsite("");
       setBizImageFile(null);
       setBizImagePreview("");
+      setBizGalleryFiles([]);
+      setBizGalleryPreviews([]);
+      setBizVideoUrl("");
+      setBizClosedDays([]);
+      setBizTags("");
     }
     setShowBizModal(true);
+  };
+
+  const handleAddGalleryFiles = (files) => {
+    const fileArr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (fileArr.length < files.length) {
+      alert("Hanya file gambar yang bisa ditambahkan ke galeri foto. Untuk video, isi kolom \"Link Video\" ya.");
+    }
+    setBizGalleryFiles((prev) => [...prev, ...fileArr]);
+    setBizGalleryPreviews((prev) => [
+      ...prev,
+      ...fileArr.map((f) => ({ url: URL.createObjectURL(f), isExisting: false, file: f })),
+    ]);
+  };
+
+  const handleRemoveGalleryPreview = (index) => {
+    const removed = bizGalleryPreviews[index];
+    setBizGalleryPreviews((prev) => prev.filter((_, i) => i !== index));
+    if (!removed.isExisting) {
+      setBizGalleryFiles((prev) => prev.filter((f) => f !== removed.file));
+    }
+  };
+
+  const toggleClosedDay = (day) => {
+    setBizClosedDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
   };
 
   const handleSaveBusiness = async (e) => {
@@ -230,6 +276,17 @@ export default function Dashboard() {
       if (bizWebsite) formData.append("website", bizWebsite);
       if (bizImageFile) {
         formData.append("image", bizImageFile);
+      }
+      if (bizVideoUrl) formData.append("video_url", bizVideoUrl);
+      bizTags.split(",").map((t) => t.trim()).filter(Boolean).forEach((tag) => formData.append("tags[]", tag));
+      bizClosedDays.forEach((day) => formData.append("closed_days[]", day));
+      bizGalleryFiles.forEach((file) => formData.append("images[]", file));
+      if (selectedBiz) {
+        // Existing gallery entries the user removed in the edit modal need
+        // to be deleted server-side too.
+        const keptPaths = bizGalleryPreviews.filter((p) => p.isExisting).map((p) => p.path);
+        const removedPaths = (selectedBiz.images || []).filter((p) => !keptPaths.includes(p));
+        removedPaths.forEach((path) => formData.append("remove_gallery[]", path));
       }
 
       if (selectedBiz) {
@@ -606,15 +663,13 @@ export default function Dashboard() {
               <span>Premium & Invoice</span>
             </button>
 
-            {user?.role === "reseller" && (
-              <button
-                className={`db-menu-btn ${activeTab === "reseller" ? "active" : ""}`}
-                onClick={() => setActiveTab("reseller")}
-              >
-                <Gift size={18} />
-                <span>Reseller</span>
-              </button>
-            )}
+            <button
+              className={`db-menu-btn ${activeTab === "booking" ? "active" : ""}`}
+              onClick={() => setActiveTab("booking")}
+            >
+              <CalendarDays size={18} />
+              <span>Booking</span>
+            </button>
 
             {isAdmin && (
               <>
@@ -638,13 +693,6 @@ export default function Dashboard() {
                 >
                   <Users size={18} />
                   <span>Kelola User</span>
-                </button>
-                <button
-                  className={`db-menu-btn ${activeTab === "reseller" ? "active" : ""}`}
-                  onClick={() => setActiveTab("reseller")}
-                >
-                  <Gift size={18} />
-                  <span>Reseller</span>
                 </button>
               </>
             )}
@@ -957,6 +1005,113 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* TAB: BOOKING */}
+          {activeTab === "booking" && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>{isAdmin ? "Semua Booking" : "Booking Masuk"}</h2>
+              </div>
+
+              {loading ? (
+                <div className="db-loader-wrap">
+                  <div className="db-spinner" />
+                  <span>Memuat booking...</span>
+                </div>
+              ) : bookings.length > 0 ? (
+                <div className="db-table-responsive">
+                  <table className="db-table">
+                    <thead>
+                      <tr>
+                        <th>Pelanggan</th>
+                        <th>Kontak</th>
+                        {isAdmin && <th>Bisnis</th>}
+                        <th>Tanggal &amp; Jam</th>
+                        <th>Catatan</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bookings.map((b) => (
+                        <tr key={b.id}>
+                          <td><strong>{b.customer_name}</strong></td>
+                          <td>{b.customer_phone}</td>
+                          {isAdmin && <td>{b.business?.title || "-"}</td>}
+                          <td>
+                            {new Date(b.booking_date).toLocaleDateString("id-ID")}
+                            {b.booking_time ? ` · ${b.booking_time}` : ""}
+                          </td>
+                          <td>{b.notes || "-"}</td>
+                          <td>
+                            <span className={`db-status-badge db-status--${b.status === "confirmed" ? "approved" : b.status === "cancelled" ? "rejected" : b.status === "completed" ? "approved" : "pending"}`}>
+                              {b.status === "pending" && "Menunggu"}
+                              {b.status === "confirmed" && "Dikonfirmasi"}
+                              {b.status === "completed" && "Selesai"}
+                              {b.status === "cancelled" && "Dibatalkan"}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="db-table-actions">
+                              {b.status === "pending" && (
+                                <button
+                                  className="db-table-btn db-btn-edit"
+                                  title="Konfirmasi"
+                                  onClick={async () => {
+                                    await api.put(`/bookings/${b.id}`, { status: "confirmed" });
+                                    setBookings((prev) => prev.map((x) => x.id === b.id ? { ...x, status: "confirmed" } : x));
+                                  }}
+                                >
+                                  <CheckCircle size={16} />
+                                </button>
+                              )}
+                              {b.status === "confirmed" && (
+                                <button
+                                  className="db-table-btn db-btn-edit"
+                                  title="Tandai selesai"
+                                  onClick={async () => {
+                                    await api.put(`/bookings/${b.id}`, { status: "completed" });
+                                    setBookings((prev) => prev.map((x) => x.id === b.id ? { ...x, status: "completed" } : x));
+                                  }}
+                                >
+                                  <CheckCircle size={16} />
+                                </button>
+                              )}
+                              {(b.status === "pending" || b.status === "confirmed") && (
+                                <button
+                                  className="db-table-btn db-btn-delete"
+                                  title="Batalkan"
+                                  onClick={async () => {
+                                    await api.put(`/bookings/${b.id}`, { status: "cancelled" });
+                                    setBookings((prev) => prev.map((x) => x.id === b.id ? { ...x, status: "cancelled" } : x));
+                                  }}
+                                >
+                                  <XCircle size={16} />
+                                </button>
+                              )}
+                              <button
+                                className="db-table-btn db-btn-delete"
+                                title="Hapus"
+                                onClick={async () => {
+                                  if (!confirm("Hapus booking ini?")) return;
+                                  await api.delete(`/bookings/${b.id}`);
+                                  setBookings((prev) => prev.filter((x) => x.id !== b.id));
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="db-empty-state">Belum ada booking yang masuk.</div>
+              )}
+            </div>
+          )}
+
           {/* TAB: EVENTS (admin) */}
           {activeTab === "events" && isAdmin && (
             <div className="db-panel">
@@ -1012,76 +1167,6 @@ export default function Dashboard() {
           )}
 
           {/* TAB: RESELLER */}
-          {activeTab === "reseller" && (
-            <div className="db-panel">
-              <div className="db-panel-header">
-                <h2>Program Reseller</h2>
-              </div>
-
-              {!resellerData.referral_code ? (
-                <div className="db-empty-state">
-                  Akun ini belum memiliki kode referral. Hubungi admin untuk mengaktifkan kode referral reseller.
-                </div>
-              ) : (
-                <>
-                  <div className="db-referral-box">
-                    Kode referral Anda: <strong>{resellerData.referral_code}</strong>
-                    <p>Bagikan kode ini ke calon mitra bisnis. Setiap bisnis yang mendaftar memakai kode ini akan tercatat di sini.</p>
-                  </div>
-
-                  <div className="db-benefit-cards">
-                    <div className="db-benefit-card">
-                      <span className="db-benefit-card__num">{resellerData.benefit.total_referrals}</span>
-                      <span className="db-benefit-card__label">Total Bisnis Terdaftar</span>
-                    </div>
-                    <div className="db-benefit-card">
-                      <span className="db-benefit-card__num">{resellerData.benefit.premium_referrals}</span>
-                      <span className="db-benefit-card__label">Bisnis Premium Aktif</span>
-                    </div>
-                    <div className="db-benefit-card db-benefit-card--highlight">
-                      <span className="db-benefit-card__num">{formatRupiah(resellerData.benefit.estimated_commission)}</span>
-                      <span className="db-benefit-card__label">Estimasi Komisi</span>
-                    </div>
-                  </div>
-
-                  <h3 className="db-subheading">Daftar Bisnis Kode Referral</h3>
-                  {resellerData.referred_businesses.length > 0 ? (
-                    <div className="db-table-responsive">
-                      <table className="db-table">
-                        <thead>
-                          <tr>
-                            <th>Nama Bisnis</th>
-                            <th>Pemilik</th>
-                            <th>Kategori</th>
-                            <th>Status Premium</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {resellerData.referred_businesses.map((biz) => (
-                            <tr key={biz.id}>
-                              <td><strong>{biz.title}</strong></td>
-                              <td>{biz.user?.name || "-"}</td>
-                              <td>{biz.category?.name || "-"}</td>
-                              <td>
-                                {biz.is_premium_active ? (
-                                  <span className="db-plan-badge db-plan-badge--premium"><Crown size={13} /> Premium</span>
-                                ) : (
-                                  <span className="db-plan-badge db-plan-badge--free">Free</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="db-empty-state">Belum ada bisnis yang memakai kode referral Anda.</div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
           {/* TAB: CATEGORIES */}
           {activeTab === "categories" && isAdmin && (
             <div className="db-panel">
@@ -1347,6 +1432,86 @@ export default function Dashboard() {
                   <img src={bizImagePreview} alt="Pratinjau" className="db-form-preview-img" />
                 </div>
               )}
+
+              <div className="db-form-row">
+                <div className="db-form-group">
+                  <label>Galeri Foto Tambahan (boleh pilih banyak sekaligus)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      if (e.target.files?.length) {
+                        handleAddGalleryFiles(e.target.files);
+                        e.target.value = ""; // allow re-selecting the same file again later
+                      }
+                    }}
+                  />
+                </div>
+                <div className="db-form-group">
+                  <label>Link Video (YouTube, dll — opsional)</label>
+                  <input
+                    type="url"
+                    value={bizVideoUrl}
+                    onChange={(e) => setBizVideoUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                  />
+                </div>
+              </div>
+
+              <div className="db-form-group">
+                <label>Tags (pisahkan dengan koma)</label>
+                <input
+                  type="text"
+                  value={bizTags}
+                  onChange={(e) => setBizTags(e.target.value)}
+                  placeholder="Contoh: Tour Murah, Wisata Keluarga, Open Trip"
+                />
+              </div>
+
+              {bizGalleryPreviews.length > 0 && (
+                <div className="db-img-preview-wrap" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {bizGalleryPreviews.map((p, idx) => (
+                    <div key={idx} style={{ position: "relative" }}>
+                      <img
+                        src={p.url}
+                        alt={`Galeri ${idx + 1}`}
+                        className="db-form-preview-img"
+                        style={{ width: 90, height: 90, objectFit: "cover", borderRadius: 8 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGalleryPreview(idx)}
+                        aria-label="Hapus foto ini"
+                        style={{
+                          position: "absolute", top: -8, right: -8,
+                          background: "#dc2626", color: "#fff", border: "2px solid #fff",
+                          borderRadius: "50%", width: 22, height: 22, cursor: "pointer",
+                          fontSize: 13, lineHeight: 1, fontWeight: 700,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="db-form-group">
+                <label>Hari Tutup (centang hari yang libur, kosongkan jika buka setiap hari)</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                  {HARI_LIST.map((day) => (
+                    <label key={day} style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400 }}>
+                      <input
+                        type="checkbox"
+                        checked={bizClosedDays.includes(day)}
+                        onChange={() => toggleClosedDay(day)}
+                      />
+                      {day}
+                    </label>
+                  ))}
+                </div>
+              </div>
 
               <div className="db-modal-footer">
                 <button type="button" className="db-btn-cancel" onClick={() => setShowBizModal(false)}>

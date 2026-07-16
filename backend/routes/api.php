@@ -8,6 +8,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\BookingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,6 +30,9 @@ Route::get('events', [EventController::class, 'index']);
 Route::get('events/{id}', [EventController::class, 'show']);
 
 Route::get('subscription-plans', [SubscriptionController::class, 'plans']);
+
+// Booking: siapa saja (pengunjung, tanpa login) boleh mengajukan booking ke sebuah bisnis
+Route::post('bookings', [BookingController::class, 'store']);
 
 
 /*
@@ -57,6 +61,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('subscriptions', [SubscriptionController::class, 'index']);
     Route::post('subscriptions', [SubscriptionController::class, 'store']);
     Route::get('subscriptions/{id}', [SubscriptionController::class, 'show']);
+
+    // Booking: pemilik bisnis melihat/mengelola booking yang masuk ke bisnis miliknya
+    Route::get('my-bookings', [BookingController::class, 'index']);
+    Route::put('bookings/{id}', [BookingController::class, 'update']);
+    Route::delete('bookings/{id}', [BookingController::class, 'destroy']);
 
     // Jalur khusus untuk user bertipe Reseller melihat bisnisnya
     Route::get('reseller/businesses', [UserController::class, 'resellerBusinesses']);

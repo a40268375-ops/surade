@@ -13,11 +13,17 @@ class Business extends Model
         'title',
         'description',
         'address',
+        'latitude',
+        'longitude',
         'phone',
         'email',
         'operating_hours',
+        'closed_days',
+        'tags',
         'website',
         'image',
+        'images',
+        'video_url',
         'is_premium',
         'premium_expires_at',
         'premium_plan',
@@ -28,6 +34,9 @@ class Business extends Model
     protected $casts = [
         'is_premium' => 'boolean',
         'premium_expires_at' => 'datetime',
+        'images' => 'array',
+        'closed_days' => 'array',
+        'tags' => 'array',
     ];
 
     // Computed field sent to the frontend so the UI (and ads) automatically
@@ -54,6 +63,11 @@ class Business extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function bookings(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Booking::class);
     }
 
     public function subscriptions(): \Illuminate\Database\Eloquent\Relations\HasMany

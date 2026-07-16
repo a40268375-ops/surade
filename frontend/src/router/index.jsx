@@ -13,6 +13,7 @@ import Login from "../pages/Login";
 import Profile from "../pages/Profile";
 import SmartCity from "../pages/SmartCity";
 import Dashboard from "../pages/Dashboard";
+import ForgotPassword from "../pages/ForgotPassword";
 
 // === IMPORT COMPONENT ADMIN ===
 import UserManagement from '../pages/Admin/UserManagement';
@@ -40,6 +41,7 @@ function AppRouter() {
         <Route path="/business/:id" element={<BusinessDetail />} />
         <Route path="/category/:categoryId" element={<Category />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/profile/:id" element={<Profile />} />
         <Route path="/smart-city/:id" element={<SmartCity />} />
         <Route path="/dashboard" element={<Dashboard />} />

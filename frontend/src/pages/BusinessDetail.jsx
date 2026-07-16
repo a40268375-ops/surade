@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import api, { getImageUrl } from "../utils/api";
 import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
 import { usePageLoading } from "../hooks/usePageLoading";
@@ -16,8 +17,10 @@ import {
   Clock,
   X,
   ChevronDown,
+  CalendarCheck,
 } from "lucide-react";
 import "./Home.css";
+import "./Login.css";
 import "./BusinessDetail.css";
 
 const DEFAULT_SELLER = {
@@ -31,14 +34,13 @@ const DAY_NAMES = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu
 const OPEN_ALL_WEEK_CATEGORIES = ["Cafe & Restaurant", "Wisata"];
 
 function buildWeeklySchedule(business) {
-  const openAllWeek = OPEN_ALL_WEEK_CATEGORIES.includes(business.category);
+  const closedDays = business.closedDays || [];
   // JS getDay(): 0 = Minggu ... 6 = Sabtu → convert to index in DAY_NAMES (Senin-first)
   const jsToday = new Date().getDay();
   const todayIndex = jsToday === 0 ? 6 : jsToday - 1;
 
   return DAY_NAMES.map((day, idx) => {
-    const isSunday = idx === 6;
-    const closed = isSunday && !openAllWeek;
+    const closed = closedDays.includes(day);
     return {
       day,
       hours: closed ? "Tutup" : business.hours,
@@ -356,9 +358,19 @@ export default function BusinessDetail() {
   const pageLoading = usePageLoading();
   const { id } = useParams();
   const [business, setBusiness] = useState(null);
+  const [fetchingBusiness, setFetchingBusiness] = useState(true);
   const [saved, setSaved] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
   const [showHours, setShowHours] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [bookingName, setBookingName] = useState("");
+  const [bookingPhone, setBookingPhone] = useState("");
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingTime, setBookingTime] = useState("");
+  const [bookingNotes, setBookingNotes] = useState("");
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [bookingError, setBookingError] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showPriceDropdown, setShowPriceDropdown] = useState(false);
   const [priceCategory, setPriceCategory] = useState(2); // 1: cheap, 2: medium, 3: expensive
@@ -366,11 +378,54 @@ export default function BusinessDetail() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const foundBusiness = BISNIS_DATA.find((b) => b.id === parseInt(id));
-    setBusiness(foundBusiness);
+    let cancelled = false;
+    setFetchingBusiness(true);
+
+    async function loadBusiness() {
+      try {
+        const data = await api.get(`/businesses/${id}`);
+        if (cancelled) return;
+
+        const img = data.image
+          ? getImageUrl(data.image)
+          : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1200&h=600&fit=crop";
+        const galleryImgs = (data.images || []).map((p) => getImageUrl(p));
+
+        setBusiness({
+          id: data.id,
+          name: data.title,
+          category: data.category?.name || "Lainnya",
+          tags: (data.tags && data.tags.length > 0) ? data.tags : [data.title],
+          location: data.address,
+          address: data.address,
+          phone: data.phone,
+          email: data.email,
+          website: data.website,
+          hours: data.operating_hours || "08.00 - 17.00",
+          closedDays: data.closed_days || [],
+          description: data.description,
+          img,
+          images: [img, ...galleryImgs],
+          video: data.video_url || null,
+          status: data.status === "approved" ? "Buka Sekarang" : "Menunggu Persetujuan",
+          rating: 4.5,
+          reviews: 0,
+          seller: DEFAULT_SELLER,
+        });
+      } catch (e) {
+        console.error("Gagal memuat detail bisnis dari API", e);
+        if (!cancelled) setBusiness(null);
+      } finally {
+        if (!cancelled) setFetchingBusiness(false);
+      }
+    }
+
+    loadBusiness();
     setCurrentImageIndex(0);
     setShowPhone(false);
     setShowHours(false);
+
+    return () => { cancelled = true; };
   }, [id]);
 
   useEffect(() => {
@@ -394,6 +449,7 @@ export default function BusinessDetail() {
   };
 
   const handleWhatsApp = () => {
+    if (!business.phone) return;
     const phone = business.phone.replace(/\D/g, "");
     window.open(`https://wa.me/${phone}`, "_blank");
   };
@@ -403,7 +459,39 @@ export default function BusinessDetail() {
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
   };
 
-  if (pageLoading) {
+  const handleBookingSubmit = async (e) => {
+    e.preventDefault();
+    setBookingError("");
+
+    if (!bookingName.trim() || !bookingPhone.trim() || !bookingDate) {
+      setBookingError("Nama, nomor HP, dan tanggal wajib diisi.");
+      return;
+    }
+
+    setBookingSubmitting(true);
+    try {
+      await api.post("/bookings", {
+        business_id: business.id,
+        customer_name: bookingName.trim(),
+        customer_phone: bookingPhone.trim(),
+        booking_date: bookingDate,
+        booking_time: bookingTime || null,
+        notes: bookingNotes.trim() || null,
+      });
+      setBookingSuccess(true);
+      setBookingName("");
+      setBookingPhone("");
+      setBookingDate("");
+      setBookingTime("");
+      setBookingNotes("");
+    } catch (err) {
+      setBookingError(err?.data?.message || "Gagal mengirim booking. Silakan coba lagi.");
+    } finally {
+      setBookingSubmitting(false);
+    }
+  };
+
+  if (pageLoading || fetchingBusiness) {
     return <Loading />;
   }
 
@@ -539,6 +627,16 @@ export default function BusinessDetail() {
                 <Send size={22} strokeWidth={1.8} />
               </button>
 
+              {/* Booking */}
+              <button
+                type="button"
+                className="bd-quick-action"
+                title="Booking"
+                onClick={() => { setBookingSuccess(false); setBookingError(""); setShowBookingModal(true); }}
+              >
+                <CalendarCheck size={22} strokeWidth={1.8} />
+              </button>
+
               <button
                 type="button"
                 className={`bd-quick-action ${saved ? "active" : ""}`}
@@ -579,9 +677,28 @@ export default function BusinessDetail() {
                 <div className="bd-video-container">
                   <h3 className="bd-video-title">Video Profil</h3>
                   <div className="bd-video-player-wrapper">
-                    <video controls src={business.video} poster={business.img} className="bd-video-player">
-                      Your browser does not support the video tag.
-                    </video>
+                    {(() => {
+                      const ytMatch = business.video.match(
+                        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]{11})/
+                      );
+                      if (ytMatch) {
+                        return (
+                          <iframe
+                            className="bd-video-player"
+                            src={`https://www.youtube.com/embed/${ytMatch[1]}`}
+                            title="Video Profil"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            style={{ border: 0, width: "100%", aspectRatio: "16/9" }}
+                          />
+                        );
+                      }
+                      return (
+                        <video controls src={business.video} poster={business.img} className="bd-video-player">
+                          Your browser does not support the video tag.
+                        </video>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -642,11 +759,27 @@ export default function BusinessDetail() {
             {/* Location */}
             <div className="bd-location-card">
               <h3 className="bd-location-card__title">Lokasi</h3>
-              <button type="button" className="bd-location-card__map" onClick={handleDirections}>
-                <div className="bd-location-card__map-placeholder">
-                  <MapPin size={32} />
-                  <p>Peta lokasi akan ditampilkan di sini</p>
-                </div>
+              <div className="bd-location-card__map" style={{ padding: 0, overflow: "hidden" }}>
+                <iframe
+                  title={`Peta lokasi ${business.name}`}
+                  src={`https://www.google.com/maps?q=${encodeURIComponent(business.address)}&output=embed`}
+                  width="100%"
+                  height="220"
+                  style={{ border: 0, display: "block" }}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+              <button
+                type="button"
+                className="bd-location-card__directions-link"
+                onClick={handleDirections}
+                style={{
+                  marginTop: 10, width: "100%", textAlign: "center", background: "none",
+                  border: "none", color: "#007570", fontWeight: 600, cursor: "pointer", padding: "6px 0",
+                }}
+              >
+                Buka di Google Maps →
               </button>
             </div>
 
@@ -690,6 +823,102 @@ export default function BusinessDetail() {
           </div>
         </div>
       </section>
+
+      {/* Booking Modal */}
+      {showBookingModal && (
+        <div
+          className="login-modal-overlay"
+          onClick={() => setShowBookingModal(false)}
+        >
+          <div
+            className="login-modal"
+            style={{ maxWidth: 440 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="login-modal__header">
+              <div>
+                <h2 className="login-modal__title">Booking {business.name}</h2>
+                <p className="login-modal__subtitle">Isi data di bawah, pemilik bisnis akan mengonfirmasi booking Anda.</p>
+              </div>
+              <button
+                className="login-modal__close"
+                onClick={() => setShowBookingModal(false)}
+                aria-label="Tutup"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="login-modal__divider" />
+
+            {bookingSuccess ? (
+              <div className="login-modal__body">
+                <p style={{ textAlign: "center", padding: "20px 0" }}>
+                  ✅ Booking berhasil dikirim! Pemilik bisnis akan segera menghubungi Anda.
+                </p>
+                <button
+                  type="button"
+                  className="login-register-btn"
+                  onClick={() => setShowBookingModal(false)}
+                >
+                  Tutup
+                </button>
+              </div>
+            ) : (
+              <form className="login-modal__body" onSubmit={handleBookingSubmit} noValidate>
+                {bookingError && (
+                  <div className="login-error">
+                    <span>{bookingError}</span>
+                  </div>
+                )}
+                <input
+                  type="text"
+                  className="login-input"
+                  placeholder="Nama Anda"
+                  value={bookingName}
+                  onChange={(e) => setBookingName(e.target.value)}
+                />
+                <input
+                  type="tel"
+                  className="login-input"
+                  placeholder="Nomor HP / WhatsApp"
+                  value={bookingPhone}
+                  onChange={(e) => setBookingPhone(e.target.value)}
+                />
+                <div className="login-modal__row">
+                  <input
+                    type="date"
+                    className="login-input"
+                    value={bookingDate}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                  />
+                  <input
+                    type="time"
+                    className="login-input"
+                    value={bookingTime}
+                    onChange={(e) => setBookingTime(e.target.value)}
+                  />
+                </div>
+                <textarea
+                  className="login-input"
+                  placeholder="Catatan (opsional)"
+                  rows={3}
+                  value={bookingNotes}
+                  onChange={(e) => setBookingNotes(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="login-register-btn"
+                  disabled={bookingSubmitting}
+                >
+                  {bookingSubmitting ? "Mengirim..." : "Kirim Booking"}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

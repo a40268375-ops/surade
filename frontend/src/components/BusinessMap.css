@@ -1,0 +1,249 @@
+.biz-map {
+  position: relative;
+  width: 100%;
+  height: 560px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+  background: #e5e7eb;
+}
+
+.biz-map__canvas {
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.biz-map__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+/* Pin custom (marker) */
+.biz-map-pin__wrap {
+  position: relative;
+  width: 40px;
+  height: 48px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.biz-map-pin__pin {
+  width: 34px;
+  height: 34px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #ffffff;
+  border: 2px solid #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+}
+
+.biz-map-pin__pin svg {
+  transform: rotate(45deg);
+}
+
+.biz-map-pin__badge {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+}
+
+/* Panel daftar bisnis di lokasi terpilih */
+.biz-map__panel {
+  position: absolute;
+  z-index: 500;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  /* Desktop: panel mengambang di kanan atas peta */
+  top: 16px;
+  right: 16px;
+  width: 300px;
+  max-height: calc(100% - 32px);
+}
+
+.biz-map__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-weight: 600;
+  color: #111827;
+}
+
+.biz-map__panel-header > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #16a34a;
+}
+
+.biz-map__panel-close {
+  border: none;
+  background: #f3f4f6;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #374151;
+  flex-shrink: 0;
+}
+
+.biz-map__panel-close:hover {
+  background: #e5e7eb;
+}
+
+.biz-map__panel-list {
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.biz-map__panel-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.biz-map__panel-item:hover {
+  background: #f0fdf4;
+}
+
+.biz-map__panel-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.biz-map__panel-item-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 2px;
+}
+
+.biz-map__panel-item-loc {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Panel untuk 1 bisnis (muncul saat 1 pin diklik) */
+.biz-map__panel--single {
+  width: 260px;
+  padding: 20px 18px 18px;
+  align-items: flex-start;
+}
+
+.biz-map__panel-close--float {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.biz-map__single-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.biz-map__single-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 2px;
+  padding-right: 20px;
+}
+
+.biz-map__single-category {
+  font-size: 0.8rem;
+  color: #007570;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.biz-map__single-loc {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin: 0 0 14px;
+}
+
+.biz-map__single-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #16a34a;
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 8px;
+  transition: background 0.18s;
+}
+
+.biz-map__single-cta:hover {
+  background: #15803d;
+}
+
+@media (max-width: 720px) {
+  .biz-map {
+    height: 460px;
+  }
+
+  .biz-map__panel {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    border-radius: 16px 16px 0 0;
+    max-height: 60%;
+  }
+}

@@ -1,207 +1,217 @@
 /* ─────────────────────────────────────────────
    SUMBER DATA TUNGGAL untuk Smart City & Smart Village.
-   PENTING: sebelumnya data ini didefinisikan terpisah di
-   Home.jsx dan SmartCity.jsx dengan isi yang tidak sinkron
-   (mis. Yogyakarta ada di Home.jsx tapi tidak ada di
-   SmartCity.jsx). Akibatnya klik satu kota bisa nyasar ke
-   kota lain atau ke halaman "tidak ditemukan" yang salah.
+   Home.jsx dan SmartCity.jsx SAMA-SAMA mengambil data dari
+   file ini, jadi `id` selalu konsisten dan /smart-city/:id
+   akan selalu membuka kota/desa yang benar.
 
-   Sekarang Home.jsx dan SmartCity.jsx SAMA-SAMA mengambil
-   data dari file ini, jadi `id` selalu konsisten dan
-   /smart-city/:id akan selalu membuka kota yang benar.
+   CATATAN UPDATE: seluruh data sudah diganti dari kota/provinsi
+   umum menjadi 12 desa/kelurahan di Kecamatan Surade, Kabupaten
+   Sukabumi, Jawa Barat. Data populasi berdasarkan BPS Kabupaten
+   Sukabumi (2021-2024). Data "bisnis", "area" per desa, dan
+   nama kepala desa bersifat placeholder karena data resmi
+   per-desa tidak tersedia publik — silakan sesuaikan sendiri.
+
+   SEMUA LINK FOTO di bawah ini sudah dicek ulang satu-satu
+   (per 16 Juli 2026) dan dipastikan aktif di Unsplash — link
+   lama di versi sebelumnya ada yang sudah dihapus/mati.
+
+   FIX 16 Juli 2026: Desa Buniwangi dan Desa Sukatani sebelumnya
+   memakai foto yang sama persis (photo-1624142482803). Foto
+   Desa Sukatani sekarang diganti dengan foto sawah/ladang udara
+   yang berbeda (photo-1568979810251, oleh Radoslav Bali).
 ───────────────────────────────────────────── */
 
 export const SMART_CITIES = [
   {
     id: 1,
-    name: "Aceh",
-    bisnis: 142,
-    population: "5.2 Juta",
-    area: "5,677 km²",
-    governor: "Muzakir Manaf",
-    img: "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=1200&h=600&fit=crop",
-    description: "Provinsi Aceh adalah provinsi paling barat Indonesia yang kaya akan budaya dan sejarah. Program Smart City di Aceh berfokus pada pengembangan ekonomi digital dan pariwisata berbasis teknologi.",
+    name: "Kelurahan Surade",
+    bisnis: 96,
+    population: "9.562 Jiwa",
+    area: "Pusat Kec. Surade",
+    governor: "Lurah Surade",
+    img: "https://images.unsplash.com/photo-1760292132737-aab82a97bc9e?w=1200&h=600&fit=crop",
+    description: "Kelurahan Surade adalah pusat pemerintahan Kecamatan Surade sekaligus pusat aktivitas warga, ditandai dengan Bunderan/Tugu Surade. Program Smart Village di sini fokus pada digitalisasi layanan publik dan pusat perdagangan kecamatan.",
     highlights: [
-      "Sistem e-Government terintegrasi",
-      "Digitalisasi pasar tradisional",
-      "Smart tourism untuk wisata religius",
-      "Pengembangan UMKM berbasis teknologi"
+      "Pusat layanan publik kecamatan digital",
+      "Digitalisasi pasar dan pertokoan lokal",
+      "Ikon Bunderan Tugu Surade",
+      "Pemberdayaan UMKM pusat kota kecamatan"
     ]
   },
   {
     id: 2,
-    name: "Bali",
-    bisnis: 385,
-    population: "4.3 Juta",
-    area: "5,780 km²",
-    governor: "Wayan Koster",
-    img: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1200&h=600&fit=crop",
-    description: "Bali adalah destinasi wisata dunia yang menerapkan konsep Smart City untuk meningkatkan pengalaman wisata dan keberlanjutan ekonomi lokal.",
+    name: "Desa Pasiripis",
+    bisnis: 61,
+    population: "13.334 Jiwa",
+    area: "Pesisir Selatan Surade",
+    governor: "Kepala Desa Pasiripis",
+    img: "https://images.unsplash.com/photo-1759861680725-914ce086be4e?w=1200&h=600&fit=crop",
+    description: "Desa Pasiripis merupakan desa berpenduduk terbanyak di Kecamatan Surade, dengan garis pantai berpasir putih seperti Pantai Karangtrisna, Minajaya, dan Karanggantungan. Fokus Smart Village di sini adalah pariwisata pantai dan perikanan.",
     highlights: [
-      "Bali Smart Island Program",
-      "Sistem manajemen lalu lintas cerdas",
-      "Digitalisasi industri pariwisata",
-      "Platform UMKM Bali Digital"
+      "Smart tourism pantai Karangtrisna & Minajaya",
+      "Digitalisasi hasil perikanan nelayan lokal",
+      "Konservasi kawasan pesisir",
+      "Pengembangan UMKM olahan laut"
     ]
   },
   {
     id: 3,
-    name: "Bogor",
-    bisnis: 273,
-    population: "5.4 Juta",
-    area: "6,284 km²",
-    governor: "Budi Santoso",
-    img: "https://images.unsplash.com/photo-1568802088984-38109b53e40c?w=1200&h=600&fit=crop",
-    description: "Kota Bogor sebagai kota penyangga Jakarta mengembangkan Smart City untuk mengatasi tantangan urbanisasi dan meningkatkan kualitas hidup warganya.",
+    name: "Desa Buniwangi",
+    bisnis: 48,
+    population: "11.263 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Buniwangi",
+    img: "https://images.unsplash.com/photo-1624142482803-3bd79c3a6efc?w=1200&h=600&fit=crop",
+    description: "Desa Buniwangi merupakan salah satu desa dengan penduduk terbesar kedua di Kecamatan Surade, dengan mayoritas warga bermata pencaharian sebagai petani. Smart Village di desa ini mengedepankan digitalisasi pertanian dan koperasi desa.",
     highlights: [
-      "Smart transportation system",
-      "Digitalisasi layanan publik",
-      "Pengelolaan sampah cerdas",
-      "Smart agriculture dan UMKM"
+      "Digitalisasi hasil pertanian dan perkebunan",
+      "Koperasi dan UMKM desa berbasis digital",
+      "Layanan administrasi desa online",
+      "Program irigasi dan pertanian cerdas"
     ]
   },
   {
     id: 4,
-    name: "Jakarta",
-    bisnis: 1240,
-    population: "10.6 Juta",
-    area: "661 km²",
-    governor: "Heru Budi Hartono",
-    img: "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=1200&h=600&fit=crop",
-    description: "DKI Jakarta sebagai ibu kota Indonesia adalah pioneer Smart City dengan implementasi teknologi canggih dalam berbagai aspek kehidupan urban.",
+    name: "Desa Cipeundeuy",
+    bisnis: 22,
+    population: "4.646 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Cipeundeuy",
+    img: "https://images.unsplash.com/photo-1646928998297-5fb2a10aca27?w=1200&h=600&fit=crop",
+    description: "Desa Cipeundeuy adalah desa agraris di Kecamatan Surade yang mengandalkan sektor pertanian dan perkebunan sebagai penggerak ekonomi warganya. Smart Village berfokus pada pemberdayaan petani dan digitalisasi UMKM rumahan.",
     highlights: [
-      "Jakarta Smart City terintegrasi",
-      "Sistem transportasi cerdas",
-      "E-Government terdepan",
-      "Platform ekonomi digital terbesar"
+      "Pemberdayaan kelompok tani lokal",
+      "Digitalisasi UMKM rumahan",
+      "Layanan publik desa terintegrasi",
+      "Edukasi digital untuk warga desa"
     ]
   },
   {
     id: 5,
-    name: "Jambi",
-    bisnis: 89,
-    population: "3.5 Juta",
-    area: "50,058 km²",
-    governor: "Al Haris",
-    img: "https://images.unsplash.com/photo-1604999333679-b86d54738315?w=1200&h=600&fit=crop",
-    description: "Provinsi Jambi mengembangkan Smart City dengan fokus pada pengelolaan sumber daya alam berkelanjutan dan digitalisasi layanan publik.",
+    name: "Desa Gunungsungging",
+    bisnis: 27,
+    population: "5.735 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Gunungsungging",
+    img: "https://images.unsplash.com/photo-1759147833377-0345de4fb7eb?w=1200&h=600&fit=crop",
+    description: "Desa Gunungsungging berada di kawasan perbukitan Kecamatan Surade dengan potensi perkebunan yang cukup besar. Program Smart Village di desa ini menyasar digitalisasi hasil kebun dan konektivitas internet desa.",
     highlights: [
-      "Smart environmental monitoring",
-      "Digitalisasi pertanian dan perkebunan",
-      "E-Government terintegrasi",
-      "Pengembangan ekonomi digital"
+      "Digitalisasi hasil perkebunan",
+      "Perluasan akses internet desa",
+      "Pengembangan wisata alam perbukitan",
+      "Pemberdayaan ekonomi warga lokal"
     ]
   },
   {
     id: 6,
-    name: "Kep. Mentawai",
-    bisnis: 34,
-    population: "83 Ribu",
-    area: "6,011 km²",
-    governor: "Yudas Sabaggalet",
-    img: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=600&fit=crop",
-    description: "Kepulauan Mentawai mengembangkan Smart Village untuk meningkatkan konektivitas dan ekonomi masyarakat lokal dengan tetap menjaga kearifan lokal.",
+    name: "Desa Citanglar",
+    bisnis: 30,
+    population: "6.614 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Citanglar",
+    img: "https://images.unsplash.com/photo-1744887079971-29d8f215cc5d?w=1200&h=600&fit=crop",
+    description: "Desa Citanglar mengembangkan Smart Village dengan menitikberatkan pada peningkatan konektivitas dan pemberdayaan ekonomi warga melalui digitalisasi layanan desa.",
     highlights: [
-      "Smart Village untuk pulau terpencil",
-      "Digitalisasi wisata bahari",
-      "Konektivitas internet satelit",
-      "Pemberdayaan UMKM lokal"
+      "Peningkatan konektivitas internet desa",
+      "Digitalisasi layanan administrasi warga",
+      "Pemberdayaan UMKM lokal",
+      "Program pertanian berkelanjutan"
     ]
   },
   {
     id: 7,
-    name: "Magelang",
-    bisnis: 198,
-    population: "1.3 Juta",
-    area: "1,062 km²",
-    governor: "Zaenal Arifin",
-    img: "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=1200&h=600&fit=crop",
-    description: "Kota Magelang mengembangkan Smart City dengan fokus pada pariwisata berbasis teknologi dan digitalisasi UMKM lokal.",
+    name: "Desa Jagamukti",
+    bisnis: 26,
+    population: "5.875 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Jagamukti",
+    img: "https://images.unsplash.com/photo-1519082572439-7ed19908e47e?w=1200&h=600&fit=crop",
+    description: "Desa Jagamukti mengembangkan Smart Village dengan fokus pada digitalisasi pertanian dan penguatan UMKM lokal warga desa.",
     highlights: [
-      "Smart tourism Borobudur",
       "Digitalisasi UMKM lokal",
-      "Sistem manajemen lalu lintas",
-      "Layanan publik digital"
+      "Program pertanian dan perkebunan cerdas",
+      "Layanan publik desa digital",
+      "Pemberdayaan pemuda desa"
     ]
   },
   {
     id: 8,
-    name: "Medan",
-    bisnis: 467,
-    population: "2.4 Juta",
-    area: "265 km²",
-    governor: "Bobby Nasution",
-    img: "https://images.unsplash.com/photo-1572285870954-7b08e56f4c58?w=1200&h=600&fit=crop",
-    description: "Kota Medan sebagai kota terbesar di Sumatera menerapkan Smart City untuk meningkatkan efisiensi layanan publik dan ekonomi digital.",
+    name: "Desa Kadaleman",
+    bisnis: 24,
+    population: "5.319 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Kadaleman",
+    img: "https://images.unsplash.com/photo-1681414163860-e764ef3a362f?w=1200&h=600&fit=crop",
+    description: "Desa Kadaleman menerapkan konsep Smart Village untuk meningkatkan efisiensi layanan publik desa dan mendorong ekonomi digital warganya.",
     highlights: [
-      "Medan Smart City terintegrasi",
-      "Digitalisasi pasar tradisional",
-      "Sistem transportasi cerdas",
-      "Platform UMKM Medan Digital"
+      "Smart Village terintegrasi",
+      "Digitalisasi layanan publik desa",
+      "Pemberdayaan UMKM warga",
+      "Program literasi digital desa"
     ]
   },
   {
     id: 9,
-    name: "Papua Barat",
-    bisnis: 56,
-    population: "1.1 Juta",
-    area: "115,242 km²",
-    governor: "Paulus Waterpauw",
-    img: "https://images.unsplash.com/photo-1591109078846-8f53bab16c37?w=1200&h=600&fit=crop",
-    description: "Provinsi Papua Barat mengembangkan Smart Village untuk meningkatkan akses layanan publik dan ekonomi masyarakat di daerah terpencil.",
+    name: "Desa Wanasari",
+    bisnis: 21,
+    population: "5.115 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Wanasari",
+    img: "https://images.unsplash.com/photo-1667658126089-eeb299129dff?w=1200&h=600&fit=crop",
+    description: "Desa Wanasari mengembangkan Smart Village untuk meningkatkan akses layanan publik dan ekonomi masyarakat, dengan sejumlah pondok pesantren sebagai pusat pendidikan agama warganya.",
     highlights: [
-      "Smart Village untuk daerah terpencil",
-      "Digitalisasi layanan kesehatan",
-      "Konektivitas internet daerah",
-      "Pemberdayaan ekonomi lokal"
+      "Digitalisasi layanan pendidikan & pesantren",
+      "Konektivitas internet desa",
+      "Pemberdayaan ekonomi lokal",
+      "Layanan kesehatan desa digital"
     ]
   },
   {
     id: 10,
-    name: "Sulawesi Tengah",
-    bisnis: 112,
-    population: "2.9 Juta",
-    area: "68,033 km²",
-    governor: "Rusdy Mastura",
-    img: "https://images.unsplash.com/photo-1527153818091-1a9638521e2a?w=1200&h=600&fit=crop",
-    description: "Provinsi Sulawesi Tengah mengembangkan Smart City dengan fokus pada pengelolaan sumber daya alam dan digitalisasi layanan publik.",
+    name: "Desa Sirnasari",
+    bisnis: 29,
+    population: "6.376 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Sirnasari",
+    img: "https://images.unsplash.com/photo-1519688091-5b7aad286ad1?w=1200&h=600&fit=crop",
+    description: "Desa Sirnasari mengembangkan Smart Village dengan fokus pada pengelolaan sumber daya alam dan digitalisasi layanan publik bagi warganya.",
     highlights: [
-      "Smart environmental monitoring",
+      "Smart environmental monitoring desa",
       "Digitalisasi pertanian",
-      "E-Government terintegrasi",
-      "Pengembangan ekonomi digital"
+      "Layanan publik desa terintegrasi",
+      "Pengembangan ekonomi digital warga"
     ]
   },
   {
     id: 11,
-    name: "Sumatera Utara",
-    bisnis: 321,
-    population: "14.8 Juta",
-    area: "72,981 km²",
-    governor: "Edy Rahmayadi",
-    img: "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=1200&h=600&fit=crop",
-    description: "Provinsi Sumatera Utara mengembangkan Smart City untuk meningkatkan efisiensi layanan publik dan pertumbuhan ekonomi digital.",
+    name: "Desa Sukatani",
+    bisnis: 18,
+    population: "3.980 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Sukatani",
+    img: "https://images.unsplash.com/photo-1568979810251-6688ca885c1d?w=1200&h=600&fit=crop",
+    description: "Desa Sukatani adalah desa dengan jumlah penduduk paling sedikit di Kecamatan Surade, dengan potensi pertanian dan perkebunan sebagai andalan warga. Smart Village di desa ini mendorong digitalisasi UMKM dan pertanian.",
     highlights: [
-      "Smart City terintegrasi",
-      "Digitalisasi industri dan perdagangan",
-      "Sistem transportasi cerdas",
-      "Platform UMKM digital"
+      "Digitalisasi industri rumahan dan UMKM",
+      "Program pertanian cerdas",
+      "Layanan administrasi desa online",
+      "Pemberdayaan ekonomi warga"
     ]
   },
   {
     id: 12,
-    name: "Yogyakarta",
-    bisnis: 524,
-    population: "3.7 Juta",
-    area: "3,133 km²",
-    governor: "Sri Sultan Hamengkubuwono X",
-    img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=600&fit=crop",
-    description: "Daerah Istimewa Yogyakarta mengembangkan Smart City dengan fokus pada pariwisata budaya, pendidikan, dan digitalisasi UMKM berbasis kearifan lokal.",
+    name: "Desa Kademangan",
+    bisnis: 20,
+    population: "4.354 Jiwa",
+    area: "Kec. Surade",
+    governor: "Kepala Desa Kademangan",
+    img: "https://images.unsplash.com/photo-1759861680725-914ce086be4e?w=1200&h=600&fit=crop",
+    description: "Desa Kademangan mengembangkan Smart Village dengan fokus pada pariwisata berbasis kearifan lokal dan digitalisasi UMKM warga desa.",
     highlights: [
-      "Smart tourism kawasan Malioboro & Keraton",
-      "Digitalisasi UMKM dan ekonomi kreatif",
-      "Ekosistem pendidikan berbasis teknologi",
-      "Layanan publik terintegrasi Jogja Smart Service"
+      "Digitalisasi UMKM lokal",
+      "Pengembangan wisata desa",
+      "Layanan publik terintegrasi",
+      "Edukasi digital untuk warga"
     ]
   },
 ];

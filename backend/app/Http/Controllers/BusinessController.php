@@ -74,11 +74,19 @@ class BusinessController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'address' => 'required|string',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'phone' => 'required|string',
             'email' => 'nullable|email',
             'operating_hours' => 'nullable|string',
+            'closed_days' => 'nullable|array',
+            'closed_days.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
             'website' => 'nullable|string',
+            'video_url' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'referred_by' => 'nullable|string',
         ]);
 
@@ -86,13 +94,21 @@ class BusinessController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $data = $request->except('image');
+        $data = $request->except(['image', 'images']);
         $data['user_id'] = $request->user()->id;
         $data['status'] = $request->user()->role === 'admin' ? 'approved' : 'pending';
 
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('businesses', 'public');
             $data['image'] = '/storage/' . $path;
+        }
+
+        if ($request->hasFile('images')) {
+            $galleryPaths = [];
+            foreach ($request->file('images') as $file) {
+                $galleryPaths[] = '/storage/' . $file->store('businesses', 'public');
+            }
+            $data['images'] = $galleryPaths;
         }
 
         $business = Business::create($data);
@@ -129,11 +145,21 @@ class BusinessController extends Controller
             'title' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|required|string',
             'address' => 'sometimes|required|string',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'phone' => 'sometimes|required|string',
             'email' => 'nullable|email',
             'operating_hours' => 'nullable|string',
+            'closed_days' => 'nullable|array',
+            'closed_days.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
             'website' => 'nullable|string',
+            'video_url' => 'nullable|string',
             'image' => 'nullable', // could be string URL or file
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'remove_gallery' => 'nullable|array',
+            'remove_gallery.*' => 'string',
             'is_premium' => 'nullable|boolean',
             'status' => 'nullable|string|in:pending,approved,rejected',
         ]);
@@ -142,7 +168,7 @@ class BusinessController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $data = $request->except('image');
+        $data = $request->except(['image', 'images', 'remove_gallery']);
 
         if ($request->hasFile('image')) {
             // Delete old image if exists
@@ -153,6 +179,23 @@ class BusinessController extends Controller
             $path = $request->file('image')->store('businesses', 'public');
             $data['image'] = '/storage/' . $path;
         }
+
+        // Start from the existing gallery, drop any paths the user asked to
+        // remove, then append any newly-uploaded files.
+        $gallery = $business->images ?? [];
+        if ($request->has('remove_gallery')) {
+            $toRemove = $request->input('remove_gallery', []);
+            foreach ($toRemove as $removePath) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $removePath));
+            }
+            $gallery = array_values(array_diff($gallery, $toRemove));
+        }
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $file) {
+                $gallery[] = '/storage/' . $file->store('businesses', 'public');
+            }
+        }
+        $data['images'] = $gallery;
 
         // Only admin can change status or premium status
         if ($request->user()->role !== 'admin') {
@@ -181,6 +224,10 @@ class BusinessController extends Controller
         if ($business->image) {
             $oldPath = str_replace('/storage/', '', $business->image);
             Storage::disk('public')->delete($oldPath);
+        }
+
+        foreach ($business->images ?? [] as $galleryPath) {
+            Storage::disk('public')->delete(str_replace('/storage/', '', $galleryPath));
         }
 
         $business->delete();

@@ -177,7 +177,7 @@ export default function Login() {
 
               {/* Forgot Password */}
               <div className="login-forgot">
-                <Link to="/contact">Lupa kata sandi?</Link>
+              <Link to="/forgot-password">Lupa kata sandi?</Link>
               </div>
 
               {/* Divider */}

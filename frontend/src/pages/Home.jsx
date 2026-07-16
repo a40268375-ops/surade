@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
   import { SMART_CITIES } from "../data/smartCities";
   import logoImg from "../assets/logo.png";
   import Loading from "../components/Loading";
+  import WaveDivider from "../components/WaveDivider";
   import {
     Store,
     Coffee,
@@ -714,6 +715,13 @@ import { useState, useRef, useEffect } from "react";
               ))}
             </div>
           </div>
+        </section>
+
+        {/* ── FOTO CURUG CIKASO / KECAMATAN SURADE (band foto diapit gelombang) ── */}
+        <section className="kenapa-section">
+          <WaveDivider position="top" color="#f8fafc" />
+          <div className="kenapa-overlay" />
+          <WaveDivider position="bottom" color="#ffffff" flip />
         </section>
 
         {/* ── CEPAT PENCARIAN SECTION ── */}

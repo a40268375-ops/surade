@@ -121,7 +121,7 @@ body { background: #f5f6fa; }
 ───────────────────────────────────────────── */
 .home-hero {
   position: relative;
-  min-height: 80vh;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -133,7 +133,7 @@ body { background: #f5f6fa; }
 .home-hero__bg {
   position: absolute;
   inset: 0;
-  background: url('../assets/city_bg.jpg') no-repeat center top / cover;
+  background: url('../assets/city_bg.jpg') no-repeat center center / cover;
   z-index: 0;
   overflow: hidden;
 }
@@ -1634,5 +1634,36 @@ body { background: #f5f6fa; }
     flex-direction: column;
     text-align: center;
     gap: 12px;
+  }
+}
+/* ══════════════════════════════════════════════════
+   FOTO CURUG CIKASO / KECAMATAN SURADE — band foto polos
+   diapit gelombang pemisah di atas & bawah (tanpa teks)
+═══════════════════════════════════════════════════ */
+.kenapa-section {
+  position: relative;
+  height: 380px;
+  overflow: hidden;
+  isolation: isolate;
+
+  /* Ganti nama file di bawah ini dengan foto Curug Cikaso
+     atau foto Kecamatan Surade kamu sendiri */
+  background-image: url("../assets/sawah-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.kenapa-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 46, 44, 0.25), rgba(0, 46, 44, 0.35));
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .kenapa-section {
+    height: 240px;
+    background-attachment: scroll;
   }
 }

@@ -4,6 +4,8 @@ import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
 import { usePageLoading } from "../hooks/usePageLoading";
 import { SMART_CITIES } from "../data/smartCities";
+import api, { getImageUrl } from "../utils/api";
+import BusinessMap from "../components/BusinessMap";
 import {
   MapPin,
   Building2,
@@ -100,12 +102,32 @@ export default function SmartCity() {
   const [city, setCity] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dbBusinesses, setDbBusinesses] = useState([]);
+  const [viewMode, setViewMode] = useState("grid"); // "grid" | "map"
 
   useEffect(() => {
     window.scrollTo(0, 0);
     const foundCity = SMART_CITIES.find((c) => c.id === parseInt(id));
     setCity(foundCity);
   }, [id]);
+
+  // Ambil SEMUA bisnis dari API, lalu di bawah kita saring yang alamatnya
+  // menyebut nama desa/kelurahan ini (mis. "Kelurahan Surade", "Desa
+  // Sukatani"). Nama desa disederhanakan dulu (buang kata "Desa"/
+  // "Kelurahan") supaya bisnis yang alamatnya cuma tulis "Sukatani" saja
+  // (tanpa embel-embel "Desa") tetap ketemu.
+  useEffect(() => {
+    async function loadBusinesses() {
+      try {
+        const data = await api.get("/businesses");
+        setDbBusinesses(data);
+      } catch (e) {
+        console.error("Gagal memuat data bisnis dari API", e);
+        setDbBusinesses([]);
+      }
+    }
+    loadBusinesses();
+  }, []);
 
   if (pageLoading) {
     return <Loading />;
@@ -123,9 +145,24 @@ export default function SmartCity() {
     );
   }
 
-  const filteredBusinesses = MOCK_BUSINESSES.filter((business) => {
+  const villageKeyword = city.name.replace(/^(desa|kelurahan)\s+/i, "").toLowerCase();
+
+  const businessesInThisVillage = dbBusinesses
+    .filter((b) => (b.address || "").toLowerCase().includes(villageKeyword))
+    .map((b) => ({
+      id: b.id,
+      name: b.title,
+      category: b.category?.name || "Lainnya",
+      location: b.address,
+      rating: null,
+      reviews: 0,
+      status: b.status === "approved" ? "Buka Sekarang" : "Pending",
+      img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
+    }));
+
+  const filteredBusinesses = businessesInThisVillage.filter((business) => {
     const matchesCategory = selectedCategory === "all" || business.category.toLowerCase().includes(selectedCategory);
-    const matchesSearch = business.name.toLowerCase().includes(searchQuery) || 
+    const matchesSearch = business.name.toLowerCase().includes(searchQuery) ||
                          business.location.toLowerCase().includes(searchQuery);
     return matchesCategory && matchesSearch;
   });
@@ -216,6 +253,26 @@ export default function SmartCity() {
               <span className="sc-section__count">({filteredBusinesses.length})</span>
             </h2>
 
+            <div className="category-view-toggle" style={{ marginBottom: 16 }}>
+              <button
+                type="button"
+                className={`category-view-toggle__btn ${viewMode === "grid" ? "active" : ""}`}
+                onClick={() => setViewMode("grid")}
+              >
+                Daftar
+              </button>
+              <button
+                type="button"
+                className={`category-view-toggle__btn ${viewMode === "map" ? "active" : ""}`}
+                onClick={() => setViewMode("map")}
+              >
+                Peta
+              </button>
+            </div>
+
+            {viewMode === "map" ? (
+              <BusinessMap businesses={filteredBusinesses} />
+            ) : (
             <div className="sc-business-grid">
               {filteredBusinesses.length > 0 ? (
                 filteredBusinesses.map((business) => (
@@ -263,6 +320,7 @@ export default function SmartCity() {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       </section>

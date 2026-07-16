@@ -1,6 +1,7 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import api, { getImageUrl } from "../utils/api";
+import BusinessMap from "../components/BusinessMap";
 import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
 import {
@@ -93,6 +94,7 @@ export default function Category() {
   const [saved, setSaved] = useState({});
   const [searchKeyword, setSearchKeyword] = useState(queryQ);
   const [sortBy, setSortBy] = useState("relevan");
+  const [viewMode, setViewMode] = useState("grid"); // "grid" | "map"
 
   // Data asli dari API (bukan lagi data contoh/statis)
   const [dbCategories, setDbCategories] = useState([]);
@@ -343,6 +345,22 @@ export default function Category() {
                   Reset filter
                 </button>
               )}
+              <div className="category-view-toggle">
+                <button
+                  type="button"
+                  className={`category-view-toggle__btn ${viewMode === "grid" ? "active" : ""}`}
+                  onClick={() => setViewMode("grid")}
+                >
+                  Daftar
+                </button>
+                <button
+                  type="button"
+                  className={`category-view-toggle__btn ${viewMode === "map" ? "active" : ""}`}
+                  onClick={() => setViewMode("map")}
+                >
+                  Peta
+                </button>
+              </div>
               <div className="category-sort">
                 <SlidersHorizontal size={15} className="category-sort__icon" />
                 <select
@@ -359,7 +377,9 @@ export default function Category() {
             </div>
           </div>
 
-          {loading ? null : finalBisnis.length > 0 ? (
+          {viewMode === "map" ? (
+            <BusinessMap businesses={finalBisnis} />
+          ) : loading ? null : finalBisnis.length > 0 ? (
             <div className="reko-grid">
               {finalBisnis.map((bisnis, idx) => (
                 <Link
