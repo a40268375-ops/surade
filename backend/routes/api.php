@@ -9,6 +9,11 @@ use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\CouponController;
+use App\Http\Controllers\MenuItemController;
+use App\Http\Controllers\MessageController;
+use App\Http\Controllers\SavedBusinessController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,6 +38,12 @@ Route::get('subscription-plans', [SubscriptionController::class, 'plans']);
 
 // Booking: siapa saja (pengunjung, tanpa login) boleh mengajukan booking ke sebuah bisnis
 Route::post('bookings', [BookingController::class, 'store']);
+
+// Menu sebuah bisnis (dipanggil publik lewat ?business_id=)
+Route::get('menu-items', [MenuItemController::class, 'index']);
+
+// Inbox: siapa saja (pengunjung, tanpa login) boleh kirim pesan ke sebuah bisnis
+Route::post('messages', [MessageController::class, 'store']);
 
 
 /*
@@ -70,6 +81,31 @@ Route::middleware('auth:sanctum')->group(function () {
     // Jalur khusus untuk user bertipe Reseller melihat bisnisnya
     Route::get('reseller/businesses', [UserController::class, 'resellerBusinesses']);
 
+    // Pengumuman (read-only untuk pemilik bisnis, CRUD di grup admin di bawah)
+    Route::get('announcements', [AnnouncementController::class, 'index']);
+
+    // Kupon milik bisnis sendiri
+    Route::get('my-coupons', [CouponController::class, 'index']);
+    Route::post('coupons', [CouponController::class, 'store']);
+    Route::put('coupons/{id}', [CouponController::class, 'update']);
+    Route::delete('coupons/{id}', [CouponController::class, 'destroy']);
+
+    // Menu milik bisnis sendiri (POST dipakai juga untuk update agar mendukung upload gambar)
+    Route::get('my-menu-items', [MenuItemController::class, 'index']);
+    Route::post('menu-items', [MenuItemController::class, 'store']);
+    Route::post('menu-items/{id}', [MenuItemController::class, 'update']);
+    Route::delete('menu-items/{id}', [MenuItemController::class, 'destroy']);
+
+    // Inbox pesan masuk ke bisnis sendiri
+    Route::get('my-messages', [MessageController::class, 'index']);
+    Route::put('messages/{id}', [MessageController::class, 'update']); // tandai dibaca
+    Route::delete('messages/{id}', [MessageController::class, 'destroy']);
+
+    // Simpan / bookmark bisnis
+    Route::get('my-saved-businesses', [SavedBusinessController::class, 'index']);
+    Route::post('saved-businesses', [SavedBusinessController::class, 'store']);
+    Route::delete('saved-businesses/{id}', [SavedBusinessController::class, 'destroy']);
+
     // -------------------------------------------------------------
     // Fitur Khusus ADMIN (Grouped & Prefixed dengan 'admin/')
     // -------------------------------------------------------------
@@ -105,6 +141,11 @@ Route::middleware('auth:sanctum')->group(function () {
         // 7. Verifikasi Pembayaran Premium (Admin Control)
         Route::put('subscriptions/{id}/verify', [SubscriptionController::class, 'verify']);
         Route::put('subscriptions/{id}/reject', [SubscriptionController::class, 'reject']);
+
+        // 8. CRUD Pengumuman (Admin Control)
+        Route::post('announcements', [AnnouncementController::class, 'store']);
+        Route::put('announcements/{id}', [AnnouncementController::class, 'update']);
+        Route::delete('announcements/{id}', [AnnouncementController::class, 'destroy']);
     });
 
 });

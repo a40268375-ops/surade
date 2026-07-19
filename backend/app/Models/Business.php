@@ -13,6 +13,7 @@ class Business extends Model
         'title',
         'description',
         'address',
+        'village',
         'latitude',
         'longitude',
         'phone',

@@ -4,9 +4,9 @@ import { useState, useRef, useEffect } from "react";
   import "./Home.css";
   import Navbar from "../components/Navbar";
   import { SMART_CITIES } from "../data/smartCities";
+  import { DESA_LIST } from "../data/desaList";
   import logoImg from "../assets/logo.png";
   import Loading from "../components/Loading";
-  import WaveDivider from "../components/WaveDivider";
   import {
     Store,
     Coffee,
@@ -27,16 +27,8 @@ import { useState, useRef, useEffect } from "react";
     Calendar,
   } from "lucide-react";
 
-  /* ── Indonesian cities ── */
-  const KOTA_INDONESIA = [
-    "Jakarta", "Surabaya", "Bandung", "Medan", "Bekasi", "Tangerang", "Depok",
-    "Semarang", "Palembang", "Makassar", "South Tangerang", "Batam", "Pekanbaru",
-    "Bandar Lampung", "Padang", "Malang", "Bogor", "Denpasar", "Samarinda",
-    "Tasikmalaya", "Pontianak", "Banjarmasin", "Balikpapan", "Jambi", "Surakarta",
-    "Mataram", "Manado", "Yogyakarta", "Ambon", "Kupang", "Jayapura", "Sorong",
-    "Ternate", "Gorontalo", "Kendari", "Palu", "Pekalongan", "Tegal", "Cirebon",
-    "Sukabumi", "Kabupaten Bogor", "Kabupaten Bekasi", "Kabupaten Tangerang",
-  ];
+  /* ── Daftar Desa/Kelurahan Kecamatan Surade (dropdown Lokasi) ── */
+  const KOTA_INDONESIA = DESA_LIST;
 
   /* ── Category tabs ── */
   const CATEGORIES = [
@@ -259,7 +251,7 @@ import { useState, useRef, useEffect } from "react";
 
   export default function Home() {
     const navigate = useNavigate();
-    const [selectedKota, setSelectedKota] = useState("Jakarta");
+    const [selectedKota, setSelectedKota] = useState(DESA_LIST[0] || "Kelurahan Surade");
     const [kotaSearch, setKotaSearch] = useState("");
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState("all");
@@ -277,6 +269,7 @@ import { useState, useRef, useEffect } from "react";
     const [dbBusinesses, setDbBusinesses] = useState([]);
     const [dbCategories, setDbCategories] = useState([]);
     const [dbAds, setDbAds] = useState([]);
+    const [dbEvents, setDbEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [apiError, setApiError] = useState(false);
 
@@ -297,6 +290,10 @@ import { useState, useRef, useEffect } from "react";
           // moment its owner's premium period ends - no manual step needed.
           const adsData = await api.get('/advertisements');
           setDbAds(adsData);
+          // Event & Promo: diisi Admin lewat Dashboard > Event, tayang otomatis
+          // untuk semua pengunjung begitu dibuat (tidak perlu premium/approval).
+          const eventsData = await api.get('/events');
+          setDbEvents(eventsData);
           setApiError(false);
         } catch (e) {
           console.error("Gagal memuat data dari API", e);
@@ -364,7 +361,7 @@ import { useState, useRef, useEffect } from "react";
       name: b.title,
       category: b.category?.name || "Lainnya",
       tags: [b.title],
-      location: b.address,
+      location: b.village || b.address,
       views: "Pratinjau",
       status: b.status === "approved" ? "Buka Sekarang" : "Pending",
       img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
@@ -569,7 +566,7 @@ import { useState, useRef, useEffect } from "react";
                       <input
                         autoFocus
                         type="text"
-                        placeholder="Cari kota..."
+                        placeholder="Cari desa..."
                         value={kotaSearch}
                         onChange={(e) => setKotaSearch(e.target.value)}
                         className="home-kota-dropdown__input"
@@ -588,7 +585,7 @@ import { useState, useRef, useEffect } from "react";
                             {kota}
                           </li>
                         ))
-                        : <li className="home-kota-dropdown__empty">Kota tidak ditemukan</li>
+                        : <li className="home-kota-dropdown__empty">Desa tidak ditemukan</li>
                       }
                     </ul>
                   </div>
@@ -717,11 +714,72 @@ import { useState, useRef, useEffect } from "react";
           </div>
         </section>
 
-        {/* ── FOTO CURUG CIKASO / KECAMATAN SURADE (band foto diapit gelombang) ── */}
+        {/* ── EVENT & PROMO SECTION ──
+             Diisi Admin lewat Dashboard > Event. Tayang otomatis untuk semua
+             pengunjung (beda dengan Iklan, event TIDAK butuh langganan Premium
+             karena ini konten resmi dari admin, bukan promosi bisnis perorangan). */}
+        {dbEvents.length > 0 && (
+          <section className="event-section">
+            <div className="event-inner">
+              <h2 className="event-title">Event &amp; Promo</h2>
+              <p className="event-subtitle">Info acara dan promo terbaru dari Surade.co.id</p>
+
+              <div className="event-grid">
+                {dbEvents.map((ev) => (
+                  <div key={ev.id} className="event-card">
+                    <div className="event-card__img-wrap">
+                      <img
+                        src={ev.image ? getImageUrl(ev.image) : "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=500&h=300&fit=crop"}
+                        alt={ev.title}
+                        className="event-card__img"
+                        loading="lazy"
+                      />
+                      {ev.event_date && (
+                        <span className="event-card__date">
+                          {new Date(ev.event_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                    <div className="event-card__body">
+                      <h3 className="event-card__title">{ev.title}</h3>
+                      {ev.location && (
+                        <p className="event-card__location">
+                          <MapPin size={13} />
+                          {ev.location}
+                        </p>
+                      )}
+                      <p className="event-card__desc">{ev.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── FOTO CURUG CIKASO / KECAMATAN SURADE (gelombang lembut di tepi) ── */}
         <section className="kenapa-section">
-          <WaveDivider position="top" color="#f8fafc" />
           <div className="kenapa-overlay" />
-          <WaveDivider position="bottom" color="#ffffff" flip />
+
+          <svg className="kenapa-wave kenapa-wave--top" viewBox="0 0 1440 140" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="kenapaWaveTop" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d="M0,0 L1440,0 L1440,60 C1200,110 960,40 720,64 C480,88 240,24 0,72 Z" fill="url(#kenapaWaveTop)" />
+          </svg>
+
+          <svg className="kenapa-wave kenapa-wave--bottom" viewBox="0 0 1440 140" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="kenapaWaveBottom" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d="M0,140 L1440,140 L1440,80 C1200,32 960,100 720,76 C480,52 240,116 0,68 Z" fill="url(#kenapaWaveBottom)" />
+          </svg>
         </section>
 
         {/* ── CEPAT PENCARIAN SECTION ── */}
@@ -966,7 +1024,7 @@ import { useState, useRef, useEffect } from "react";
           <div className="footer-bottom">
             <div className="footer-bottom__inner">
               <p className="footer-copyright">
-                &copy; 2024 Surade.co.id. All rights reserved.
+                &copy; 2026 Surade.co.id. All rights reserved.
               </p>
             </div>
           </div>

@@ -836,3 +836,46 @@
 .db-invoice-success__icon--pending {
   color: #d97706;
 }
+/* ── Pengumuman list ── */
+.db-announcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.db-announcement-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  background: #fff;
+}
+.db-announcement-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  gap: 0.6rem;
+}
+.db-announcement-card__top strong {
+  font-size: 1rem;
+  color: #111827;
+}
+.db-announcement-card__date {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+.db-announcement-card p {
+  color: #4b5563;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 0.5rem;
+  white-space: pre-line;
+}
+
+/* ── Long text cells (inbox message) ── */
+.db-message-cell {
+  max-width: 260px;
+  white-space: normal;
+  color: #4b5563;
+  font-size: 0.85rem;
+}

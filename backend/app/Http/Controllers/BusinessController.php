@@ -34,7 +34,11 @@ class BusinessController extends Controller
         }
 
         if ($request->has('location') && $request->location != '') {
-            $query->where('address', 'like', "%{$request->location}%");
+            $location = $request->location;
+            $query->where(function ($q) use ($location) {
+                $q->where('village', $location)
+                  ->orWhere('address', 'like', "%{$location}%");
+            });
         }
 
        $isAdminRequest = $request->user() && $request->user()->role === 'admin';
@@ -74,6 +78,7 @@ class BusinessController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'address' => 'required|string',
+            'village' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'phone' => 'required|string',
@@ -85,8 +90,8 @@ class BusinessController extends Controller
             'tags.*' => 'string',
             'website' => 'nullable|string',
             'video_url' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'referred_by' => 'nullable|string',
         ]);
 
@@ -145,6 +150,7 @@ class BusinessController extends Controller
             'title' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|required|string',
             'address' => 'sometimes|required|string',
+            'village' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'phone' => 'sometimes|required|string',
@@ -156,8 +162,8 @@ class BusinessController extends Controller
             'tags.*' => 'string',
             'website' => 'nullable|string',
             'video_url' => 'nullable|string',
-            'image' => 'nullable', // could be string URL or file
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // could be a new uploaded file
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'remove_gallery' => 'nullable|array',
             'remove_gallery.*' => 'string',
             'is_premium' => 'nullable|boolean',

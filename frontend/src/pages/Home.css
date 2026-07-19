@@ -1651,7 +1651,20 @@ body { background: #f5f6fa; }
   background-image: url("../assets/sawah-bg.jpg");
   background-size: cover;
   background-position: center;
+
+  /* Efek parallax: foto "diam" di tempat saat halaman di-scroll, jadi
+     bagian foto yang kelihatan di jendela gelombang ini berubah/mengalir
+     mengikuti scroll (persis seperti website referensi rafting itu). */
   background-attachment: fixed;
+}
+
+/* background-attachment: fixed tidak didukung dengan baik di HP (iOS Safari
+   dkk), jadi di layar sempit kita balikin ke mode biasa (scroll normal)
+   supaya tetap smooth di mobile. */
+@media (max-width: 768px), (hover: none) {
+  .kenapa-section {
+    background-attachment: scroll;
+  }
 }
 
 .kenapa-overlay {
@@ -1661,9 +1674,150 @@ body { background: #f5f6fa; }
   z-index: 1;
 }
 
+.kenapa-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 130px;
+  z-index: 2;
+  pointer-events: none;
+  display: block;
+}
+
+.kenapa-wave--top {
+  top: 0;
+}
+
+.kenapa-wave--bottom {
+  bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .kenapa-wave {
+    height: 70px;
+  }
+}
+
 @media (max-width: 768px) {
   .kenapa-section {
     height: 240px;
-    background-attachment: scroll;
   }
+}
+/* ─────────────────────────────────────────────
+   EVENT & PROMO SECTION
+   (diisi Admin lewat Dashboard > Event, tayang
+   otomatis ke semua pengunjung)
+───────────────────────────────────────────── */
+.event-section {
+  background: #f8fafc;
+  padding: 56px 0 64px;
+  border-top: 1px solid #e8ecf0;
+}
+
+.event-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.event-title {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.event-subtitle {
+  font-size: 0.85rem;
+  color: #64748b;
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.event-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.event-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e8ecf0;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.06);
+  transition: box-shadow 0.22s, transform 0.22s;
+}
+
+.event-card:hover {
+  box-shadow: 0 8px 32px rgba(15,23,42,0.12);
+  transform: translateY(-3px);
+}
+
+.event-card__img-wrap {
+  position: relative;
+  height: 170px;
+  overflow: hidden;
+}
+
+.event-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.event-card__date {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 20px;
+}
+
+.event-card__body {
+  padding: 16px 18px 18px;
+}
+
+.event-card__title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+
+.event-card__location {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #007570;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.event-card__desc {
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .event-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .event-grid { grid-template-columns: 1fr; }
 }

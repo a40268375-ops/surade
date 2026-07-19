@@ -65,6 +65,7 @@ const BusinessManagement = () => {
                         <th>Nama Bisnis (Title)</th>
                         <th>Kategori & Pemilik</th>
                         <th>Kontak & Alamat</th>
+                        <th>Desa</th>
                         <th>Status</th>
                         <th>Tipe Akun</th>
                         <th>Aksi Kontrol</th>
@@ -73,7 +74,7 @@ const BusinessManagement = () => {
                 <tbody>
                     {businesses.length === 0 ? (
                         <tr>
-                            <td colSpan="7" style={{ textAlign: 'center' }}>Belum ada data bisnis terdaftar.</td>
+                            <td colSpan="8" style={{ textAlign: 'center' }}>Belum ada data bisnis terdaftar.</td>
                         </tr>
                     ) : (
                         businesses.map((b) => (
@@ -99,7 +100,11 @@ const BusinessManagement = () => {
                                     <span style={{ fontSize: '13px', display: 'block' }}>📞 {b.phone}</span>
                                     <span style={{ fontSize: '12px', color: '#555', display: 'block' }}>📍 {b.address}</span>
                                 </td>
-                                
+
+                                <td>
+                                    <span style={{ fontSize: '13px' }}>{b.village || <em style={{ color: '#adb5bd' }}>Belum diisi</em>}</span>
+                                </td>
+
                                 <td>
                                     <span style={{ 
                                         padding: '4px 8px', 

@@ -278,31 +278,41 @@ body { background: #f5f6fa; }
   color: #ef4444;
 }
 
-.category-view-toggle {
-  display: inline-flex;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
+/* Layout 2 kolom: daftar bisnis (kiri) + kotak peta (kanan), tampil bareng
+   di halaman yang sama — bukan tab/toggle terpisah. */
+.category-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+  align-items: start;
 }
 
-.category-view-toggle__btn {
-  background: #fff;
-  border: none;
-  color: #64748b;
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: background 0.18s, color 0.18s;
+.category-layout__main {
+  min-width: 0; /* supaya grid kartu tidak overflow */
 }
 
-.category-view-toggle__btn + .category-view-toggle__btn {
-  border-left: 1.5px solid #e2e8f0;
+.category-layout__map {
+  position: sticky;
+  top: 88px; /* di bawah navbar */
 }
 
-.category-view-toggle__btn.active {
-  background: #007570;
-  color: #fff;
+.category-layout__map .biz-map {
+  height: 620px;
+}
+
+@media (max-width: 1080px) {
+  .category-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .category-layout__map {
+    position: static;
+    order: -1; /* peta muncul di atas daftar pada layar sempit */
+  }
+
+  .category-layout__map .biz-map {
+    height: 340px;
+  }
 }
 
 .category-sort {

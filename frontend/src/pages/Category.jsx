@@ -1,7 +1,6 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import api, { getImageUrl } from "../utils/api";
-import BusinessMap from "../components/BusinessMap";
 import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
 import {
@@ -20,6 +19,7 @@ import {
   SearchX,
   X,
 } from "lucide-react";
+import BusinessMap from "../components/BusinessMap";
 import "./Category.css";
 
 /* ── Fallback category tabs (dipakai hanya kalau API belum bisa diakses) ── */
@@ -94,7 +94,6 @@ export default function Category() {
   const [saved, setSaved] = useState({});
   const [searchKeyword, setSearchKeyword] = useState(queryQ);
   const [sortBy, setSortBy] = useState("relevan");
-  const [viewMode, setViewMode] = useState("grid"); // "grid" | "map"
 
   // Data asli dari API (bukan lagi data contoh/statis)
   const [dbCategories, setDbCategories] = useState([]);
@@ -159,7 +158,7 @@ export default function Category() {
         category: b.category?.name || "Lainnya",
         categorySlug: b.category?.slug || "",
         tags: [b.title],
-        location: b.address,
+        location: b.village || b.address,
         views: "Pratinjau",
         status: b.status === "approved" ? "Buka Sekarang" : "Pending",
         img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
@@ -345,22 +344,6 @@ export default function Category() {
                   Reset filter
                 </button>
               )}
-              <div className="category-view-toggle">
-                <button
-                  type="button"
-                  className={`category-view-toggle__btn ${viewMode === "grid" ? "active" : ""}`}
-                  onClick={() => setViewMode("grid")}
-                >
-                  Daftar
-                </button>
-                <button
-                  type="button"
-                  className={`category-view-toggle__btn ${viewMode === "map" ? "active" : ""}`}
-                  onClick={() => setViewMode("map")}
-                >
-                  Peta
-                </button>
-              </div>
               <div className="category-sort">
                 <SlidersHorizontal size={15} className="category-sort__icon" />
                 <select
@@ -377,80 +360,89 @@ export default function Category() {
             </div>
           </div>
 
-          {viewMode === "map" ? (
-            <BusinessMap businesses={finalBisnis} />
-          ) : loading ? null : finalBisnis.length > 0 ? (
-            <div className="reko-grid">
-              {finalBisnis.map((bisnis, idx) => (
-                <Link
-                  key={bisnis.id}
-                  to={`/business/${bisnis.id}`}
-                  className="biz-card biz-card--link"
-                  style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s` }}
-                >
-                  {/* Image */}
-                  <div className="biz-card__img-wrap">
-                    <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
-                    <div className="biz-card__img-overlay">
-                      <button
-                        type="button"
-                        className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
-                        onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
-                        aria-label="Simpan"
-                      >
-                        <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                        <span>Simpan</span>
-                      </button>
-                      <span className="biz-card__views">
-                        <Eye size={13} />
-                        <span>{bisnis.views}</span>
-                      </span>
-                    </div>
-                    {bisnis.rating && (
-                      <span className="biz-card__rating">
-                        <Star size={12} fill="#fbbf24" stroke="#fbbf24" />
-                        {bisnis.rating}
-                      </span>
-                    )}
-                  </div>
+          <div className="category-layout">
+            <div className="category-layout__main">
+              {loading ? null : finalBisnis.length > 0 ? (
+                <div className="reko-grid">
+                  {finalBisnis.map((bisnis, idx) => (
+                    <Link
+                      key={bisnis.id}
+                      to={`/business/${bisnis.id}`}
+                      className="biz-card biz-card--link"
+                      style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s` }}
+                    >
+                      {/* Image */}
+                      <div className="biz-card__img-wrap">
+                        <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
+                        <div className="biz-card__img-overlay">
+                          <button
+                            type="button"
+                            className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
+                            onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
+                            aria-label="Simpan"
+                          >
+                            <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
+                            <span>Simpan</span>
+                          </button>
+                          <span className="biz-card__views">
+                            <Eye size={13} />
+                            <span>{bisnis.views}</span>
+                          </span>
+                        </div>
+                        {bisnis.rating && (
+                          <span className="biz-card__rating">
+                            <Star size={12} fill="#fbbf24" stroke="#fbbf24" />
+                            {bisnis.rating}
+                          </span>
+                        )}
+                      </div>
 
-                  {/* Body */}
-                  <div className="biz-card__body">
-                    <h3 className="biz-card__name">{bisnis.name}</h3>
-                    <p className="biz-card__category">{bisnis.category}</p>
-                    <div className="biz-card__tags">
-                      {bisnis.tags.map((tag) => (
-                        <span key={tag} className="biz-card__tag">
-                          <Tag size={11} />
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="biz-card__footer">
-                      <span className="biz-card__location">
-                        <MapPin size={12} />
-                        {bisnis.location}
-                      </span>
-                      <span className="biz-card__cta">{bisnis.status} →</span>
-                    </div>
+                      {/* Body */}
+                      <div className="biz-card__body">
+                        <h3 className="biz-card__name">{bisnis.name}</h3>
+                        <p className="biz-card__category">{bisnis.category}</p>
+                        <div className="biz-card__tags">
+                          {bisnis.tags.map((tag) => (
+                            <span key={tag} className="biz-card__tag">
+                              <Tag size={11} />
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="biz-card__footer">
+                          <span className="biz-card__location">
+                            <MapPin size={12} />
+                            {bisnis.location}
+                          </span>
+                          <span className="biz-card__cta">{bisnis.status} →</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="category-empty">
+                  <SearchX size={48} className="category-empty__icon" />
+                  <p>Tidak ada bisnis yang cocok dengan pencarian atau filter Anda.</p>
+                  <div className="category-empty__actions">
+                    {hasActiveFilters && (
+                      <button type="button" className="category-empty__reset" onClick={resetFilters}>
+                        Reset Filter
+                      </button>
+                    )}
+                    <Link to="/" className="category-empty__link">Kembali ke Home</Link>
                   </div>
-                </Link>
-              ))}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="category-empty">
-              <SearchX size={48} className="category-empty__icon" />
-              <p>Tidak ada bisnis yang cocok dengan pencarian atau filter Anda.</p>
-              <div className="category-empty__actions">
-                {hasActiveFilters && (
-                  <button type="button" className="category-empty__reset" onClick={resetFilters}>
-                    Reset Filter
-                  </button>
-                )}
-                <Link to="/" className="category-empty__link">Kembali ke Home</Link>
-              </div>
-            </div>
-          )}
+
+            {/* Peta: nempel di samping daftar, selalu kelihatan bareng (bukan tab terpisah) */}
+            {!loading && finalBisnis.length > 0 && (
+              <aside className="category-layout__map">
+                <BusinessMap businesses={finalBisnis} />
+              </aside>
+            )}
+          </div>
         </div>
       </section>
     </div>

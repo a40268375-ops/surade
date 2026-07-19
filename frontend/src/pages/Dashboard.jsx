@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import api, { getImageUrl } from "../utils/api";
 import "./Dashboard.css";
 import Loading from "../components/Loading";
+import { DESA_LIST } from "../data/desaList";
 import {
   Building2,
   Users,
@@ -27,8 +28,8 @@ import {
   Megaphone,
   CalendarDays,
   Crown,
-  Receipt,
   Gift,
+  Receipt,
   Lock,
   Home,
   ArrowLeft,
@@ -49,6 +50,11 @@ export default function Dashboard() {
   const [plans, setPlans] = useState({});
   const [resellerData, setResellerData] = useState(null); // legacy, unused now that Reseller tab is removed
   const [bookings, setBookings] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [coupons, setCoupons] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [savedBusinesses, setSavedBusinesses] = useState([]);
 
   // Loading/Error states
   const [loading, setLoading] = useState(true);
@@ -83,6 +89,7 @@ export default function Dashboard() {
   const [bizCategory, setBizCategory] = useState("");
   const [bizDescription, setBizDescription] = useState("");
   const [bizAddress, setBizAddress] = useState("");
+  const [bizVillage, setBizVillage] = useState("");
   const [bizPhone, setBizPhone] = useState("");
   const [bizEmail, setBizEmail] = useState("");
   const [bizHours, setBizHours] = useState("");
@@ -154,14 +161,14 @@ export default function Dashboard() {
         const data = await api.get("/categories");
         setCategories(data);
       } else if (activeTab === "users" && isAdmin) {
-        const data = await api.get("/users");
+        const data = await api.get("/admin/users");
         setUsers(data);
       } else if (activeTab === "ads") {
         // Admin: all ads across every status (for moderation).
         // Regular user: only their own ads across every status.
         const [pending, approved, rejected] = await Promise.all([
           api.get("/advertisements?status=pending"),
-          api.get("/advertisements?status=approved"),
+          api.get("/advertisements?status=verified"),
           api.get("/advertisements?status=rejected"),
         ]);
         setAds([...pending, ...approved, ...rejected]);
@@ -182,13 +189,49 @@ export default function Dashboard() {
       } else if (activeTab === "booking") {
         const data = await api.get("/my-bookings");
         setBookings(data);
+      } else if (activeTab === "announcements") {
+        const data = await api.get("/announcements");
+        setAnnouncements(data);
+      } else if (activeTab === "coupons") {
+        const [couponData, myBiz] = await Promise.all([
+          api.get("/my-coupons"),
+          api.get(isAdmin ? "/businesses?status=all" : "/my-businesses"),
+        ]);
+        setCoupons(couponData);
+        setBusinesses(myBiz);
+      } else if (activeTab === "menu") {
+        const [menuData, myBiz] = await Promise.all([
+          api.get("/my-menu-items"),
+          api.get(isAdmin ? "/businesses?status=all" : "/my-businesses"),
+        ]);
+        setMenuItems(menuData);
+        setBusinesses(myBiz);
+      } else if (activeTab === "inbox") {
+        const data = await api.get("/my-messages");
+        setMessages(data);
+      } else if (activeTab === "saved") {
+        const data = await api.get("/my-saved-businesses");
+        setSavedBusinesses(data);
       }
       
       // Always prefetch categories for select dropdown
       const cats = await api.get("/categories");
       setCategories(cats);
     } catch (err) {
-      setError("Gagal memuat data dari server.");
+      console.error("fetchInitialData failed:", err);
+      if (err?.isNetworkError) {
+        setError(err.message || "Tidak dapat terhubung ke server backend.");
+      } else if (err?.status === 401) {
+        setError("Sesi login sudah habis. Silakan login ulang.");
+      } else if (err?.status === 403) {
+        setError("Anda tidak punya izin untuk mengakses data ini.");
+      } else if (err?.status >= 500) {
+        setError(`Server backend mengalami error (${err.status}). Cek log Laravel (storage/logs/laravel.log) untuk detailnya.`);
+      } else if (err?.data?.message) {
+        setError(err.data.message);
+      } else {
+        setError("Gagal memuat data dari server.");
+      }
     } finally {
       setLoading(false);
     }
@@ -202,6 +245,7 @@ export default function Dashboard() {
       setBizCategory(biz.category_id);
       setBizDescription(biz.description);
       setBizAddress(biz.address);
+      setBizVillage(biz.village || "");
       setBizPhone(biz.phone);
       setBizEmail(biz.email || "");
       setBizHours(biz.operating_hours || "");
@@ -220,6 +264,7 @@ export default function Dashboard() {
       setBizCategory(categories[0]?.id || "");
       setBizDescription("");
       setBizAddress("");
+      setBizVillage("");
       setBizPhone("");
       setBizEmail("");
       setBizHours("");
@@ -270,6 +315,7 @@ export default function Dashboard() {
       formData.append("category_id", bizCategory);
       formData.append("description", bizDescription);
       formData.append("address", bizAddress);
+      if (bizVillage) formData.append("village", bizVillage);
       formData.append("phone", bizPhone);
       if (bizEmail) formData.append("email", bizEmail);
       if (bizHours) formData.append("operating_hours", bizHours);
@@ -300,7 +346,18 @@ export default function Dashboard() {
       setShowBizModal(false);
       fetchInitialData();
     } catch (err) {
-      alert("Gagal menyimpan bisnis. Cek kembali isian Anda.");
+      console.error("handleSaveBusiness failed:", err);
+      if (err?.isNetworkError) {
+        alert(err.message || "Tidak dapat terhubung ke server.");
+      } else if (err?.data?.errors) {
+        // Laravel validation error shape: { errors: { field: ["message", ...] } }
+        const messages = Object.values(err.data.errors).flat().join("\n");
+        alert("Gagal menyimpan bisnis:\n\n" + messages);
+      } else if (err?.data?.message) {
+        alert("Gagal menyimpan bisnis: " + err.data.message);
+      } else {
+        alert(`Gagal menyimpan bisnis (status ${err?.status || "?"}). Cek console browser (F12) untuk detail teknisnya.`);
+      }
     } finally {
       setActionLoading(false);
     }
@@ -318,7 +375,7 @@ export default function Dashboard() {
 
   const handleApproveBusiness = async (id) => {
     try {
-      await api.post(`/businesses/${id}/approve`);
+      await api.post(`/admin/businesses/${id}/approve`);
       fetchInitialData();
     } catch (err) {
       alert("Gagal menyetujui bisnis.");
@@ -327,7 +384,7 @@ export default function Dashboard() {
 
   const handleTogglePremium = async (id) => {
     try {
-      await api.post(`/businesses/${id}/toggle-premium`);
+      await api.post(`/admin/businesses/${id}/toggle-premium`);
       fetchInitialData();
     } catch (err) {
       alert("Gagal mengubah status premium.");
@@ -353,9 +410,9 @@ export default function Dashboard() {
     try {
       const payload = { name: catName, icon: catIcon };
       if (selectedCat) {
-        await api.put(`/categories/${selectedCat.id}`, payload);
+        await api.put(`/admin/categories/${selectedCat.id}`, payload);
       } else {
-        await api.post("/categories", payload);
+        await api.post("/admin/categories", payload);
       }
       setShowCatModal(false);
       fetchInitialData();
@@ -369,10 +426,196 @@ export default function Dashboard() {
   const handleDeleteCategory = async (id) => {
     if (!confirm("Menghapus kategori akan menghapus semua bisnis terkait. Lanjutkan?")) return;
     try {
-      await api.delete(`/categories/${id}`);
+      await api.delete(`/admin/categories/${id}`);
       fetchInitialData();
     } catch (err) {
       alert("Gagal menghapus kategori.");
+    }
+  };
+
+  // --- ANNOUNCEMENT CRUD HANDLERS (admin only) ---
+  const [showAnnModal, setShowAnnModal] = useState(false);
+  const [selectedAnn, setSelectedAnn] = useState(null);
+  const [annTitle, setAnnTitle] = useState("");
+  const [annBody, setAnnBody] = useState("");
+
+  const handleOpenAnnModal = (ann = null) => {
+    setSelectedAnn(ann);
+    setAnnTitle(ann?.title || "");
+    setAnnBody(ann?.body || "");
+    setShowAnnModal(true);
+  };
+
+  const handleSaveAnnouncement = async (e) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      const payload = { title: annTitle, body: annBody };
+      if (selectedAnn) {
+        await api.put(`/admin/announcements/${selectedAnn.id}`, payload);
+      } else {
+        await api.post("/admin/announcements", payload);
+      }
+      setShowAnnModal(false);
+      fetchInitialData();
+    } catch (err) {
+      alert("Gagal menyimpan pengumuman.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id) => {
+    if (!confirm("Hapus pengumuman ini?")) return;
+    try {
+      await api.delete(`/admin/announcements/${id}`);
+      fetchInitialData();
+    } catch (err) {
+      alert("Gagal menghapus pengumuman.");
+    }
+  };
+
+  // --- COUPON CRUD HANDLERS ---
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [selectedCoupon, setSelectedCoupon] = useState(null);
+  const [cpBusinessId, setCpBusinessId] = useState("");
+  const [cpCode, setCpCode] = useState("");
+  const [cpType, setCpType] = useState("percentage");
+  const [cpValue, setCpValue] = useState("");
+  const [cpMaxUses, setCpMaxUses] = useState("");
+  const [cpExpiresAt, setCpExpiresAt] = useState("");
+
+  const handleOpenCouponModal = (coupon = null) => {
+    const myBiz = businesses.filter((b) => isAdmin || b.user_id === user?.id);
+    setSelectedCoupon(coupon);
+    setCpBusinessId(coupon?.business_id || myBiz[0]?.id || "");
+    setCpCode(coupon?.code || "");
+    setCpType(coupon?.discount_type || "percentage");
+    setCpValue(coupon?.discount_value || "");
+    setCpMaxUses(coupon?.max_uses || "");
+    setCpExpiresAt(coupon?.expires_at ? coupon.expires_at.slice(0, 10) : "");
+    setShowCouponModal(true);
+  };
+
+  const handleSaveCoupon = async (e) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      const payload = {
+        business_id: cpBusinessId,
+        code: cpCode,
+        discount_type: cpType,
+        discount_value: cpValue,
+        max_uses: cpMaxUses || null,
+        expires_at: cpExpiresAt || null,
+      };
+      if (selectedCoupon) {
+        await api.put(`/coupons/${selectedCoupon.id}`, payload);
+      } else {
+        await api.post("/coupons", payload);
+      }
+      setShowCouponModal(false);
+      fetchInitialData();
+    } catch (err) {
+      alert(err?.data?.errors ? Object.values(err.data.errors).flat().join("\n") : "Gagal menyimpan kupon.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteCoupon = async (id) => {
+    if (!confirm("Hapus kupon ini?")) return;
+    try {
+      await api.delete(`/coupons/${id}`);
+      fetchInitialData();
+    } catch (err) {
+      alert("Gagal menghapus kupon.");
+    }
+  };
+
+  // --- MENU CRUD HANDLERS ---
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [selectedMenu, setSelectedMenu] = useState(null);
+  const [mnBusinessId, setMnBusinessId] = useState("");
+  const [mnName, setMnName] = useState("");
+  const [mnDescription, setMnDescription] = useState("");
+  const [mnPrice, setMnPrice] = useState("");
+  const [mnImage, setMnImage] = useState(null);
+
+  const handleOpenMenuModal = (item = null) => {
+    const myBiz = businesses.filter((b) => isAdmin || b.user_id === user?.id);
+    setSelectedMenu(item);
+    setMnBusinessId(item?.business_id || myBiz[0]?.id || "");
+    setMnName(item?.name || "");
+    setMnDescription(item?.description || "");
+    setMnPrice(item?.price || "");
+    setMnImage(null);
+    setShowMenuModal(true);
+  };
+
+  const handleSaveMenu = async (e) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("business_id", mnBusinessId);
+      formData.append("name", mnName);
+      formData.append("description", mnDescription || "");
+      formData.append("price", mnPrice);
+      if (mnImage) formData.append("image", mnImage);
+
+      if (selectedMenu) {
+        await api.post(`/menu-items/${selectedMenu.id}`, formData);
+      } else {
+        await api.post("/menu-items", formData);
+      }
+      setShowMenuModal(false);
+      fetchInitialData();
+    } catch (err) {
+      alert(err?.data?.errors ? Object.values(err.data.errors).flat().join("\n") : "Gagal menyimpan menu.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteMenu = async (id) => {
+    if (!confirm("Hapus menu ini?")) return;
+    try {
+      await api.delete(`/menu-items/${id}`);
+      fetchInitialData();
+    } catch (err) {
+      alert("Gagal menghapus menu.");
+    }
+  };
+
+  // --- INBOX HANDLERS ---
+  const handleMarkMessageRead = async (id) => {
+    try {
+      await api.put(`/messages/${id}`);
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, is_read: true } : m)));
+    } catch (err) {
+      alert("Gagal menandai pesan.");
+    }
+  };
+
+  const handleDeleteMessage = async (id) => {
+    if (!confirm("Hapus pesan ini?")) return;
+    try {
+      await api.delete(`/messages/${id}`);
+      fetchInitialData();
+    } catch (err) {
+      alert("Gagal menghapus pesan.");
+    }
+  };
+
+  // --- SAVED (Simpan) HANDLERS ---
+  const handleUnsaveBusiness = async (id) => {
+    if (!confirm("Hapus dari daftar simpanan?")) return;
+    try {
+      await api.delete(`/saved-businesses/${id}`);
+      fetchInitialData();
+    } catch (err) {
+      alert("Gagal menghapus simpanan.");
     }
   };
 
@@ -403,14 +646,14 @@ export default function Dashboard() {
       if (uPassword) payload.password = uPassword;
 
       if (selectedUser) {
-        await api.put(`/users/${selectedUser.id}`, payload);
+        await api.put(`/admin/users/${selectedUser.id}`, payload);
       } else {
         if (!uPassword) {
           alert("Password wajib untuk user baru.");
           setActionLoading(false);
           return;
         }
-        await api.post("/users", payload);
+        await api.post("/admin/users", payload);
       }
       setShowUserModal(false);
       fetchInitialData();
@@ -428,7 +671,7 @@ export default function Dashboard() {
     }
     if (!confirm("Apakah Anda yakin ingin menghapus user ini?")) return;
     try {
-      await api.delete(`/users/${id}`);
+      await api.delete(`/admin/users/${id}`);
       fetchInitialData();
     } catch (err) {
       alert("Gagal menghapus user.");
@@ -536,14 +779,18 @@ export default function Dashboard() {
     try {
       const payload = { title: evTitle, description: evDescription, location: evLocation, event_date: evDate || null, image: evImage };
       if (selectedEvent) {
-        await api.put(`/events/${selectedEvent.id}`, payload);
+        // FIX: backend cuma menyediakan PUT /admin/events/{id} (di dalam
+        // grup rute admin), bukan /events/{id} - sebelumnya salah alamat
+        // sehingga selalu gagal dengan pesan "Gagal menyimpan event."
+        await api.put(`/admin/events/${selectedEvent.id}`, payload);
       } else {
-        await api.post("/events", payload);
+        // FIX: sama seperti di atas, endpoint yang benar POST /admin/events
+        await api.post("/admin/events", payload);
       }
       setShowEventModal(false);
       fetchInitialData();
     } catch (err) {
-      alert("Gagal menyimpan event.");
+      alert(err?.data?.message || "Gagal menyimpan event.");
     } finally {
       setActionLoading(false);
     }
@@ -552,7 +799,8 @@ export default function Dashboard() {
   const handleDeleteEvent = async (id) => {
     if (!confirm("Hapus event ini?")) return;
     try {
-      await api.delete(`/events/${id}`);
+      // FIX: endpoint yang benar DELETE /admin/events/{id}
+      await api.delete(`/admin/events/${id}`);
       fetchInitialData();
     } catch (err) {
       alert("Gagal menghapus event.");
@@ -669,6 +917,46 @@ export default function Dashboard() {
             >
               <CalendarDays size={18} />
               <span>Booking</span>
+            </button>
+
+            <button
+              className={`db-menu-btn ${activeTab === "announcements" ? "active" : ""}`}
+              onClick={() => setActiveTab("announcements")}
+            >
+              <Megaphone size={18} />
+              <span>Pengumuman</span>
+            </button>
+
+            <button
+              className={`db-menu-btn ${activeTab === "coupons" ? "active" : ""}`}
+              onClick={() => setActiveTab("coupons")}
+            >
+              <Gift size={18} />
+              <span>Kupon</span>
+            </button>
+
+            <button
+              className={`db-menu-btn ${activeTab === "menu" ? "active" : ""}`}
+              onClick={() => setActiveTab("menu")}
+            >
+              <Grid size={18} />
+              <span>Menu</span>
+            </button>
+
+            <button
+              className={`db-menu-btn ${activeTab === "inbox" ? "active" : ""}`}
+              onClick={() => setActiveTab("inbox")}
+            >
+              <Mail size={18} />
+              <span>Inbox</span>
+            </button>
+
+            <button
+              className={`db-menu-btn ${activeTab === "saved" ? "active" : ""}`}
+              onClick={() => setActiveTab("saved")}
+            >
+              <Star size={18} />
+              <span>Simpan</span>
             </button>
 
             {isAdmin && (
@@ -886,17 +1174,17 @@ export default function Dashboard() {
                           <td>{ad.location}</td>
                           <td>
                             <span className={`db-status-badge db-status--${ad.status}`}>
-                              {ad.status === "approved" ? "Disetujui" : ad.status === "pending" ? "Tertunda" : "Ditolak"}
+                              {ad.status === "verified" ? "Disetujui" : ad.status === "pending" ? "Tertunda" : "Ditolak"}
                             </span>
                           </td>
                           <td>
-                            {ad.status === "approved" && (isAdmin || canPostAds) ? (
+                            {ad.status === "verified" && (isAdmin || canPostAds) ? (
                               <span className="db-visible-badge db-visible--yes">
                                 <Crown size={13} /> Tampil
                               </span>
                             ) : (
                               <span className="db-visible-badge db-visible--no">
-                                <Lock size={13} /> {ad.status !== "approved" ? "Menunggu" : "Premium nonaktif"}
+                                <Lock size={13} /> {ad.status !== "verified" ? "Menunggu" : "Premium nonaktif"}
                               </span>
                             )}
                           </td>
@@ -904,7 +1192,7 @@ export default function Dashboard() {
                             <div className="db-table-actions">
                               {isAdmin && ad.status === "pending" && (
                                 <>
-                                  <button className="db-table-btn db-btn-approve" onClick={() => handleAdStatus(ad.id, "approved")} title="Setujui">
+                                  <button className="db-table-btn db-btn-approve" onClick={() => handleAdStatus(ad.id, "verified")} title="Setujui">
                                     <CheckCircle size={16} />
                                   </button>
                                   <button className="db-table-btn db-btn-delete" onClick={() => handleAdStatus(ad.id, "rejected")} title="Tolak">
@@ -1108,6 +1396,250 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="db-empty-state">Belum ada booking yang masuk.</div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: PENGUMUMAN */}
+          {activeTab === "announcements" && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Pengumuman</h2>
+                {isAdmin && (
+                  <button className="db-action-btn" onClick={() => handleOpenAnnModal()}>
+                    <Plus size={16} />
+                    <span>Tambah Pengumuman</span>
+                  </button>
+                )}
+              </div>
+
+              {loading ? (
+                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat...</span></div>
+              ) : announcements.length > 0 ? (
+                <div className="db-announcement-list">
+                  {announcements.map((a) => (
+                    <div key={a.id} className="db-announcement-card">
+                      <div className="db-announcement-card__top">
+                        <strong>{a.title}</strong>
+                        <span className="db-announcement-card__date">{new Date(a.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+                      </div>
+                      <p>{a.body}</p>
+                      {isAdmin && (
+                        <div className="db-table-actions">
+                          <button className="db-table-btn db-btn-edit" onClick={() => handleOpenAnnModal(a)}><Edit2 size={14} /></button>
+                          <button className="db-table-btn db-btn-delete" onClick={() => handleDeleteAnnouncement(a.id)}><Trash2 size={14} /></button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="db-empty-state">Belum ada pengumuman.</div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: KUPON */}
+          {activeTab === "coupons" && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Kupon</h2>
+                <button className="db-action-btn" onClick={() => handleOpenCouponModal()}>
+                  <Plus size={16} />
+                  <span>Tambah Kupon</span>
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat...</span></div>
+              ) : coupons.length > 0 ? (
+                <div className="db-table-responsive">
+                  <table className="db-table">
+                    <thead>
+                      <tr>
+                        <th>Kode</th>
+                        <th>Bisnis</th>
+                        <th>Diskon</th>
+                        <th>Terpakai</th>
+                        <th>Kadaluarsa</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {coupons.map((c) => (
+                        <tr key={c.id}>
+                          <td><strong>{c.code}</strong></td>
+                          <td>{c.business?.title || "-"}</td>
+                          <td>{c.discount_type === "percentage" ? `${c.discount_value}%` : formatRupiah(c.discount_value)}</td>
+                          <td>{c.used_count}{c.max_uses ? ` / ${c.max_uses}` : ""}</td>
+                          <td>{c.expires_at ? new Date(c.expires_at).toLocaleDateString("id-ID") : "-"}</td>
+                          <td>
+                            <span className={`db-status-badge db-status--${c.is_active ? "verified" : "rejected"}`}>
+                              {c.is_active ? "Aktif" : "Nonaktif"}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="db-table-actions">
+                              <button className="db-table-btn db-btn-edit" onClick={() => handleOpenCouponModal(c)}><Edit2 size={14} /></button>
+                              <button className="db-table-btn db-btn-delete" onClick={() => handleDeleteCoupon(c.id)}><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="db-empty-state">Belum ada kupon.</div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: MENU */}
+          {activeTab === "menu" && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Menu</h2>
+                <button className="db-action-btn" onClick={() => handleOpenMenuModal()}>
+                  <Plus size={16} />
+                  <span>Tambah Menu</span>
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat...</span></div>
+              ) : menuItems.length > 0 ? (
+                <div className="db-table-responsive">
+                  <table className="db-table">
+                    <thead>
+                      <tr>
+                        <th>Foto</th>
+                        <th>Nama</th>
+                        <th>Bisnis</th>
+                        <th>Harga</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {menuItems.map((m) => (
+                        <tr key={m.id}>
+                          <td>{m.image ? <img src={getImageUrl(m.image)} alt={m.name} className="db-table-thumb" /> : "-"}</td>
+                          <td><strong>{m.name}</strong></td>
+                          <td>{m.business?.title || "-"}</td>
+                          <td>{formatRupiah(m.price)}</td>
+                          <td>
+                            <span className={`db-status-badge db-status--${m.is_available ? "verified" : "rejected"}`}>
+                              {m.is_available ? "Tersedia" : "Habis"}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="db-table-actions">
+                              <button className="db-table-btn db-btn-edit" onClick={() => handleOpenMenuModal(m)}><Edit2 size={14} /></button>
+                              <button className="db-table-btn db-btn-delete" onClick={() => handleDeleteMenu(m.id)}><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="db-empty-state">Belum ada menu.</div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: INBOX */}
+          {activeTab === "inbox" && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Inbox</h2>
+              </div>
+
+              {loading ? (
+                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat...</span></div>
+              ) : messages.length > 0 ? (
+                <div className="db-table-responsive">
+                  <table className="db-table">
+                    <thead>
+                      <tr>
+                        <th>Pengirim</th>
+                        <th>Kontak</th>
+                        <th>Bisnis</th>
+                        <th>Pesan</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {messages.map((m) => (
+                        <tr key={m.id}>
+                          <td><strong>{m.sender_name}</strong></td>
+                          <td>{m.sender_contact || "-"}</td>
+                          <td>{m.business?.title || "-"}</td>
+                          <td className="db-message-cell">{m.message}</td>
+                          <td>
+                            <span className={`db-status-badge db-status--${m.is_read ? "verified" : "pending"}`}>
+                              {m.is_read ? "Dibaca" : "Baru"}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="db-table-actions">
+                              {!m.is_read && (
+                                <button className="db-table-btn db-btn-edit" title="Tandai dibaca" onClick={() => handleMarkMessageRead(m.id)}><CheckCircle size={14} /></button>
+                              )}
+                              <button className="db-table-btn db-btn-delete" onClick={() => handleDeleteMessage(m.id)}><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="db-empty-state">Belum ada pesan masuk.</div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: SIMPAN */}
+          {activeTab === "saved" && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Bisnis Tersimpan</h2>
+              </div>
+
+              {loading ? (
+                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat...</span></div>
+              ) : savedBusinesses.length > 0 ? (
+                <div className="db-table-responsive">
+                  <table className="db-table">
+                    <thead>
+                      <tr>
+                        <th>Nama Bisnis</th>
+                        <th>Kategori</th>
+                        <th>Alamat</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {savedBusinesses.map((s) => (
+                        <tr key={s.id}>
+                          <td><strong>{s.business?.title || "-"}</strong></td>
+                          <td>{s.business?.category?.name || "-"}</td>
+                          <td>{s.business?.address || "-"}</td>
+                          <td>
+                            <button className="db-table-btn db-btn-delete" onClick={() => handleUnsaveBusiness(s.id)}><Trash2 size={14} /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="db-empty-state">Belum ada bisnis yang disimpan.</div>
               )}
             </div>
           )}
@@ -1370,6 +1902,21 @@ export default function Dashboard() {
                   />
                 </div>
                 <div className="db-form-group">
+                  <label>Desa / Kelurahan</label>
+                  <select
+                    value={bizVillage}
+                    onChange={(e) => setBizVillage(e.target.value)}
+                  >
+                    <option value="">Pilih desa/kelurahan...</option>
+                    {DESA_LIST.map((desa) => (
+                      <option key={desa} value={desa}>{desa}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="db-form-row">
+                <div className="db-form-group">
                   <label>No. HP / WhatsApp <span className="req">*</span></label>
                   <input
                     type="text"
@@ -1519,6 +2066,133 @@ export default function Dashboard() {
                 </button>
                 <button type="submit" className="db-btn-submit" disabled={actionLoading}>
                   {actionLoading ? "Menyimpan..." : "Simpan Bisnis"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ANNOUNCEMENT FORM MODAL (admin) --- */}
+      {showAnnModal && (
+        <div className="db-modal-overlay" onClick={() => setShowAnnModal(false)}>
+          <div className="db-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="db-modal-header">
+              <h3>{selectedAnn ? "Edit Pengumuman" : "Tambah Pengumuman"}</h3>
+              <button className="db-modal-close" onClick={() => setShowAnnModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleSaveAnnouncement} className="db-modal-body">
+              <div className="db-form-group">
+                <label>Judul <span className="req">*</span></label>
+                <input type="text" required value={annTitle} onChange={(e) => setAnnTitle(e.target.value)} />
+              </div>
+              <div className="db-form-group">
+                <label>Isi Pengumuman <span className="req">*</span></label>
+                <textarea required rows={5} value={annBody} onChange={(e) => setAnnBody(e.target.value)} />
+              </div>
+              <div className="db-modal-footer">
+                <button type="button" className="db-btn-cancel" onClick={() => setShowAnnModal(false)}>Batal</button>
+                <button type="submit" className="db-btn-submit" disabled={actionLoading}>
+                  {actionLoading ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- COUPON FORM MODAL --- */}
+      {showCouponModal && (
+        <div className="db-modal-overlay" onClick={() => setShowCouponModal(false)}>
+          <div className="db-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="db-modal-header">
+              <h3>{selectedCoupon ? "Edit Kupon" : "Tambah Kupon"}</h3>
+              <button className="db-modal-close" onClick={() => setShowCouponModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleSaveCoupon} className="db-modal-body">
+              <div className="db-form-group">
+                <label>Bisnis <span className="req">*</span></label>
+                <select required value={cpBusinessId} onChange={(e) => setCpBusinessId(e.target.value)}>
+                  {businesses.filter((b) => isAdmin || b.user_id === user?.id).map((b) => (
+                    <option key={b.id} value={b.id}>{b.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="db-form-group">
+                <label>Kode Kupon <span className="req">*</span></label>
+                <input type="text" required value={cpCode} onChange={(e) => setCpCode(e.target.value.toUpperCase())} placeholder="Contoh: HEMAT10" />
+              </div>
+              <div className="db-form-row">
+                <div className="db-form-group">
+                  <label>Tipe Diskon <span className="req">*</span></label>
+                  <select value={cpType} onChange={(e) => setCpType(e.target.value)}>
+                    <option value="percentage">Persen (%)</option>
+                    <option value="fixed">Nominal (Rp)</option>
+                  </select>
+                </div>
+                <div className="db-form-group">
+                  <label>Nilai Diskon <span className="req">*</span></label>
+                  <input type="number" required min="1" value={cpValue} onChange={(e) => setCpValue(e.target.value)} />
+                </div>
+              </div>
+              <div className="db-form-row">
+                <div className="db-form-group">
+                  <label>Maks. Pemakaian</label>
+                  <input type="number" min="1" value={cpMaxUses} onChange={(e) => setCpMaxUses(e.target.value)} placeholder="Tanpa batas" />
+                </div>
+                <div className="db-form-group">
+                  <label>Kadaluarsa</label>
+                  <input type="date" value={cpExpiresAt} onChange={(e) => setCpExpiresAt(e.target.value)} />
+                </div>
+              </div>
+              <div className="db-modal-footer">
+                <button type="button" className="db-btn-cancel" onClick={() => setShowCouponModal(false)}>Batal</button>
+                <button type="submit" className="db-btn-submit" disabled={actionLoading}>
+                  {actionLoading ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MENU FORM MODAL --- */}
+      {showMenuModal && (
+        <div className="db-modal-overlay" onClick={() => setShowMenuModal(false)}>
+          <div className="db-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="db-modal-header">
+              <h3>{selectedMenu ? "Edit Menu" : "Tambah Menu"}</h3>
+              <button className="db-modal-close" onClick={() => setShowMenuModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleSaveMenu} className="db-modal-body">
+              <div className="db-form-group">
+                <label>Bisnis <span className="req">*</span></label>
+                <select required value={mnBusinessId} onChange={(e) => setMnBusinessId(e.target.value)}>
+                  {businesses.filter((b) => isAdmin || b.user_id === user?.id).map((b) => (
+                    <option key={b.id} value={b.id}>{b.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="db-form-group">
+                <label>Nama Menu <span className="req">*</span></label>
+                <input type="text" required value={mnName} onChange={(e) => setMnName(e.target.value)} />
+              </div>
+              <div className="db-form-group">
+                <label>Deskripsi</label>
+                <textarea rows={3} value={mnDescription} onChange={(e) => setMnDescription(e.target.value)} />
+              </div>
+              <div className="db-form-group">
+                <label>Harga (Rp) <span className="req">*</span></label>
+                <input type="number" required min="0" value={mnPrice} onChange={(e) => setMnPrice(e.target.value)} />
+              </div>
+              <div className="db-form-group">
+                <label>Foto Menu</label>
+                <input type="file" accept="image/*" onChange={(e) => setMnImage(e.target.files?.[0] || null)} />
+              </div>
+              <div className="db-modal-footer">
+                <button type="button" className="db-btn-cancel" onClick={() => setShowMenuModal(false)}>Batal</button>
+                <button type="submit" className="db-btn-submit" disabled={actionLoading}>
+                  {actionLoading ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
             </form>

@@ -103,7 +103,6 @@ export default function SmartCity() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [dbBusinesses, setDbBusinesses] = useState([]);
-  const [viewMode, setViewMode] = useState("grid"); // "grid" | "map"
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -253,74 +252,64 @@ export default function SmartCity() {
               <span className="sc-section__count">({filteredBusinesses.length})</span>
             </h2>
 
-            <div className="category-view-toggle" style={{ marginBottom: 16 }}>
-              <button
-                type="button"
-                className={`category-view-toggle__btn ${viewMode === "grid" ? "active" : ""}`}
-                onClick={() => setViewMode("grid")}
-              >
-                Daftar
-              </button>
-              <button
-                type="button"
-                className={`category-view-toggle__btn ${viewMode === "map" ? "active" : ""}`}
-                onClick={() => setViewMode("map")}
-              >
-                Peta
-              </button>
-            </div>
-
-            {viewMode === "map" ? (
-              <BusinessMap businesses={filteredBusinesses} />
-            ) : (
-            <div className="sc-business-grid">
-              {filteredBusinesses.length > 0 ? (
-                filteredBusinesses.map((business) => (
-                  <Link
-                    key={business.id}
-                    to={`/business/${business.id}`}
-                    className="sc-business-card"
-                  >
-                    <div className="sc-business-card__img-wrap">
-                      <img
-                        src={business.img}
-                        alt={business.name}
-                        className="sc-business-card__img"
-                      />
-                      <div className="sc-business-card__overlay">
-                        <span
-                          className={`sc-business-card__status ${business.status === "Buka Sekarang" ? "open" : "closed"}`}
-                        >
-                          {business.status}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="sc-business-card__body">
-                      <h3 className="sc-business-card__name">{business.name}</h3>
-                      <p className="sc-business-card__category">{business.category}</p>
-                      <div className="sc-business-card__meta">
-                        <div className="sc-business-card__rating">
-                          <Star size={14} fill="#fbbf24" stroke="#fbbf24" />
-                          <span>{business.rating}</span>
-                          <span className="sc-business-card__reviews">({business.reviews})</span>
+            <div className="category-content-layout">
+              <div className="category-results-col">
+                <div className="sc-business-grid">
+                  {filteredBusinesses.length > 0 ? (
+                    filteredBusinesses.map((business) => (
+                      <Link
+                        key={business.id}
+                        to={`/business/${business.id}`}
+                        className="sc-business-card"
+                      >
+                        <div className="sc-business-card__img-wrap">
+                          <img
+                            src={business.img}
+                            alt={business.name}
+                            className="sc-business-card__img"
+                          />
+                          <div className="sc-business-card__overlay">
+                            <span
+                              className={`sc-business-card__status ${business.status === "Buka Sekarang" ? "open" : "closed"}`}
+                            >
+                              {business.status}
+                            </span>
+                          </div>
                         </div>
-                        <div className="sc-business-card__location">
-                          <MapPin size={14} />
-                          <span>{business.location}</span>
+                        <div className="sc-business-card__body">
+                          <h3 className="sc-business-card__name">{business.name}</h3>
+                          <p className="sc-business-card__category">{business.category}</p>
+                          <div className="sc-business-card__meta">
+                            <div className="sc-business-card__rating">
+                              <Star size={14} fill="#fbbf24" stroke="#fbbf24" />
+                              <span>{business.rating}</span>
+                              <span className="sc-business-card__reviews">({business.reviews})</span>
+                            </div>
+                            <div className="sc-business-card__location">
+                              <MapPin size={14} />
+                              <span>{business.location}</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      </Link>
+                    ))
+                  ) : (
+                    <div className="sc-empty-state">
+                      <Search size={48} className="sc-empty-state__icon" />
+                      <h3 className="sc-empty-state__title">Tidak ada bisnis ditemukan</h3>
+                      <p className="sc-empty-state__text">Coba ubah kata kunci pencarian atau filter kategori</p>
                     </div>
-                  </Link>
-                ))
-              ) : (
-                <div className="sc-empty-state">
-                  <Search size={48} className="sc-empty-state__icon" />
-                  <h3 className="sc-empty-state__title">Tidak ada bisnis ditemukan</h3>
-                  <p className="sc-empty-state__text">Coba ubah kata kunci pencarian atau filter kategori</p>
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* Peta lokasi bisnis di desa ini — di sisi kanan */}
+              <div className="category-map-col">
+                <div className="category-map-box category-map-box--sticky">
+                  <BusinessMap businesses={filteredBusinesses} height={420} />
+                </div>
+              </div>
             </div>
-            )}
           </div>
         </div>
       </section>
