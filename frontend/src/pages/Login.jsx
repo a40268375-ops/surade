@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./Login.css";
 import logoImg from "../assets/logo.png";
 import {
@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 
 export default function Login() {
+  const navigate = useNavigate();
+
   /* ── Login form state ── */
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,10 +26,11 @@ export default function Login() {
   const [regLastName, setRegLastName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [regPasswordConfirmation, setRegPasswordConfirmation] = useState("");
   const [regGender, setRegGender] = useState("");
 
   /* ── Login handler ── */
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -37,24 +40,111 @@ export default function Login() {
     }
 
     setLoading(true);
-    // Simulate login API
-    setTimeout(() => {
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data?.message || "Email atau kata sandi salah. Silakan coba lagi.");
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      window.dispatchEvent(new Event("userAuthChanged"));
+
+      navigate("/admin-user");
+    } catch (err) {
+      setError("Terjadi kesalahan koneksi. Silakan coba lagi.");
+    } finally {
       setLoading(false);
-      setError("Email atau kata sandi salah. Silakan coba lagi.");
-    }, 1500);
+    }
   };
 
   /* ── Register handler ── */
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    // Placeholder for registration logic
-    alert("Pendaftaran berhasil! Silakan login.");
-    setShowRegister(false);
-    setRegFirstName("");
-    setRegLastName("");
-    setRegEmail("");
-    setRegPassword("");
-    setRegGender("");
+    setError("");
+
+    const gmailOnlyRegex = /^[^\s@]+@gmail\.com$/i;
+
+    if (!regFirstName.trim() || !regLastName.trim()) {
+      setError("Nama wajib diisi.");
+      return;
+    }
+
+    if (!regEmail.trim() || !gmailOnlyRegex.test(regEmail.trim())) {
+      setError("Email harus menggunakan Gmail (contoh: nama@gmail.com).");
+      return;
+    }
+
+    if (!regPassword || regPassword.length < 8) {
+      setError("Kata sandi minimal 8 karakter.");
+      return;
+    }
+
+    if (!regPasswordConfirmation || regPassword !== regPasswordConfirmation) {
+      setError("Konfirmasi kata sandi tidak sesuai.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name: `${regFirstName} ${regLastName}`.trim(),
+          email: regEmail.trim(),
+          password: regPassword,
+          password_confirmation: regPasswordConfirmation,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data?.message || "Gagal mendaftar. Silakan coba lagi.");
+        return;
+      }
+
+      // Automatically login and redirect
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      window.dispatchEvent(new Event("userAuthChanged"));
+
+      alert("Pendaftaran berhasil! Verifikasi email dikirim ke Gmail Anda.");
+      
+      setShowRegister(false);
+      setRegFirstName("");
+      setRegLastName("");
+      setRegEmail("");
+      setRegPassword("");
+      setRegPasswordConfirmation("");
+      setRegGender("");
+
+      navigate("/admin-user");
+    } catch (err) {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -92,7 +182,7 @@ export default function Login() {
                 id="login-email"
                 type="email"
                 className={`login-input ${error ? "login-input--error" : ""}`}
-                placeholder="Email atau nomor telepon"
+                placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
@@ -229,9 +319,10 @@ export default function Login() {
                 id="reg-email"
                 type="email"
                 className="login-input"
-                placeholder="Email atau nomor telepon"
+                placeholder="Email"
                 value={regEmail}
                 onChange={(e) => setRegEmail(e.target.value)}
+                autoComplete="email"
               />
 
               <input
@@ -241,6 +332,17 @@ export default function Login() {
                 placeholder="Kata sandi baru"
                 value={regPassword}
                 onChange={(e) => setRegPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+
+              <input
+                id="reg-password-confirmation"
+                type="password"
+                className="login-input"
+                placeholder="Konfirmasi kata sandi"
+                value={regPasswordConfirmation}
+                onChange={(e) => setRegPasswordConfirmation(e.target.value)}
+                autoComplete="new-password"
               />
 
               <span className="login-label">Jenis Kelamin</span>

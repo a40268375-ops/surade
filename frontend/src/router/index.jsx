@@ -11,6 +11,7 @@ import Category from "../pages/Category";
 import Login from "../pages/Login";
 import Profile from "../pages/Profile";
 import SmartCity from "../pages/SmartCity";
+import AdminUser from "../pages/AdminUser";
 
 function AppRouter() {
   return (
@@ -28,6 +29,7 @@ function AppRouter() {
         <Route path="/login" element={<Login />} />
         <Route path="/profile/:id" element={<Profile />} />
         <Route path="/smart-city/:id" element={<SmartCity />} />
+        <Route path="/admin-user" element={<AdminUser />} />
       </Routes>
     </BrowserRouter>
   );

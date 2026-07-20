@@ -1,5 +1,5 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import {
   Search,
@@ -12,6 +12,7 @@ import {
   Smartphone,
   Shirt,
   Wrench,
+  ChevronDown,
 } from "lucide-react";
 import "./Category.css";
 
@@ -26,10 +27,25 @@ const CATEGORIES = [
   { id: "wisata", label: "Wisata", icon: <MapPin size={26} strokeWidth={1.7} /> },
 ];
 
+/* ── Cities list ── */
+const CITIES = [
+  "Semua",
+  "Aceh",
+  "Bali",
+  "Bogor",
+  "Depok",
+  "Jakarta",
+  "Jambi",
+  "Kep. Mentawai",
+  "Magelang",
+  "Medan",
+  "Bekasi",
+];
+
 /* ── Mock business data ── */
 const BISNIS_DATA = [
   {
-    id: 1, name: "Amel Irwanto cake", category: "Pertokoan",
+    id: 1, name: "Amel Irwanto cake", category: "Bisnis & Market",
     tags: ["Amel irwanto cake"], location: "Kabupaten Bogor",
     views: "Pratinjau", status: "Buka Sekarang",
     img: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
@@ -47,7 +63,7 @@ const BISNIS_DATA = [
     img: "https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=400&h=250&fit=crop",
   },
   {
-    id: 4, name: "Salon & Spa Cantik", category: "Pertokoan",
+    id: 4, name: "Salon & Spa Cantik", category: "Fashion",
     tags: ["Salon", "Perawatan"], location: "Kota Depok",
     views: "Pratinjau", status: "Buka Sekarang",
     img: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
@@ -75,6 +91,9 @@ export default function Category() {
   const [activeCategory, setActiveCategory] = useState(categoryId || "all");
   const [saved, setSaved] = useState({});
   const [searchKeyword, setSearchKeyword] = useState(queryQ);
+  const [selectedCity, setSelectedCity] = useState(queryLocation || "Semua");
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const cityDropdownRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -87,6 +106,17 @@ export default function Category() {
     setSearchKeyword(queryQ);
   }, [queryQ]);
 
+  // Outside-click detection for city dropdown
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target)) {
+        setCityDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const filteredBisnis = activeCategory === "all"
     ? BISNIS_DATA
     : BISNIS_DATA.filter((b) =>
@@ -96,7 +126,11 @@ export default function Category() {
     );
 
   const searchFilteredBisnis = filteredBisnis.filter((b) => {
-    // Location filter
+    // City filter
+    const matchesCity = !selectedCity || selectedCity === "Semua" ||
+      b.location.toLowerCase().includes(selectedCity.toLowerCase());
+
+    // Location filter from URL
     const matchesLocation = !queryLocation || queryLocation === "Semua" ||
       b.location.toLowerCase().includes(queryLocation.toLowerCase());
 
@@ -107,7 +141,7 @@ export default function Category() {
       b.tags.some(tag => tag.toLowerCase().includes(searchKeyword.toLowerCase())) ||
       b.location.toLowerCase().includes(searchKeyword.toLowerCase());
 
-    return matchesLocation && matchesKeyword;
+    return matchesCity && matchesLocation && matchesKeyword;
   });
 
   const handleSearchChange = (e) => {
@@ -149,16 +183,46 @@ export default function Category() {
             Temukan bisnis terbaik di kategori {currentCategory?.label?.toLowerCase() || "semua kategori"}
           </p>
 
-          {/* Search Bar */}
-          <div className="category-search">
-            <Search size={18} className="category-search__icon" />
-            <input
-              type="text"
-              placeholder="Cari bisnis..."
-              value={searchKeyword}
-              onChange={handleSearchChange}
-              className="category-search__input"
-            />
+          {/* Search Bar with City Filter */}
+          <div className="category-search-container">
+            <div className="category-search">
+              <Search size={18} className="category-search__icon" />
+              <input
+                type="text"
+                placeholder="Cari bisnis..."
+                value={searchKeyword}
+                onChange={handleSearchChange}
+                className="category-search__input"
+              />
+            </div>
+            <div className="category-city-filter" ref={cityDropdownRef}>
+              <button
+                className="category-city-btn"
+                onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
+              >
+                <MapPin size={18} />
+                <span>{selectedCity}</span>
+                <ChevronDown size={18} className={`category-city-caret ${cityDropdownOpen ? "open" : ""}`} />
+              </button>
+              {cityDropdownOpen && (
+                <div className="category-city-dropdown">
+                  <div className="category-city-list">
+                    {CITIES.map((city) => (
+                      <button
+                        key={city}
+                        className={`category-city-option ${selectedCity === city ? "selected" : ""}`}
+                        onClick={() => {
+                          setSelectedCity(city);
+                          setCityDropdownOpen(false);
+                        }}
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>

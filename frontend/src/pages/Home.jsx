@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import "./Home.css";
 import Navbar from "../components/Navbar";
 import logoImg from "../assets/logo.png";
+import { getBusinesses } from "../services/businessService";
 import {
   Store,
   Coffee,
@@ -265,6 +266,25 @@ const BLOG_DATA = [
   },
 ];
 
+const getCategoryIcon = (iconName) => {
+  switch (iconName) {
+    case "store":
+      return <Store size={26} strokeWidth={1.7} />;
+    case "coffee":
+      return <Coffee size={26} strokeWidth={1.7} />;
+    case "smartphone":
+      return <Smartphone size={26} strokeWidth={1.7} />;
+    case "shirt":
+      return <Shirt size={26} strokeWidth={1.7} />;
+    case "wrench":
+      return <Wrench size={26} strokeWidth={1.7} />;
+    case "map-pin":
+      return <MapPin size={26} strokeWidth={1.7} />;
+    default:
+      return <Store size={26} strokeWidth={1.7} />;
+  }
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const [selectedKota, setSelectedKota] = useState("Jakarta");
@@ -280,6 +300,74 @@ export default function Home() {
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const dropdownRef = useRef(null);
   const keywordDropdownRef = useRef(null);
+  const [businesses, setBusinesses] = useState([]);
+  const [categories, setCategories] = useState(CATEGORIES);
+  const [bisnisData, setBisnisData] = useState(BISNIS_DATA);
+  const [temukanData, setTemukanData] = useState(TEMUKAN_DATA);
+  const [adsData, setAdsData] = useState(ADS_DATA);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch categories
+        const catRes = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
+        const catData = await catRes.json();
+        if (Array.isArray(catData)) {
+          const mappedCategories = [
+            { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
+            ...catData.map(c => ({
+              id: c.slug,
+              label: c.name,
+              icon: getCategoryIcon(c.icon)
+            }))
+          ];
+          setCategories(mappedCategories);
+        }
+      } catch (err) {
+        console.error("Failed to fetch categories:", err);
+      }
+
+      try {
+        // Fetch businesses
+        const bizRes = await fetch(`${import.meta.env.VITE_API_URL}/businesses?all=true`);
+        const bizJson = await bizRes.json();
+        const bizData = bizJson?.data || bizJson || [];
+        if (Array.isArray(bizData)) {
+          const mapped = bizData.map(b => ({
+            id: b.id,
+            name: b.name,
+            category: b.category?.name || "Umum",
+            categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
+            tags: [b.name],
+            location: b.city || "Indonesia",
+            views: b.views || 0,
+            status: b.status === "approved" ? "Buka Sekarang" : "Tutup",
+            img: b.banner || b.logo || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+            open: b.status === "approved",
+            featured: b.featured,
+            description: b.description
+          }));
+          setBisnisData(mapped);
+          setTemukanData(mapped);
+          
+          // Filter ads
+          const ads = mapped.filter(b => b.featured).map(b => ({
+            id: b.id,
+            businessId: b.id,
+            img: b.img,
+            name: b.name,
+            desc: b.description || "Portal Bisnis Terpercaya"
+          }));
+          if (ads.length > 0) {
+            setAdsData(ads);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch businesses:", err);
+      }
+    };
+    fetchData();
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -302,41 +390,43 @@ export default function Home() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentAdIndex((prev) => (prev + 1) % ADS_DATA.length);
+      if (adsData.length > 0) {
+        setCurrentAdIndex((prev) => (prev + 1) % adsData.length);
+      }
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [adsData]);
 
   const filteredKota = KOTA_INDONESIA.filter((k) =>
     k.toLowerCase().includes(kotaSearch.toLowerCase())
   );
 
   const filteredBisnis = activeCategory === "all"
-    ? BISNIS_DATA
-    : BISNIS_DATA.filter((b) =>
+    ? bisnisData
+    : bisnisData.filter((b) =>
       b.category.toLowerCase().includes(
-        CATEGORIES.find((c) => c.id === activeCategory)?.label.split(" ")[0].toLowerCase() ?? ""
+        categories.find((c) => c.id === activeCategory)?.label.split(" ")[0].toLowerCase() ?? ""
       )
     );
 
   const cityFilteredBisnis = selectedCity
-    ? BISNIS_DATA.filter((b) => b.location.includes(selectedCity))
-    : BISNIS_DATA;
+    ? bisnisData.filter((b) => b.location.includes(selectedCity))
+    : bisnisData;
 
   const searchFilteredBisnis = searchKeyword
-    ? BISNIS_DATA.filter((b) =>
+    ? bisnisData.filter((b) =>
         b.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
         b.category.toLowerCase().includes(searchKeyword.toLowerCase()) ||
         b.tags.some(tag => tag.toLowerCase().includes(searchKeyword.toLowerCase())) ||
         b.location.toLowerCase().includes(searchKeyword.toLowerCase())
       )
-    : BISNIS_DATA;
+    : bisnisData;
 
   // Combine all filters
-  const finalFilteredBisnis = BISNIS_DATA.filter((b) => {
+  const finalFilteredBisnis = bisnisData.filter((b) => {
     const matchesCategory = activeCategory === "all" ||
       b.category.toLowerCase().includes(
-        CATEGORIES.find((c) => c.id === activeCategory)?.label.split(" ")[0].toLowerCase() ?? ""
+        categories.find((c) => c.id === activeCategory)?.label.split(" ")[0].toLowerCase() ?? ""
       );
     const matchesCity = !selectedCity || b.location.includes(selectedCity);
     const matchesSearch = !searchKeyword ||
@@ -349,7 +439,7 @@ export default function Home() {
   });
 
   // Filter TEMUKAN_DATA based on search
-  const filteredTemukanData = TEMUKAN_DATA.filter((b) => {
+  const filteredTemukanData = temukanData.filter((b) => {
     const matchesSearch = !searchKeyword ||
       b.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
       b.category.toLowerCase().includes(searchKeyword.toLowerCase()) ||
@@ -375,6 +465,7 @@ export default function Home() {
     }
     navigate(`/category/${selectedSearchCategory}?q=${encodeURIComponent(searchKeyword)}&location=${encodeURIComponent(selectedKota)}`);
   };
+  
 
   return (
     <div className="home-page">
@@ -406,6 +497,11 @@ export default function Home() {
                   }
                 }}
               />
+              {selectedSearchCategory !== "all" && (
+                <span className="home-search__selected-category">
+                  {CATEGORIES.find(c => c.id === selectedSearchCategory)?.label}
+                </span>
+              )}
 
               {keywordDropdownOpen && (
                 <div className="home-keyword-dropdown">
@@ -422,7 +518,6 @@ export default function Home() {
                               setSearchKeyword(item.keyword);
                               setSelectedSearchCategory(item.category || "all");
                               setKeywordDropdownOpen(false);
-                              navigate(`/category/${item.category || "all"}?q=${encodeURIComponent(item.keyword)}&location=${encodeURIComponent(selectedKota)}`);
                             }}
                           >
                             <span className="home-keyword-dropdown__history-text">{item.keyword}</span>
@@ -439,14 +534,13 @@ export default function Home() {
                   <div className="home-keyword-dropdown__section">
                     <span className="home-keyword-dropdown__section-title">Cari berdasarkan Kategori</span>
                     <ul className="home-keyword-dropdown__list">
-                      {CATEGORIES.map((cat) => (
+                      {categories.map((cat) => (
                         <li
                           key={cat.id}
                           className="home-keyword-dropdown__item home-keyword-dropdown__item--category"
                           onClick={() => {
                             setSelectedSearchCategory(cat.id);
                             setKeywordDropdownOpen(false);
-                            navigate(`/category/${cat.id}?location=${encodeURIComponent(selectedKota)}`);
                           }}
                         >
                           <span className="home-keyword-dropdown__cat-icon">{cat.icon}</span>
@@ -530,7 +624,7 @@ export default function Home() {
               ‹
             </button>
             <div className="ads-carousel__track" style={{ transform: `translateX(-${currentAdIndex * 33.33}%)` }}>
-              {[...ADS_DATA, ...ADS_DATA].map((ad, index) => (
+              {adsData.length > 0 && [...adsData, ...adsData].map((ad, index) => (
                 <Link key={`${ad.id}-${index}`} to={`/business/${ad.businessId}`} className="ad-card">
                   <div className="ad-card__img-wrap">
                     <img src={ad.img} alt={ad.name} className="ad-card__img" loading="lazy" />
@@ -559,7 +653,7 @@ export default function Home() {
             </div>
             <button
               className="ads-carousel__nav ads-carousel__nav--next"
-              onClick={() => setCurrentAdIndex((prev) => Math.min(ADS_DATA.length - 3, prev + 1))}
+              onClick={() => setCurrentAdIndex((prev) => Math.min(adsData.length - 3, prev + 1))}
               aria-label="Next slide"
             >
               ›
@@ -573,7 +667,7 @@ export default function Home() {
         <div className="category-inner">
           {/* Category tabs */}
           <div className="reko-tabs">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <Link
                 key={cat.id}
                 to={`/category/${cat.id}`}

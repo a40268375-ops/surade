@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import logoImg from "../assets/logo.png";
 import {
   ChevronDown,
@@ -301,12 +301,26 @@ export default function SmartCity() {
   const [city, setCity] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const cityDropdownRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
     const foundCity = SMART_CITIES.find((c) => c.id === parseInt(id));
     setCity(foundCity);
+    setSelectedCity(foundCity?.name || null);
   }, [id]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target)) {
+        setCityDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (!city) {
     return (
@@ -322,9 +336,11 @@ export default function SmartCity() {
 
   const filteredBusinesses = MOCK_BUSINESSES.filter((business) => {
     const matchesCategory = selectedCategory === "all" || business.category.toLowerCase().includes(selectedCategory);
-    const matchesSearch = business.name.toLowerCase().includes(searchQuery) || 
-                         business.location.toLowerCase().includes(searchQuery);
-    return matchesCategory && matchesSearch;
+    const matchesSearch = !searchQuery || 
+                         business.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         business.location.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCity = !selectedCity || business.location.includes(selectedCity);
+    return matchesCategory && matchesSearch && matchesCity;
   });
 
   return (
@@ -394,15 +410,45 @@ export default function SmartCity() {
 
           {/* Search & Filter */}
           <div className="sc-filter-bar">
-            <div className="sc-search-box">
-              <Search size={18} className="sc-search-box__icon" />
-              <input
-                type="text"
-                placeholder="Cari bisnis atau lokasi..."
-                className="sc-search-box__input"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="sc-search-container">
+              <div className="sc-search-box">
+                <Search size={18} className="sc-search-box__icon" />
+                <input
+                  type="text"
+                  placeholder="Cari bisnis..."
+                  className="sc-search-box__input"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="sc-city-filter" ref={cityDropdownRef}>
+                <button
+                  className="sc-city-btn"
+                  onClick={() => setCityDropdownOpen((v) => !v)}
+                >
+                  <MapPin size={16} />
+                  <span>{selectedCity}</span>
+                  <ChevronDown size={14} className={`sc-city-caret${cityDropdownOpen ? " open" : ""}`} />
+                </button>
+                {cityDropdownOpen && (
+                  <div className="sc-city-dropdown">
+                    <div className="sc-city-list">
+                      {SMART_CITIES.map((c) => (
+                        <button
+                          key={c.id}
+                          className={`sc-city-option${selectedCity === c.name ? " selected" : ""}`}
+                          onClick={() => {
+                            setSelectedCity(c.name);
+                            setCityDropdownOpen(false);
+                          }}
+                        >
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="sc-category-tabs">
               {CATEGORIES.map((cat) => (

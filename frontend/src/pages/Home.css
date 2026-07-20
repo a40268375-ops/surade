@@ -215,6 +215,20 @@ body { background: #f5f6fa; }
 }
 .home-search__input::placeholder { color: #94a3b8; }
 
+.home-search__selected-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f0fdfa;
+  color: #007570;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .home-search__divider {
   width: 1px; height: 26px;
   background: rgba(15,23,42,0.14);
