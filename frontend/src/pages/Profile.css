@@ -27,7 +27,7 @@
 .profile-header__cover-bg {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #007570 0%, #009688 50%, #0d9488 100%);
+  background: linear-gradient(135deg, #10b981 0%, #00b3ab 50%, #0d9488 100%);
 }
 
 .profile-header__cover-bg::before {
@@ -104,7 +104,7 @@
 }
 
 .profile-header__meta-item svg {
-  color: #007570;
+  color: #10b981;
   flex-shrink: 0;
 }
 
@@ -155,15 +155,15 @@
 }
 
 .profile-header__btn--primary {
-  background: #007570;
+  background: #10b981;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(0, 117, 112, 0.2);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
 
 .profile-header__btn--primary:hover {
   background: #005a58;
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 117, 112, 0.3);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
 }
 
 .profile-header__btn--primary.saved {
@@ -179,9 +179,9 @@
 
 .profile-header__btn--secondary:hover {
   border-color: #007570;
-  color: #007570;
+  color: #10b981;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 117, 112, 0.1);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
 }
 
 /* ── PROFILE CONTENT ── */
@@ -224,14 +224,14 @@
 }
 
 .profile-tab:hover {
-  color: #007570;
+  color: #10b981;
   background: #f0fdfa;
 }
 
 .profile-tab.active {
-  background: #007570;
+  background: #10b981;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 117, 112, 0.2);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
 }
 
 .profile-tab svg {
@@ -244,7 +244,7 @@
 }
 
 .profile-tab:hover svg {
-  color: #007570;
+  color: #10b981;
 }
 
 .profile-tab.active:hover svg {
@@ -412,7 +412,7 @@
 .profile-card__blog-category {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #007570;
+  color: #10b981;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 4px 0;

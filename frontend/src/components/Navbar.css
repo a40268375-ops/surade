@@ -60,7 +60,7 @@
 
 
 .home-nav__link:hover {
-  color: #fff;
+  color: #a7f3d0;
 }
 
 .home-nav__link--dropdown {
@@ -106,7 +106,7 @@
   border: none;
   border-radius: 6px;
   padding: 9px 18px;
-  background: #007570;
+  background: #10b981;
   color: #fff;
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
@@ -117,7 +117,7 @@
 }
 
 .home-nav__button:hover {
-  background: #005a58;
+  background: #059669;
   transform: translateY(-1px);
 }
 
@@ -166,7 +166,7 @@
 
 .home-nav__dropdown-item:hover {
   background: #f8fafc;
-  color: #007570;
+  color: #10b981;
 }
 
 .home-nav__dropdown-chevron {
@@ -177,13 +177,13 @@
 
 .home-nav__dropdown-item:hover .home-nav__dropdown-chevron,
 .home-nav__dropdown-item.active .home-nav__dropdown-chevron {
-  color: #007570;
+  color: #10b981;
   transform: translateX(2px);
 }
 
 .home-nav__dropdown-item.active {
   background: #f8fafc;
-  color: #007570;
+  color: #10b981;
 }
 
 /* ── SUBMENU FLYOUT (muncul di samping saat item di-hover) ── */
@@ -230,7 +230,7 @@
 
 .home-nav__sub-item:hover {
   background: #f8fafc;
-  color: #007570;
+  color: #10b981;
 }
 
 @media (max-width: 900px) {

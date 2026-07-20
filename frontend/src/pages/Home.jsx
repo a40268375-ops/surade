@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
   import { SMART_CITIES } from "../data/smartCities";
   import { DESA_LIST } from "../data/desaList";
   import logoImg from "../assets/logo.png";
+  import waterfallImg from "../assets/waterfall.jpg";
   import Loading from "../components/Loading";
   import {
     Store,
@@ -115,7 +116,7 @@ import { useState, useRef, useEffect } from "react";
   /* ── Temukan Tempat Baru data ── */
   const TEMUKAN_DATA = [
     {
-      id: 101, name: "Global Bakery Leuwiliang", category: "Pertokoan", categoryColor: "#007570",
+      id: 101, name: "Global Bakery Leuwiliang", category: "Pertokoan", categoryColor: "#10b981",
       tags: ["Global Bakery Leuwiliang"], location: "Kabupaten Bogor", open: true,
       img: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=240&fit=crop",
     },
@@ -125,7 +126,7 @@ import { useState, useRef, useEffect } from "react";
       img: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=240&fit=crop",
     },
     {
-      id: 103, name: "Bunda Diana", category: "Pertokoan", categoryColor: "#007570",
+      id: 103, name: "Bunda Diana", category: "Pertokoan", categoryColor: "#10b981",
       tags: ["Bunda Diana"], location: "Kabupaten Bogor", open: true,
       img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=240&fit=crop",
     },
@@ -140,7 +141,7 @@ import { useState, useRef, useEffect } from "react";
       img: "https://images.unsplash.com/photo-1550966871-3ed3cbe818b5?w=400&h=240&fit=crop",
     },
     {
-      id: 106, name: "Toko Kue Ibu Nanih", category: "Pertokoan", categoryColor: "#007570",
+      id: 106, name: "Toko Kue Ibu Nanih", category: "Pertokoan", categoryColor: "#10b981",
       tags: ["Toko Kue Ibu Nanih"], location: "Kabupaten Bogor", open: true,
       img: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&h=240&fit=crop",
     },
@@ -155,7 +156,7 @@ import { useState, useRef, useEffect } from "react";
       img: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400&h=240&fit=crop",
     },
     {
-      id: 109, name: "Amel Irwanto cake", category: "Pertokoan", categoryColor: "#007570",
+      id: 109, name: "Amel Irwanto cake", category: "Pertokoan", categoryColor: "#10b981",
       tags: ["Amel irwanto cake"], location: "Kabupaten Bogor", open: true,
       img: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=240&fit=crop",
     },
@@ -459,18 +460,18 @@ import { useState, useRef, useEffect } from "react";
 
         {/* ── HERO BANNER ── */}
         <section className="home-hero">
-          <div className="home-hero__bg" />
+          <div className="home-hero__bg" style={{ backgroundImage: `url(${waterfallImg})` }} />
           <div className="home-hero__content">
-            <h1 
-              className="home-hero__title" 
+            <h1
+              className="home-hero__title"
               style={{
-                background: 'linear-gradient(100deg, #fff0ed 0%, #fff0ed 32%, #B52809 44%, #d6380c 52%, #8f1a06 60%, #fff0ed 72%, #fff0ed 100%)',
+                background: 'linear-gradient(100deg, #ffffff 0%, #ffffff 40%, #a7f3d0 50%, #ffffff 60%, #ffffff 100%)',
                 WebkitBackgroundClip: 'text',
                 backgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                color: '#B52809',
-                backgroundSize: '260% 100%',
-                animation: 'home-hero-shimmer 4.5s linear infinite'
+                color: '#ffffff',
+                backgroundSize: '200% 100%',
+                animation: 'home-hero-shimmer 7s ease-in-out infinite'
               }}
             >
               Surade.co.id

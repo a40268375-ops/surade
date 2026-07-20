@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   overflow: hidden;
 }
 
@@ -81,7 +81,7 @@
 .pc-section__icon {
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border-radius: 20px;
   display: flex;
   align-items: center;
@@ -128,7 +128,7 @@
 .pc-card__icon {
   width: 64px;
   height: 64px;
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -152,7 +152,7 @@
 
 /* Contact Box */
 .pc-contact-box {
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border-radius: 20px;
   padding: 40px;
   text-align: center;
@@ -230,7 +230,7 @@
 .pc-benefit-item__icon {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -304,7 +304,7 @@
 
 .pc-opening-item__button {
   padding: 10px 24px;
-  background: #007570;
+  background: #10b981;
   color: white;
   border: none;
   border-radius: 8px;
@@ -315,7 +315,7 @@
 }
 
 .pc-opening-item__button:hover {
-  background: #005a58;
+  background: #059669;
   transform: translateY(-2px);
 }
 
