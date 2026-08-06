@@ -1,0 +1,151 @@
+/* ── Full-screen Loading Screen ── */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.loading-screen--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ── The "i" logo ── */
+.loading-logo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+}
+
+.loading-logo__i {
+  font-size: 4.5rem;
+  font-weight: 900;
+  font-family: 'Poppins', 'Arial Black', sans-serif;
+  color: #007570;
+  line-height: 1;
+  animation: loadingPulse 1.2s ease-in-out infinite;
+}
+
+.loading-logo__dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #00d4a0;
+  animation: loadingBounce 1.2s ease-in-out infinite;
+}
+
+/* ── Spinner ring ── */
+.loading-ring {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 3px solid #e8f5f4;
+  border-top-color: #007570;
+  animation: loadingSpin 0.8s linear infinite;
+}
+
+/* ── Text ── */
+.loading-text {
+  margin-top: 28px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  animation: loadingFade 1.5s ease-in-out infinite;
+}
+
+.loading-dots::after {
+  content: '';
+  animation: loadingDots 1.5s steps(4, end) infinite;
+}
+
+/* ── Inline spinner for components ── */
+.loading-spinner-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.loading-spinner-inline .loading-logo {
+  width: 56px;
+  height: 56px;
+}
+
+.loading-spinner-inline .loading-logo__i {
+  font-size: 3rem;
+}
+
+.loading-spinner-inline .loading-logo__dot {
+  width: 10px;
+  height: 10px;
+}
+
+.loading-spinner-inline .loading-ring {
+  width: 76px;
+  height: 76px;
+}
+
+.loading-spinner-inline .loading-text {
+  font-size: 0.85rem;
+  margin-top: 12px;
+}
+
+/* ── Keyframes ── */
+@keyframes loadingSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loadingPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.92); opacity: 0.7; }
+}
+
+@keyframes loadingBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes loadingFade {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes loadingDots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+/* ── Inline skeleton ── */
+.skeleton-pulse {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+

@@ -1,6 +1,8 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
+import { InlineSpinner } from "../components/LoadingScreen";
+import { getStorageUrl } from "../utils/constants";
 import {
   Search,
   MapPin,
@@ -13,11 +15,32 @@ import {
   Shirt,
   Wrench,
   ChevronDown,
+  X,
+  ListFilter,
+  Building2,
+  Landmark,
 } from "lucide-react";
+import heroImg from "../assets/category_hero_illustration.png";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import "./Category.css";
+import L from "leaflet";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+// Fix default Leaflet icon for Vite/webpack bundlers
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
+const HERO_IMAGE = heroImg;
 
 /* ── Category tabs ── */
-const CATEGORIES = [
+const INITIAL_CATEGORIES = [
   { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
   { id: "bisnis", label: "Bisnis & Market", icon: <Store size={26} strokeWidth={1.7} /> },
   { id: "cafe", label: "Cafe & Restaurant", icon: <Coffee size={26} strokeWidth={1.7} /> },
@@ -26,6 +49,38 @@ const CATEGORIES = [
   { id: "servis", label: "Servis & Tukang", icon: <Wrench size={26} strokeWidth={1.7} /> },
   { id: "wisata", label: "Wisata", icon: <MapPin size={26} strokeWidth={1.7} /> },
 ];
+
+const getCategoryIcon = (iconName) => {
+  switch (iconName) {
+    case "store": return <Store size={26} strokeWidth={1.7} />;
+    case "coffee": return <Coffee size={26} strokeWidth={1.7} />;
+    case "smartphone": return <Smartphone size={26} strokeWidth={1.7} />;
+    case "shirt": return <Shirt size={26} strokeWidth={1.7} />;
+    case "wrench": return <Wrench size={26} strokeWidth={1.7} />;
+    case "map-pin": return <MapPin size={26} strokeWidth={1.7} />;
+    case "building": return <Building2 size={26} strokeWidth={1.7} />;
+    case "landmark": return <Landmark size={26} strokeWidth={1.7} />;
+    default: return <Store size={26} strokeWidth={1.7} />;
+  }
+};
+
+// Helper to get coordinates for a business
+const getCoords = (business) => {
+  if (business.lat && business.lng) {
+    return [business.lat, business.lng];
+  }
+  const cityKey = business.location.replace(/^(Kota|Kabupaten)\s*/, "");
+  const cityMap = {
+    "Jakarta": [-6.200000, 106.816666],
+    "Bandung": [-6.914744, 107.609810],
+    "Surabaya": [-7.257471, 112.752088],
+    "Bogor": [-6.597268, 106.806977],
+    "Bekasi": [-6.245913, 106.970156],
+    "Depok": [-6.402484, 106.794243],
+    "Semua": [-2.548926, 118.014863]
+  };
+  return cityMap[cityKey] || [-2.5, 118];
+};
 
 /* ── Cities list ── */
 const CITIES = [
@@ -42,45 +97,6 @@ const CITIES = [
   "Bekasi",
 ];
 
-/* ── Mock business data ── */
-const BISNIS_DATA = [
-  {
-    id: 1, name: "Amel Irwanto cake", category: "Bisnis & Market",
-    tags: ["Amel irwanto cake"], location: "Kabupaten Bogor",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-  },
-  {
-    id: 2, name: "Warung Makan Sederhana", category: "Cafe & Restaurant",
-    tags: ["Warung makan", "Nasi padang"], location: "Kota Bogor",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=250&fit=crop",
-  },
-  {
-    id: 3, name: "Toko Elektronik Jaya", category: "Elektronik & Gadget",
-    tags: ["Handphone", "Aksesoris"], location: "Kabupaten Bogor",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=400&h=250&fit=crop",
-  },
-  {
-    id: 4, name: "Salon & Spa Cantik", category: "Fashion",
-    tags: ["Salon", "Perawatan"], location: "Kota Depok",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
-  },
-  {
-    id: 5, name: "Bengkel Motor Makmur", category: "Servis & Tukang",
-    tags: ["Bengkel", "Motor", "Oli"], location: "Kabupaten Bekasi",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=250&fit=crop",
-  },
-  {
-    id: 6, name: "Wisata Alam Puncak", category: "Wisata",
-    tags: ["Wisata", "Alam", "Liburan"], location: "Kabupaten Bogor",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=250&fit=crop",
-  },
-];
 
 export default function Category() {
   const { categoryId } = useParams();
@@ -95,6 +111,60 @@ export default function Category() {
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
   const cityDropdownRef = useRef(null);
 
+  const [categories, setCategories] = useState(INITIAL_CATEGORIES);
+  const [bisnisData, setBisnisData] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoadingData(true);
+      try {
+        const catRes = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
+        const catData = await catRes.json();
+        if (Array.isArray(catData)) {
+          const mappedCategories = [
+            { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
+            ...catData.map(c => ({
+              id: c.slug,
+              label: c.name,
+              icon: getCategoryIcon(c.icon)
+            }))
+          ];
+          setCategories(mappedCategories);
+        }
+      } catch (err) {
+        console.error("Failed to fetch categories:", err);
+      }
+
+      try {
+        const bizRes = await fetch(`${import.meta.env.VITE_API_URL}/businesses?all=true`);
+        const bizJson = await bizRes.json();
+        const bizData = bizJson?.data || bizJson || [];
+        if (Array.isArray(bizData)) {
+          const mapped = bizData.map(b => ({
+            id: b.id,
+            name: b.name,
+            category: b.category?.name || "Umum",
+            categorySlug: b.category?.slug || "umum",
+            tags: [b.name],
+            location: b.city || "Indonesia",
+            views: b.views || 0,
+            status: "Buka Sekarang",
+            img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+            lat: b.lat,
+            lng: b.lng
+          }));
+          setBisnisData(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch businesses:", err);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   useEffect(() => {
     window.scrollTo(0, 0);
     if (categoryId) {
@@ -104,7 +174,8 @@ export default function Category() {
 
   useEffect(() => {
     setSearchKeyword(queryQ);
-  }, [queryQ]);
+    setSelectedCity(queryLocation || "Semua");
+  }, [queryQ, queryLocation]);
 
   // Outside-click detection for city dropdown
   useEffect(() => {
@@ -118,21 +189,28 @@ export default function Category() {
   }, []);
 
   const filteredBisnis = activeCategory === "all"
-    ? BISNIS_DATA
-    : BISNIS_DATA.filter((b) =>
-      b.category.toLowerCase().includes(
-        CATEGORIES.find((c) => c.id === activeCategory)?.label.split(" ")[0].toLowerCase() ?? ""
-      )
-    );
+    ? bisnisData
+    : bisnisData.filter((b) => {
+        if (!b) return false;
+        const currentCat = categories.find((c) => c.id === activeCategory);
+        const catLabel = currentCat?.label || activeCategory;
+        const bSlug = (b.categorySlug || "").toLowerCase();
+        const bName = (b.category || "").toLowerCase();
+        const targetId = activeCategory.toLowerCase();
+        const targetLabel = catLabel.toLowerCase();
+
+        return (
+          bSlug === targetId ||
+          bName === targetLabel ||
+          bName.includes(targetId) ||
+          bName.includes(targetLabel.split(" ")[0])
+        );
+      });
 
   const searchFilteredBisnis = filteredBisnis.filter((b) => {
     // City filter
     const matchesCity = !selectedCity || selectedCity === "Semua" ||
       b.location.toLowerCase().includes(selectedCity.toLowerCase());
-
-    // Location filter from URL
-    const matchesLocation = !queryLocation || queryLocation === "Semua" ||
-      b.location.toLowerCase().includes(queryLocation.toLowerCase());
 
     // Keyword filter
     const matchesKeyword = !searchKeyword ||
@@ -141,12 +219,20 @@ export default function Category() {
       b.tags.some(tag => tag.toLowerCase().includes(searchKeyword.toLowerCase())) ||
       b.location.toLowerCase().includes(searchKeyword.toLowerCase());
 
-    return matchesCity && matchesLocation && matchesKeyword;
+    return matchesCity && matchesKeyword;
   });
+
+  const [searchHistoryCategory, setSearchHistoryCategory] = useState([]);
+
+  useEffect(() => {
+    const history = JSON.parse(localStorage.getItem("search_history_category") || "[]");
+    setSearchHistoryCategory(history);
+  }, []);
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchKeyword(val);
+    // Update URL param
     setSearchParams((prev) => {
       if (val) {
         prev.set("q", val);
@@ -155,13 +241,20 @@ export default function Category() {
       }
       return prev;
     });
+    // Update history (max 2 entries)
+    if (val.trim()) {
+      const newEntry = { keyword: val.trim(), category: activeCategory };
+      const updated = [newEntry, ...searchHistoryCategory.filter(h => h.keyword.toLowerCase() !== val.trim().toLowerCase())].slice(0, 2);
+      localStorage.setItem("search_history_category", JSON.stringify(updated));
+      setSearchHistoryCategory(updated);
+    }
   };
 
   function toggleSave(id) {
     setSaved((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  const currentCategory = CATEGORIES.find((c) => c.id === activeCategory);
+  const currentCategory = categories.find((c) => c.id === activeCategory);
 
   return (
     <div className="category-page">
@@ -169,19 +262,21 @@ export default function Category() {
       <Navbar />
 
       {/* HERO SECTION */}
-      <section className="category-hero">
-        <div className="category-hero__content">
-          <div className="category-hero__breadcrumb">
-            <Link to="/">Home</Link>
-            <span>/</span>
-            <span>Kategori</span>
-            <span>/</span>
-            <span>{currentCategory?.label || "Semua"}</span>
-          </div>
-          <h1 className="category-hero__title">{currentCategory?.label || "Semua Kategori"}</h1>
-          <p className="category-hero__subtitle">
-            Temukan bisnis terbaik di kategori {currentCategory?.label?.toLowerCase() || "semua kategori"}
-          </p>
+        <section className="category-hero">
+          <img className="category-hero__bg" src={HERO_IMAGE} alt="Hero background" />
+          <div className="category-hero__overlay" />
+          <div className="category-hero__content">
+            <div className="category-hero__breadcrumb">
+              <Link to="/">Home</Link>
+              <span>/</span>
+              <span>Kategori</span>
+              <span>/</span>
+              <span>{currentCategory?.label || "Semua"}</span>
+            </div>
+            <h1 className="category-hero__title">{currentCategory?.label || "Semua Kategori"}</h1>
+            <p className="category-hero__subtitle">
+              Temukan bisnis terbaik di kategori {currentCategory?.label?.toLowerCase() || "semua kategori"}
+            </p>
 
           {/* Search Bar with City Filter */}
           <div className="category-search-container">
@@ -231,7 +326,7 @@ export default function Category() {
       <section className="category-tabs-section">
         <div className="category-tabs-inner">
           <div className="reko-tabs">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <Link
                 key={cat.id}
                 to={`/category/${cat.id}?${searchParams.toString()}`}
@@ -248,12 +343,30 @@ export default function Category() {
       {/* BUSINESS CARDS */}
       <section className="category-business-section">
         <div className="category-business-inner">
-          <h2 className="category-business__title">
-            {searchFilteredBisnis.length} Bisnis Ditemukan
-          </h2>
+          <div className="category-business__header">
+            <h2 className="category-business__title">
+              {searchFilteredBisnis.length} Bisnis Ditemukan
+            </h2>
+            <div className="category-business__filters">
+              <button className="btn-filter-outline" onClick={() => {
+                 setSearchKeyword("");
+                 setSelectedCity("Semua");
+                 setSearchParams((prev) => { prev.delete("q"); prev.delete("location"); return prev; });
+               }}>
+                <X size={14} /> Reset filter
+              </button>
+              <button className="btn-filter-outline">
+                <ListFilter size={14} /> Paling Relevan <ChevronDown size={14} />
+              </button>
+            </div>
+          </div>
 
-          {searchFilteredBisnis.length > 0 ? (
-            <div className="reko-grid">
+          <div className="category-business-split">
+            <div className="category-business-left">
+              {loadingData ? (
+                <InlineSpinner text="Memuat data bisnis..." />
+              ) : searchFilteredBisnis.length > 0 ? (
+                <div className="reko-grid">
               {searchFilteredBisnis.map((bisnis) => (
                 <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
                   {/* Image */}
@@ -298,13 +411,41 @@ export default function Category() {
                   </div>
                 </Link>
               ))}
+                </div>
+              ) : (
+                <div className="category-empty">
+                  <p>Tidak ada bisnis ditemukan untuk kategori ini.</p>
+                  <Link to="/" className="category-empty__link">Kembali ke Home</Link>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="category-empty">
-              <p>Tidak ada bisnis ditemukan untuk kategori ini.</p>
-              <Link to="/" className="category-empty__link">Kembali ke Home</Link>
+
+            {/* MAP LAYOUT */}
+            <div className="category-business-right">
+              <MapContainer
+                center={[-6.200000, 106.816666]}
+                zoom={10}
+                style={{ height: "100%", width: "100%", borderRadius: "16px" }}
+                scrollWheelZoom={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {searchFilteredBisnis.map((bisnis) => (
+                  <Marker key={bisnis.id} position={getCoords(bisnis)}>
+                    <Popup>
+                      <strong>{bisnis.name}</strong><br />
+                      {bisnis.location}<br />
+                      <span style={{ color: bisnis.status === "Buka Sekarang" ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
+                        {bisnis.status}
+                      </span>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
             </div>
-          )}
+          </div>
         </div>
       </section>
     </div>

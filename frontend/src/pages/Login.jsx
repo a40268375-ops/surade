@@ -65,7 +65,9 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(data.user));
       window.dispatchEvent(new Event("userAuthChanged"));
 
-      navigate("/admin-user");
+      // Redirect based on role from backend
+      const redirectUrl = data.redirect_url || "/dashboard";
+      navigate(redirectUrl);
     } catch (err) {
       setError("Terjadi kesalahan koneksi. Silakan coba lagi.");
     } finally {
@@ -100,6 +102,11 @@ export default function Login() {
       return;
     }
 
+    if (!regGender) {
+      setError("Jenis kelamin wajib dipilih.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -114,6 +121,7 @@ export default function Login() {
           email: regEmail.trim(),
           password: regPassword,
           password_confirmation: regPasswordConfirmation,
+          gender: regGender,
         }),
       });
 
@@ -139,7 +147,9 @@ export default function Login() {
       setRegPasswordConfirmation("");
       setRegGender("");
 
-      navigate("/admin-user");
+      // Redirect based on role from backend (default users go to /dashboard)
+      const redirectUrl = data.redirect_url || "/dashboard";
+      navigate(redirectUrl);
     } catch (err) {
       setError("Terjadi kesalahan. Silakan coba lagi.");
     } finally {
@@ -161,8 +171,7 @@ export default function Login() {
               className="login-branding__logo"
             />
             <p className="login-branding__tagline">
-              <strong>Info.co.id</strong> membantu Anda menemukan informasi
-              bisnis, toko, dan layanan terpercaya di seluruh Indonesia.
+              <strong>Info.co.id</strong> Membantu anda meningkatkan dan mempromosikan usaha bisnis anda di seluruh indonesia
             </p>
           </div>
 
@@ -268,7 +277,7 @@ export default function Login() {
             <a href="#">Bantuan</a>
           </div>
           <p className="login-footer__copy">
-            &copy; 2024 Info.co.id. All rights reserved.
+            &copy; 2026 Info.co.id. All rights reserved.
           </p>
         </div>
       </footer>

@@ -117,23 +117,24 @@ body { background: #f5f6fa; }
 .home-nav__button:hover { background: #005a58; transform: translateY(-1px); }
 
 /* ─────────────────────────────────────────────
-   HERO BANNER  (city bg, ~65vh)
+   HERO BANNER  (~90vh)
 ───────────────────────────────────────────── */
 .home-hero {
   position: relative;
-  min-height: 80vh;
+  min-height: 90vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
+  text-align: left;
   overflow: visible;
+  padding: 40px 0;
 }
 
-/* The city background */
+/* The hero background */
 .home-hero__bg {
   position: absolute;
   inset: 0;
-  background: url('../assets/city_bg.jpg') no-repeat center top / cover;
+  background: url('../assets/hero_bg.jpg') no-repeat center top / cover;
   z-index: 0;
   overflow: hidden;
 }
@@ -141,39 +142,91 @@ body { background: #f5f6fa; }
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.50);
+  background: linear-gradient(
+    to right,
+    rgba(5, 10, 22, 0.92) 0%,
+    rgba(5, 10, 22, 0.78) 45%,
+    rgba(5, 10, 22, 0.25) 75%,
+    rgba(5, 10, 22, 0.10) 100%
+  );
+}
+
+.home-hero__container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 48px;
+  display: flex;
+  align-items: center;
 }
 
 .home-hero__content {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 760px;
-  padding: 62px 24px 40px;   /* 62px offset = navbar height */
+  max-width: 620px;
+  padding: 40px 0;
   color: #fff;
   overflow: visible;
+  text-align: left;
 }
 
 /* Title */
 .home-hero__title {
-  font-size: clamp(2.8rem, 6vw, 5rem);
+  font-size: clamp(2.8rem, 5vw, 4.2rem);
   font-weight: 800;
   line-height: 1.08;
-  margin-bottom: 8px;
+  margin-bottom: 14px;
   color: #fff;
-  -webkit-text-stroke: 4px rgba(0,0,0,0.4);
-  paint-order: stroke fill;
   letter-spacing: -0.01em;
+  display: block;
+}
+
+.home-hero__title-sub {
+  display: block;
+  color: #00c9b1;
+  font-size: clamp(2.6rem, 5vw, 4rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+/* Badge */
+.home-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 6px 14px 6px 8px;
+  margin-bottom: 22px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.90);
+  backdrop-filter: blur(6px);
+}
+
+.home-hero__badge-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 201, 177, 0.18);
+  flex-shrink: 0;
 }
 
 /* Subtitle */
 .home-hero__subtitle {
-  font-size: clamp(1rem, 2.2vw, 1.3rem);
-  font-weight: 500;
-  color: rgba(255,255,255,0.92);
-  margin-bottom: 32px;
-  -webkit-text-stroke: 1.5px rgba(0,0,0,0.3);
-  paint-order: stroke fill;
+  font-size: clamp(0.95rem, 1.6vw, 1.05rem);
+  font-weight: 400;
+  color: rgba(255,255,255,0.82);
+  margin-bottom: 36px;
+  line-height: 1.65;
 }
 
 /* ─────────────────────────────────────────────
@@ -181,15 +234,15 @@ body { background: #f5f6fa; }
 ───────────────────────────────────────────── */
 .home-search {
   width: 100%;
-  max-width: 700px;
-  margin: 0 auto;
+  max-width: 680px;
+  margin: 0;
   display: flex;
   align-items: center;
   background: #fff;
   border-radius: 999px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.28);
   padding: 0 8px 0 20px;
-  height: 52px;
+  height: 56px;
   position: relative;
   overflow: visible;
 }

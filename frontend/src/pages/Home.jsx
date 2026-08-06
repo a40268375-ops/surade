@@ -4,6 +4,8 @@ import "./Home.css";
 import Navbar from "../components/Navbar";
 import logoImg from "../assets/logo.png";
 import { getBusinesses } from "../services/businessService";
+import { InlineSpinner } from "../components/LoadingScreen";
+import { getStorageUrl } from "../utils/constants";
 import {
   Store,
   Coffee,
@@ -16,17 +18,19 @@ import {
   Bookmark,
   Eye,
   Tag,
-  ChevronDown as ChevronDownIcon,
   Pointer,
+  Megaphone,
   Rocket,
   BookOpen,
   User,
   Calendar,
+  Building2,
+  Landmark,
 } from "lucide-react";
 
 /* ── Indonesian cities ── */
 const KOTA_INDONESIA = [
-  "Jakarta", "Surabaya", "Bandung", "Medan", "Bekasi", "Tangerang", "Depok",
+  "Semua", "Jakarta", "Surabaya", "Bandung", "Medan", "Bekasi", "Tangerang", "Depok",
   "Semarang", "Palembang", "Makassar", "South Tangerang", "Batam", "Pekanbaru",
   "Bandar Lampung", "Padang", "Malang", "Bogor", "Denpasar", "Samarinda",
   "Tasikmalaya", "Pontianak", "Banjarmasin", "Balikpapan", "Jambi", "Surakarta",
@@ -46,168 +50,11 @@ const CATEGORIES = [
   { id: "wisata", label: "Wisata", icon: <MapPin size={26} strokeWidth={1.7} /> },
 ];
 
-/* ── Mock business data ── */
-const BISNIS_DATA = [
-  {
-    id: 1, name: "Amel Irwanto cake", category: "Pertokoan",
-    tags: ["Amel irwanto cake"], location: "Kabupaten Bogor",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-  },
-  {
-    id: 2, name: "Warung Makan Sederhana", category: "Cafe & Restaurant",
-    tags: ["Warung makan", "Nasi padang"], location: "Kota Bogor",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=250&fit=crop",
-  },
-  {
-    id: 3, name: "Toko Elektronik Jaya", category: "Elektronik & Gadget",
-    tags: ["Handphone", "Aksesoris"], location: "Kabupaten Bogor",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=400&h=250&fit=crop",
-  },
-  {
-    id: 4, name: "Salon & Spa Cantik", category: "Pertokoan",
-    tags: ["Salon", "Perawatan"], location: "Kota Depok",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
-  },
-  {
-    id: 5, name: "Bengkel Motor Makmur", category: "Servis & Tukang",
-    tags: ["Bengkel", "Motor", "Oli"], location: "Kabupaten Bekasi",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=250&fit=crop",
-  },
-  {
-    id: 6, name: "Wisata Alam Puncak", category: "Wisata",
-    tags: ["Wisata", "Alam", "Liburan"], location: "Kabupaten Bogor",
-    views: "Pratinjau", status: "Buka Sekarang",
-    img: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=250&fit=crop",
-  },
-];
-
-/* ── Smart City data ── */
-const SMART_CITIES = [
-  { id: 1, name: "Aceh", bisnis: 142, img: "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=400&h=260&fit=crop" },
-  { id: 2, name: "Bali", bisnis: 385, img: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=400&h=260&fit=crop" },
-  { id: 3, name: "Bogor", bisnis: 273, img: "https://images.unsplash.com/photo-1568802088984-38109b53e40c?w=400&h=260&fit=crop" },
-  { id: 4, name: "Jakarta", bisnis: 1240, img: "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=400&h=260&fit=crop" },
-  { id: 5, name: "Jambi", bisnis: 89, img: "https://images.unsplash.com/photo-1604999333679-b86d54738315?w=400&h=260&fit=crop" },
-  { id: 6, name: "Kep. Mentawai", bisnis: 34, img: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=260&fit=crop" },
-  { id: 7, name: "Magelang", bisnis: 198, img: "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=400&h=260&fit=crop" },
-  { id: 8, name: "Medan", bisnis: 467, img: "https://images.unsplash.com/photo-1572285870954-7b08e56f4c58?w=400&h=260&fit=crop" },
-  { id: 9, name: "Papua Barat", bisnis: 56, img: "https://images.unsplash.com/photo-1591109078846-8f53bab16c37?w=400&h=260&fit=crop" },
-  { id: 10, name: "Sulawesi Tengah", bisnis: 112, img: "https://images.unsplash.com/photo-1527153818091-1a9638521e2a?w=400&h=260&fit=crop" },
-  { id: 11, name: "Sumatera Utara", bisnis: 321, img: "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=400&h=260&fit=crop" },
-  { id: 12, name: "Yogyakarta", bisnis: 524, img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=260&fit=crop" },
-];
-
-/* ── Ads/Iklan data ── */
-const ADS_DATA = [
-  {
-    id: 1, businessId: 1, img: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=800&h=400&fit=crop",
-    name: "Amel Irwanto cake", desc: "Kue lezat berkualitas tinggi untuk momen istimewa Anda"
-  },
-  {
-    id: 2, businessId: 2, img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=400&fit=crop",
-    name: "Warung Makan Sederhana", desc: "Masakan Padang autentik dengan cita rasa tradisional"
-  },
-  {
-    id: 3, businessId: 3, img: "https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=800&h=400&fit=crop",
-    name: "Toko Elektronik Jaya", desc: "Gadget terbaru dan aksesoris terlengkap bergaransi"
-  },
-  {
-    id: 4, businessId: 4, img: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&h=400&fit=crop",
-    name: "Salon & Spa Cantik", desc: "Perawatan kecantikan premium dan spa relaksasi terbaik"
-  },
-];
-
 /* ── How it works steps ── */
 const QUICK_STEPS = [
   { num: "1", title: "Ketik Kata Kunci", desc: "Pemilihan kata kunci akan mempercepat dalam pencarian." },
   { num: "2", title: "Ketik Lokasi", desc: "Anda dapat menemukan lokasi secara mudah dengan mengetik daerah yang Anda cari." },
   { num: "3", title: "Temukan Pencarian", desc: "Penuhi semua keperluan dan kebutuhan Anda." },
-];
-
-/* ── Temukan Tempat Baru data ── */
-const TEMUKAN_DATA = [
-  {
-    id: 101, name: "Global Bakery Leuwiliang", category: "Pertokoan", categoryColor: "#007570",
-    tags: ["Global Bakery Leuwiliang"], location: "Kabupaten Bogor", open: true,
-    img: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=240&fit=crop",
-  },
-  {
-    id: 102, name: "TK Triwala", category: "Yayasan", categoryColor: "#f59e0b",
-    tags: ["Tk Triwala"], location: "Kuningan", open: false,
-    img: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=240&fit=crop",
-  },
-  {
-    id: 103, name: "Bunda Diana", category: "Pertokoan", categoryColor: "#007570",
-    tags: ["Bunda Diana"], location: "Kabupaten Bogor", open: true,
-    img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=240&fit=crop",
-  },
-  {
-    id: 104, name: "Rumah Makan Athiam", category: "Cafe & Restaurant", categoryColor: "#0ea5e9",
-    tags: ["Rumah Makan Athiam"], location: "Sukabumi", open: true,
-    img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=240&fit=crop",
-  },
-  {
-    id: 105, name: "Rumah Makan Cikole Sukabumi", category: "Cafe & Restaurant", categoryColor: "#0ea5e9",
-    tags: ["Rumah Makan Cikole Sukabumi"], location: "Sukabumi", open: true,
-    img: "https://images.unsplash.com/photo-1550966871-3ed3cbe818b5?w=400&h=240&fit=crop",
-  },
-  {
-    id: 106, name: "Toko Kue Ibu Nanih", category: "Pertokoan", categoryColor: "#007570",
-    tags: ["Toko Kue Ibu Nanih"], location: "Kabupaten Bogor", open: true,
-    img: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&h=240&fit=crop",
-  },
-  {
-    id: 107, name: "Kantor Kecamatan Sawangan", category: "Kantor Pemerintah", categoryColor: "#10b981",
-    tags: ["Kantor Kecamatan Sawangan"], location: "Depok", open: true,
-    img: "https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&h=240&fit=crop",
-  },
-  {
-    id: 108, name: "Kantor Kecamatan Sawangan", category: "Kantor Pemerintah", categoryColor: "#10b981",
-    tags: ["Kantor Kecamatan Sawangan"], location: "Depok", open: true,
-    img: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400&h=240&fit=crop",
-  },
-  {
-    id: 109, name: "Amel Irwanto cake", category: "Pertokoan", categoryColor: "#007570",
-    tags: ["Amel irwanto cake"], location: "Kabupaten Bogor", open: true,
-    img: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=240&fit=crop",
-  },
-];
-
-/* ── Testimonials data ── */
-const TESTIMONIALS_DATA = [
-  {
-    id: 1,
-    name: "Nindi Afrilia",
-    role: "Marketing Executive",
-    text: "Dengan adanya info.co.id cukup membantu untuk memudahkan melakukan pencarian yang ada di Indonesia",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop",
-  },
-  {
-    id: 2,
-    name: "Putri Indah lestari",
-    role: "Research and Development",
-    text: "What i liked most about the service was the consistent high quality service, which was excelent and friendly. Overall very satusfied with the programs.",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&h=120&fit=crop",
-  },
-  {
-    id: 3,
-    name: "Algi Triana",
-    role: "Design Freelancer",
-    text: "Keren... baru sehari dicek di google analytic sudah masuk beberapa session referal dari satujutalink.",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop",
-  },
-  {
-    id: 4,
-    name: "Fajar Septiawan",
-    role: "Bussines Development",
-    text: "Excellent !! This web-based information system helps the user in finding a variety of information, especially travel information with......Selengkapnya",
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&h=120&fit=crop",
-  },
 ];
 
 /* ── Key Features data ── */
@@ -238,33 +85,202 @@ const FEATURES_DATA = [
   },
 ];
 
-/* ── Blog/Experience data ── */
-const BLOG_DATA = [
+/* ── Smart Cities data ── */
+const SMART_CITIES = [
   {
     id: 1,
-    category: "Umum",
-    title: "Cucurak Khas Bogor, sambut Bulan Ramadhan",
-    author: "Hikmah Yusila",
-    date: "15 Agustus 2017",
-    img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=260&fit=crop",
+    slug: "aceh",
+    name: "Aceh",
+    description: "Provinsi Aceh mengembangkan Smart City dan Smart Village untuk meningkatkan layanan publik berbasis digital di seluruh kabupaten/kota.",
+    img: "https://images.unsplash.com/photo-1584982637256-4b2a4729f276?w=600&h=400&fit=crop",
+    bisnis: 312,
+    population: "5,5 Juta",
+    area: "57.956 km²",
+    highlights: ["Sistem informasi desa digital", "E-Government Aceh", "Digitalisasi layanan kependudukan"]
   },
   {
     id: 2,
-    category: "Budaya",
-    title: "Tradisi Grebeg Gethuk di Kota Magelang",
-    author: "Hikmah Yusila",
-    date: "16 Februari 2017",
-    img: "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=400&h=260&fit=crop",
+    slug: "bali",
+    name: "Bali",
+    description: "Provinsi Bali mengintegrasikan teknologi smart tourism dengan program Smart City untuk mendukung sektor pariwisata dan ekonomi kreatif daerah.",
+    img: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600&h=400&fit=crop",
+    bisnis: 874,
+    population: "4,3 Juta",
+    area: "5.780 km²",
+    highlights: ["Smart Tourism Platform", "Digitalisasi UMKM pariwisata", "Sistem informasi wisata terpadu"]
   },
   {
     id: 3,
-    category: "Kuliner",
-    title: "Pasar Tiban Pahingan Magelang, Destinasi Wisata Kuliner Sambil Mendengarkan Pengajian",
-    author: "Hikmah Yusila",
-    date: "16 Februari 2017",
-    img: "https://images.unsplash.com/photo-1572285870954-7b08e56f4c58?w=400&h=260&fit=crop",
+    slug: "bogor",
+    name: "Bogor",
+    description: "Kota Bogor mengembangkan Smart City dengan fokus pada pengelolaan transportasi, layanan publik digital, dan sistem pengelolaan sampah yang lebih efisien.",
+    img: "https://upload.wikimedia.org/wikipedia/commons/e/eb/Tugu_Kujang_1.jpg",
+    bisnis: 462,
+    population: "1,1 Juta",
+    area: "118 km²",
+    highlights: ["Sistem transportasi cerdas", "Digitalisasi layanan publik", "Pengelolaan sampah berbasis IoT"]
+  },
+  {
+    id: 4,
+    slug: "jakarta",
+    name: "Jakarta",
+    description: "DKI Jakarta sebagai pionir Smart City Indonesia telah mengoperasikan Jakarta Smart City Command Center yang memantau kota secara real-time melalui ribuan CCTV dan sensor.",
+    img: "https://images.unsplash.com/photo-1555993539-1732b0258235?w=600&h=400&fit=crop",
+    bisnis: 2140,
+    population: "10,6 Juta",
+    area: "664 km²",
+    highlights: ["Jakarta Smart City Command Center", "Sistem transportasi Transjakarta terintegrasi", "Qlue — platform pengaduan warga digital"]
+  },
+  {
+    id: 5,
+    slug: "jambi",
+    name: "Jambi",
+    description: "Kota Jambi menjalankan program Smart City dalam kerangka Gerakan Menuju 100 Smart City Kementerian Kominfo dengan fokus pada smart economy dan smart government.",
+    img: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Gentala_Arasy.jpg",
+    bisnis: 198,
+    population: "606 Ribu",
+    area: "205 km²",
+    highlights: ["Gerakan 100 Smart City Kemkominfo", "Sistem informasi perizinan online", "Digitalisasi UMKM lokal"]
+  },
+  {
+    id: 6,
+    slug: "kabupaten-kepulauan-mentawai",
+    name: "Kabupaten Kepulauan Mentawai",
+    description: "Kabupaten Kepulauan Mentawai mengembangkan program Smart Village untuk memperluas akses informasi dan layanan digital hingga ke desa-desa terpencil di kepulauan.",
+    img: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=600&h=400&fit=crop",
+    bisnis: 45,
+    population: "87 Ribu",
+    area: "6.011 km²",
+    highlights: ["Akses internet desa", "Sistem informasi potensi desa", "Pelayanan administrasi terpadu"]
+  },
+  {
+    id: 7,
+    slug: "magelang",
+    name: "Magelang",
+    description: "Kota Magelang terpilih dalam program Gerakan Menuju 100 Smart City dan mengembangkan sistem layanan publik digital serta pengelolaan kota berbasis data.",
+    img: "https://upload.wikimedia.org/wikipedia/commons/7/73/Borobudur_Temple.jpg",
+    bisnis: 187,
+    population: "123 Ribu",
+    area: "18 km²",
+    highlights: ["Data GO (Open Data)", "Sistem layanan kesehatan terpadu", "Magelang Cerdas (Aplikasi Publik)"]
+  },
+  {
+    id: 8,
+    slug: "medan",
+    name: "Medan",
+    description: "Kota Medan terus berinovasi dalam mengimplementasikan konsep Smart City melalui layanan Medan Smart City yang mengintegrasikan berbagai layanan publik dan administrasi kota.",
+    img: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Istana_Maimun_Medan.jpg",
+    bisnis: 934,
+    population: "2,4 Juta",
+    area: "265 km²",
+    highlights: ["Medan Smart City", "CCTV Terintegrasi", "E-Parkir dan layanan digital"]
+  },
+  {
+    id: 9,
+    slug: "papua-barat",
+    name: "Papua Barat",
+    description: "Provinsi Papua Barat menjalankan program Smart Village untuk mendekatkan layanan pemerintah kepada masyarakat desa dan meningkatkan konektivitas digital di wilayah terpencil.",
+    img: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=250&fit=crop",
+    bisnis: 87,
+    population: "1,1 Juta",
+    area: "97.024 km²",
+    highlights: ["Program Smart Village pedalaman", "Perluasan infrastruktur internet 4G", "Sistem informasi kampung digital"]
+  },
+  {
+    id: 10,
+    slug: "sulawesi-tengah",
+    name: "Sulawesi Tengah",
+    description: "Provinsi Sulawesi Tengah mengembangkan program Smart Village untuk memperkuat sistem informasi desa dan mendorong digitalisasi potensi ekonomi lokal pascabencana.",
+    img: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&h=250&fit=crop",
+    bisnis: 143,
+    population: "3,1 Juta",
+    area: "61.841 km²",
+    highlights: ["Sistem informasi desa pascabencana", "Digitalisasi potensi ekonomi lokal", "Program pemulihan berbasis teknologi"]
+  },
+  {
+    id: 11,
+    slug: "sumatera-utara",
+    name: "Sumatera Utara",
+    description: "Provinsi Sumatera Utara mendorong percepatan Smart City di Kota Medan dan Smart Village di berbagai kabupaten untuk meningkatkan pelayanan publik berbasis teknologi.",
+    img: "https://images.unsplash.com/photo-1588666309990-d68f08e3d4a6?w=400&h=250&fit=crop",
+    bisnis: 1240,
+    population: "15,1 Juta",
+    area: "72.981 km²",
+    highlights: ["Program Smart City Medan", "Digitalisasi desa di Kabupaten Toba", "Sistem informasi pariwisata Danau Toba"]
+  },
+  {
+    id: 12,
+    slug: "yogyakarta",
+    name: "Yogyakarta",
+    description: "Kota Yogyakarta masuk dalam program Gerakan Menuju 100 Smart City dan secara konsisten mengembangkan layanan publik digital serta ekosistem startup berbasis kota.",
+    img: "https://images.unsplash.com/photo-1602576666092-bf6447a729fc?w=400&h=250&fit=crop",
+    bisnis: 673,
+    population: "437 Ribu",
+    area: "33 km²",
+    highlights: ["Gerakan 100 Smart City Kemkominfo", "Ekosistem startup dan inovasi digital", "Sistem informasi pariwisata terpadu"]
   },
 ];
+
+/* ── Testimonials data ── */
+const TESTIMONIALS_DATA = [
+  {
+    id: 1,
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&crop=face",
+    name: "Nindi Afrilia",
+    role: "Marketing Executive",
+    text: "Dengan adanya Info.co.id, masyarakat jadi lebih mudah menemukan berbagai informasi dan layanan yang ada di daerah mereka.",
+  },
+  {
+    id: 2,
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop&crop=face",
+    name: "Putri Indah Lestari",
+    role: "Research and Development",
+    text: "Info.co.id membantu menyajikan informasi daerah dalam satu platform yang lebih mudah diakses dan dipahami oleh semua kalangan.",
+  },
+  {
+    id: 3,
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face",
+    name: "Algi Triana",
+    role: "UI/UX Designer",
+    text: "Platform ini punya potensi besar untuk membuat informasi lokal lebih mudah ditemukan. Tampilannya pun cukup bersih dan nyaman dipakai.",
+  },
+  {
+    id: 4,
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&crop=face",
+    name: "Fajar Septiawan",
+    role: "Business Development",
+    text: "Info.co.id jadi salah satu platform yang membantu menghubungkan masyarakat dengan berbagai informasi dan potensi bisnis di daerahnya.",
+  },
+  {
+    id: 5,
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face",
+    name: "Risa Permata",
+    role: "Digital Development",
+    text: "Saya senang ada platform seperti ini. Digitalisasi informasi daerah itu penting banget, terutama untuk mendukung program Smart Village.",
+  },
+  {
+    id: 6,
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face",
+    name: "Bagas Nugroho",
+    role: "Web Developer",
+    text: "Dari sisi teknis, Info.co.id sudah cukup solid. Integrasi data bisnis lokal dengan sistem pencariannya terasa responsif dan mudah digunakan.",
+  },
+  {
+    id: 7,
+    avatar: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=80&h=80&fit=crop&crop=face",
+    name: "Laras Diningrum",
+    role: "Project Manager",
+    text: "Koordinasi antar tim dalam pengembangan platform ini cukup terstruktur. Roadmap-nya jelas dan fokus pada kebutuhan pengguna di daerah.",
+  },
+  {
+    id: 8,
+    avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=80&h=80&fit=crop&crop=face",
+    name: "Dito Firmansyah",
+    role: "Product Team",
+    text: "Info.co.id membantu UMKM di daerah untuk lebih mudah ditemukan. Ini langkah nyata menuju ekosistem digital yang lebih merata di Indonesia.",
+  },
+];
+
 
 const getCategoryIcon = (iconName) => {
   switch (iconName) {
@@ -280,6 +296,10 @@ const getCategoryIcon = (iconName) => {
       return <Wrench size={26} strokeWidth={1.7} />;
     case "map-pin":
       return <MapPin size={26} strokeWidth={1.7} />;
+    case "building":
+      return <Building2 size={26} strokeWidth={1.7} />;
+    case "landmark":
+      return <Landmark size={26} strokeWidth={1.7} />;
     default:
       return <Store size={26} strokeWidth={1.7} />;
   }
@@ -287,7 +307,7 @@ const getCategoryIcon = (iconName) => {
 
 export default function Home() {
   const navigate = useNavigate();
-  const [selectedKota, setSelectedKota] = useState("Jakarta");
+  const [selectedKota, setSelectedKota] = useState("Semua");
   const [kotaSearch, setKotaSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
@@ -295,19 +315,24 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedSearchCategory, setSelectedSearchCategory] = useState("all");
-  const [keywordDropdownOpen, setKeywordDropdownOpen] = useState(false);
   const [searchHistory, setSearchHistory] = useState([]);
+  const [keywordDropdownOpen, setKeywordDropdownOpen] = useState(false);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const dropdownRef = useRef(null);
   const keywordDropdownRef = useRef(null);
   const [businesses, setBusinesses] = useState([]);
   const [categories, setCategories] = useState(CATEGORIES);
-  const [bisnisData, setBisnisData] = useState(BISNIS_DATA);
-  const [temukanData, setTemukanData] = useState(TEMUKAN_DATA);
-  const [adsData, setAdsData] = useState(ADS_DATA);
+  const [bisnisData, setBisnisData] = useState([]);
+  const [temukanData, setTemukanData] = useState([]);
+  const [adsData, setAdsData] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [blogsData, setBlogsData] = useState([]);
+  const [testimonialsData, setTestimonialsData] = useState(TESTIMONIALS_DATA);
+  const [smartCitiesData, setSmartCitiesData] = useState(SMART_CITIES);
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoadingData(true);
       try {
         // Fetch categories
         const catRes = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
@@ -333,38 +358,77 @@ export default function Home() {
         const bizJson = await bizRes.json();
         const bizData = bizJson?.data || bizJson || [];
         if (Array.isArray(bizData)) {
-          const mapped = bizData.map(b => ({
-            id: b.id,
-            name: b.name,
-            category: b.category?.name || "Umum",
-            categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
-            tags: [b.name],
-            location: b.city || "Indonesia",
-            views: b.views || 0,
-            status: b.status === "approved" ? "Buka Sekarang" : "Tutup",
-            img: b.banner || b.logo || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-            open: b.status === "approved",
-            featured: b.featured,
-            description: b.description
-          }));
+          const mapped = bizData.map(b => {
+            // Extract main category and subcategory
+            const mainCategory = b.category?.parent || b.category;
+            const subCategory = b.category?.parent ? b.category : null;
+            const categoryName = mainCategory?.name || b.category?.name || "Umum";
+            const subCategoryName = subCategory?.name || null;
+
+            return {
+              id: b.id,
+              name: b.name,
+              category: categoryName,
+              subCategory: subCategoryName,
+              categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
+              tags: [b.name],
+              location: b.city || "Indonesia",
+              views: b.views || 0,
+              status: "Buka Sekarang",
+              img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+              open: true,
+              featured: b.featured,
+              description: b.description
+            };
+          });
           setBisnisData(mapped);
           setTemukanData(mapped);
           
-          // Filter ads
-          const ads = mapped.filter(b => b.featured).map(b => ({
-            id: b.id,
-            businessId: b.id,
-            img: b.img,
-            name: b.name,
-            desc: b.description || "Portal Bisnis Terpercaya"
-          }));
-          if (ads.length > 0) {
-            setAdsData(ads);
-          }
+          // Dynamically update smart city business counts from database
+          const updatedSmartCities = SMART_CITIES.map(city => {
+            const count = mapped.filter(b => b.location && b.location.toLowerCase().includes(city.name.toLowerCase())).length;
+            return { ...city, bisnis: count };
+          });
+          setSmartCitiesData(updatedSmartCities);
         }
       } catch (err) {
         console.error("Failed to fetch businesses:", err);
       }
+
+      try {
+        // Fetch advertisements from API
+        const adsRes = await fetch(`${import.meta.env.VITE_API_URL}/advertisements`);
+        const adsJson = await adsRes.json();
+        const adsData = adsJson?.data || adsJson || [];
+        if (Array.isArray(adsData)) {
+          const mappedAds = adsData.map(ad => ({
+            id: ad.id,
+            businessId: ad.business?.id,
+            img: getStorageUrl(ad.business?.logo || ad.business?.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+            name: ad.business?.name || "Bisnis",
+            desc: ad.business?.description || "Portal Bisnis Terpercaya",
+            packageName: ad.package_name,
+            price: ad.price
+          }));
+          setAdsData(mappedAds);
+        }
+      } catch (err) {
+        console.error("Failed to fetch advertisements:", err);
+      }
+
+      try {
+        // Fetch blogs from API
+        const blogsRes = await fetch(`${import.meta.env.VITE_API_URL}/blogs`);
+        const blogsJson = await blogsRes.json();
+        const blogsData = blogsJson?.data || blogsJson || [];
+        if (Array.isArray(blogsData)) {
+          setBlogsData(blogsData);
+        }
+      } catch (err) {
+        console.error("Failed to fetch blogs:", err);
+      }
+
+      setLoadingData(false);
     };
     fetchData();
   }, []);
@@ -459,7 +523,7 @@ export default function Home() {
       const updatedHistory = [
         newHistoryItem,
         ...searchHistory.filter(h => h.keyword.toLowerCase() !== searchKeyword.trim().toLowerCase())
-      ].slice(0, 5);
+      ].slice(0, 2);
       localStorage.setItem("search_history", JSON.stringify(updatedHistory));
       setSearchHistory(updatedHistory);
     }
@@ -475,136 +539,163 @@ export default function Home() {
       {/* ── HERO BANNER ── */}
       <section className="home-hero">
         <div className="home-hero__bg" />
-        <div className="home-hero__content">
-          <h1 className="home-hero__title">Info.co.id</h1>
-          <p className="home-hero__subtitle">Semua Ada Disini</p>
+        <div className="home-hero__container">
+          <div className="home-hero__content">
+            {/* Badge / Pill */}
+            <div className="home-hero__badge">
+              <div className="home-hero__badge-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 1L3 5V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V5L12 1Z" fill="url(#heroBadgeGrad)"/>
+                  <path d="M9 11.8L11.2 14L15.5 9.5" stroke="#050a16" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <defs>
+                    <linearGradient id="heroBadgeGrad" x1="3" y1="1" x2="21" y2="23" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#00d2be"/>
+                      <stop offset="1" stopColor="#007570"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <span>Direktori Bisnis Terpercaya di Indonesia</span>
+            </div>
 
-          {/* Search Bar */}
-          <div className="home-search">
-            <div className="home-search__group home-search__group--keyword" ref={keywordDropdownRef}>
-              <span className="home-search__label">Kata Kunci :</span>
-              <input
-                className="home-search__input"
-                type="text"
-                placeholder="UMKM, Pelaku Usaha, Bisnis, dll"
-                id="search-keyword"
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                onFocus={() => setKeywordDropdownOpen(true)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleSearchSubmit();
-                  }
-                }}
-              />
-              {selectedSearchCategory !== "all" && (
-                <span className="home-search__selected-category">
-                  {CATEGORIES.find(c => c.id === selectedSearchCategory)?.label}
-                </span>
-              )}
+            {/* Title & Subtitle */}
+            <h1 className="home-hero__title">
+              Info.co.id
+              <span className="home-hero__title-sub">Semua Ada Disini</span>
+            </h1>
+            <p className="home-hero__subtitle">
+              Temukan dan terhubung dengan berbagai<br />
+              pelaku usaha terbaik di Indonesia.
+            </p>
 
-              {keywordDropdownOpen && (
-                <div className="home-keyword-dropdown">
-                  {/* Riwayat Pencarian (Top) */}
-                  {searchHistory.length > 0 && (
+            {/* Search Bar */}
+            <form className="home-search" onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(); }}>
+              <div className="home-search__group home-search__group--keyword" ref={keywordDropdownRef}>
+                <span className="home-search__label">Kata Kunci :</span>
+                <input
+                  className="home-search__input"
+                  type="text"
+                  placeholder="UMKM, Pelaku Usaha, Bisnis, dll"
+                  id="search-keyword"
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  onFocus={() => setKeywordDropdownOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSearchSubmit();
+                    }
+                  }}
+                />
+                {selectedSearchCategory !== "all" && (
+                  <span className="home-search__selected-category">
+                    {CATEGORIES.find(c => c.id === selectedSearchCategory)?.label || selectedSearchCategory}
+                  </span>
+                )}
+
+                {keywordDropdownOpen && (
+                  <div className="home-keyword-dropdown">
+                    {/* Riwayat Pencarian (Top) */}
+                    {searchHistory.length > 0 && (
+                      <div className="home-keyword-dropdown__section">
+                        <span className="home-keyword-dropdown__section-title">Riwayat Pencarian</span>
+                        <ul className="home-keyword-dropdown__list">
+                          {searchHistory.map((item, idx) => (
+                            <li
+                              key={idx}
+                              className="home-keyword-dropdown__item home-keyword-dropdown__item--history"
+                              onClick={() => {
+                                setSearchKeyword(item.keyword);
+                                setSelectedSearchCategory(item.category || "all");
+                                setKeywordDropdownOpen(false);
+                                navigate(`/category/${item.category || "all"}?q=${encodeURIComponent(item.keyword)}&location=${encodeURIComponent(selectedKota)}`);
+                              }}
+                            >
+                              <span className="home-keyword-dropdown__history-text">{item.keyword}</span>
+                              <span className="home-keyword-dropdown__history-cat">
+                                di {CATEGORIES.find(c => c.id === item.category)?.label || "Semua"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Kategori Pilihan */}
                     <div className="home-keyword-dropdown__section">
-                      <span className="home-keyword-dropdown__section-title">Riwayat Pencarian</span>
+                      <span className="home-keyword-dropdown__section-title">Cari berdasarkan Kategori</span>
                       <ul className="home-keyword-dropdown__list">
-                        {searchHistory.map((item, idx) => (
+                        {categories.map((cat) => (
                           <li
-                            key={idx}
-                            className="home-keyword-dropdown__item home-keyword-dropdown__item--history"
+                            key={cat.id}
+                            className="home-keyword-dropdown__item home-keyword-dropdown__item--category"
                             onClick={() => {
-                              setSearchKeyword(item.keyword);
-                              setSelectedSearchCategory(item.category || "all");
-                              setKeywordDropdownOpen(false);
-                            }}
+  setSelectedSearchCategory(cat.id);
+  setKeywordDropdownOpen(false);
+}}
                           >
-                            <span className="home-keyword-dropdown__history-text">{item.keyword}</span>
-                            <span className="home-keyword-dropdown__history-cat">
-                              di {CATEGORIES.find(c => c.id === item.category)?.label || "Semua"}
-                            </span>
+                            <span className="home-keyword-dropdown__cat-icon">{cat.icon}</span>
+                            <span className="home-keyword-dropdown__cat-label">{cat.label}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
 
-                  {/* Kategori Pilihan */}
-                  <div className="home-keyword-dropdown__section">
-                    <span className="home-keyword-dropdown__section-title">Cari berdasarkan Kategori</span>
-                    <ul className="home-keyword-dropdown__list">
-                      {categories.map((cat) => (
-                        <li
-                          key={cat.id}
-                          className="home-keyword-dropdown__item home-keyword-dropdown__item--category"
-                          onClick={() => {
-                            setSelectedSearchCategory(cat.id);
-                            setKeywordDropdownOpen(false);
-                          }}
-                        >
-                          <span className="home-keyword-dropdown__cat-icon">{cat.icon}</span>
-                          <span className="home-keyword-dropdown__cat-label">{cat.label}</span>
-                        </li>
-                      ))}
+              <div className="home-search__divider" />
+
+              <div className="home-search__group home-search__group--lokasi" ref={dropdownRef}>
+                <span className="home-search__label">Lokasi</span>
+                <button
+                  type="button"
+                  className="home-search__kota-btn"
+                  onClick={() => setDropdownOpen((v) => !v)}
+                >
+                  <span className="home-search__kota-text">{selectedKota}</span>
+                </button>
+
+                {dropdownOpen && (
+                  <div className="home-kota-dropdown" role="listbox">
+                    <div className="home-kota-dropdown__search">
+                      <Search size={13} className="home-kota-dropdown__icon" />
+                      <input
+                        autoFocus
+                        type="text"
+                        placeholder="Cari kota..."
+                        value={kotaSearch}
+                        onChange={(e) => setKotaSearch(e.target.value)}
+                        className="home-kota-dropdown__input"
+                      />
+                    </div>
+                    <ul className="home-kota-dropdown__list">
+                      {filteredKota.length > 0
+                        ? filteredKota.map((kota) => (
+                          <li
+                            key={kota}
+                            role="option"
+                            aria-selected={kota === selectedKota}
+                            className={`home-kota-dropdown__item${kota === selectedKota ? " selected" : ""}`}
+                            onClick={() => { setSelectedKota(kota); setDropdownOpen(false); setKotaSearch(""); }}
+                          >
+                            {kota}
+                          </li>
+                        ))
+                        : <li className="home-kota-dropdown__empty">Kota tidak ditemukan</li>
+                      }
                     </ul>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="home-search__group home-search__group--lokasi" ref={dropdownRef}>
-              <span className="home-search__label">Lokasi</span>
-              <button
-                type="button"
-                className="home-search__kota-btn"
-                onClick={() => setDropdownOpen((v) => !v)}
+              <button 
+                className="home-search__button" 
+                type="submit" 
+                aria-label="Cari"
               >
-                <span>{selectedKota}</span>
-                <ChevronDown size={14} className={`home-search__kota-caret${dropdownOpen ? " open" : ""}`} />
+                <Search size={18} strokeWidth={2.5} />
               </button>
-
-              {dropdownOpen && (
-                <div className="home-kota-dropdown" role="listbox">
-                  <div className="home-kota-dropdown__search">
-                    <Search size={13} className="home-kota-dropdown__icon" />
-                    <input
-                      autoFocus
-                      type="text"
-                      placeholder="Cari kota..."
-                      value={kotaSearch}
-                      onChange={(e) => setKotaSearch(e.target.value)}
-                      className="home-kota-dropdown__input"
-                    />
-                  </div>
-                  <ul className="home-kota-dropdown__list">
-                    {filteredKota.length > 0
-                      ? filteredKota.map((kota) => (
-                        <li
-                          key={kota}
-                          role="option"
-                          aria-selected={kota === selectedKota}
-                          className={`home-kota-dropdown__item${kota === selectedKota ? " selected" : ""}`}
-                          onClick={() => { setSelectedKota(kota); setDropdownOpen(false); setKotaSearch(""); }}
-                        >
-                          {kota}
-                        </li>
-                      ))
-                      : <li className="home-kota-dropdown__empty">Kota tidak ditemukan</li>
-                    }
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            <button 
-              className="home-search__button" 
-              type="button" 
-              aria-label="Cari"
-              onClick={handleSearchSubmit}
-            >
-              <Search size={18} strokeWidth={2.5} />
-            </button>
+            </form>
           </div>
         </div>
       </section>
@@ -615,38 +706,39 @@ export default function Home() {
           <h2 className="reko-title"></h2>
 
           {/* Ads carousel */}
-          <div className="ads-carousel">
-            <button
-              className="ads-carousel__nav ads-carousel__nav--prev"
-              onClick={() => setCurrentAdIndex((prev) => Math.max(0, prev - 1))}
-              aria-label="Previous slide"
-            >
-              ‹
-            </button>
-            <div className="ads-carousel__track" style={{ transform: `translateX(-${currentAdIndex * 33.33}%)` }}>
-              {adsData.length > 0 && [...adsData, ...adsData].map((ad, index) => (
-                <Link key={`${ad.id}-${index}`} to={`/business/${ad.businessId}`} className="ad-card">
-                  <div className="ad-card__img-wrap">
-                    <img src={ad.img} alt={ad.name} className="ad-card__img" loading="lazy" />
-                    <div className="ad-card__img-overlay">
-                      <button
-                        type="button"
-                        className={`ad-card__save${saved[ad.id] ? " saved" : ""}`}
-                        onClick={(e) => { e.preventDefault(); toggleSave(ad.id); }}
-                        aria-label="Simpan"
-                      >
-                        <Bookmark size={13} fill={saved[ad.id] ? "currentColor" : "none"} />
-                        <span>Simpan</span>
-                      </button>
-                      <span className="ad-card__views">
-                        <Eye size={13} />
-                        <span>Pratinjau</span>
-                      </span>
+          {adsData.length > 0 ? (
+            <div className="ads-carousel">
+              <button
+                className="ads-carousel__nav ads-carousel__nav--prev"
+                onClick={() => setCurrentAdIndex((prev) => Math.max(0, prev - 1))}
+                aria-label="Previous slide"
+              >
+                ‹
+              </button>
+              <div className="ads-carousel__track" style={{ transform: `translateX(-${currentAdIndex * 33.33}%)` }}>
+                {[...adsData, ...adsData].map((ad, index) => (
+                  <Link key={`${ad.id}-${index}`} to={`/business/${ad.businessId}`} className="ad-card">
+                    <div className="ad-card__img-wrap">
+                      <img src={ad.img} alt={ad.name} className="ad-card__img" loading="lazy" />
+                      <div className="ad-card__img-overlay">
+                        <button
+                          type="button"
+                          className={`ad-card__save${saved[ad.id] ? " saved" : ""}`}
+                          onClick={(e) => { e.preventDefault(); toggleSave(ad.id); }}
+                          aria-label="Simpan"
+                        >
+                          <Bookmark size={13} fill={saved[ad.id] ? "currentColor" : "none"} />
+                          <span>Simpan</span>
+                        </button>
+                        <span className="ad-card__views">
+                          <Eye size={13} />
+                          <span>Pratinjau</span>
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="ad-card__body">
-                    <h3 className="ad-card__name">{ad.name}</h3>
-                    <p className="ad-card__category">{ad.desc}</p>
+                    <div className="ad-card__body">
+                      <h3 className="ad-card__name">{ad.name}</h3>
+                      <p className="ad-card__category">{ad.desc}</p>
                   </div>
                 </Link>
               ))}
@@ -659,6 +751,12 @@ export default function Home() {
               ›
             </button>
           </div>
+          ) : (
+            <div className="ads-empty-state">
+              <Megaphone size={48} style={{ opacity: 0.5 }} />
+              <p>Belum ada bisnis yang sedang beriklan</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -688,27 +786,27 @@ export default function Home() {
           <p className="smart-subtitle">Info.Co.Id Mendorong Percepatan Program Pemerintah Smart City &amp; Smart Village</p>
 
           <div className="smart-grid">
-            {SMART_CITIES.map((city) => (
+            {smartCitiesData.length > 0 ? (
+              smartCitiesData.map((city) => (
               <Link 
                 key={city.id} 
-                to={`/smart-city/${city.id}`}
+                to={`/location/${city.slug}`}
                 className="smart-card-link"
               >
-                <div 
-                  className={`smart-card${selectedCity === city.name ? " active" : ""}`} 
-                  tabIndex={0}
-                  onClick={() => setSelectedCity(selectedCity === city.name ? null : city.name)}
-                >
+                <div className="smart-card">
                   <img src={city.img} alt={city.name} className="smart-card__img" loading="lazy" />
-                  <div className="smart-card__overlay" />
-                  <span className="smart-card__name">{city.name}</span>
-                  <div className="smart-card__tooltip">
-                    <span className="smart-card__tooltip-count">{city.bisnis.toLocaleString("id-ID")}</span>
-                    <span className="smart-card__tooltip-label"> bisnis terdaftar</span>
+                  <div className="smart-card__content">
+                    <h3 className="smart-card__name">{city.name}</h3>
+                    <p className="smart-card__count">{city.bisnis.toLocaleString("id-ID")} bisnis terdaftar</p>
                   </div>
                 </div>
               </Link>
-            ))}
+            ))
+            ) : (
+              <div className="smart-empty">
+                <p>Belum ada data smart city.</p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -749,6 +847,9 @@ export default function Home() {
             Temukan Dihalaman Kami Untuk Dapat Membantu Dalam Menemukan Pelaku Usaha Hingga Skala Terkecil
           </p>
 
+          {loadingData ? (
+            <InlineSpinner text="Memuat data bisnis..." />
+          ) : (
           <div className="temukan-grid">
             {filteredTemukanData.map((bisnis) => (
               <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
@@ -775,10 +876,18 @@ export default function Home() {
                 {/* Body */}
                 <div className="biz-card__body">
                   <h3 className="biz-card__name">{bisnis.name}</h3>
-                  <p className="biz-card__category">
-                    <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor }} />
-                    {bisnis.category}
-                  </p>
+                  <div className="biz-card__categories">
+                    <p className="biz-card__category">
+                      <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor }} />
+                      {bisnis.category}
+                    </p>
+                    {bisnis.subCategory && (
+                      <p className="biz-card__category biz-card__category--sub">
+                        <span className="biz-card__cat-separator">›</span>
+                        {bisnis.subCategory}
+                      </p>
+                    )}
+                  </div>
                   <div className="biz-card__tags">
                     {bisnis.tags.map((tag) => (
                       <span key={tag} className="biz-card__tag">
@@ -798,6 +907,7 @@ export default function Home() {
               </Link>
             ))}
           </div>
+          )}
         </div>
       </section>
 
@@ -807,7 +917,8 @@ export default function Home() {
           <h2 className="testi-title">Apa Yang Mereka Katakan</h2>
 
           <div className="testi-grid">
-            {TESTIMONIALS_DATA.map((testi) => (
+            {testimonialsData.length > 0 ? (
+              testimonialsData.map((testi) => (
               <div key={testi.id} className="testi-card">
                 <div className="testi-card__avatar-wrap">
                   <img src={testi.avatar} alt={testi.name} className="testi-card__avatar" loading="lazy" />
@@ -821,7 +932,12 @@ export default function Home() {
                   <p className="testi-card__text">{testi.text}</p>
                 </div>
               </div>
-            ))}
+            ))
+            ) : (
+              <div className="testi-empty">
+                <p>Belum ada testimoni. Jadilah yang pertama memberikan testimoni!</p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -850,7 +966,8 @@ export default function Home() {
           <p className="blog-subtitle">Bagikan Pengalaman Dan Info Anda Di Info.co.id.</p>
 
           <div className="blog-grid">
-            {BLOG_DATA.map((post) => (
+            {blogsData.length > 0 ? (
+              blogsData.map((post) => (
               <Link key={post.id} to="/blog" className="blog-card blog-card--link">
                 <div className="blog-card__img-wrap">
                   <img src={post.img} alt={post.title} className="blog-card__img" loading="lazy" />
@@ -870,7 +987,12 @@ export default function Home() {
                   </div>
                 </div>
               </Link>
-            ))}
+            ))
+            ) : (
+              <div className="blog-empty">
+                <p>Belum ada artikel blog.</p>
+              </div>
+            )}
           </div>
         </div>
       </section>

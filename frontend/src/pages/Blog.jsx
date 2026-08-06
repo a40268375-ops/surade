@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import api from "../services/api";
 import logoImg from "../assets/logo.png";
+import { InlineSpinner } from "../components/LoadingScreen";
 import {
   User,
   Calendar,
@@ -10,91 +12,97 @@ import {
   Search,
 } from "lucide-react";
 import "./Blog.css";
-
-/* ── Blog data ── */
-const BLOG_POSTS = [
-  {
-    id: 1,
-    title: "Cucurak Khas Bogor, sambut Bulan Ramadhan",
-    excerpt: "Tradisi cucurak merupakan salah satu budaya lokal yang masih dilestarikan oleh masyarakat Bogor sebagai bentuk syukur menyambut bulan suci Ramadhan.",
-    category: "Budaya",
-    author: "Hikmah Yusila",
-    date: "15 Agustus 2017",
-    readTime: "5 min",
-    img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop",
-  },
-  {
-    id: 2,
-    title: "Tradisi Grebeg Gethuk di Kota Magelang",
-    excerpt: "Grebeg Gethuk adalah tradisi tahunan yang menjadi ikon budaya Kota Magelang, melambangkan kerukunan dan kebersamaan masyarakat.",
-    category: "Budaya",
-    author: "Hikmah Yusila",
-    date: "16 Februari 2017",
-    readTime: "4 min",
-    img: "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=800&h=500&fit=crop",
-  },
-  {
-    id: 3,
-    title: "Pasar Tiban Pahingan Magelang, Destinasi Wisata Kuliner",
-    excerpt: "Pasar Tiban Pahingan menawarkan pengalaman unik berwisata kuliner sambil mendengarkan pengajian, memadukan tradisi dan kuliner lokal.",
-    category: "Kuliner",
-    author: "Hikmah Yusila",
-    date: "16 Februari 2017",
-    readTime: "6 min",
-    img: "https://images.unsplash.com/photo-1572285870954-7b08e56f4c58?w=800&h=500&fit=crop",
-  },
-  {
-    id: 4,
-    title: "Pesona Rumah Gadang Minangkabau",
-    excerpt: "Rumah Gadang adalah ikon arsitektur tradisional Minangkabau dengan atap bergonjong yang khas, merepresentasikan filosofi adat dan budaya.",
-    category: "Budaya",
-    author: "Andi Pratama",
-    date: "20 Maret 2024",
-    readTime: "7 min",
-    img: "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=800&h=500&fit=crop",
-  },
-  {
-    id: 5,
-    title: "Keindahan Pulau Komodo dan Habitatnya",
-    excerpt: "Pulau Komodo adalah rumah bagi komodo, reptil terbesar di dunia, serta menawarkan pemandangan alam yang memukau dan biodiversitas unik.",
-    category: "Wisata",
-    author: "Siti Rahayu",
-    date: "25 April 2024",
-    readTime: "8 min",
-    img: "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=800&h=500&fit=crop",
-  },
-  {
-    id: 6,
-    title: "Tari Kecak: Tradisi Bali yang Mendunia",
-    excerpt: "Tari Kecak adalah seni pertunjukan tradisional Bali yang terkenal dengan gerakan tangan yang kompleks dan nyanyian khas 'cak-cak-cak'.",
-    category: "Budaya",
-    author: "Made Widana",
-    date: "10 Mei 2024",
-    readTime: "5 min",
-    img: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&h=500&fit=crop",
-  },
-];
-
-const CATEGORIES = [
-  { id: "all", label: "Semua" },
-  { id: "budaya", label: "Budaya" },
-  { id: "kuliner", label: "Kuliner" },
-  { id: "wisata", label: "Wisata" },
-  { id: "teknologi", label: "Teknologi" },
-];
+import { DEFAULT_AVATAR } from "../utils/constants";
 
 export default function Blog() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [blogs, setBlogs] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    fetchBlogs();
+    fetchCategories();
   }, []);
 
-  const filteredPosts = BLOG_POSTS.filter((post) => {
-    const matchesCategory = activeCategory === "all" || post.category.toLowerCase() === activeCategory;
-    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+  const fetchBlogs = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/blogs?status=published");
+      const data = res.data?.data || res.data || [];
+      setBlogs(data);
+    } catch (err) {
+      console.error("Failed to fetch blogs:", err);
+      setBlogs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get("/blog-categories");
+      const data = res.data?.data || res.data || [];
+      if (Array.isArray(data)) {
+        const mappedCategories = [
+          { id: "all", label: "Semua" },
+          ...data.map(c => ({ id: c.slug, label: c.name }))
+        ];
+        setCategories(mappedCategories);
+      }
+    } catch (err) {
+      console.error("Failed to fetch blog categories:", err);
+    }
+  };
+
+  const getCategoryLabel = (catId) => {
+    const cat = categories.find(c => c.id === catId);
+    return cat?.label || catId || "Umum";
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" });
+  };
+
+  const getReadTime = (content) => {
+    if (!content) return "1 min";
+    const words = content.split(/\s+/).length;
+    const min = Math.ceil(words / 200);
+    return min + " min";
+  };
+
+const getStorageUrl = (path) => {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/i, "");
+    return `${baseUrl}/storage/${path}`;
+  };
+
+  const getThumbnailUrl = (blog) => {
+    if (blog.thumbnail) {
+      return getStorageUrl(blog.thumbnail);
+    }
+    return "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop";
+  };
+
+  const getUserAvatar = (blog) => {
+    if (blog?.user?.avatar) {
+      return getStorageUrl(blog.user.avatar);
+    }
+    return DEFAULT_AVATAR;
+  };
+
+  const filteredPosts = blogs.filter((post) => {
+    const cat = (post.blog_category || "").toLowerCase();
+    const matchesCategory = activeCategory === "all" || cat === activeCategory;
+    const title = (post.title || "").toLowerCase();
+    const excerpt = (post.excerpt || "").toLowerCase();
+    const search = searchQuery.toLowerCase();
+    const matchesSearch = !search || title.includes(search) || excerpt.includes(search);
     return matchesCategory && matchesSearch;
   });
 
@@ -134,7 +142,7 @@ export default function Blog() {
               />
             </div>
             <div className="blog-categories">
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <button
                   key={cat.id}
                   type="button"
@@ -147,41 +155,48 @@ export default function Blog() {
             </div>
           </div>
 
-          {/* Blog Grid */}
-          <div className="blog-grid">
-            {filteredPosts.map((post) => (
-              <article key={post.id} className="blog-card">
-                <div className="blog-card__img-wrap">
-                  <img src={post.img} alt={post.title} className="blog-card__img" loading="lazy" />
-                  <span className="blog-card__category">{post.category}</span>
-                </div>
-                <div className="blog-card__body">
-                  <h2 className="blog-card__title">{post.title}</h2>
-                  <p className="blog-card__excerpt">{post.excerpt}</p>
-                  <div className="blog-card__meta">
-                    <span className="blog-card__meta-item">
-                      <User size={14} />
-                      {post.author}
-                    </span>
-                    <span className="blog-card__meta-item">
-                      <Calendar size={14} />
-                      {post.date}
-                    </span>
-                    <span className="blog-card__meta-item">
-                      <Clock size={14} />
-                      {post.readTime}
-                    </span>
-                  </div>
-                  <Link to={`/blog/${post.id}`} className="blog-card__link">
-                    Baca Selengkapnya
-                    <ArrowRight size={16} />
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
+          {/* Loading */}
+          {loading && (
+            <InlineSpinner text="Memuat artikel..." />
+          )}
 
-          {filteredPosts.length === 0 && (
+          {/* Blog Grid */}
+          {!loading && (
+            <div className="blog-grid">
+              {filteredPosts.map((post) => (
+                <article key={post.id} className="blog-card">
+                  <div className="blog-card__img-wrap">
+                    <img src={getThumbnailUrl(post)} alt={post.title} className="blog-card__img" loading="lazy" />
+                    <span className="blog-card__category">{getCategoryLabel(post.blog_category)}</span>
+                  </div>
+                  <div className="blog-card__body">
+                    <h2 className="blog-card__title">{post.title}</h2>
+                    <p className="blog-card__excerpt">{post.excerpt || post.content?.substring(0, 150)}</p>
+                    <div className="blog-card__meta">
+                      <span className="blog-card__meta-item">
+                        <User size={14} />
+                        {post.user?.name || post.author || "Penulis"}
+                      </span>
+                      <span className="blog-card__meta-item">
+                        <Calendar size={14} />
+                        {formatDate(post.published_at || post.created_at)}
+                      </span>
+                      <span className="blog-card__meta-item">
+                        <Clock size={14} />
+                        {getReadTime(post.content || post.excerpt)}
+                      </span>
+                    </div>
+                    <Link to={`/blog/${post.id}`} className="blog-card__link">
+                      Baca Selengkapnya
+                      <ArrowRight size={16} />
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {!loading && filteredPosts.length === 0 && (
             <div className="blog-empty">
               <p>Tidak ada artikel yang ditemukan.</p>
             </div>

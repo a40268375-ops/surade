@@ -17,6 +17,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'phone',
         'avatar',
+        'bio',
+        'location',
+        'banner',
         'role',
         'password',
     ];
@@ -80,6 +83,17 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /*
     |--------------------------------------------------------------------------
+    | Advertisements
+    |--------------------------------------------------------------------------
+    */
+
+    public function advertisements()
+    {
+        return $this->hasMany(Advertisement::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Conversations
     |--------------------------------------------------------------------------
     */
@@ -116,11 +130,6 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isAdmin()
     {
         return $this->role === 'admin';
-    }
-
-    public function isReseller()
-    {
-        return $this->role === 'reseller';
     }
 
     public function isUser()

@@ -1,13 +1,12 @@
-# TODO - Login/Register Updates
+# TODO: Fix "Profil Saya" Navbar Link & Bersihin Profile.jsx
 
-- [x] Update `frontend/src/pages/Login.jsx`:
-  - [x] Add state for `regPasswordConfirmation`
-  - [x] Change register email placeholder/text to Gmail-only
-  - [x] Add second password confirmation input under password (keep existing styling)
-  - [x] Implement client validation:
-    - [x] Email matches `@gmail.com`
-    - [x] Password matches confirmation
-  - [x] Connect register submit to `POST /register` and send `password_confirmation`
-  - [x] Handle success/failure without major UI layout changes
-- [x] Test register flow in frontend
+## Steps
+1. ✅ Edit `Navbar.jsx` - Link "Profil Saya" dan "Pengaturan" ke `/admin-user?tab=profile`
+2. ✅ Edit `AdminUser.jsx` - Tambah `useSearchParams`, baca `?tab=profile`, set `activeTab` awal sesuai query param
+3. ✅ Edit `Profile.jsx` - Bersihin semua sisa CRUD/edit yang broken:
+   - Hapus import `../utils/media` (file gak ada)
+   - Hapus panggilan `setPhotoPreview`, `setBannerPreview` yang gak didefinisikan
+   - Fix URL gambar pake `getMediaUrl()` fungsi lokal
+   - Jadikan murni halaman publik view-only (lht profil orang / sendiri)
+4. ✅ Router `/admin-user` udah bener di `router/index.jsx`
 
