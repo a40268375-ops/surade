@@ -1,0 +1,139 @@
+/* =========================================================
+   Loading.css
+   Logo di tengah dengan cincin gradasi warna brand (teal/hijau)
+   yang berputar halus di sekelilingnya, di atas latar terang
+   yang selaras dengan identitas Surade.co.id (sebelumnya latar
+   gelap polos #202125 yang beda sendiri dari tema web).
+   ========================================================= */
+
+:root {
+  --loading-primary: #159c60;
+  --loading-primary-dark: #007570;
+  --loading-primary-light: #eefdf5;
+}
+
+/* ---------- FULL PAGE LOADER ---------- */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 40%, #f2fdf8 0%, #eaf6f1 45%, #e3f1ec 100%);
+}
+
+.loading-screen__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+/* Cincin gradasi berputar + logo diam di tengahnya */
+.loading-screen__orbit {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-screen__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--loading-primary-light) 0deg,
+    var(--loading-primary) 140deg,
+    var(--loading-primary-dark) 220deg,
+    var(--loading-primary-light) 360deg
+  );
+  animation: loadingSpin 1.6s linear infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+}
+
+.loading-screen__logo {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+  border-radius: 50%;
+  background: #ffffff;
+  padding: 12px;
+  box-shadow: 0 6px 20px rgba(0, 117, 112, 0.18);
+}
+
+.loading-screen__text {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--loading-primary-dark);
+}
+
+/* Tiga titik kecil berkedip bergantian di bawah - aksen halus tambahan */
+.loading-screen__dots {
+  display: flex;
+  gap: 6px;
+}
+.loading-screen__dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--loading-primary);
+  animation: loadingDotPulse 1.2s ease-in-out infinite;
+}
+.loading-screen__dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-screen__dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ---------- INLINE LOADER (dipakai di dalam section/card) ---------- */
+.loading-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 0;
+}
+
+.loading-inline__text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--loading-primary-dark);
+}
+
+.loading-ring {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--loading-primary-light) 0deg,
+    var(--loading-primary) 140deg,
+    var(--loading-primary-dark) 220deg,
+    var(--loading-primary-light) 360deg
+  );
+  animation: loadingSpin 1s linear infinite;
+}
+.loading-ring::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: #ffffff;
+  border-radius: 50%;
+}
+.loading-ring--sm { width: 26px; height: 26px; }
+
+/* ---------- ANIMATIONS ---------- */
+
+@keyframes loadingSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loadingDotPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50%      { opacity: 1; transform: scale(1.15); }
+}

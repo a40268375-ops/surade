@@ -1,0 +1,948 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+
+/* ─────────────────────────────────────────────
+   RESET & BASE
+───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+* { font-family: 'Poppins', sans-serif; }
+
+body { background: #f5f6fa; }
+
+/* ─────────────────────────────────────────────
+   PAGE SHELL
+───────────────────────────────────────────── */
+.category-page {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────
+   NAVBAR
+   (Navbar sekarang di-styling sepenuhnya oleh
+   src/components/Navbar.css — blok lama di sini
+   sudah dihapus supaya tidak bentrok/menimpa)
+───────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────
+   HERO SECTION
+───────────────────────────────────────────── */
+.category-hero {
+  position: relative;
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 20px 60px;
+  overflow: hidden;
+}
+
+.category-hero__bg {
+  position: absolute;
+  inset: 0;
+  background: url('../assets/waterfall.jpg') no-repeat center center / cover;
+  z-index: 0;
+}
+
+.category-hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.40) 50%, rgba(0, 0, 0, 0.65) 100%);
+  z-index: 1;
+}
+
+.category-hero__content {
+  position: relative;
+  z-index: 2;
+  max-width: 800px;
+  width: 100%;
+  text-align: center;
+}
+
+.category-hero__breadcrumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 20px;
+}
+
+.category-hero__breadcrumb a {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.category-hero__breadcrumb a:hover {
+  color: white;
+}
+
+.category-hero__title {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  color: transparent;
+  background: linear-gradient(100deg, #ffffff 0%, #ffffff 28%, #2563eb 40%, #7c3aed 52%, #ec4899 60%, #ffffff 78%, #ffffff 100%);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+.category-hero__subtitle {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 32px;
+}
+
+/* Search Bar */
+.category-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 500px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 14px 20px;
+}
+
+.category-search__icon {
+  color: rgba(255, 255, 255, 0.8);
+  flex-shrink: 0;
+}
+
+.category-search__input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  color: white;
+}
+
+.category-search__input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ─────────────────────────────────────────────
+   CATEGORY TABS SECTION
+───────────────────────────────────────────── */
+.category-tabs-section {
+  background: #ffffff;
+  padding: 30px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.category-tabs-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* PERBAIKAN: class ini dulu namanya sama persis (.reko-tabs, .reko-tab, dst)
+   dengan yang dipakai di Home.css - karena CSS di-load global (bukan
+   di-scope per halaman), rule dari Home.css bisa menimpa punya halaman ini
+   tergantung urutan loading, sehingga baris kategori ini kadang tampil
+   kosong/blank sama sekali. Sekarang diberi nama unik (cat-tab*) khusus
+   halaman Kategori supaya tidak akan pernah bentrok lagi dengan Home.css.
+   PERBAIKAN LAGI: nilai-nilai di bawah ini SENGAJA disalin persis
+   (byte-per-byte) dari ".reko-tab*" di Home.css - termasuk semua
+   "!important"-nya - supaya kartu kategori di halaman ini dijamin selalu
+   identik ukuran & tampilannya dengan yang di halaman Home, walau
+   sebelumnya sempat beda karena masing-masing diedit terpisah. */
+.cat-tabs {
+  display: grid;
+  grid-template-columns: repeat(7, 150px);
+  gap: 16px;
+  margin-bottom: 16px;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 8px;
+  justify-content: center;
+}
+
+.cat-tab {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  height: 140px !important;
+  min-height: 140px !important;
+  max-height: 140px !important;
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+  padding: 12px !important;
+  background: #ffffff !important;
+  border: 1px solid #f1f5f9 !important;
+  border-radius: 20px !important;
+  cursor: pointer !important;
+  white-space: normal !important;
+  color: #64748b !important;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  text-align: center !important;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 4px 8px rgba(0, 0, 0, 0.02),
+    0 1px 1px rgba(0, 0, 0, 0.05) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  backdrop-filter: blur(10px) !important;
+  box-sizing: border-box !important;
+}
+
+.cat-tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #10b981, #059669, #047857);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.cat-tab::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.02), rgba(5, 150, 105, 0.02));
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.cat-tab--link {
+  text-decoration: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  height: 140px !important;
+  min-height: 140px !important;
+  max-height: 140px !important;
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+  padding: 12px !important;
+  background: #ffffff !important;
+  border: 1px solid #f1f5f9 !important;
+  border-radius: 20px !important;
+  white-space: normal !important;
+  color: #64748b !important;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  text-align: center !important;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 4px 8px rgba(0, 0, 0, 0.02),
+    0 1px 1px rgba(0, 0, 0, 0.05) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  backdrop-filter: blur(10px) !important;
+  box-sizing: border-box !important;
+}
+
+.cat-tab--link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #10b981, #059669, #047857);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.cat-tab--link::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.02), rgba(5, 150, 105, 0.02));
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.cat-tab:hover,
+.cat-tab--link:hover {
+  border-color: #d1fae5;
+  color: #059669;
+  background: #ffffff;
+}
+
+.cat-tab:hover::before,
+.cat-tab--link:hover::before {
+  transform: scaleX(1);
+}
+
+.cat-tab:hover::after,
+.cat-tab--link:hover::after {
+  opacity: 1;
+}
+
+.cat-tab.active {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #047857;
+  box-shadow:
+    0 6px 20px rgba(16, 185, 129, 0.12),
+    0 12px 40px rgba(16, 185, 129, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform: translateY(-4px) scale(1.05);
+}
+
+.cat-tab.active::before {
+  transform: scaleX(1);
+}
+
+.cat-tab.active::after {
+  opacity: 1;
+}
+
+.cat-tab__icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+  border-radius: 16px !important;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  position: relative !important;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+.cat-tab__icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
+  border-radius: 16px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.cat-tab:hover .cat-tab__icon,
+.cat-tab--link:hover .cat-tab__icon {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+}
+
+.cat-tab:hover .cat-tab__icon::before,
+.cat-tab--link:hover .cat-tab__icon::before {
+  opacity: 1;
+}
+
+.cat-tab.active .cat-tab__icon {
+  background: linear-gradient(135deg, #a7f3d0, #6ee7b7);
+  transform: scale(1.15) rotate(-3deg);
+  box-shadow:
+    0 6px 16px rgba(16, 185, 129, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.cat-tab__label {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+  letter-spacing: -0.01em !important;
+  white-space: normal !important;
+  max-width: 100% !important;
+  word-break: break-word !important;
+  position: relative !important;
+  z-index: 2 !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  text-overflow: ellipsis !important;
+  max-height: 34px !important;
+  min-height: 34px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  height: 34px !important;
+}
+
+.cat-tab__count {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 0px 7px;
+  border-radius: 20px;
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.cat-tab.active .cat-tab__count,
+.cat-tab--link:hover .cat-tab__count {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+
+/* ─────────────────────────────────────────────
+   BUSINESS SECTION
+───────────────────────────────────────────── */
+.category-business-section {
+  background: #f5f6fa;
+  padding: 40px 0 60px;
+}
+
+.category-business-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.category-business__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* ── Toolbar: result count + sort + reset ── */
+.category-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.category-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.category-toolbar__reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1.5px solid #e2e8f0;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s;
+}
+
+.category-toolbar__reset:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* Layout 2 kolom: daftar bisnis (kiri) + kotak peta (kanan), tampil bareng
+   di halaman yang sama — bukan tab/toggle terpisah. */
+.category-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+.category-layout__main {
+  min-width: 0; /* supaya grid kartu tidak overflow */
+}
+
+.category-layout__map {
+  position: sticky;
+  top: 108px; /* di bawah navbar, digeser dikit biar lebih sejajar sama kartu */
+}
+
+.category-layout__map .biz-map {
+  /* Tinggi TETAP (bukan ngikutin tinggi kartu lagi), supaya ukurannya
+     selalu sama persis di halaman manapun (halaman 1, 2, 3, dst) -
+     nggak berubah-ubah walau jumlah kartu di halaman itu beda. */
+  height: 671px;
+}
+
+@media (max-width: 1080px) {
+  .category-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .category-layout__map {
+    position: static;
+    order: -1; /* peta muncul di atas daftar pada layar sempit */
+  }
+
+  .category-layout__map .biz-map {
+    height: 340px;
+  }
+}
+
+.category-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+.category-sort__icon {
+  color: #007570;
+  flex-shrink: 0;
+}
+
+.category-sort__select {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+/* ── Business Grid ──
+   Dulu pakai auto-fill(minmax(280px,1fr)) — itu bikin baris terakhir yang
+   nggak penuh jadi melebar aneh (lihat screenshot: 1 kartu sendirian jadi
+   raksasa). Sekarang dikunci pas 4 kolom sama rata di desktop, menyusut
+   di layar lebih sempit. */
+.reko-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1400px) {
+  .reko-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1080px) {
+  /* di lebar ini .category-layout sudah jadi 1 kolom (peta pindah ke
+     atas), jadi ruang buat grid lebih lega lagi */
+  .reko-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .reko-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .reko-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Pagination ── */
+.category-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2.5rem;
+}
+
+.category-pagination__nav,
+.category-pagination__num {
+  min-width: 38px;
+  height: 38px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.category-pagination__nav:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.category-pagination__nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.category-pagination__num:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.category-pagination__num.active {
+  background: #16a34a;
+  color: #fff;
+}
+
+.category-pagination__ellipsis {
+  color: #94a3b8;
+  padding: 0 4px;
+}
+
+/* ── Single Business Card ── */
+.biz-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e8ecf0;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.06);
+  transition: box-shadow 0.22s, transform 0.22s;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+  animation: bizCardIn 0.35s ease backwards;
+}
+
+@keyframes bizCardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.biz-card:hover {
+  box-shadow: 0 8px 32px rgba(15,23,42,0.12);
+  transform: translateY(-3px);
+}
+
+.biz-card__rating {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  background: rgba(255,255,255,0.92);
+  border-radius: 20px;
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.biz-card__img-wrap {
+  position: relative;
+  overflow: hidden;
+  height: 180px;
+}
+
+/* Badge "Premium" — hanya tampil untuk bisnis dengan langganan aktif.
+   Bisnis gratis tidak menampilkan apa pun di posisi ini. */
+.biz-card__premium {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(220,38,38,0.4);
+}
+.biz-card__img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s ease;
+}
+.biz-card:hover .biz-card__img { transform: scale(1.05); }
+
+.biz-card__img-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 10px;
+  background: linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 60%);
+}
+
+.biz-card__save {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 9px;
+  background: rgba(255,255,255,0.22);
+  border-radius: 6px;
+  color: #fff; font-size: 0.72rem; font-weight: 500;
+  cursor: pointer; transition: background 0.18s;
+}
+.biz-card__save:hover { background: rgba(255,255,255,0.38); }
+.biz-card__save.saved { background: rgba(239,68,68,0.75); }
+
+.biz-card__views {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 9px;
+  background: rgba(255,255,255,0.22);
+  border-radius: 6px;
+  color: #fff; font-size: 0.72rem; font-weight: 500;
+}
+
+.biz-card__body { padding: 14px 16px 16px; }
+
+.biz-card__name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.biz-card__category {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.biz-card__tags {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-bottom: 10px;
+}
+.biz-card__tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: #475569;
+}
+
+.biz-card__footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  flex-wrap: wrap;
+}
+
+.biz-card__location {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.72rem; color: #64748b;
+}
+
+.biz-card__cta {
+  font-size: 0.75rem; font-weight: 600;
+  color: #16a34a;
+  text-decoration: none; white-space: nowrap;
+  transition: color 0.15s;
+}
+.biz-card__cta:hover { color: #15803d; }
+
+.biz-card__cta.closed {
+  color: #ef4444;
+}
+
+.biz-card__cta.closed:hover {
+  color: #dc2626;
+}
+
+/* ── Empty State ── */
+.category-empty {
+  text-align: center;
+  padding: 60px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.category-empty__icon {
+  color: #cbd5e1;
+  margin-bottom: 16px;
+}
+
+.category-empty p {
+  font-size: 1.1rem;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.category-empty__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.category-empty__reset {
+  padding: 12px 24px;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  color: #475569;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.category-empty__reset:hover {
+  border-color: #007570;
+  color: #007570;
+}
+
+.category-empty__link {
+  display: inline-block;
+  padding: 12px 24px;
+  background: #007570;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.category-empty__link:hover {
+  background: #005a58;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .category-hero {
+    min-height: 35vh;
+    padding: 80px 20px 50px;
+  }
+
+  .category-hero__title {
+    font-size: 1.8rem;
+  }
+
+  .category-hero__subtitle {
+    font-size: 1rem;
+  }
+
+  .category-search {
+    padding: 12px 16px;
+  }
+
+  .reko-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .category-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .category-toolbar__right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .cat-tabs {
+    gap: 8px;
+  }
+
+  .cat-tab,
+  .cat-tab--link {
+    min-width: 84px;
+    padding: 12px 10px;
+  }
+
+  .cat-tab__label {
+    font-size: 0.8rem;
+  }
+}
+/* Business Card Seller Info */
+.biz-card__seller {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.biz-card__seller-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  padding: 4px;
+  flex: 1;
+}
+
+.biz-card__seller-link:hover {
+  background: #f8fafc;
+  color: #667eea;
+}
+
+.biz-card__seller-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.biz-card__seller-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #2d3748;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.biz-card__seller-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #4a5568;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* Responsive untuk mobile */
+@media (max-width: 768px) {
+  .biz-card__seller {
+    padding-top: 10px;
+    margin-top: 10px;
+  }
+  
+  .biz-card__seller-name {
+    font-size: 0.8rem;
+  }
+  
+  .biz-card__seller-avatar {
+    width: 24px;
+    height: 24px;
+  }
+}
