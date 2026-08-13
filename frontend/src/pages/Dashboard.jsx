@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api, { getImageUrl } from "../utils/api";
@@ -90,6 +90,8 @@ import {
   ChevronUp,
   TrendingUp,
   DollarSign,
+  Image as ImageIcon,
+  Package,
 } from "lucide-react";
 import emptyStateIcon from "../assets/icon-empty-state.png";
 import logoImg from "../assets/logo.png";
@@ -230,6 +232,12 @@ export default function Dashboard() {
   const [plans, setPlans] = useState({});
   const [resellerData, setResellerData] = useState(null); // legacy, unused now that Reseller tab is removed
   const [showAllHistory, setShowAllHistory] = useState(false);
+  // PERMINTAAN: grafik-grafik di Dashboard supaya bisa "lihat detail" biar
+  // kelihatan rincian perkembangannya, bukan cuma garis kecil. State ini
+  // ngatur tabel rincian (tanggal + jumlah) di bawah tiap grafik.
+  const [showUserChartDetail, setShowUserChartDetail] = useState(false);
+  const [showBizChartDetail, setShowBizChartDetail] = useState(false);
+  const [showVisitChartDetail, setShowVisitChartDetail] = useState(false);
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
   const [selectedBusinessForPayment, setSelectedBusinessForPayment] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState('monthly');
@@ -340,11 +348,11 @@ export default function Dashboard() {
   const handleGenerateReferralCode = async () => {
     try {
       const response = await api.post("/generate-referral-code");
-      
-      // Update user context with new referral code
-      const updatedUser = { ...user, referral_code: response.referral_code };
-      setUser(updatedUser);
-      
+
+      // Re-fetch profil dari server supaya `user.referral_code` ikut ke-update
+      // di seluruh halaman (AuthContext tidak expose setter langsung).
+      await refreshUser();
+
       alert(`Kode referral berhasil dibuat: ${response.referral_code}`);
     } catch (error) {
       console.error("Error generating referral code:", error);
@@ -405,10 +413,87 @@ export default function Dashboard() {
   const [announcements, setAnnouncements] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [selectedInboxId, setSelectedInboxId] = useState(null); // sekarang menyimpan KEY thread, bukan id pesan
+  const [inboxDraft, setInboxDraft] = useState("");
+  const [sendingInboxReply, setSendingInboxReply] = useState(false);
   const [savedBusinesses, setSavedBusinesses] = useState([]);
   const [premiumPackages, setPremiumPackages] = useState([]);
   const [contentItems, setContentItems] = useState([]);
   const [contentHistory, setContentHistory] = useState([]);
+
+  // --- INBOX / CHAT DUA ARAH -----------------------------------------
+  // "messages" dari API sekarang berisi SEMUA baris pesan yang relevan buat
+  // akun yang login (baik yang ia kirim sebagai pelanggan, maupun yang
+  // masuk ke bisnis miliknya sebagai penjual). Di sini kita kelompokkan
+  // jadi satu "thread" per (bisnis, pelanggan) supaya tampil sebagai
+  // percakapan chat, persis seperti WhatsApp - bukan daftar pesan lepas.
+  const inboxThreads = useMemo(() => {
+    const groups = new Map();
+
+    messages.forEach((m) => {
+      // Pesan tamu (belum login, tanpa customer_id) tetap jadi thread-nya
+      // sendiri per pesan - tidak bisa dibalas lewat chat karena tidak ada
+      // akun tujuan, tapi tetap kelihatan di Inbox seperti biasa.
+      const key = m.customer_id ? `${m.business_id}-${m.customer_id}` : `guest-${m.id}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          business_id: m.business_id,
+          customer_id: m.customer_id || null,
+          business: m.business,
+          items: [],
+        });
+      }
+      const group = groups.get(key);
+      group.items.push(m);
+      if (m.business && !group.business) group.business = m.business;
+    });
+
+    return Array.from(groups.values())
+      .map((group) => {
+        const items = [...group.items].sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        );
+        const last = items[items.length - 1];
+        const amOwner = isAdmin || group.business?.user_id === user?.id;
+        const fromCustomerMsg = items.find((m) => m.sender_role !== "seller");
+        const otherName = amOwner
+          ? fromCustomerMsg?.sender_name || last.sender_name
+          : group.business?.title || "Penjual";
+        const unread = items.filter(
+          (m) => !m.is_read && m.sender_id !== user?.id && m.sender_role !== (amOwner ? "seller" : "customer")
+        ).length;
+        return { ...group, items, last, amOwner, otherName, unread };
+      })
+      .sort((a, b) => new Date(b.last.created_at) - new Date(a.last.created_at));
+  }, [messages, isAdmin, user]);
+
+  const selectedInboxThread =
+    inboxThreads.find((t) => t.key === selectedInboxId) || inboxThreads[0] || null;
+
+  // Total pesan yang belum dibaca dan BUKAN dikirim oleh saya sendiri -
+  // dipakai untuk badge angka di menu Inbox (sidebar) dan ikon amplop topbar.
+  const unreadInboxCount = messages.filter((m) => !m.is_read && m.sender_id !== user?.id).length;
+
+  useEffect(() => {
+    if (!inboxThreads.length) {
+      setSelectedInboxId(null);
+      setInboxDraft("");
+      return;
+    }
+
+    if (!selectedInboxId || !inboxThreads.some((t) => t.key === selectedInboxId)) {
+      setSelectedInboxId(inboxThreads[0].key);
+    }
+  }, [inboxThreads, selectedInboxId]);
+
+  const handleSelectInboxThread = (thread) => {
+    setSelectedInboxId(thread.key);
+    const unreadIds = thread.items
+      .filter((m) => !m.is_read && m.sender_id !== user?.id)
+      .map((m) => m.id);
+    unreadIds.forEach((id) => handleMarkMessageRead(id));
+  };
 
   const [loading, setLoading] = useState(false); // Changed to false initially
   const [actionLoading, setActionLoading] = useState(false);
@@ -836,7 +921,7 @@ export default function Dashboard() {
             setBookings(bookingData);
             // Fetch subscription data untuk user dashboard
             try {
-              const subData = await api.get("/my-subscriptions");
+              const subData = await api.get("/subscriptions");
               setSubscriptions(subData);
             } catch (e) {
               console.warn("Failed to fetch subscriptions:", e);
@@ -1527,6 +1612,33 @@ export default function Dashboard() {
     }
   };
 
+  const handleInboxReply = async () => {
+    const thread = selectedInboxThread;
+    const text = inboxDraft.trim();
+    if (!thread || !text) return;
+
+    // Pesan dari pengunjung tamu (belum login, tidak ada customer_id) tidak
+    // punya akun tujuan buat dibalas lewat chat di dalam sistem.
+    if (!thread.customer_id) {
+      alert("Pesan ini dikirim oleh tamu yang belum login, jadi tidak bisa dibalas lewat chat. Hubungi lewat kontak yang ia cantumkan.");
+      return;
+    }
+
+    setSendingInboxReply(true);
+    try {
+      const newMessage = await api.post(
+        `/businesses/${thread.business_id}/messages/${thread.customer_id}/reply`,
+        { message: text }
+      );
+      setMessages((prev) => [...prev, newMessage]);
+      setInboxDraft("");
+    } catch (err) {
+      alert(err?.data?.message || "Gagal mengirim balasan.");
+    } finally {
+      setSendingInboxReply(false);
+    }
+  };
+
   // --- SAVED (Simpan) HANDLERS ---
   const handleUnsaveBusiness = async (id) => {
     if (!confirm("Hapus dari daftar simpanan?")) return;
@@ -1746,7 +1858,7 @@ export default function Dashboard() {
     setShowPaymentGateway(false);
     alert('Pembayaran berhasil! Status premium akan aktif dalam beberapa menit.');
     // Refresh data
-    fetchData();
+    fetchInitialData();
   };
 
   const handlePaymentError = (message) => {
@@ -2310,7 +2422,7 @@ export default function Dashboard() {
               <div className="db-menu-icon">
                 <LayoutDashboard size={20} />
               </div>
-              <span>Dasbor</span>
+              <span>Dashboard</span>
             </button>
 
             <button
@@ -2364,23 +2476,13 @@ export default function Dashboard() {
             </button>
 
             <button
-              className={`db-menu-btn ${activeTab === "announcements" ? "active" : ""}`}
-              onClick={() => setActiveTab("announcements")}
-            >
-              <div className="db-menu-icon">
-                <Megaphone size={20} />
-              </div>
-              <span>Pengumuman</span>
-            </button>
-
-            <button
               className={`db-menu-btn ${activeTab === "menu" ? "active" : ""}`}
               onClick={() => setActiveTab("menu")}
             >
               <div className="db-menu-icon">
-                <Grid3x3 size={20} />
+                <Package size={20} />
               </div>
-              <span>Menu</span>
+              <span>Produk</span>
             </button>
 
             <button
@@ -2391,23 +2493,15 @@ export default function Dashboard() {
                 <Inbox size={20} />
               </div>
               <span>Inbox</span>
-              {messages.length > 0 && (
-                <span className="db-menu-badge">{messages.length > 9 ? "9+" : messages.length}</span>
+              {unreadInboxCount > 0 && (
+                <span className="db-menu-badge">{unreadInboxCount > 9 ? "9+" : unreadInboxCount}</span>
               )}
             </button>
 
-            <button
-              className={`db-menu-btn ${activeTab === "notifications" ? "active" : ""}`}
-              onClick={() => setActiveTab("notifications")}
-            >
-              <div className="db-menu-icon">
-                <Bell size={20} />
-              </div>
-              <span>Notifikasi</span>
-              {unreadNotifications > 0 && (
-                <span className="db-menu-badge">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span>
-              )}
-            </button>
+            {/* Menu "Notifikasi" di sidebar sengaja dihapus - semua notifikasi
+                sekarang cukup dibuka lewat ikon lonceng di topbar (lihat
+                db-notification-dropdown di bawah), jadi tidak ada lagi menu
+                terpisah. Ini berlaku sama baik untuk admin maupun user. */}
 
             <button
               className={`db-menu-btn ${activeTab === "reseller" ? "active" : ""}`}
@@ -2488,39 +2582,47 @@ export default function Dashboard() {
               <span>Kembali ke Website</span>
             </button>
 
-            <button
-              className={`db-profile-card ${activeTab === "profile" ? "active" : ""}`}
-              onClick={() => setActiveTab("profile")}
-            >
-              <div className="db-avatar">
-                {user?.avatar ? (
-                  <img src={getImageUrl(user.avatar)} alt={user?.name || "Foto profil"} className="db-avatar__img" />
-                ) : (
-                  <UserCircle2 size={22} />
-                )}
-              </div>
-              <div className="db-profile-info">
-                <h3>{user?.name}</h3>
-                <span className={`db-role-badge db-role--${user?.role}`}>
-                  {user?.role === "admin" ? "Administrator" : user?.role === "reseller" ? "Reseller" : "User"}
-                </span>
-              </div>
-              <ChevronRight size={16} className="db-profile-card__chevron" />
-            </button>
+            <div className="db-profile-group">
+              <button
+                className={`db-profile-card ${activeTab === "profile" ? "active" : ""}`}
+                onClick={() => setActiveTab("profile")}
+              >
+                <div className="db-avatar">
+                  {user?.avatar ? (
+                    <img src={getImageUrl(user.avatar)} alt={user?.name || "Foto profil"} className="db-avatar__img" />
+                  ) : (
+                    <UserCircle2 size={22} />
+                  )}
+                </div>
+                <div className="db-profile-info">
+                  <h3>{user?.name}</h3>
+                  <span className={`db-role-badge db-role--${user?.role}`}>
+                    {user?.role === "admin" ? "Administrator" : user?.role === "reseller" ? "Reseller" : "User"}
+                  </span>
+                </div>
+              </button>
 
-            <button className="db-menu-btn db-menu-btn--logout" onClick={logout}>
-              <div className="db-menu-icon">
+              <button
+                className="db-logout-icon-btn"
+                onClick={logout}
+                title="Keluar"
+                aria-label="Keluar"
+              >
                 <LogOut size={18} />
-              </div>
-              <span>Keluar</span>
-            </button>
+              </button>
+            </div>
           </div>
         </aside>
 
         {/* Main Content Area */}
         <main className="db-content">
-          {/* Topbar (search, mail, notifikasi, profil) - HANYA untuk admin */}
-          {activeTab === "dashboard" && isAdmin && (
+          {/* Topbar (search, mail, notifikasi, profil) - tampil di tab
+              Dasbor untuk SEMUA role (dulu sempat dibatasi admin-only,
+              padahal user/reseller biasa juga perlu akses cepat ke
+              pencarian, pesan, dan profil mereka sendiri). Bagian
+              notifikasi tetap otomatis menyesuaikan - cuma admin yang
+              lihat isinya, lihat pengecekan `isAdmin` di dalam). */}
+          {activeTab === "dashboard" && (
             <div className="db-topbar">
               <div className="db-topbar__search" style={{ position: "relative" }}>
                 <Search size={16} />
@@ -2594,7 +2696,7 @@ export default function Dashboard() {
               <div className="db-topbar__actions">
                 <button type="button" className="db-topbar__icon-btn" onClick={() => setActiveTab("inbox")} title="Pesan">
                   <Mail size={18} />
-                  {messages.length > 0 && <span className="db-topbar__icon-badge">{messages.length > 9 ? "9+" : messages.length}</span>}
+                  {unreadInboxCount > 0 && <span className="db-topbar__icon-badge">{unreadInboxCount > 9 ? "9+" : unreadInboxCount}</span>}
                 </button>
                 <div className="db-topbar__icon-wrapper">
                   <button
@@ -2612,15 +2714,27 @@ export default function Dashboard() {
                     <div className="db-notification-dropdown">
                       <div className="db-notification-dropdown__header">
                         <h3>Notifikasi</h3>
-                        {unreadNotifications > 0 && (
-                          <button
-                            type="button"
-                            className="db-notification-dropdown__mark-all"
-                            onClick={handleMarkAllNotificationsRead}
-                          >
-                            Tandai semua dibaca
-                          </button>
-                        )}
+                        <div className="db-notification-dropdown__header-actions">
+                          {unreadNotifications > 0 && (
+                            <button
+                              type="button"
+                              className="db-notification-dropdown__mark-all"
+                              onClick={handleMarkAllNotificationsRead}
+                            >
+                              Tandai semua dibaca
+                            </button>
+                          )}
+                          {isAdmin && notifications.length > 0 && (
+                            <button
+                              type="button"
+                              className="db-notification-dropdown__mark-all"
+                              onClick={handleCleanupNotifications}
+                              title="Bersihkan notifikasi lama"
+                            >
+                              Bersihkan lama
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="db-notification-dropdown__list">
                         {notifications.length > 0 ? (
@@ -2636,6 +2750,7 @@ export default function Dashboard() {
                                 {notif.type === 'business' && <Building2 size={16} />}
                                 {notif.type === 'blog' && <BookOpen size={16} />}
                                 {notif.type === 'event' && <CalendarDays size={16} />}
+                                {notif.type === 'message' && <Mail size={16} />}
                                 {!notif.type && <Bell size={16} />}
                               </div>
                               <div className="db-notification-item__content">
@@ -2646,6 +2761,17 @@ export default function Dashboard() {
                                 </span>
                               </div>
                               {!notif.is_read && <div className="db-notification-item__dot" />}
+                              <button
+                                type="button"
+                                className="db-notification-item__delete"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteNotification(notif.id);
+                                }}
+                                title="Hapus notifikasi"
+                              >
+                                <X size={13} />
+                              </button>
                             </div>
                           ))
                         ) : (
@@ -2655,9 +2781,6 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-                <button type="button" className="db-topbar__icon-btn" onClick={() => setActiveTab("dashboard")} title="Dasbor">
-                  <Grid3x3 size={18} />
-                </button>
                 <div className="db-topbar__divider" />
                 <button type="button" className="db-topbar__user" onClick={() => setActiveTab("profile")}>
                   <div className="db-topbar__user-info">
@@ -2690,13 +2813,11 @@ export default function Dashboard() {
                     <p className="db-dashboard-titlebar__subtitle">Selamat Datang {user?.name || "Pengguna"}</p>
                   )}
                 </div>
-                {isAdmin && (
-                  <div className="db-dashboard-breadcrumb">
-                    <Home size={14} />
-                    <ChevronRight size={13} />
-                    <span className="db-dashboard-breadcrumb__current">Dashboard</span>
-                  </div>
-                )}
+                <div className="db-dashboard-breadcrumb">
+                  <Home size={14} />
+                  <ChevronRight size={13} />
+                  <span className="db-dashboard-breadcrumb__current">Dashboard</span>
+                </div>
               </div>
 
               {/* Admin banners - keep as original */}
@@ -2808,75 +2929,10 @@ export default function Dashboard() {
                     </button>
                   </div>
                 </div>
-              ) : (
-                // Same layout for User/Reseller 
-                <div className="db-kpi-grid">
-                  <div className="db-kpi-card">
-                    <div className="db-kpi-card__icon db-kpi-card__icon--blue"><Building2 size={16} /></div>
-                    <span className="db-kpi-card__value">{businesses.filter((b) => b.user_id === user?.id).length}</span>
-                    <span className="db-kpi-card__label">Total Bisnis</span>
-                    <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("businesses")}>
-                      More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                    </button>
-                  </div>
-
-                  <div className="db-kpi-card">
-                    <div className="db-kpi-card__icon db-kpi-card__icon--slate"><Users size={16} /></div>
-                    <span className="db-kpi-card__value">1</span>
-                    <span className="db-kpi-card__label">User</span>
-                    <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("businesses")}>
-                      More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                    </button>
-                  </div>
-
-                  <div className="db-kpi-card">
-                    <div className="db-kpi-card__icon db-kpi-card__icon--green"><Crown size={16} /></div>
-                    <span className="db-kpi-card__value">{businesses.filter((b) => b.user_id === user?.id && b.is_premium_active).length}</span>
-                    <span className="db-kpi-card__label">Premium</span>
-                    <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("premium")}>
-                      More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                    </button>
-                  </div>
-
-                  <div className="db-kpi-card">
-                    <div className="db-kpi-card__icon db-kpi-card__icon--green"><Receipt size={16} /></div>
-                    <span className="db-kpi-card__value db-kpi-card__value--currency">
-                        {formatRupiah(
-                          subscriptions
-                            .filter((s) => s.business?.user_id === user?.id)
-                            .filter((s) => {
-                              const d = s.created_at ? new Date(s.created_at) : null;
-                              const now = new Date();
-                              return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                            })
-                            .reduce((sum, s) => sum + Number(s.amount || 0), 0)
-                        )}
-                      </span>
-                    <span className="db-kpi-card__label">Pendapatan</span>
-                    <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("premium")}>
-                      More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                    </button>
-                  </div>
-
-                  <div className="db-kpi-card">
-                    <div className="db-kpi-card__icon db-kpi-card__icon--blue"><Eye size={16} /></div>
-                    <span className="db-kpi-card__value">{weeklyAnalytics?.user_total ?? 0}</span>
-                    <span className="db-kpi-card__label">Pengunjung</span>
-                    <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("businesses")}>
-                      More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                    </button>
-                  </div>
-
-                  <div className="db-kpi-card">
-                    <div className="db-kpi-card__icon db-kpi-card__icon--amber"><Megaphone size={16} /></div>
-                    <span className="db-kpi-card__value">{ads.filter((a) => a.user_id === user?.id && a.status === "verified").length}</span>
-                    <span className="db-kpi-card__label">Iklan</span>
-                    <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("ads")}>
-                      More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                    </button>
-                  </div>
-                </div>
-              )}
+              ) : null}
+              {/* PERMINTAAN: baris kartu KPI kecil (Total Bisnis/Premium/
+                  Pengunjung/Iklan) untuk User/Reseller dihapus - langsung
+                  lanjut ke widget grafik & riwayat di bawah. */}
               
               {/* PERBAIKAN: sebelumnya baris ini cuma komentar biasa dan div
                   di bawahnya (widget admin: grafik, kalender, ulasan,
@@ -2895,6 +2951,13 @@ export default function Dashboard() {
                           <Users size={18} />
                         </div>
                         <span>Grafik Pendaftaran User</span>
+                        <button
+                          type="button"
+                          className="db-widget-card__header-link"
+                          onClick={() => setShowUserChartDetail((v) => !v)}
+                        >
+                          {showUserChartDetail ? "Sembunyikan Detail" : "Lihat Detail"}
+                        </button>
                       </div>
                       <div className="db-widget-card__body db-widget-card__body--chart">
                         <DashboardChart
@@ -2903,6 +2966,30 @@ export default function Dashboard() {
                             { name: "User Baru", color: "#3b82f6", values: userRegistrationChart?.values || [0, 0, 0, 0, 0, 0, 0] },
                           ]}
                         />
+                        {showUserChartDetail && (
+                          <div className="db-chart-detail-table">
+                            <div className="db-chart-detail-table__row db-chart-detail-table__row--head">
+                              <span>Tanggal</span>
+                              <span>User Baru</span>
+                            </div>
+                            {(userRegistrationChart?.labels || ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]).map((lbl, i) => {
+                              const values = userRegistrationChart?.values || [0, 0, 0, 0, 0, 0, 0];
+                              const prev = i > 0 ? values[i - 1] : null;
+                              const val = values[i] || 0;
+                              const trend = prev === null ? null : val > prev ? "up" : val < prev ? "down" : "flat";
+                              return (
+                                <div className="db-chart-detail-table__row" key={lbl + i}>
+                                  <span>{lbl}</span>
+                                  <span className="db-chart-detail-table__value">
+                                    {val}
+                                    {trend === "up" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--up" />}
+                                    {trend === "down" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--down" style={{ transform: "rotate(90deg)" }} />}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="db-widget-card db-widget-card--sales">
@@ -2911,6 +2998,13 @@ export default function Dashboard() {
                           <Building2 size={18} />
                         </div>
                         <span>Grafik Bisnis Baru</span>
+                        <button
+                          type="button"
+                          className="db-widget-card__header-link"
+                          onClick={() => setShowBizChartDetail((v) => !v)}
+                        >
+                          {showBizChartDetail ? "Sembunyikan Detail" : "Lihat Detail"}
+                        </button>
                       </div>
                       <div className="db-widget-card__body db-widget-card__body--chart">
                         <DashboardChart
@@ -2919,6 +3013,30 @@ export default function Dashboard() {
                             { name: "Bisnis Baru", color: "#10b981", values: businessRegistrationChart?.values || [0, 0, 0, 0, 0, 0, 0] },
                           ]}
                         />
+                        {showBizChartDetail && (
+                          <div className="db-chart-detail-table">
+                            <div className="db-chart-detail-table__row db-chart-detail-table__row--head">
+                              <span>Tanggal</span>
+                              <span>Bisnis Baru</span>
+                            </div>
+                            {(businessRegistrationChart?.labels || ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]).map((lbl, i) => {
+                              const values = businessRegistrationChart?.values || [0, 0, 0, 0, 0, 0, 0];
+                              const prev = i > 0 ? values[i - 1] : null;
+                              const val = values[i] || 0;
+                              const trend = prev === null ? null : val > prev ? "up" : val < prev ? "down" : "flat";
+                              return (
+                                <div className="db-chart-detail-table__row" key={lbl + i}>
+                                  <span>{lbl}</span>
+                                  <span className="db-chart-detail-table__value">
+                                    {val}
+                                    {trend === "up" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--up" />}
+                                    {trend === "down" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--down" style={{ transform: "rotate(90deg)" }} />}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -3004,64 +3122,12 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="db-widget-card">
-                      <div className="db-widget-card__header">
-                        <div className="db-widget-card__header-icon">
-                          <Star size={18} />
-                        </div>
-                        <span>Ulasan Terbaru</span>
-                        {recentReviews.length > 3 && (
-                          <button
-                            type="button"
-                            className="db-widget-card__header-link"
-                            onClick={() => setShowAllReviews(!showAllReviews)}
-                          >
-                            {showAllReviews ? "Tampilkan Sedikit" : "Lihat Semua"}
-                          </button>
-                        )}
-                      </div>
-                      <div className="db-widget-card__body">
-                        {recentReviews.length > 0 ? (
-                          (showAllReviews ? recentReviews : recentReviews.slice(0, 3)).map((r) => (
-                            <div key={r.id} className="db-widget-review">
-                              <div className="db-widget-message__avatar">
-                                {r.reviewer_avatar ? (
-                                  <img src={getImageUrl(r.reviewer_avatar)} alt={r.reviewer_name} />
-                                ) : (
-                                  (r.reviewer_name || "?").charAt(0).toUpperCase()
-                                )}
-                              </div>
-                              <div className="db-widget-message__body">
-                                <div className="db-widget-message__top">
-                                  <strong>{r.reviewer_name}</strong>
-                                  <span className="db-widget-review__stars">
-                                    <span className="star-filled">{"★".repeat(r.rating)}</span>
-                                    <span className="star-empty">{"☆".repeat(5 - r.rating)}</span>
-                                  </span>
-                                </div>
-                                <p>{r.comment}</p>
-                                <span className="db-widget-review__business">untuk {r.business_name}</span>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="db-widget-empty">Belum ada ulasan masuk.</p>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
               ) : (
 
                 // Dashboard User - Sesuai gambar contoh yang diberikan
                 <div className="db-panel db-panel--dashboard">
-                  <div className="db-dashboard-titlebar">
-                    <div>
-                      <h1 className="db-dashboard-titlebar__title">Dashboard</h1>
-                      <p className="db-dashboard-titlebar__subtitle">Selamat Datang {user?.name || "Pengguna"}</p>
-                    </div>
-                  </div>
-
                   {/* Admin banners - keep as original */}
                   {!dismissedBanners.includes("info") && (
                     <div className="db-dashboard-banner db-dashboard-banner--info">
@@ -3143,33 +3209,49 @@ export default function Dashboard() {
 
                   {/* Charts Row - 2 grafik seperti gambar ketiga */}
                   <div className="db-charts-row">
-                    <div className="db-chart-card">
+                    <div className="db-chart-card db-chart-card--wide">
                       <div className="db-chart-card__header">
-                        <div className="db-chart-card__icon">👥</div>
-                        <h3>Grafik Pendaftaran User</h3>
+                        <div className="db-chart-card__icon"><Eye size={18} /></div>
+                        <h3>Grafik Kunjungan Pelanggan</h3>
+                        <button
+                          type="button"
+                          className="db-widget-card__header-link"
+                          onClick={() => setShowVisitChartDetail((v) => !v)}
+                        >
+                          {showVisitChartDetail ? "Sembunyikan Detail" : "Lihat Detail"}
+                        </button>
                       </div>
                       <div className="db-chart-container">
                         <DashboardChart
-                          labels={["Sab", "Min", "Sen", "Sel", "Rab", "Kam", "Jum"]}
+                          labels={weeklyAnalytics?.labels || ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]}
                           series={[
-                            { name: "User Baru", color: "#22c55e", values: [0, 0, 0, 0, 6, 0, 0] },
+                            { name: "Kunjungan", color: "#22c55e", values: weeklyAnalytics?.values || [0, 0, 0, 0, 0, 0, 0] },
                           ]}
                         />
-                      </div>
-                    </div>
-
-                    <div className="db-chart-card">
-                      <div className="db-chart-card__header">
-                        <div className="db-chart-card__icon">🏢</div>
-                        <h3>Grafik Bisnis Baru</h3>
-                      </div>
-                      <div className="db-chart-container">
-                        <DashboardChart
-                          labels={["Sab", "Min", "Sen", "Sel", "Rab", "Kam", "Jum"]}
-                          series={[
-                            { name: "Bisnis Baru", color: "#3b82f6", values: [0, 0, 0, 0, 0, 0, 1] },
-                          ]}
-                        />
+                        {showVisitChartDetail && (
+                          <div className="db-chart-detail-table">
+                            <div className="db-chart-detail-table__row db-chart-detail-table__row--head">
+                              <span>Tanggal</span>
+                              <span>Kunjungan</span>
+                            </div>
+                            {(weeklyAnalytics?.labels || ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]).map((lbl, i) => {
+                              const values = weeklyAnalytics?.values || [0, 0, 0, 0, 0, 0, 0];
+                              const prev = i > 0 ? values[i - 1] : null;
+                              const val = values[i] || 0;
+                              const trend = prev === null ? null : val > prev ? "up" : val < prev ? "down" : "flat";
+                              return (
+                                <div className="db-chart-detail-table__row" key={lbl + i}>
+                                  <span>{lbl}</span>
+                                  <span className="db-chart-detail-table__value">
+                                    {val}
+                                    {trend === "up" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--up" />}
+                                    {trend === "down" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--down" style={{ transform: "rotate(90deg)" }} />}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -3188,10 +3270,10 @@ export default function Dashboard() {
                   </div>
 
                   {/* Bottom Row - Riwayat Premium & Ulasan */}
-                  <div className="db-bottom-row">
+                  <div className="db-bottom-row db-bottom-row--split">
                     <div className="db-premium-history">
                       <div className="db-section-header">
-                        <div className="db-section-icon">💳</div>
+                        <div className="db-section-icon"><Receipt size={18} /></div>
                         <h3>Riwayat Pengajuan Premium</h3>
                       </div>
                       <div className="db-history-items">
@@ -3209,42 +3291,9 @@ export default function Dashboard() {
                             </div>
                           ))
                         ) : (
-                          <>
-                            <div className="db-history-item">
-                              <div className="db-history-content">
-                                <p className="db-history-title">Pengajuan dari: User</p>
-                                <p className="db-history-amount">Rp350.000</p>
-                                <span className="db-history-status db-history-status--pending">PENDING</span>
-                                <p className="db-history-date">{new Date().toLocaleDateString('id-ID')}</p>
-                              </div>
-                            </div>
-                            <div className="db-history-item">
-                              <div className="db-history-content">
-                                <p className="db-history-title">Pengajuan dari: User</p>
-                                <p className="db-history-amount">Rp35.000</p>
-                                <span className="db-history-status db-history-status--pending">PENDING</span>
-                                <p className="db-history-date">{new Date().toLocaleDateString('id-ID')}</p>
-                              </div>
-                            </div>
-                            <div className="db-history-item">
-                              <div className="db-history-content">
-                                <p className="db-history-title">Pengajuan dari: User</p>
-                                <p className="db-history-amount">Rp35.000</p>
-                                <span className="db-history-status db-history-status--pending">PENDING</span>
-                                <p className="db-history-date">{new Date().toLocaleDateString('id-ID')}</p>
-                              </div>
-                            </div>
-                            <div className="db-history-item">
-                              <div className="db-history-content">
-                                <p className="db-history-title">Pengajuan dari: User</p>
-                                <p className="db-history-amount">Rp1.350.000</p>
-                                <span className="db-history-status db-history-status--pending">PENDING</span>
-                                <p className="db-history-date">{new Date().toLocaleDateString('id-ID')}</p>
-                              </div>
-                            </div>
-                          </>
+                          <p className="db-widget-empty">Belum ada pengajuan premium.</p>
                         )}
-                        {((subscriptions && subscriptions.length > 3) || (!subscriptions || subscriptions.length === 0)) && (
+                        {subscriptions && subscriptions.length > 3 && (
                           <button 
                             className="db-view-all-btn"
                             onClick={() => setShowAllHistory(!showAllHistory)}
@@ -3257,17 +3306,45 @@ export default function Dashboard() {
 
                     <div className="db-reviews-section">
                       <div className="db-section-header">
-                        <div className="db-section-icon">⭐</div>
+                        <div className="db-section-icon"><Star size={18} /></div>
                         <h3>Ulasan Terbaru</h3>
-                        <button className="db-view-all-link">Lihat Semua</button>
+                        {recentReviews.length > 3 && (
+                          <button
+                            type="button"
+                            className="db-view-all-link"
+                            onClick={() => setShowAllReviews(!showAllReviews)}
+                          >
+                            {showAllReviews ? "Tampilkan Sedikit" : "Lihat Semua"}
+                          </button>
+                        )}
                       </div>
-                      <div className="db-review-item">
-                        <div className="db-review-avatar">AS</div>
-                        <div className="db-review-content">
-                          <h4>Admin Surade</h4>
-                          <div className="db-review-rating">⭐⭐⭐⭐⭐</div>
-                          <p>asdnadbybcybzy</p>
-                        </div>
+                      <div className="db-review-list">
+                        {recentReviews.length > 0 ? (
+                          (showAllReviews ? recentReviews : recentReviews.slice(0, 3)).map((r) => (
+                            <div key={r.id} className="db-review-item">
+                              <div className="db-review-avatar">
+                                {r.reviewer_avatar ? (
+                                  <img src={getImageUrl(r.reviewer_avatar)} alt={r.reviewer_name} />
+                                ) : (
+                                  (r.reviewer_name || '?').charAt(0).toUpperCase()
+                                )}
+                              </div>
+                              <div className="db-review-content">
+                                <div className="db-review-meta">
+                                  <strong>{r.reviewer_name}</strong>
+                                  <span className="db-review-stars">
+                                    <span className="star-filled">{'★'.repeat(r.rating)}</span>
+                                    <span className="star-empty">{'☆'.repeat(5 - r.rating)}</span>
+                                  </span>
+                                </div>
+                                <p className="db-review-comment">{r.comment}</p>
+                                <span className="db-review-business">untuk {r.business_name}</span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="db-widget-empty">Belum ada ulasan masuk.</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -4677,163 +4754,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* TAB: PENGUMUMAN */}
-          {activeTab === "announcements" && (
-            <div className="db-panel">
-            {showAnnModal ? (
-              <div className="db-inline-form-page db-inline-form-page--biz">
-                {/* ── Hero Section ── */}
-                <div className="db-hero">
-                  <div className="db-hero__content">
-                    <button type="button" className="db-hero__back" onClick={() => setShowAnnModal(false)}>
-                      <ArrowLeft size={16} />
-                      <span>Kembali ke Dashboard</span>
-                      <span className="db-hero__back-dot" />
-                    </button>
-                    <h1 className="db-hero__title">
-                      Buat <span className="db-hero__title-highlight">Pengumuman</span> Baru
-                    </h1>
-                    <p className="db-hero__subtitle">
-                      Buat pengumuman penting untuk seluruh pengguna platform
-                    </p>
-                  </div>
-                  <div className="db-hero__illustration">
-                    <div className="db-mock-card">
-                      <div className="db-mock-card__dots">
-                        <span /><span /><span />
-                      </div>
-                      <div className="db-mock-card__icon">
-                        <Megaphone size={24} />
-                      </div>
-                    </div>
-                    <div className="db-mock-plant" aria-hidden="true">📣</div>
-                  </div>
-                </div>
-
-                {/* Progress Tabs */}
-                <div className="db-progress-container">
-                  <div className={`db-progress-step ${annStep > 0 ? "completed" : "active"}`}>
-                    <div className="db-progress-icon">
-                      <Info size={20} />
-                    </div>
-                    <div className="db-progress-label">Info Dasar</div>
-                  </div>
-                  <div className="db-progress-line"></div>
-                  <div className={`db-progress-step ${annStep === 1 ? "active" : ""}`}>
-                    <div className="db-progress-icon">
-                      <Edit2 size={20} />
-                    </div>
-                    <div className="db-progress-label">Konten</div>
-                  </div>
-                </div>
-
-                {/* ── Form Card ── */}
-                <form onSubmit={handleSaveAnnouncement} className="db-card">
-                  {/* Info Dasar Section */}
-                  <div className="db-form-section" ref={(el) => (annSectionRefs.current[0] = el)}>
-                    <div className="db-form-section__header">
-                      <div className="db-form-section__icon">
-                        <Info size={20} />
-                      </div>
-                      <div>
-                        <h3>Informasi Dasar</h3>
-                        <p>Detail utama tentang pengumuman</p>
-                      </div>
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Judul Pengumuman <span className="req">*</span></label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={annTitle} 
-                        onChange={(e) => setAnnTitle(e.target.value)} 
-                        placeholder="Judul pengumuman yang menarik" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="db-form-section__divider" />
-
-                  {/* Konten Section */}
-                  <div className="db-form-section" ref={(el) => (annSectionRefs.current[1] = el)}>
-                    <div className="db-form-section__header">
-                      <div className="db-form-section__icon">
-                        <Edit2 size={20} />
-                      </div>
-                      <div>
-                        <h3>Konten Pengumuman</h3>
-                        <p>Tulis pesan yang ingin disampaikan</p>
-                      </div>
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Isi Pengumuman <span className="req">*</span></label>
-                      <textarea 
-                        required 
-                        rows={8} 
-                        value={annBody} 
-                        onChange={(e) => setAnnBody(e.target.value)} 
-                        placeholder="Tulis isi pengumuman di sini... Jelaskan dengan detail dan jelas agar mudah dipahami pengguna." 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="db-card__footer">
-                    <button type="button" className="db-btn-cancel" onClick={() => setShowAnnModal(false)}>
-                      Batal
-                    </button>
-                    <button type="submit" className="db-btn-submit" disabled={actionLoading}>
-                      {actionLoading ? "Menyimpan..." : "Publikasikan Pengumuman"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <>
-              <div className="db-panel-header">
-                <h2>Pengumuman</h2>
-                {isAdmin && (
-                  <button className="db-action-btn" onClick={() => handleOpenAnnModal()}>
-                    <Plus size={16} />
-                    <span>Tambah Pengumuman</span>
-                  </button>
-                )}
-              </div>
-
-              {loading ? (
-                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat...</span></div>
-              ) : announcements.length > 0 ? (
-                <div className="db-announcement-list">
-                  {announcements.map((a) => (
-                    <div key={a.id} className="db-announcement-card">
-                      <div className="db-announcement-card__top">
-                        <strong>{a.title}</strong>
-                        <span className="db-announcement-card__date">{new Date(a.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
-                      </div>
-                      <p>{a.body}</p>
-                      {isAdmin && (
-                        <div className="db-table-actions">
-                          <button className="db-table-btn db-btn-edit" onClick={() => handleOpenAnnModal(a)}><Edit2 size={14} /></button>
-                          <button className="db-table-btn db-btn-delete" onClick={() => handleDeleteAnnouncement(a.id)}><Trash2 size={14} /></button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <DashboardEmptyState
-                  title="Tingkatkan Jangkauan Bisnis Anda"
-                  subtitle="Anda harus berada di sini untuk pertama kalinya. Jika Anda ingin menambahkan sesuatu, klik tombol di bawah ini."
-                  actionLabel={isAdmin ? "Tambah Pengumuman Baru" : undefined}
-                  onAction={isAdmin ? () => handleOpenAnnModal() : undefined}
-                />
-              )}
-              </>
-            )}
-            </div>
-          )}
-
         {/* TAB: MENU */}
           {activeTab === "menu" && (
             <div className="db-panel">
@@ -4848,10 +4768,10 @@ export default function Dashboard() {
                       <span className="db-hero__back-dot" />
                     </button>
                     <h1 className="db-hero__title">
-                      Tambah <span className="db-hero__title-highlight">Menu</span> Baru
+                      Tambah <span className="db-hero__title-highlight">Produk</span> Baru
                     </h1>
                     <p className="db-hero__subtitle">
-                      Tambahkan produk atau layanan ke dalam daftar menu bisnis Anda
+                      Tambahkan produk atau layanan ke dalam daftar produk bisnis Anda
                     </p>
                   </div>
                   <div className="db-hero__illustration">
@@ -4916,7 +4836,7 @@ export default function Dashboard() {
                     </div>
 
                     <div className="db-form-group">
-                      <label>Nama Menu/Produk <span className="req">*</span></label>
+                      <label>Nama Produk <span className="req">*</span></label>
                       <input 
                         type="text" 
                         required 
@@ -4979,7 +4899,7 @@ export default function Dashboard() {
                     </div>
 
                     <div className="db-form-group">
-                      <label>Foto Menu (opsional)</label>
+                      <label>Foto Produk (opsional)</label>
                       <div className="db-upload-area">
                         <div className="db-upload-area__icon">
                           <Camera size={32} />
@@ -5001,7 +4921,7 @@ export default function Dashboard() {
                       Batal
                     </button>
                     <button type="submit" className="db-btn-submit" disabled={actionLoading}>
-                      {actionLoading ? "Menyimpan..." : "Simpan Menu"}
+                      {actionLoading ? "Menyimpan..." : "Simpan Produk"}
                     </button>
                   </div>
                 </form>
@@ -5009,10 +4929,10 @@ export default function Dashboard() {
             ) : (
               <>
               <div className="db-panel-header">
-                <h2>Menu</h2>
+                <h2>Produk</h2>
                 <button className="db-action-btn" onClick={() => handleOpenMenuModal()}>
                   <Plus size={16} />
-                  <span>Tambah Menu</span>
+                  <span>Tambah Produk</span>
                 </button>
               </div>
 
@@ -5058,7 +4978,7 @@ export default function Dashboard() {
                 <DashboardEmptyState
                   title="Tingkatkan Jangkauan Bisnis Anda"
                   subtitle="Anda harus berada di sini untuk pertama kalinya. Jika Anda ingin menambahkan sesuatu, klik tombol di bawah ini."
-                  actionLabel="Tambah Menu Baru"
+                  actionLabel="Tambah Produk Baru"
                   onAction={() => handleOpenMenuModal()}
                 />
               )}
@@ -5067,70 +4987,136 @@ export default function Dashboard() {
             </div>
           )}
 
-        {/* TAB: INBOX */}
+        {/* TAB: INBOX - chat dua arah, mirip WhatsApp. Menampilkan gabungan
+            percakapan sebagai penjual (pesan masuk ke bisnis sendiri) dan
+            sebagai pelanggan (pesan yang dikirim ke penjual lain), supaya
+            satu akun bisa membalas siapa pun yang mengirim pesan padanya. */}
           {activeTab === "inbox" && (
             <div className="db-panel">
               <div className="db-panel-header">
                 <h2>Inbox</h2>
               </div>
 
-              {/* Inbox/Chat adalah fitur Premium - user gratis diarahkan
-                  untuk upgrade dulu sebelum bisa lihat & balas pesan. */}
-              {!isAdmin && !businesses.some((b) => b.is_premium_active) ? (
-                <div className="db-premium-lock">
-                  <Crown size={40} className="db-premium-lock__icon" />
-                  <h3>Inbox adalah Fitur Premium</h3>
-                  <p>
-                    Upgrade salah satu bisnis kamu ke Premium supaya bisa menerima
-                    dan membalas pesan langsung dari calon pelanggan lewat Inbox.
-                  </p>
-                  <button
-                    type="button"
-                    className="db-btn-primary"
-                    onClick={() => setActiveTab("premium")}
-                  >
-                    Upgrade ke Premium
-                  </button>
-                </div>
-              ) : loading ? (
+              {loading ? (
                 <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat...</span></div>
-              ) : messages.length > 0 ? (
-                <div className="db-table-responsive">
-                  <table className="db-table">
-                    <thead>
-                      <tr>
-                        <th>Pengirim</th>
-                        <th>Kontak</th>
-                        <th>Bisnis</th>
-                        <th>Pesan</th>
-                        <th>Status</th>
-                        <th>Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {messages.map((m) => (
-                        <tr key={m.id}>
-                          <td><strong>{m.sender_name}</strong></td>
-                          <td>{m.sender_contact || "-"}</td>
-                          <td>{m.business?.title || "-"}</td>
-                          <td className="db-message-cell">{m.message}</td>
-                          <td>
-                            <span className={`db-status-badge db-status--${m.is_read ? "verified" : "pending"}`}>
-                              {m.is_read ? "Dibaca" : "Baru"}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="db-table-actions">
-                              {!m.is_read && (
-                                <button className="db-table-btn db-btn-edit" title="Tandai dibaca" onClick={() => handleMarkMessageRead(m.id)}><CheckCircle size={14} /></button>
-                              )}
-                              <button className="db-table-btn db-btn-delete" onClick={() => handleDeleteMessage(m.id)}><Trash2 size={14} /></button>
+              ) : inboxThreads.length > 0 ? (
+                <div className="db-inbox-chat-layout">
+                  <aside className="db-inbox-sidebar">
+                    {inboxThreads.map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        className={`db-inbox-item ${selectedInboxThread?.key === t.key ? "active" : ""}`}
+                        onClick={() => handleSelectInboxThread(t)}
+                      >
+                        <div className="db-inbox-avatar">
+                          {(t.otherName || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div className="db-inbox-item__meta">
+                          <div className="db-inbox-item__top">
+                            <strong>{t.otherName}</strong>
+                            {t.unread > 0 && <span className="db-inbox-dot" />}
+                          </div>
+                          <span className="db-inbox-item__business">
+                            {t.amOwner ? (t.business?.title || "Bisnis") : "Anda bertanya ke penjual ini"}
+                          </span>
+                          <p>{t.last.message}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </aside>
+
+                  <div className="db-chat-panel">
+                    {selectedInboxThread ? (
+                      <>
+                        <div className="db-chat-header">
+                          <div className="db-chat-header__info">
+                            <div className="db-inbox-avatar large">
+                              {(selectedInboxThread.otherName || "?").charAt(0).toUpperCase()}
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            <div>
+                              <h3>{selectedInboxThread.otherName}</h3>
+                              <span>
+                                {selectedInboxThread.amOwner
+                                  ? selectedInboxThread.business?.title || "Konsumen"
+                                  : "Percakapan dengan penjual"}
+                              </span>
+                            </div>
+                          </div>
+                          {(selectedInboxThread.amOwner || isAdmin) && (
+                            <div className="db-chat-header__actions">
+                              <button
+                                type="button"
+                                className="db-chat-action"
+                                onClick={() => handleDeleteMessage(selectedInboxThread.last.id)}
+                                title="Hapus pesan terakhir"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="db-chat-thread">
+                          {selectedInboxThread.items.map((m) => {
+                            const isMine = selectedInboxThread.amOwner
+                              ? m.sender_role === "seller"
+                              : m.sender_role !== "seller";
+                            return (
+                              <div key={m.id} className={`db-chat-bubble ${isMine ? "outgoing" : "incoming"}`}>
+                                <p>{m.message}</p>
+                                <span>{m.created_at ? new Date(m.created_at).toLocaleString("id-ID") : ""}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {!selectedInboxThread.customer_id ? (
+                          <div className="db-chat-composer db-chat-composer--locked">
+                            <p>
+                              Pesan ini dikirim oleh pengunjung yang belum login, jadi tidak bisa
+                              dibalas lewat chat. Hubungi lewat kontak yang ia cantumkan.
+                            </p>
+                          </div>
+                        ) : selectedInboxThread.amOwner &&
+                          !isAdmin &&
+                          !businesses.find((b) => b.id === selectedInboxThread.business_id)?.is_premium_active ? (
+                          <div className="db-chat-composer db-chat-composer--locked">
+                            <Crown size={18} />
+                            <p>Upgrade bisnis ini ke Premium untuk bisa membalas pesan pelanggan.</p>
+                            <button type="button" className="db-btn-primary" onClick={() => setActiveTab("premium")}>
+                              Upgrade ke Premium
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="db-chat-composer">
+                            <textarea
+                              value={inboxDraft}
+                              rows={2}
+                              placeholder="Tulis pesan..."
+                              onChange={(e) => setInboxDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleInboxReply();
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleInboxReply}
+                              disabled={sendingInboxReply || !inboxDraft.trim()}
+                            >
+                              <Send size={16} />
+                              {sendingInboxReply ? "Mengirim..." : "Kirim"}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="db-chat-empty">Pilih percakapan untuk memulai chat.</div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <DashboardEmptyState
@@ -5907,84 +5893,10 @@ export default function Dashboard() {
             </div>
           )}
 
-        {/* TAB: NOTIFIKASI */}
-          {activeTab === "notifications" && (
-            <div className="db-panel">
-              <div className="db-panel-header">
-                <h2>Notifikasi</h2>
-                <div className="db-panel-header-actions">
-                  {unreadNotifications > 0 && (
-                    <button
-                      type="button"
-                      className="db-action-btn db-action-btn--secondary"
-                      onClick={handleMarkAllNotificationsRead}
-                    >
-                      <CheckCircle size={16} />
-                      <span>Tandai Semua Dibaca</span>
-                    </button>
-                  )}
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      className="db-action-btn db-action-btn--danger"
-                      onClick={handleCleanupNotifications}
-                    >
-                      <Trash2 size={16} />
-                      <span>Bersihkan Lama</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {loading ? (
-                <div className="db-loader-wrap">
-                  <div className="db-spinner" />
-                  <span>Memuat notifikasi...</span>
-                </div>
-              ) : notifications.length > 0 ? (
-                <div className="db-notifications-list">
-                  {notifications.map((notification) => (
-                    <div 
-                      key={notification.id} 
-                      className={`db-notification-item ${!notification.is_read ? 'unread' : ''}`}
-                      onClick={() => handleMarkNotificationRead(notification.id)}
-                    >
-                      <div className="db-notification-item__icon">
-                        {notification.type === 'business' && <ShoppingBag size={20} />}
-                        {notification.type === 'payment' && <CreditCard size={20} />}
-                        {notification.type === 'message' && <MessageSquare size={20} />}
-                        {notification.type === 'review' && <Star size={20} />}
-                        {!notification.type && <Bell size={20} />}
-                      </div>
-                      <div className="db-notification-item__content">
-                        <h3 className="db-notification-item__title">{notification.title}</h3>
-                        <p className="db-notification-item__message">{notification.message}</p>
-                        <span className="db-notification-item__time">
-                          {notification.created_at ? new Date(notification.created_at).toLocaleString('id-ID') : '-'}
-                        </span>
-                      </div>
-                      {!notification.is_read && <div className="db-notification-item__dot" />}
-                      <button 
-                        className="db-notification-item__delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteNotification(notification.id);
-                        }}
-                        title="Hapus notifikasi"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <DashboardEmptyState
-                  title="Belum Ada Notifikasi"
-                  subtitle="Notifikasi terbaru akan muncul di sini."
-                />
-              )}
-            </div>
-          )}
+        {/* Panel tab "notifications" sudah dihapus - lihat catatan di sidebar
+            di atas. Semua fungsinya (tandai dibaca, tandai semua dibaca,
+            hapus satuan, bersihkan lama) sekarang ada di dropdown lonceng
+            topbar, aktif untuk admin maupun user biasa. */}
 
         {/* TAB: RESELLER */}
           {activeTab === "reseller" && (

@@ -258,12 +258,26 @@ class SellerController extends Controller
 
         $message = Message::create([
             'business_id' => $business->id,
+            'customer_id' => Auth::id(),
+            'sender_id' => Auth::id(),
+            'sender_role' => 'customer',
             'sender_name' => Auth::user()->name,
             'sender_contact' => Auth::user()->email,
             'message' => $request->message,
             'is_read' => false,
         ]);
 
-        return response()->json(['message' => 'Pesan berhasil dikirim']);
+        NotificationController::createNotification(
+            $business->user_id,
+            'message',
+            'Pesan Baru',
+            Auth::user()->name . " mengirim pesan baru di '{$business->title}'.",
+            ['business_id' => $business->id, 'customer_id' => Auth::id()]
+        );
+
+        return response()->json([
+            'message' => 'Pesan berhasil dikirim',
+            'data' => $message,
+        ]);
     }
 }

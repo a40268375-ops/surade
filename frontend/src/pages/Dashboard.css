@@ -1226,36 +1226,82 @@
 
 .db-charts-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 300px;
-  gap: 2rem;
-  margin-bottom: 3rem;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.9fr);
+  gap: 1.5rem;
+  margin-bottom: 2.2rem;
   align-items: start;
+  max-width: 1240px;
+  width: 100%;
+}
+
+.db-chart-card--wide {
+  min-height: 420px;
 }
 
 .db-chart-card {
-  background: var(--primary-color);
+  background: linear-gradient(135deg, #0d8f8e 0%, #0b726b 100%);
   color: var(--white);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-card);
-  min-height: 350px;
+  border-radius: 1.8rem;
+  padding: 1.35rem 1.5rem 1.5rem;
+  box-shadow: 0 10px 22px rgba(10, 92, 93, 0.18);
+  min-height: 460px;
+  display: flex;
+  flex-direction: column;
 }
 
 .db-chart-card__header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.2rem;
+  padding-bottom: 0.25rem;
+}
+
+.db-chart-card__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .db-chart-card__icon {
-  font-size: 1.5rem;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .db-chart-card h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 800;
   margin: 0;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.db-chart-card__header-link {
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.db-chart-card__header-link:hover {
+  background: rgba(255, 255, 255, 0.22);
+  text-decoration: none;
 }
 
 .db-sidebar-widgets {
@@ -1297,42 +1343,144 @@
   align-items: start;
 }
 
+.db-bottom-row--single {
+  grid-template-columns: 1fr;
+}
+
+.db-bottom-row--split {
+  grid-template-columns: 1fr 1fr;
+}
+
 .db-premium-history, .db-reviews-section {
   background: var(--white);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
   box-shadow: var(--shadow-card);
   border: 1px solid var(--gray-border);
+  min-height: 320px;
 }
 
 .db-section-header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.3rem;
   position: relative;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .db-section-icon {
-  font-size: 1.25rem;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(13, 148, 136, 0.12);
+  color: #0e8a86;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .db-section-header h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 800;
   color: var(--text-main);
   margin: 0;
   flex: 1;
+  letter-spacing: -0.02em;
 }
 
 .db-view-all-link {
-  background: none;
+  background: rgba(13, 148, 136, 0.08);
   border: none;
   color: var(--primary-color);
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   cursor: pointer;
-  text-decoration: underline;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+}
+
+.db-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.db-review-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.9rem 0.95rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fdfefe;
+}
+
+.db-review-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.db-review-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.db-review-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.db-review-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.db-review-meta strong {
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.db-review-stars {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.db-review-stars .star-filled {
+  color: #fbbf24;
+}
+
+.db-review-stars .star-empty {
+  color: #d1d5db;
+}
+
+.db-review-comment {
+  margin: 0 0 0.25rem;
+  font-size: 0.84rem;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+.db-review-business {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
 }
 
 .db-history-items {
@@ -1492,8 +1640,10 @@
 .db-chart-container {
   min-height: 250px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  gap: 1rem;
+  width: 100%;
 }
 
 .db-chart-loading {
@@ -2058,22 +2208,15 @@
   flex-shrink: 0;
   position: sticky;
   top: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-}
-
-.db-sidebar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.db-sidebar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.db-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
+  /* PERBAIKAN: dulu overflow-y:auto ada di sini (.db-sidebar), jadi
+     SELURUH sidebar (header, menu, DAN bagian bawah "Kembali ke Website" /
+     profil / keluar) ikut ke-scroll jadi satu bagian. Makanya bagian
+     bawah itu bisa ikut "kegeser" hilang pas menu di-scroll, padahal
+     harusnya diam di tempat kayak di Info.co.id (gambar referensi).
+     Sekarang overflow-nya dipindah HANYA ke ".db-menu" (lihat di bawah),
+     supaya cuma daftar menu yang scroll, sementara header di atas dan
+     bagian bawah tetap diam di posisinya. */
+  overflow: hidden;
 }
 
 .db-sidebar-header {
@@ -2085,6 +2228,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   gap: 0.75rem;
   backdrop-filter: blur(10px);
+  flex-shrink: 0;
 }
 
 .db-sidebar-logo {
@@ -2208,33 +2352,52 @@
 .db-menu {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 1.25rem 1rem;
+  gap: 0.15rem;
+  padding: 1rem 0.85rem;
   flex-grow: 1;
+  /* Ini yang jadi area scroll-nya sekarang, bukan .db-sidebar lagi -
+     supaya header di atas & bagian bawah (Kembali ke Website/profil/
+     keluar) tetap diam, cuma daftar menu ini yang jalan pas di-scroll. */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.db-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.db-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.db-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
 .db-menu-btn {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 0.875rem 1.125rem;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
   background: none;
   border: none;
   border-radius: var(--radius-md);
   text-align: left;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   transition: var(--transition);
   position: relative;
   font-family: var(--font-family);
-  margin: 0.25rem 0;
+  margin: 0.1rem 0;
 }
 
 .db-menu-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2272,6 +2435,7 @@
   padding: 1rem 1rem 1.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
 }
 
 .db-back-btn {
@@ -2280,10 +2444,10 @@
   justify-content: center;
   gap: 0.6rem;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(45, 212, 191, 0.14);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #ffffff;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  color: #5eead4;
   border-radius: var(--radius);
   font-weight: 600;
   font-size: 0.9rem;
@@ -2293,29 +2457,64 @@
 }
 
 .db-back-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(45, 212, 191, 0.22);
+  border-color: rgba(45, 212, 191, 0.5);
+}
+
+.db-profile-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  backdrop-filter: none;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0;
+  overflow: visible;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
 }
 
 .db-profile-card {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius);
+  padding: 0.6rem 0.5rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-align: left;
   width: 100%;
+  min-width: 0;
+  flex: 1;
   transition: var(--transition);
 }
 
 .db-profile-card:hover,
 .db-profile-card.active {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.db-logout-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.db-logout-icon-btn:hover {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fca5a5;
 }
 
 .db-avatar {
@@ -2359,29 +2558,26 @@
 }
 
 .db-role-badge {
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  text-transform: uppercase;
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0;
+  border-radius: 0;
+  text-transform: capitalize;
+  background: none !important;
+  border: none !important;
 }
 
 .db-role--admin {
-  background-color: rgba(251, 191, 36, 0.25);
   color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
 .db-role--reseller {
-  background-color: rgba(56, 189, 248, 0.25);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #7dd3fc;
 }
 
 .db-role--user {
-  background-color: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 /* BARU: varian untuk dipakai di dalam tabel (background putih), beda dari
@@ -2414,8 +2610,9 @@
 
 .db-menu-btn--logout {
   color: #fca5a5;
-  margin-top: 0.75rem;
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  margin-top: 0;
+  border: none;
+  border-radius: var(--radius-md);
 }
 
 .db-menu-btn--logout .db-menu-icon {
@@ -2423,9 +2620,8 @@
 }
 
 .db-menu-btn--logout:hover {
-  background-color: rgba(248, 113, 113, 0.2);
+  background-color: rgba(248, 113, 113, 0.12);
   color: #fecaca;
-  border-color: rgba(248, 113, 113, 0.5);
 }
 
 .db-menu-btn--logout:hover .db-menu-icon {
@@ -3268,6 +3464,272 @@
   color: #4b5563;
   font-size: 0.85rem;
 }
+
+.db-inbox-chat-layout {
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  min-height: 620px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.db-inbox-sidebar {
+  background: #f8fafc;
+  border-right: 1px solid #e5e7eb;
+  padding: 0.75rem;
+  overflow-y: auto;
+}
+
+.db-inbox-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 14px;
+  padding: 0.8rem 0.7rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.db-inbox-item:hover {
+  background: #eefaf7;
+}
+
+.db-inbox-item.active {
+  background: #dff7f3;
+}
+
+.db-inbox-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0d8f8e 0%, #0c6d6f 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.db-inbox-avatar.large {
+  width: 44px;
+  height: 44px;
+}
+
+.db-inbox-item__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.db-inbox-item__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.db-inbox-item__top strong {
+  font-size: 0.92rem;
+  color: #0f172a;
+}
+
+.db-inbox-item__business {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.72rem;
+  color: #0d9488;
+  font-weight: 700;
+}
+
+.db-inbox-item__meta p {
+  margin: 0.35rem 0 0;
+  color: #475569;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.db-inbox-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+.db-chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 620px;
+  background: #ffffff;
+}
+
+.db-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.db-chat-header__info {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.db-chat-header__info h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.db-chat-header__info span {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 0.76rem;
+}
+
+.db-chat-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.db-chat-action {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.db-chat-thread {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.25rem;
+  background: linear-gradient(180deg, #f9fbfb 0%, #edf7f6 100%);
+}
+
+.db-chat-bubble {
+  max-width: 72%;
+  padding: 0.8rem 1rem;
+  border-radius: 16px 16px 16px 6px;
+  background: #ffffff;
+  border: 1px solid #ecfdf5;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.db-chat-bubble p {
+  margin: 0;
+  color: #1f2937;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.db-chat-bubble span {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.db-chat-bubble.outgoing {
+  margin-left: auto;
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  border-radius: 16px 16px 6px 16px;
+}
+
+.db-chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem 1.1rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.db-chat-composer textarea {
+  flex: 1;
+  min-height: 52px;
+  max-height: 120px;
+  resize: vertical;
+  border: 1px solid #dbe7e5;
+  border-radius: 12px;
+  padding: 0.8rem 0.9rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #0f172a;
+  outline: none;
+}
+
+.db-chat-composer textarea:focus {
+  border-color: #0d8f8e;
+  box-shadow: 0 0 0 4px rgba(13, 143, 142, 0.08);
+}
+
+.db-chat-composer button {
+  border: none;
+  background: linear-gradient(135deg, #0d8f8e 0%, #0b726b 100%);
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+}
+
+.db-chat-composer button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.db-chat-composer--locked {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  color: #64748b;
+}
+
+.db-chat-composer--locked p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.db-chat-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #64748b;
+  font-weight: 600;
+}
+
 /* ── RESELLER DIRECTORY ── */
 .db-reseller-grid {
   display: grid;
@@ -4127,6 +4589,69 @@
 .db-widget-card__header-link:hover { text-decoration: underline; }
 .db-widget-card__header-link--static { color: #9ca3af; cursor: default; }
 
+.db-widget-card__header--dark .db-widget-card__header-link {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.db-widget-card__header--dark .db-widget-card__header-link:hover {
+  background: rgba(255, 255, 255, 0.28);
+  text-decoration: none;
+}
+
+/* Tabel rincian "Lihat Detail" di bawah tiap grafik - nunjukin tanggal,
+   nilai, dan panah kecil naik/turun dibanding hari sebelumnya, biar
+   kelihatan jelas perkembangannya (bukan cuma garis di grafik). */
+.db-chart-detail-table {
+  margin-top: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(0, 90, 89, 0.3);
+  padding: 0.75rem 0.8rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  min-width: 220px;
+  overflow-y: auto;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.db-chart-detail-table__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 4px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+}
+
+.db-chart-detail-table__row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.db-chart-detail-table__row--head {
+  font-weight: 700;
+  color: #ffffff;
+  background: none !important;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  border-radius: 0;
+}
+
+.db-chart-detail-table__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.db-chart-detail-table__trend--up { color: #10b981; }
+.db-chart-detail-table__trend--down { color: #ef4444; }
+
 .db-widget-card__header-actions {
   margin-left: auto;
   display: flex;
@@ -4164,15 +4689,23 @@
   background: #00625e;
 }
 
+/* PERBAIKAN TAMPILAN: sebelumnya grafik (komponen DashboardChart) punya
+   background gradasi + shadow sendiri (lihat .db-chart di bawah), yang
+   kalau dipasang di dalam kartu--sales yang sudah teal, hasilnya jadi
+   "kotak gelap di dalam kotak gelap" (dua lapis warna teal berbeda).
+   Sekarang dipastikan transparan total supaya menyatu jadi satu warna
+   rata dengan kartunya, dan paddingnya dirapatkan sedikit biar lebih
+   ringkas (tidak terlalu lapang seperti sebelumnya). */
 .db-widget-card--sales .db-widget-card__body--chart {
   background: transparent;
-  padding-top: 0.5rem;
+  padding: 0.5rem 0.9rem 0.75rem;
 }
 
 .db-widget-card--sales .db-chart {
   margin-top: 0;
   background: none;
   box-shadow: none;
+  border-radius: 0;
   padding: 0.25rem 0 0;
 }
 
@@ -4809,12 +5342,15 @@
    GRAFIK TREN (DashboardChart) — SVG custom, tanpa library
 ═══════════════════════════════════════════════════ */
 .db-chart {
-  margin-top: 2rem;
-  background: linear-gradient(135deg, #007570, #005a58);
-  border: none;
-  border-radius: 16px;
-  padding: 1.5rem 1.25rem 1rem;
-  box-shadow: 0 8px 24px rgba(0, 117, 112, 0.25);
+  margin-top: 0.75rem;
+  background: rgba(0, 80, 79, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  padding: 1.15rem 1rem 0.5rem;
+  box-shadow: none;
+  width: min(100%, 760px);
+  flex: 1;
+  min-height: 250px;
 }
 
 .db-chart__svg {
@@ -4822,17 +5358,17 @@
   height: auto;
   aspect-ratio: 640 / 220;
   display: block;
-  max-height: 280px;
+  max-height: 240px;
 }
 
 .db-chart__grid {
-  stroke: rgba(255, 255, 255, 0.15);
+  stroke: rgba(255, 255, 255, 0.14);
   stroke-width: 1;
 }
 
 .db-chart__axis-label {
   font-size: 11px;
-  fill: rgba(255, 255, 255, 0.85);
+  fill: rgba(255, 255, 255, 0.9);
   font-family: 'Poppins', sans-serif;
   font-weight: 500;
 }
@@ -4845,17 +5381,19 @@
 
 .db-chart__legend {
   display: flex;
-  gap: 1.25rem;
+  gap: 1rem;
   justify-content: center;
-  padding: 0.75rem 0 0.5rem;
+  padding: 0.25rem 0 0.5rem;
+  margin-top: -0.2rem;
 }
 
 .db-chart__legend-item {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 700;
 }
 
 /* ══════════════════════════════════════════════════
@@ -4930,6 +5468,12 @@
   font-size: 16px;
   font-weight: 700;
   color: #1f2937;
+}
+
+.db-notification-dropdown__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .db-notification-dropdown__mark-all {

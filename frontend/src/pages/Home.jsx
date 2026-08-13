@@ -369,6 +369,74 @@ import { useState, useRef, useEffect } from "react";
       return () => clearInterval(interval);
     }, [dbAds]);
 
+    // Small UI effects: reveal timeline items and video, and typing heading
+    // PERBAIKAN: sebelumnya efek ini nyari elemen ".tl-item"/".video-col"
+    // pakai document.querySelectorAll di dalam useEffect ber-dependency
+    // kosong ([]). Masalahnya, komponen Home ini punya "if (loading) return
+    // <Loading />" SEBELUM bagian JSX yang berisi section ini - jadi pas
+    // render PERTAMA kali (masih loading), section timeline & video-nya
+    // belum ada sama sekali di DOM (yang tampil cuma <Loading/>).
+    // querySelectorAll otomatis dapat HASIL KOSONG, dan karena
+    // dependency-nya [], efeknya TIDAK PERNAH JALAN LAGI walau nanti
+    // loading selesai dan section aslinya baru muncul - alhasil class "in"
+    // yang bikin item & video kelihatan (opacity:1) tidak pernah
+    // ditambahkan, jadi timeline & video-nya tetap kosong/tidak kelihatan
+    // selamanya. Sekarang pakai ref React (bukan query DOM manual) dan
+    // efeknya diberi dependency [loading], supaya otomatis dicoba ulang
+    // begitu loading selesai dan elemennya benar-benar sudah ada.
+    const tlItemRefs = useRef([]);
+    const videoColRef = useRef(null);
+    const typedRef = useRef(false);
+    useEffect(() => {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) e.target.classList.add('in');
+        });
+      }, { threshold: 0.25 });
+
+      tlItemRefs.current.forEach((el, i) => {
+        if (!el) return;
+        el.style.transitionDelay = (i * 0.12) + 's';
+        io.observe(el);
+      });
+
+      if (videoColRef.current) io.observe(videoColRef.current);
+
+      return () => io.disconnect();
+    }, [loading]);
+
+    useEffect(() => {
+      const fullText = "Cepat dan Memudahkan Pencarian";
+      const typedEl = document.getElementById('typedText');
+      const cursorEl = document.querySelector('.type-cursor');
+      if (!typedEl) return;
+
+      const headingIo = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting && !typedRef.current) {
+            typedRef.current = true;
+            let i = 0;
+            typedEl.textContent = '';
+            const timer = setInterval(() => {
+              typedEl.textContent += fullText.charAt(i);
+              i++;
+              if (i >= fullText.length) {
+                clearInterval(timer);
+                if (cursorEl) {
+                  setTimeout(() => { cursorEl.style.opacity = '0'; cursorEl.style.transition = 'opacity .5s ease'; }, 900);
+                }
+              }
+            }, 45);
+          }
+        });
+      }, { threshold: 0.5 });
+
+      const headingEl = document.getElementById('typedHeading');
+      if (headingEl) headingIo.observe(headingEl);
+      return () => headingIo.disconnect();
+    }, [loading]);
+
+
     // Map real advertisements (Premium-only, auto-hidden on expiry) into the
     // same shape the carousel already knows how to render. Falls back to the
     // static demo cards only when there are genuinely no live ads yet.
@@ -686,7 +754,7 @@ import { useState, useRef, useEffect } from "react";
             </div>
           </div>
         </section>
-
+        
         {/* ── TERBARU / IKLAN SECTION ── */}
         <section className="reko-section">
           <div className="reko-inner">
@@ -881,35 +949,44 @@ import { useState, useRef, useEffect } from "react";
           </div>
         </section>
 
-        {/* ── CEPAT PENCARIAN SECTION ── */}
-        <section className="quick-section">
-          <div className="quick-inner">
-            <div className="quick-text">
-              <h2 className="quick-title">Cepat dan Memudahkan Pencarian</h2>
-              <p className="quick-subtitle">Mudah Menemukan Pelaku Usaha Skala Terkecil</p>
-              <div className="quick-steps">
-                {QUICK_STEPS.map((step) => (
-                  <div key={step.num} className="quick-step">
-                    <div className="quick-step__num">{step.num}-</div>
-                    <div>
-                      <p className="quick-step__title">{step.title}</p>
-                      <p className="quick-step__desc">{step.desc}</p>
+        {/* ── TEMUKAN TEMPAT BARU SECTION ── */}
+        <section className="howit">
+          <div className="blob blob-1"></div>
+          <div className="blob blob-2"></div>
+
+          <div className="howit-inner">
+            <div className="text-col">
+              <h2 id="typedHeading"><span id="typedText"></span><span className="type-cursor"></span></h2>
+              <p className="lead">Mudah menemukan pelaku usaha skala terkecil di sekitar Anda, hanya dalam tiga langkah sederhana.</p>
+
+              <div className="timeline" id="timeline">
+                {QUICK_STEPS.map((step, i) => (
+                  <div
+                    key={step.num}
+                    className="tl-item"
+                    ref={(el) => (tlItemRefs.current[i] = el)}
+                    style={{ transitionDelay: `${i * 0.12}s` }}
+                  >
+                    <div className="tl-num">{step.num}</div>
+                    <div className="tl-body">
+                      <h3>{step.title}</h3>
+                      <p>{step.desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="quick-img-wrap">
-              <img
-                src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=700&h=500&fit=crop"
-                alt="Ilustrasi pencarian bisnis"
-                className="quick-img"
-              />
+
+            <div className="video-col" ref={videoColRef}>
+              <div className="video-frame">
+                <video autoPlay muted loop playsInline poster="https://picsum.photos/seed/suradehero/900/700">
+                  <source src="/assets/surade-aerial.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
             </div>
           </div>
         </section>
-
-        {/* ── TEMUKAN TEMPAT BARU SECTION ── */}
         <section className="temukan-section">
           <div className="temukan-inner">
             <h2 className="temukan-title">Temukan Tempat Baru</h2>

@@ -163,10 +163,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('menu-items/{id}', [MenuItemController::class, 'update']);
     Route::delete('menu-items/{id}', [MenuItemController::class, 'destroy']);
 
-    // Inbox pesan masuk ke bisnis sendiri
+    // Inbox pesan masuk ke bisnis sendiri - sekarang dua arah (chat), bukan
+    // cuma pesan sekali kirim. "my-messages" mengembalikan semua pesan yang
+    // relevan buat akun yang login, baik sebagai penjual maupun pelanggan.
     Route::get('my-messages', [MessageController::class, 'index']);
     Route::put('messages/{id}', [MessageController::class, 'update']); // tandai dibaca
     Route::delete('messages/{id}', [MessageController::class, 'destroy']);
+    Route::post('businesses/{business}/messages/{customer}/reply', [MessageController::class, 'reply']);
 
     // Simpan / bookmark bisnis
     Route::get('my-saved-businesses', [SavedBusinessController::class, 'index']);

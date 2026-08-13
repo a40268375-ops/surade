@@ -107,22 +107,28 @@ class Business extends Model
             return false;
         }
 
-        // Parse operating hours (format: "08:00 - 20:00" or "08:00-20:00")
+        // Parse operating hours (format: "08:00 - 20:00", "08:00-20:00",
+        // "08.00 - 20.00", or "08.00-20.00")
         $hours = $this->operating_hours;
         
-        // Handle various formats
+        // Handle various formats. PENTING: pola dengan menit (":mm" atau
+        // ".mm") harus dicoba lebih dulu dan menit HARUS persis 2 digit,
+        // supaya jam bertitik seperti "08.00 - 17.00" tidak salah tertangkap
+        // oleh pola jam-saja di bawahnya (dulu itu bikin "08.00" kebaca
+        // jadi jam 00, karena titiknya dianggap bukan bagian dari jamnya).
+        // Nama grup dipakai eksplisit (bukan index angka) supaya jam & menit
+        // tidak ketuker walau jumlah grup antar pola beda-beda.
         $patterns = [
-            '/(\d{1,2}):?(\d{0,2})\s*[-–—]\s*(\d{1,2}):?(\d{0,2})/',
-            '/(\d{1,2})\.(\d{2})\s*[-–—]\s*(\d{1,2})\.(\d{2})/',
-            '/(\d{1,2})\s*[-–—]\s*(\d{1,2})/',
+            '/(?<oh>\d{1,2})[:.](?<om>\d{2})\s*[-–—]\s*(?<ch>\d{1,2})[:.](?<cm>\d{2})/',
+            '/(?<oh>\d{1,2})\s*[-–—]\s*(?<ch>\d{1,2})/',
         ];
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $hours, $matches)) {
-                $openHour = (int) $matches[1];
-                $openMinute = isset($matches[2]) && $matches[2] !== '' ? (int) $matches[2] : 0;
-                $closeHour = (int) $matches[3];
-                $closeMinute = isset($matches[4]) && $matches[4] !== '' ? (int) $matches[4] : 0;
+                $openHour = (int) $matches['oh'];
+                $openMinute = isset($matches['om']) && $matches['om'] !== '' ? (int) $matches['om'] : 0;
+                $closeHour = (int) $matches['ch'];
+                $closeMinute = isset($matches['cm']) && $matches['cm'] !== '' ? (int) $matches['cm'] : 0;
 
                 $openTime = $now->copy()->hour($openHour)->minute($openMinute)->second(0);
                 $closeTime = $now->copy()->hour($closeHour)->minute($closeMinute)->second(0);

@@ -22,6 +22,7 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   CalendarCheck,
   ThumbsUp,
 } from "lucide-react";
@@ -306,6 +307,17 @@ export default function BusinessDetail() {
   const [showPhone, setShowPhone] = useState(false);
   const [showHours, setShowHours] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  // BARU: state untuk modal "Chat Dengan Penjual" - sebelumnya tombol ini
+  // salah pasang, memanggil handleWhatsApp yang sama persis dengan tombol
+  // WhatsApp di sebelahnya. Sekarang benar-benar mengirim pesan lewat
+  // sistem chat internal (masuk ke tab Inbox pemilik bisnis).
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatName, setChatName] = useState(authUser?.name || "");
+  const [chatContact, setChatContact] = useState(authUser?.phone || authUser?.email || "");
+  const [chatMessage, setChatMessage] = useState("");
+  const [chatError, setChatError] = useState("");
+  const [chatSubmitting, setChatSubmitting] = useState(false);
+  const [chatSuccess, setChatSuccess] = useState(false);
   const [bookingName, setBookingName] = useState("");
   const [bookingPhone, setBookingPhone] = useState("");
   const [bookingDate, setBookingDate] = useState("");
@@ -321,6 +333,9 @@ export default function BusinessDetail() {
   const [menuItems, setMenuItems] = useState([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productPage, setProductPage] = useState(1);
+  const [showGalleryLightbox, setShowGalleryLightbox] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileBusinesses, setProfileBusinesses] = useState([]);
 
@@ -427,6 +442,7 @@ export default function BusinessDetail() {
             max_announcements: 2,
           },
           status: data.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
+          is_open_now: data.is_open_now,
           rating: data.rating || 0,
           reviews: data.reviews_count || 0,
           reviewList: (data.reviews || []).map((r) => ({
@@ -471,6 +487,7 @@ export default function BusinessDetail() {
             images: fallback.images || [fallback.img],
             video: fallback.video || null,
             status: "Buka Sekarang",
+            is_open_now: true,
             rating: fallback.rating,
             reviews: fallback.reviews,
             reviewList: fallbackReviews,
@@ -507,6 +524,12 @@ export default function BusinessDetail() {
     loadMenu();
     return () => { cancelled = true; };
   }, [id]);
+
+  // Balik ke halaman 1 tiap kali daftar produk berubah (misal ganti bisnis),
+  // supaya pagination-nya nggak nyangkut di halaman kosong.
+  useEffect(() => {
+    setProductPage(1);
+  }, [menuItems]);
 
   useEffect(() => {
     if (!business) return;
@@ -600,6 +623,31 @@ export default function BusinessDetail() {
     }
   };
 
+  const handleChatSubmit = async (e) => {
+    e.preventDefault();
+    setChatError("");
+    if (!chatName.trim() || !chatMessage.trim()) {
+      setChatError("Nama dan pesan wajib diisi.");
+      return;
+    }
+    setChatSubmitting(true);
+    try {
+      await api.post("/messages", {
+        business_id: business.id,
+        sender_name: chatName.trim(),
+        sender_contact: chatContact.trim() || null,
+        message: chatMessage.trim(),
+      });
+      setChatSuccess(true);
+      setChatMessage("");
+    } catch (err) {
+      setChatError(err?.data?.message || "Gagal mengirim pesan. Silakan coba lagi.");
+    } finally {
+      setChatSubmitting(false);
+    }
+  };
+
+
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
     setBookingError("");
@@ -663,6 +711,33 @@ export default function BusinessDetail() {
     { isOpen: false, label: "Tutup Sekarang" };
   const displayStatus = openStatus.label;
   const isOpenNow = openStatus.isOpen;
+
+  // Produk: dibatasi 3 per halaman, dengan pagination bernomor (kaya di
+  // halaman kategori). Kalau produknya cuma 1 halaman, paginationnya
+  // disembunyikan sama sekali.
+  const PRODUCTS_PAGE_SIZE = 3;
+  const availableProducts = business.premium_features?.price_list
+    ? menuItems
+    : menuItems.slice(0, business.premium_features?.max_menu_items || 10);
+  const productTotalPages = Math.max(1, Math.ceil(availableProducts.length / PRODUCTS_PAGE_SIZE));
+  const productSafePage = Math.min(productPage, productTotalPages);
+  const paginatedProducts = availableProducts.slice(
+    (productSafePage - 1) * PRODUCTS_PAGE_SIZE,
+    productSafePage * PRODUCTS_PAGE_SIZE
+  );
+  const isLastProductPage = productSafePage === productTotalPages;
+  function getProductPageNumbers() {
+    const pages = [];
+    const delta = 1;
+    for (let p = 1; p <= productTotalPages; p++) {
+      if (p === 1 || p === productTotalPages || (p >= productSafePage - delta && p <= productSafePage + delta)) {
+        pages.push(p);
+      } else if (pages[pages.length - 1] !== "...") {
+        pages.push("...");
+      }
+    }
+    return pages;
+  }
 
   return (
     <div className="business-detail-page">
@@ -771,11 +846,26 @@ export default function BusinessDetail() {
               
               {business.premium_features?.photo_gallery ? (
                 <div className="bd-photo-grid">
-                  {imagesList.map((src, i) => (
-                    <div key={i} className="bd-photo-item">
+                  {(imagesList.length > 4 ? imagesList.slice(0, 3) : imagesList).map((src, i) => (
+                    <div
+                      key={i}
+                      className="bd-photo-item"
+                      onClick={() => { setLightboxIndex(i); setShowGalleryLightbox(true); }}
+                    >
                       <img src={src} alt={`${business.name} ${i + 1}`} loading="lazy" />
                     </div>
                   ))}
+                  {imagesList.length > 4 && (
+                    <div
+                      className="bd-photo-item bd-photo-item--more"
+                      onClick={() => { setLightboxIndex(3); setShowGalleryLightbox(true); }}
+                    >
+                      <img src={imagesList[3]} alt={`${business.name} 4`} loading="lazy" />
+                      <div className="bd-more-overlay">
+                        <span className="bd-more-overlay__count">+{imagesList.length - 3}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="bd-premium-restriction">
@@ -859,10 +949,7 @@ export default function BusinessDetail() {
                   </div>
                 </div>
                 <div className="bd-products-grid">
-                  {(business.premium_features?.price_list ? 
-                    menuItems : 
-                    menuItems.slice(0, business.premium_features?.max_menu_items || 10)
-                  ).map((item) => (
+                  {paginatedProducts.map((item) => (
                     <button
                       type="button"
                       key={item.id}
@@ -890,7 +977,7 @@ export default function BusinessDetail() {
                       </div>
                     </button>
                   ))}
-                  {!business.premium_features?.price_list && menuItems.length > 10 && (
+                  {!business.premium_features?.price_list && isLastProductPage && menuItems.length > 10 && (
                     <div className="bd-product-card bd-product-card--locked">
                       <div className="bd-locked-overlay">
                         <div className="bd-locked-icon">🔒</div>
@@ -902,6 +989,46 @@ export default function BusinessDetail() {
                     </div>
                   )}
                 </div>
+
+                {/* Pagination produk: cuma muncul kalau lebih dari 1 halaman */}
+                {productTotalPages > 1 && (
+                  <nav className="bd-products-pagination" aria-label="Navigasi halaman produk">
+                    <button
+                      type="button"
+                      className="bd-products-pagination__nav"
+                      onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                      disabled={productSafePage === 1}
+                      aria-label="Halaman sebelumnya"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+
+                    {getProductPageNumbers().map((p, i) =>
+                      p === "..." ? (
+                        <span key={`ellipsis-${i}`} className="bd-products-pagination__ellipsis">…</span>
+                      ) : (
+                        <button
+                          type="button"
+                          key={p}
+                          className={`bd-products-pagination__num ${p === productSafePage ? "active" : ""}`}
+                          onClick={() => setProductPage(p)}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
+
+                    <button
+                      type="button"
+                      className="bd-products-pagination__nav"
+                      onClick={() => setProductPage((p) => Math.min(productTotalPages, p + 1))}
+                      disabled={productSafePage === productTotalPages}
+                      aria-label="Halaman berikutnya"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </nav>
+                )}
               </div>
             )}
 
@@ -1101,7 +1228,7 @@ export default function BusinessDetail() {
                   <button type="button" className="bd-seller-btn" onClick={handleWhatsApp}>
                     <MessageCircle size={18} /><span>WhatsApp</span>
                   </button>
-                  <button type="button" className="bd-seller-btn" onClick={handleWhatsApp}>
+                  <button type="button" className="bd-seller-btn" onClick={() => { setShowChatModal(true); setChatSuccess(false); setChatError(""); }}>
                     <MessageCircle size={18} /><span>Chat Dengan Penjual</span>
                   </button>
                   <button type="button" className="bd-seller-phone" onClick={() => setShowPhone(!showPhone)}>
@@ -1143,6 +1270,41 @@ export default function BusinessDetail() {
       </section>
 
       {/* Booking Modal */}
+      {/* ========== CHAT DENGAN PENJUAL MODAL ========== */}
+      {/* BARU: sebelumnya tombol ini cuma membuka WhatsApp (sama seperti
+          tombol WhatsApp di sebelahnya) - sekarang benar-benar mengirim
+          pesan lewat sistem chat internal (endpoint /messages), yang
+          langsung masuk ke tab Inbox pemilik bisnis dan bisa dibalas dari
+          sana seperti chat WhatsApp dua arah. */}
+      {showChatModal && (
+        <div className="login-modal-overlay" onClick={() => setShowChatModal(false)}>
+          <div className="login-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="login-modal__header">
+              <div>
+                <h2 className="login-modal__title">Chat Dengan {seller.name}</h2>
+                <p className="login-modal__subtitle">Pesan Anda akan masuk ke Inbox penjual dan bisa dibalas langsung dari sini.</p>
+              </div>
+              <button className="login-modal__close" onClick={() => setShowChatModal(false)} aria-label="Tutup"><X size={24} /></button>
+            </div>
+            <div className="login-modal__divider" />
+            {chatSuccess ? (
+              <div className="login-modal__body">
+                <p style={{ textAlign: "center", padding: "20px 0" }}>✅ Pesan terkirim! Penjual akan membalas lewat Inbox {authUser ? "Anda" : "(cek lewat kontak yang Anda cantumkan)"}.</p>
+                <button type="button" className="login-register-btn" onClick={() => setShowChatModal(false)}>Tutup</button>
+              </div>
+            ) : (
+              <form className="login-modal__body" onSubmit={handleChatSubmit} noValidate>
+                {chatError && <div className="login-error"><span>{chatError}</span></div>}
+                <input type="text" className="login-input" placeholder="Nama Anda" value={chatName} onChange={(e) => setChatName(e.target.value)} />
+                <input type="text" className="login-input" placeholder="No. HP / Email (opsional)" value={chatContact} onChange={(e) => setChatContact(e.target.value)} />
+                <textarea className="login-input" placeholder="Tulis pesan Anda..." rows={4} value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} />
+                <button type="submit" className="login-register-btn" disabled={chatSubmitting}>{chatSubmitting ? "Mengirim..." : "Kirim Pesan"}</button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {showBookingModal && (
         <div className="login-modal-overlay" onClick={() => setShowBookingModal(false)}>
           <div className="login-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
@@ -1200,6 +1362,63 @@ export default function BusinessDetail() {
                 {submittingReview ? "Mengirim..." : "Kirim Ulasan"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Gallery Lightbox Modal */}
+      {showGalleryLightbox && (
+        <div className="login-modal-overlay" onClick={() => setShowGalleryLightbox(false)}>
+          <div className="bd-lightbox" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="bd-lightbox__close"
+              onClick={() => setShowGalleryLightbox(false)}
+              aria-label="Tutup"
+            >
+              <X size={22} />
+            </button>
+
+            <div className="bd-lightbox__main">
+              {imagesList.length > 1 && (
+                <button
+                  type="button"
+                  className="bd-lightbox__nav bd-lightbox__nav--prev"
+                  onClick={() => setLightboxIndex((prev) => (prev - 1 + imagesList.length) % imagesList.length)}
+                  aria-label="Foto sebelumnya"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+              )}
+
+              <img src={imagesList[lightboxIndex]} alt={`${business.name} ${lightboxIndex + 1}`} className="bd-lightbox__img" />
+
+              {imagesList.length > 1 && (
+                <button
+                  type="button"
+                  className="bd-lightbox__nav bd-lightbox__nav--next"
+                  onClick={() => setLightboxIndex((prev) => (prev + 1) % imagesList.length)}
+                  aria-label="Foto berikutnya"
+                >
+                  <ChevronRight size={24} />
+                </button>
+              )}
+            </div>
+
+            <div className="bd-lightbox__counter">{lightboxIndex + 1} / {imagesList.length}</div>
+
+            <div className="bd-lightbox__thumbs">
+              {imagesList.map((src, i) => (
+                <button
+                  type="button"
+                  key={i}
+                  className={`bd-lightbox__thumb ${i === lightboxIndex ? "active" : ""}`}
+                  onClick={() => setLightboxIndex(i)}
+                >
+                  <img src={src} alt={`${business.name} ${i + 1}`} loading="lazy" />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

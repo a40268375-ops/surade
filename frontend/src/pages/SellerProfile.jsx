@@ -66,6 +66,8 @@ export default function SellerProfile() {
   // Chat states
   const [chatMessage, setChatMessage] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [chatThread, setChatThread] = useState([]);
+  const [loadingChatThread, setLoadingChatThread] = useState(false);
   
   // UI states
   const [savingToggle, setSavingToggle] = useState(false);
@@ -348,6 +350,44 @@ export default function SellerProfile() {
     }
   };
 
+  // Ambil riwayat percakapan dengan penjual ini (dua arah) dari inbox
+  // pribadi kita sendiri, lalu saring khusus untuk bisnis milik penjual ini.
+  // "/my-messages" untuk akun yang sedang login sebagai pelanggan otomatis
+  // hanya berisi pesan yang ia kirim + balasan yang ia terima.
+  const loadChatThread = async () => {
+    if (!user) return;
+    setLoadingChatThread(true);
+    try {
+      const sellerBusinessIds = businesses.map((b) => b.id);
+      const data = await api.get("/my-messages");
+      const thread = (Array.isArray(data) ? data : [])
+        .filter((m) => sellerBusinessIds.includes(m.business_id))
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      setChatThread(thread);
+
+      // Tandai balasan penjual yang belum dibaca jadi dibaca begitu dibuka.
+      thread
+        .filter((m) => !m.is_read && m.sender_role === "seller")
+        .forEach((m) => {
+          api.put(`/messages/${m.id}`).catch(() => {});
+        });
+    } catch (err) {
+      console.warn("Gagal memuat riwayat chat:", err);
+      setChatThread([]);
+    } finally {
+      setLoadingChatThread(false);
+    }
+  };
+
+  const handleOpenChatModal = () => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    setShowChatModal(true);
+    loadChatThread();
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!user) {
@@ -367,12 +407,16 @@ export default function SellerProfile() {
     
     setSendingMessage(true);
     try {
-      await api.post(`/sellers/${id}/messages`, {
+      const res = await api.post(`/sellers/${id}/messages`, {
         message: chatMessage.trim()
       });
-      
+
+      // Tampilkan langsung pesan yang baru dikirim di dalam thread chat,
+      // tanpa perlu menutup modal - supaya kelihatan seperti chat beneran.
+      if (res?.data) {
+        setChatThread((prev) => [...prev, res.data]);
+      }
       setChatMessage("");
-      setShowChatModal(false);
       showNotification("Pesan berhasil dikirim!", 'success');
       
     } catch (err) {
@@ -559,7 +603,7 @@ export default function SellerProfile() {
             
             <button 
               className="action-btn chat-btn"
-              onClick={() => setShowChatModal(true)}
+              onClick={handleOpenChatModal}
             >
               <Send size={18} />
               <span>Chat Penjual</span>
@@ -791,14 +835,15 @@ export default function SellerProfile() {
         </div>
       )}
 
-      {/* Chat Modal */}
+      {/* Chat Modal - sekarang menampilkan riwayat percakapan dua arah
+          (seperti WhatsApp), bukan cuma form kirim sekali lalu tertutup. */}
       {showChatModal && (
         <div 
           className="modal-overlay" 
           onClick={() => setShowChatModal(false)}
           onKeyDown={(e) => e.key === 'Escape' && setShowChatModal(false)}
         >
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content chat-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Chat dengan {seller.name}</h3>
               <button 
@@ -808,6 +853,26 @@ export default function SellerProfile() {
                 ×
               </button>
             </div>
+
+            <div className="chat-thread-scroll">
+              {loadingChatThread ? (
+                <div className="chat-thread-loading">Memuat percakapan...</div>
+              ) : chatThread.length > 0 ? (
+                chatThread.map((m) => {
+                  const isMine = m.sender_role !== "seller";
+                  return (
+                    <div key={m.id} className={`chat-bubble ${isMine ? "chat-bubble--mine" : "chat-bubble--theirs"}`}>
+                      <p>{m.message}</p>
+                      <span>{m.created_at ? new Date(m.created_at).toLocaleString("id-ID") : ""}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="chat-thread-empty">
+                  Belum ada percakapan. Tulis pesan pertama Anda ke {seller.name} di bawah ini.
+                </div>
+              )}
+            </div>
             
             <form onSubmit={handleSendMessage} className="chat-form">
               <div className="form-group">
@@ -815,7 +880,7 @@ export default function SellerProfile() {
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
                   placeholder="Tulis pesan Anda..."
-                  rows={4}
+                  rows={2}
                   required
                   minLength="5"
                   maxLength="1000"
@@ -831,7 +896,7 @@ export default function SellerProfile() {
                   className="btn-cancel"
                   onClick={() => setShowChatModal(false)}
                 >
-                  Batal
+                  Tutup
                 </button>
                 <button 
                   type="submit" 
