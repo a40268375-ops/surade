@@ -15,10 +15,10 @@ import {
 } from "lucide-react";
 import "./Home.css";
 import "./Profile.css";
-import "../components/Navbar.css";
 import Navbar from "../components/Navbar";
 import api from "../services/api";
 import { DEFAULT_AVATAR, DEFAULT_BANNER, getStorageUrl } from "../utils/constants";
+import { requireAuth } from "../utils/authCheck";
 
 export default function Profile() {
   const { id } = useParams();
@@ -217,7 +217,7 @@ export default function Profile() {
           <div className="profile-header__cover">
             {seller.banner ? (
               <img
-                src={getMediaUrl(seller.banner, defaultBanner)}
+                src={getMediaUrl(seller.banner, DEFAULT_BANNER)}
                 alt="Banner"
                 className="profile-header__cover-bg"
                 style={{ backgroundImage: 'none' }}
@@ -281,7 +281,7 @@ export default function Profile() {
               <div className="profile-header__actions">
                 <button
                   className={`profile-header__btn profile-header__btn--primary ${saved ? "saved" : ""}`}
-                  onClick={() => setSaved(!saved)}
+                  onClick={() => requireAuth(() => setSaved(!saved))}
                 >
                   <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
                   {saved ? "Disimpan" : "Simpan"}

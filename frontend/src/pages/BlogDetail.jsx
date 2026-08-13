@@ -2,6 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import api from "../services/api";
+import { requireAuth } from "../utils/authCheck";
 import logoImg from "../assets/logo.png";
 import {
   User,
@@ -18,6 +19,7 @@ import {
   ChevronRight,
   X,
   Loader2,
+  CheckCircle,
 } from "lucide-react";
 import "./BlogDetail.css";
 import { DEFAULT_AVATAR } from "../utils/constants";
@@ -50,7 +52,15 @@ export default function BlogDetail() {
       
       const userStr = localStorage.getItem("user");
       const user = userStr ? JSON.parse(userStr) : null;
-      if (user && data.favorites && data.favorites.some(f => f.user_id === user.id)) {
+      let localBlogIds = [];
+      try {
+        localBlogIds = JSON.parse(localStorage.getItem("saved_blog_ids") || "[]");
+      } catch (e) {}
+
+      const isFavApi = user && data.favorites && data.favorites.some(f => f.user_id === user.id);
+      const isFavLocal = localBlogIds.includes(data.id) || localBlogIds.includes(String(data.id));
+
+      if (isFavApi || isFavLocal) {
         setSaved(true);
       }
     } catch (err) {
@@ -87,25 +97,35 @@ export default function BlogDetail() {
   };
 
   const handleToggleSave = async () => {
-    const userStr = localStorage.getItem("user");
-    if (!userStr) {
-      alert("Silakan login terlebih dahulu untuk menyimpan artikel.");
-      return;
-    }
+    if (!requireAuth()) return;
     
     if (isSaving || !blog) return;
     setIsSaving(true);
+
+    const isCurrentlySaved = saved;
+    setSaved(!isCurrentlySaved);
+
+    let localBlogs = JSON.parse(localStorage.getItem("saved_blog_ids") || "[]");
+    if (isCurrentlySaved) {
+      localBlogs = localBlogs.filter(id => String(id) !== String(blog.id));
+    } else {
+      if (!localBlogs.includes(blog.id)) localBlogs.push(blog.id);
+    }
+    localStorage.setItem("saved_blog_ids", JSON.stringify(localBlogs));
+    localStorage.removeItem("cached_saved_items");
     
     try {
-      if (saved) {
+      if (isCurrentlySaved) {
         await api.delete(`/blog-favorites/${blog.id}`);
-        setSaved(false);
+        alert("Bookmark artikel berhasil dihapus.");
       } else {
         await api.post(`/blog-favorites/${blog.id}`);
-        setSaved(true);
+        alert("Artikel berhasil disimpan ke bookmark!");
       }
+      window.dispatchEvent(new Event("bookmarkChanged"));
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
+      setSaved(isCurrentlySaved);
       alert("Terjadi kesalahan saat menyimpan bookmark.");
     } finally {
       setIsSaving(false);
@@ -200,9 +220,29 @@ export default function BlogDetail() {
               <span>/</span>
               <span>{blog.title}</span>
             </div>
-            <div className="bdg-hero__category-badge">{getCategoryLabel(blog.blog_category)}</div>
+
             <h1 className="bdg-hero__title">{blog.title}</h1>
             {blog.excerpt && <p className="bdg-hero__excerpt">{blog.excerpt}</p>}
+
+            <div className="bdg-hero__meta">
+              <span className="bdg-hero__meta-item">
+                <User size={15} />
+                <span>{blog.user?.name || "Penulis"}</span>
+              </span>
+              <span className="bdg-hero__meta-item">
+                <Calendar size={15} />
+                <span>{formatDate(blog.published_at || blog.created_at)}</span>
+              </span>
+              <span className="bdg-hero__meta-item">
+                <Clock size={15} />
+                <span>{getReadTime(blog.content)}</span>
+              </span>
+            </div>
+
+            <Link to="/blog" className="bdg-hero__back">
+              <ArrowLeft size={16} />
+              <span>Kembali ke Blog</span>
+            </Link>
           </div>
         </div>
       </section>
@@ -217,20 +257,22 @@ export default function BlogDetail() {
                 <img src={getUserAvatar()} alt={blog.user?.name || "Penulis"} className="bdg-meta-bar__avatar" />
                 <div>
                   <span className="bdg-meta-bar__name">{blog.user?.name || "Penulis"}</span>
-                  <span className="bdg-meta-bar__role">Penulis</span>
+                  <span className="bdg-meta-bar__role">
+                    <CheckCircle size={12} /> Penulis Terverifikasi
+                  </span>
                 </div>
               </div>
               <div className="bdg-meta-bar__stats">
                 <span className="bdg-meta-bar__stat">
-                  <Calendar size={15} />
+                  <Calendar size={14} />
                   {formatDate(blog.published_at || blog.created_at)}
                 </span>
                 <span className="bdg-meta-bar__stat">
-                  <Clock size={15} />
+                  <Clock size={14} />
                   {getReadTime(blog.content)}
                 </span>
                 <span className="bdg-meta-bar__stat">
-                  <Eye size={15} />
+                  <Eye size={14} />
                   {(blog.views || 0).toLocaleString()} dilihat
                 </span>
               </div>
@@ -238,6 +280,8 @@ export default function BlogDetail() {
 
             {/* Article Body */}
             <article className="bdg-article">
+              <h2 className="bdg-article__main-title">{blog.title}</h2>
+              {blog.excerpt && <p className="bdg-article__excerpt">{blog.excerpt}</p>}
               <div
                 className="bdg-article__content"
                 dangerouslySetInnerHTML={{ __html: blog.content }}
@@ -306,21 +350,6 @@ export default function BlogDetail() {
 
           {/* ── SIDEBAR ── */}
           <aside className="bdg-sidebar">
-            {/* Author Card */}
-            <div className="bdg-sidebar-card">
-              <h3 className="bdg-sidebar-card__title">Penulis</h3>
-              <div className="bdg-author-card">
-                <img src={getUserAvatar()} alt={blog.user?.name || "Penulis"} className="bdg-author-card__avatar" />
-                <div className="bdg-author-card__info">
-                  <span className="bdg-author-card__name">{blog.user?.name || "Penulis"}</span>
-                  <span className="bdg-author-card__role">Kontributor Blog</span>
-                </div>
-                <p className="bdg-author-card__bio">
-                  {blog.user?.bio || "Penulis kontributor portal Info.co.id."}
-                </p>
-              </div>
-            </div>
-
             {/* Blog Info Card */}
             <div className="bdg-sidebar-card">
               <h3 className="bdg-sidebar-card__title">Informasi Blog</h3>

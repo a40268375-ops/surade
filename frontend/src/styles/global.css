@@ -10,3 +10,158 @@
 body {
   font-family: Arial, sans-serif;
 }
+
+/* Admin Form Styles */
+.admin-form-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 0.375rem;
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.admin-form-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.admin-form-select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.admin-form-group--checkbox {
+  display: flex;
+  align-items: center;
+}
+
+.admin-form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.admin-form-checkbox input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Admin Modal Delete Styles */
+.admin-modal-delete {
+  text-align: center;
+  padding: 1rem;
+}
+
+.admin-modal-delete__icon {
+  color: #f59e0b;
+  margin-bottom: 1rem;
+}
+
+.admin-modal-delete__warning {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+/* Admin Empty State */
+.admin-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.admin-empty svg {
+  margin-bottom: 1rem;
+  color: #9ca3af;
+}
+
+/* Admin Error State */
+.admin-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 0.375rem;
+  color: #dc2626;
+}
+
+.admin-btn--danger {
+  background-color: #dc2626;
+  color: white;
+}
+
+.admin-btn--danger:hover {
+  background-color: #b91c1c;
+}
+
+.admin-btn--danger:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* ── Global Spin & Navbar Animations (previously in Navbar.css) ── */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes userMenuFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sidebarSlide {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ── Loading Screen Animations ── */
+@keyframes loadingPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.92); opacity: 0.7; }
+}
+
+@keyframes loadingBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes loadingFade {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes loadingDots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+.loading-dots::after {
+  content: '';
+  animation: loadingDots 1.5s steps(4, end) infinite;
+}
+
+

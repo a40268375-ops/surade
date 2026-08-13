@@ -14,51 +14,59 @@ import {
 import "./Blog.css";
 import { DEFAULT_AVATAR } from "../utils/constants";
 
+const INITIAL_BLOG_CATEGORIES = [
+  { id: "all", label: "Semua" },
+  { id: "budaya", label: "Budaya" },
+  { id: "kuliner", label: "Kuliner" },
+  { id: "wisata", label: "Wisata" },
+  { id: "teknologi", label: "Teknologi" },
+];
+
 export default function Blog() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [blogs, setBlogs] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [blogs, setBlogs] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cached_blogs_page_data");
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [categories, setCategories] = useState(INITIAL_BLOG_CATEGORIES);
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cached_blogs_page_data");
+      return cached && JSON.parse(cached).length > 0 ? false : true;
+    } catch (e) {
+      return true;
+    }
+  });
 
   useEffect(() => {
     window.scrollTo(0, 0);
     fetchBlogs();
-    fetchCategories();
   }, []);
 
   const fetchBlogs = async () => {
-    setLoading(true);
     try {
-      const res = await api.get("/blogs?status=published");
-      const data = res.data?.data || res.data || [];
+      const res = await api.get("/blogs?status=published&all=true");
+      const raw = res.data?.data || res.data || [];
+      const data = Array.isArray(raw) ? raw : (raw?.data || []);
       setBlogs(data);
+      try {
+        sessionStorage.setItem("cached_blogs_page_data", JSON.stringify(data));
+      } catch (e) {}
     } catch (err) {
       console.error("Failed to fetch blogs:", err);
-      setBlogs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const res = await api.get("/blog-categories");
-      const data = res.data?.data || res.data || [];
-      if (Array.isArray(data)) {
-        const mappedCategories = [
-          { id: "all", label: "Semua" },
-          ...data.map(c => ({ id: c.slug, label: c.name }))
-        ];
-        setCategories(mappedCategories);
-      }
-    } catch (err) {
-      console.error("Failed to fetch blog categories:", err);
-    }
-  };
-
   const getCategoryLabel = (catId) => {
-    const cat = categories.find(c => c.id === catId);
+    if (!catId) return "Umum";
+    const cat = categories.find(c => c.id === catId.toLowerCase());
     return cat?.label || catId || "Umum";
   };
 

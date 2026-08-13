@@ -13,27 +13,44 @@ use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AdvertisementController;
+use App\Http\Controllers\Api\CouponController;
+use App\Http\Controllers\Api\ReportController;
 
-Route::post('/register', [AuthController::class, 'register']);
+use App\Http\Controllers\Api\AdPackageController;
+
+// OTP-based registration (3-step flow)
+Route::post('/register/send-otp',     [AuthController::class, 'sendOtp']);
+Route::post('/register/verify-otp',   [AuthController::class, 'verifyOtpAndRegister']);
+Route::post('/register/resend-otp',   [AuthController::class, 'resendOtp']);
+
 Route::post('/login', [AuthController::class, 'login']);
+
 Route::get('/businesses', [BusinessController::class, 'index']);
 Route::get('/businesses/{business}', [BusinessController::class, 'show']);
+Route::get('/businesses/{business}/ratings', [RatingController::class, 'index']);
 Route::get('/categories', function () {
-    return response()->json(App\Models\Category::with('children')->whereNull('parent_id')->orderBy('name')->get());
+    return response()->json(Illuminate\Support\Facades\Cache::remember('categories_public_v1', 300, function () {
+        return App\Models\Category::with('children')->whereNull('parent_id')->orderBy('name')->get();
+    }));
 });
 Route::get('/blogs', [BlogController::class, 'index']);
 Route::get('/blogs/{blog}', [BlogController::class, 'show']);
 Route::get('/events', [BlogController::class, 'events']);
 Route::get('/advertisements', [AdvertisementController::class, 'index']);
+Route::get('/ad-packages', [AdPackageController::class, 'publicIndex']);
 Route::get('/users', [AdminController::class, 'users']);
 Route::get('/users/{id}', [ProfileController::class, 'showUser']);
 Route::get('/businesses/{business}/products', [ProductController::class, 'getByBusiness']);
+Route::get('/plans', [AdminController::class, 'publicPlans']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'destroy']);
     Route::get('/user', function (Request $request) { return $request->user(); });
     Route::put('/users/profile', [ProfileController::class, 'update']);
     Route::get('/user/profile', [ProfileController::class, 'show']);
+    Route::get('/user/dashboard-stats', [ProfileController::class, 'dashboardStats']);
+    Route::get('/user/analytics-stats', [ProfileController::class, 'analyticsStats']);
+    Route::post('/reports', [ReportController::class, 'store']);
     Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
@@ -60,7 +77,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/my-blog-favorites', [FavoriteController::class, 'blogFavorites']);
         Route::post('/blog-favorites/{blog}', [FavoriteController::class, 'storeBlog']);
         Route::delete('/blog-favorites/{blog}', [FavoriteController::class, 'destroyBlog']);
-        Route::get('/businesses/{business}/ratings', [RatingController::class, 'index']);
         Route::post('/businesses/{business}/ratings', [RatingController::class, 'store']);
         Route::get('/my-ratings', [RatingController::class, 'myRatings']);
         Route::put('/ratings/{rating}', [RatingController::class, 'update']);
@@ -77,12 +93,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/advertisements', [AdvertisementController::class, 'store']);
         Route::put('/advertisements/{id}', [AdvertisementController::class, 'update']);
         Route::delete('/advertisements/{id}', [AdvertisementController::class, 'destroy']);
-        Route::put('/advertisements/{id}/pay', [AdvertisementController::class, 'pay']);
+        Route::match(['put', 'post'], '/advertisements/{id}/pay', [AdvertisementController::class, 'pay']);
+        Route::post('/coupons/validate', [CouponController::class, 'validateCoupon']);
+        Route::post('/subscriptions', [BusinessController::class, 'subscribeBusiness']);
     });
 
     Route::middleware(\App\Http\Middleware\AdminMiddleware::class)->prefix('admin')->group(function () {
         Route::get('/stats', [AdminController::class, 'stats']);
         Route::get('/users', [AdminController::class, 'users']);
+        Route::post('/users', [AdminController::class, 'createUser']);
         Route::put('/users/{user}', [AdminController::class, 'updateUser']);
         Route::put('/users/{user}/toggle-status', [AdminController::class, 'toggleUserStatus']);
         Route::delete('/users/{user}', [AdminController::class, 'destroyUser']);
@@ -91,9 +110,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/businesses/{business}/suspend', [AdminController::class, 'suspendBusiness']);
         Route::put('/businesses/{business}', [AdminController::class, 'updateBusiness']);
         Route::delete('/businesses/{business}', [AdminController::class, 'destroyBusiness']);
-        Route::get('/categories', function () { return response()->json(App\Models\Category::all()); });
+        Route::get('/categories', [AdminController::class, 'allCategories']);
         Route::post('/categories', [AdminController::class, 'storeCategory']);
         Route::put('/categories/{category}', [AdminController::class, 'updateCategory']);
+        Route::put('/categories/{category}/toggle-status', [AdminController::class, 'toggleCategoryStatus']);
         Route::delete('/categories/{category}', [AdminController::class, 'destroyCategory']);
         Route::get('/blogs', [AdminController::class, 'allBlogs']);
         Route::put('/blogs/{blog}/approve', [AdminController::class, 'approveBlog']);
@@ -103,20 +123,48 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/reviews/{rating}', [AdminController::class, 'destroyReview']);
         Route::get('/subscriptions', [AdminController::class, 'allSubscriptions']);
         Route::put('/subscriptions/{subscription}', [AdminController::class, 'updateSubscription']);
+        Route::get('/plans', [AdminController::class, 'allPlans']);
+        Route::post('/plans', [AdminController::class, 'storePlan']);
+        Route::put('/plans/{plan}', [AdminController::class, 'updatePlan']);
+        Route::delete('/plans/{plan}', [AdminController::class, 'destroyPlan']);
+        Route::put('/plans/{plan}/toggle-status', [AdminController::class, 'togglePlanStatus']);
         Route::get('/payments', [AdminController::class, 'allPayments']);
         Route::put('/payments/{payment}/approve', [AdminController::class, 'approvePayment']);
         Route::put('/payments/{payment}/reject', [AdminController::class, 'rejectPayment']);
+        Route::get('/coupons', [CouponController::class, 'index']);
+        Route::post('/coupons', [CouponController::class, 'store']);
+        Route::get('/coupons/{coupon}', [CouponController::class, 'show']);
+        Route::put('/coupons/{coupon}', [CouponController::class, 'update']);
+        Route::delete('/coupons/{coupon}', [CouponController::class, 'destroy']);
+        Route::put('/coupons/{coupon}/toggle-status', [CouponController::class, 'toggleStatus']);
+        Route::patch('/coupons/{coupon}/toggle-status', [CouponController::class, 'toggleStatus']);
         Route::get('/settings', [AdminController::class, 'allSettings']);
         Route::post('/settings', [AdminController::class, 'createSetting']);
         Route::put('/settings/{setting}', [AdminController::class, 'updateSetting']);
         Route::delete('/settings/{setting}', [AdminController::class, 'destroySetting']);
         Route::put('/profile', [AdminController::class, 'updateProfile']);
         Route::put('/password', [AdminController::class, 'updatePassword']);
-        Route::get('/reports', [AdminController::class, 'reports']);
+        Route::get('/reports', [ReportController::class, 'index']);
+        Route::get('/reports/{report}', [ReportController::class, 'show']);
+        Route::put('/reports/{report}/status', [ReportController::class, 'updateStatus']);
+        Route::delete('/reports/{report}/content', [ReportController::class, 'destroyContent']);
+        Route::get('/analytics-reports', [AdminController::class, 'reports']);
         Route::get('/notifications', [AdminController::class, 'notifications']);
+        Route::patch('/notifications/{id}/read', [AdminController::class, 'markNotificationRead']);
+        Route::put('/notifications/{id}/read', [AdminController::class, 'markNotificationRead']);
+        Route::patch('/notifications/read-all', [AdminController::class, 'markAllNotificationsRead']);
+        Route::put('/notifications/read-all', [AdminController::class, 'markAllNotificationsRead']);
         Route::get('/advertisements', [AdvertisementController::class, 'adminIndex']);
+        Route::put('/advertisements/{id}', [AdvertisementController::class, 'adminUpdate']);
+        Route::delete('/advertisements/{id}', [AdvertisementController::class, 'adminDestroy']);
         Route::put('/advertisements/{id}/approve', [AdvertisementController::class, 'approve']);
         Route::put('/advertisements/{id}/reject', [AdvertisementController::class, 'reject']);
         Route::put('/advertisements/{id}/expire', [AdvertisementController::class, 'expire']);
+        Route::put('/advertisements/{id}/toggle-status', [AdvertisementController::class, 'toggleStatus']);
+        Route::get('/ad-packages', [AdPackageController::class, 'index']);
+        Route::post('/ad-packages', [AdPackageController::class, 'store']);
+        Route::put('/ad-packages/{id}', [AdPackageController::class, 'update']);
+        Route::delete('/ad-packages/{id}', [AdPackageController::class, 'destroy']);
+        Route::put('/ad-packages/{id}/toggle-status', [AdPackageController::class, 'toggleStatus']);
     });
 });

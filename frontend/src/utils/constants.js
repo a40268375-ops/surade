@@ -11,7 +11,8 @@ export const DEFAULT_BANNER = "";
  */
 export const getStorageUrl = (path) => {
   if (!path) return "";
-  if (path.startsWith("http")) return path;
+  if (path.startsWith("http") || path.startsWith("blob:") || path.startsWith("data:")) return path;
   const baseUrl = (import.meta.env.VITE_API_URL || "").replace(/\/api$/i, "");
-  return `${baseUrl}/storage/${path}`;
+  const cleanPath = path.replace(/^\/?storage\//, "");
+  return `${baseUrl}/storage/${cleanPath}`;
 };

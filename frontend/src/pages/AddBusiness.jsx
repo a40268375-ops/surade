@@ -6,15 +6,49 @@ import api from "../services/api";
 import {
   Store, MapPin, ImageIcon, Video, Tag, Phone, Mail,
   Globe, Camera, ChevronRight, ChevronLeft,
-  X, Plus, Upload, Check, AlertCircle, Loader2, Search, Trash2
+  X, Plus, Upload, Check, AlertCircle, Loader2, Search, Trash2,
+  Crown, CreditCard, FileText, Sparkles, Copy, CheckCircle2, ShieldCheck, Clock
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
+
+function MapResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+
+    const t1 = setTimeout(() => { map.invalidateSize(); }, 100);
+    const t2 = setTimeout(() => { map.invalidateSize(); }, 400);
+
+    const mapDiv = map.getContainer();
+    const parent = mapDiv?.parentElement;
+    if (!parent) return () => { clearTimeout(t1); clearTimeout(t2); };
+
+    let rafId = null;
+    const observer = new ResizeObserver(() => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (map && map._container) {
+          map.invalidateSize();
+        }
+      });
+    });
+
+    observer.observe(parent);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, [map]);
+  return null;
+}
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
-import "./AddBusiness.css";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -23,16 +57,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-const STEPS = [
-  { id: 1, label: "Info Dasar", icon: <Store size={18} /> },
-  { id: 2, label: "Banner", icon: <ImageIcon size={18} /> },
-  { id: 3, label: "Lokasi", icon: <MapPin size={18} /> },
-  { id: 4, label: "Galeri", icon: <Video size={18} /> },
-];
-
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 
-/** Generate time options for dropdown: 00:00, 00:30, 01:00, ... 23:30 */
 const TIME_OPTIONS = [];
 for (let h = 0; h < 24; h++) {
   for (let m = 0; m < 60; m += 30) {
@@ -40,7 +66,6 @@ for (let h = 0; h < 24; h++) {
   }
 }
 
-/** Helper: parse "HH:MM" to total minutes */
 function parseTimeToMinutes(str) {
   if (!str || typeof str !== 'string') return null;
   const parts = str.split(':');
@@ -56,18 +81,62 @@ function MapClickHandler({ onMapClick }) {
   return null;
 }
 
+const inputCls = "w-full px-4 py-3 border-[1.5px] border-[#e2e8f0] rounded-xl text-[0.95rem] text-[#0f172a] bg-[#fafafa] outline-none transition-all duration-200 h-12 leading-normal focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_4px_rgba(0,117,112,0.1)]";
+const labelCls = "text-[0.85rem] font-semibold text-[#374151] flex items-center gap-1.5";
+const spinCls = "animate-[spin360_1s_linear_infinite]";
+
+const PAYMENT_METHODS = [
+  {
+    category: "E-Wallet",
+    items: [
+      { id: "DANA", name: "DANA", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#008cff] text-white" },
+      { id: "GoPay", name: "GoPay", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#00a5cf] text-white" },
+      { id: "OVO", name: "OVO", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#4c2a86] text-white" },
+    ]
+  },
+  {
+    category: "Virtual Account / Transfer Bank",
+    items: [
+      { id: "BCA VA", name: "BCA Virtual Account", accountName: "PT Info Media", accountNumber: "8830-1234-5678", badgeColor: "bg-[#00529c] text-white" },
+      { id: "Mandiri VA", name: "Mandiri Virtual Account", accountName: "PT Info Media", accountNumber: "137-00-1234-5678", badgeColor: "bg-[#003d79] text-white" },
+      { id: "BRI VA", name: "BRI Virtual Account", accountName: "PT Info Media", accountNumber: "0341-01-000123-56-7", badgeColor: "bg-[#00529c] text-white" },
+    ]
+  }
+];
+
 export default function AddBusiness() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
+
   const [step, setStep] = useState(1);
   const [categories, setCategories] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [createdId, setCreatedId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [isPendingVerification, setIsPendingVerification] = useState(false);
+
+  // ── Package Selection State ──
+  const [selectedPackage, setSelectedPackage] = useState(null); // null, or { isFree: true, id: 'free', ... } or plan object
+
+  // ── Coupon State (Optional) ──
+  const [couponInput, setCouponInput] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState("");
+  const [couponSuccessMsg, setCouponSuccessMsg] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+
+  // ── Payment Method & Proof State ──
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("DANA");
+  const [copiedAccount, setCopiedAccount] = useState(false);
+  const [proofFile, setProofFile] = useState(null);
+  const [proofPreview, setProofPreview] = useState(null);
+  const proofInputRef = useRef();
 
   // Category selection state
   const [selectedMainCategory, setSelectedMainCategory] = useState(null);
@@ -95,7 +164,7 @@ export default function AddBusiness() {
   const [logoPreview, setLogoPreview] = useState(null);
   const logoInputRef = useRef();
 
-  // ── Opening Days State ──
+  // Opening Days State
   const [openingDays, setOpeningDays] = useState(
     DAYS.map((day) => ({ day, open: "08:00", close: "17:00", selected: true }))
   );
@@ -105,10 +174,8 @@ export default function AddBusiness() {
       prev.map((d, i) => {
         if (i === index) {
           if (!d.selected) {
-            // When enabling, reset to default times
             return { ...d, selected: true, open: "09:00", close: "17:00" };
           } else {
-            // When disabling, clear times
             return { ...d, selected: false, open: "", close: "" };
           }
         }
@@ -122,12 +189,10 @@ export default function AddBusiness() {
       prev.map((d, i) => {
         if (i === index) {
           const updated = { ...d, [field]: value };
-          // Validate: close time should not be less than open time
           if (field === 'close' && updated.open && value) {
             const openMinutes = parseTimeToMinutes(updated.open);
             const closeMinutes = parseTimeToMinutes(value);
             if (closeMinutes < openMinutes) {
-              // Don't update if invalid
               return d;
             }
           }
@@ -138,12 +203,6 @@ export default function AddBusiness() {
     );
   };
 
-  const parseTimeToMinutes = (timeStr) => {
-    if (!timeStr) return 0;
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
-
   const getOpeningDaysSummary = () => {
     const active = openingDays.filter((d) => d.selected);
     if (active.length === 0) return "Tidak ada";
@@ -151,6 +210,7 @@ export default function AddBusiness() {
     return active.map((d) => d.day).join(", ");
   };
 
+  // Fetch Categories
   useEffect(() => {
     setCategoriesLoading(true);
     fetch(`${import.meta.env.VITE_API_URL}/categories`)
@@ -158,6 +218,19 @@ export default function AddBusiness() {
       .then((d) => { if (Array.isArray(d)) setCategories(d); })
       .catch(console.error)
       .finally(() => setCategoriesLoading(false));
+  }, []);
+
+  // Fetch Premium Plans dynamically from API
+  useEffect(() => {
+    setPlansLoading(true);
+    fetch(`${import.meta.env.VITE_API_URL}/plans`)
+      .then((r) => r.json())
+      .then((d) => {
+        const list = Array.isArray(d) ? d : (d?.data || []);
+        setPlans(list);
+      })
+      .catch(console.error)
+      .finally(() => setPlansLoading(false));
   }, []);
 
   // Update form.category_id when subcategory changes
@@ -205,13 +278,9 @@ export default function AddBusiness() {
               }));
             }
 
-            // Load category selection for editing
             if (data.category_id && categories.length > 0) {
-              // Find subcategory
               let subCategory = null;
               let mainCategory = null;
-
-              // Search in children of all main categories
               for (const main of categories) {
                 if (main.children && Array.isArray(main.children)) {
                   const found = main.children.find((child) => child.id === data.category_id);
@@ -222,12 +291,9 @@ export default function AddBusiness() {
                   }
                 }
               }
-
-              // Also check if category_id is a main category (backward compatibility)
               if (!subCategory) {
                 mainCategory = categories.find((c) => c.id === data.category_id);
               }
-
               if (subCategory) {
                 setSelectedSubCategory(subCategory);
                 setSelectedMainCategory(mainCategory);
@@ -235,6 +301,13 @@ export default function AddBusiness() {
                 setSelectedMainCategory(mainCategory);
                 setSelectedSubCategory(null);
               }
+            }
+
+            // Set default package if editing
+            if (data.is_premium) {
+              setSelectedPackage({ id: 1, name: "Premium", price: 50000, isFree: false });
+            } else {
+              setSelectedPackage({ id: "free", name: "Free", price: 0, isFree: true });
             }
           }
         })
@@ -276,7 +349,6 @@ export default function AddBusiness() {
     });
   };
 
-  // ── Logo ──
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -289,6 +361,21 @@ export default function AddBusiness() {
     setLogo(null);
     if (logoPreview) URL.revokeObjectURL(logoPreview);
     setLogoPreview(null);
+  };
+
+  const handleProofChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProofFile(file);
+      setProofPreview(URL.createObjectURL(file));
+      setError("");
+    }
+  };
+
+  const removeProof = () => {
+    setProofFile(null);
+    if (proofPreview) URL.revokeObjectURL(proofPreview);
+    setProofPreview(null);
   };
 
   const geocodeAddress = async () => {
@@ -334,8 +421,66 @@ export default function AddBusiness() {
     });
   };
 
-  const validateStep = () => {
+  // Coupon application logic
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) {
+      setCouponError("Masukkan kode kupon terlebih dahulu.");
+      return;
+    }
+    setCouponLoading(true);
+    setCouponError("");
+    setCouponSuccessMsg("");
+    try {
+      const res = await api.post("/coupons/validate", {
+        code: couponInput.trim(),
+        product_type: "premium",
+        amount: selectedPackage?.price || 0,
+      });
+      if (res.data?.valid) {
+        setAppliedCoupon(res.data);
+        setCouponSuccessMsg(res.data.message || "Kupon berhasil diterapkan!");
+      } else {
+        setAppliedCoupon(null);
+        setCouponError(res.data?.message || "Kode kupon tidak valid atau sudah tidak berlaku.");
+      }
+    } catch (e) {
+      setAppliedCoupon(null);
+      const msg = e?.response?.data?.message || "Kode kupon tidak valid atau sudah tidak berlaku.";
+      setCouponError(msg);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponSuccessMsg("");
+    setCouponError("");
+  };
+
+  // Dynamic Step Indicator configuration based on Free vs Premium
+  const isFreeSelection = selectedPackage?.isFree;
+  
+  const currentSteps = isFreeSelection
+    ? [
+        { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
+        { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
+        { id: 3, label: "Review & Daftar", icon: <Check size={18} /> },
+      ]
+    : [
+        { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
+        { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
+        { id: 3, label: "Ringkasan", icon: <FileText size={18} /> },
+        { id: 4, label: "Pembayaran", icon: <CreditCard size={18} /> },
+        { id: 5, label: "Upload Bukti", icon: <Upload size={18} /> },
+      ];
+
+  const validateCurrentStep = () => {
     if (step === 1) {
+      if (!selectedPackage) return "Silakan pilih salah satu paket terlebih dahulu.";
+    }
+    if (step === 2) {
       if (!form.name.trim()) return "Nama usaha wajib diisi.";
       if (!selectedMainCategory) {
         setCategoryError("Pilih kategori utama.");
@@ -350,18 +495,24 @@ export default function AddBusiness() {
       if (!form.province.trim()) return "Provinsi wajib diisi.";
       if (!form.description.trim()) return "Deskripsi wajib diisi.";
       if (!form.phone.trim()) return "Nomor telepon wajib diisi.";
-    }
-    if (step === 3) {
       if (!address.trim()) return "Alamat wajib diisi.";
+    }
+    if (step === 5 && !isFreeSelection) {
+      if (!proofFile) return "Wajib mengunggah bukti pembayaran sebelum mengirim.";
     }
     return null;
   };
 
   const nextStep = () => {
-    const err = validateStep();
-    if (err) { setError(err); setTimeout(() => setError(""), 3500); return; }
+    const err = validateCurrentStep();
+    if (err) {
+      setError(err);
+      setTimeout(() => setError(""), 3500);
+      return;
+    }
     setError("");
-    setStep((s) => Math.min(s + 1, 4));
+    const maxSteps = isFreeSelection ? 3 : 5;
+    setStep((s) => Math.min(s + 1, maxSteps));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -371,11 +522,11 @@ export default function AddBusiness() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSubmit = async () => {
+  // Submit Free Business
+  const handleFreeSubmit = async () => {
     setLoading(true);
     setError("");
     try {
-      // Build opening_days array from state
       const selectedDays = openingDays
         .filter((d) => d.selected)
         .map((d) => ({ day: d.day, open: d.open, close: d.close }));
@@ -391,17 +542,14 @@ export default function AddBusiness() {
 
       let bizId;
       if (isEditing) {
-        // Update existing business
-        const bizRes = await api.put(`/businesses/${id}`, payload);
+        await api.put(`/businesses/${id}`, payload);
         bizId = id;
       } else {
-        // Create new business
         const bizRes = await api.post("/businesses", payload);
         bizId = bizRes.data?.data?.id;
         if (!bizId) throw new Error("ID bisnis tidak ditemukan.");
       }
 
-      // Upload logo if exists
       if (logo) {
         const fd = new FormData();
         fd.append("logo", logo);
@@ -418,12 +566,92 @@ export default function AddBusiness() {
         gallery.forEach(({ file }) => fd.append("files[]", file));
         await api.post(`/businesses/${bizId}/gallery`, fd);
       }
+
       setCreatedId(bizId);
+      setIsPendingVerification(false);
       setSuccess(true);
     } catch (e) {
       const msg = e?.response?.data?.message ||
         (e?.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(", ") : e.message) ||
-        "Terjadi kesalahan.";
+        "Terjadi kesalahan saat mendaftarkan usaha.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Submit Premium Business + Subscription + Proof
+  const handlePremiumSubmit = async () => {
+    const err = validateCurrentStep();
+    if (err) {
+      setError(err);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const selectedDays = openingDays
+        .filter((d) => d.selected)
+        .map((d) => ({ day: d.day, open: d.open, close: d.close }));
+
+      const payload = {
+        ...form,
+        address,
+        tags,
+        opening_days: selectedDays,
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
+      };
+
+      let bizId;
+      if (isEditing) {
+        await api.put(`/businesses/${id}`, payload);
+        bizId = id;
+      } else {
+        const bizRes = await api.post("/businesses", payload);
+        bizId = bizRes.data?.data?.id;
+        if (!bizId) throw new Error("ID bisnis tidak ditemukan.");
+      }
+
+      if (logo) {
+        const fd = new FormData();
+        fd.append("logo", logo);
+        await api.post(`/businesses/${bizId}/logo`, fd);
+      }
+
+      for (const banner of banners) {
+        const fd = new FormData();
+        fd.append("banner", banner.file);
+        await api.post(`/businesses/${bizId}/banner`, fd);
+      }
+      if (gallery.length > 0) {
+        const fd = new FormData();
+        gallery.forEach(({ file }) => fd.append("files[]", file));
+        await api.post(`/businesses/${bizId}/gallery`, fd);
+      }
+
+      // Submit Subscription + Payment Proof
+      const subFd = new FormData();
+      subFd.append("business_id", bizId);
+      subFd.append("plan_id", selectedPackage.id);
+      if (appliedCoupon?.code) {
+        subFd.append("coupon_code", appliedCoupon.code);
+      }
+      subFd.append("payment_method", selectedPaymentMethod);
+      if (proofFile) {
+        subFd.append("proof", proofFile);
+      }
+
+      await api.post("/subscriptions", subFd);
+
+      setCreatedId(bizId);
+      setIsPendingVerification(true);
+      setSuccess(true);
+    } catch (e) {
+      const msg = e?.response?.data?.message ||
+        (e?.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(", ") : e.message) ||
+        "Terjadi kesalahan saat mendaftarkan usaha dan mengirim pembayaran.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -452,114 +680,469 @@ export default function AddBusiness() {
     onDrop: (e) => { e.preventDefault(); onAdd(e.dataTransfer.files); },
   });
 
+  const getAccountDetail = () => {
+    for (const cat of PAYMENT_METHODS) {
+      const found = cat.items.find((item) => item.id === selectedPaymentMethod);
+      if (found) return found;
+    }
+    return PAYMENT_METHODS[0].items[0];
+  };
+
+  const currentAccount = getAccountDetail();
+
   // ── SUCCESS SCREEN ──
   if (success) {
     return (
-      <div className="add-biz-page">
+      <div className="min-h-screen bg-[#f0f4f8] font-['Poppins',sans-serif]">
         <Navbar />
-        <div className="add-biz-success">
-          <div className="add-biz-success__icon"><Check size={48} /></div>
-          <h1>{isEditing ? "Usaha Berhasil Diperbarui!" : "Usaha Berhasil Didaftarkan!"}</h1>
-          <p>{isEditing ? "Perubahan pada usaha kamu telah disimpan." : "Usaha kamu sedang dalam proses review oleh tim kami."}</p>
-          <div className="add-biz-success__actions">
-            <Link to={"/business/" + createdId} className="btn-primary">Lihat Halaman Usaha</Link>
-            <Link to="/admin-user" className="btn-outline">Ke Dashboard Admin</Link>
-            <Link to="/" className="btn-outline">Kembali ke Beranda</Link>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] text-center px-6 py-[60px] max-w-[560px] mx-auto">
+          {isPendingVerification ? (
+            <>
+              <div className="w-[90px] h-[90px] rounded-full bg-gradient-to-br from-[#d97706] to-[#f59e0b] text-white flex items-center justify-center mb-7 shadow-[0_8px_32px_rgba(217,119,6,0.3)] animate-[popIn_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+                <Clock size={48} />
+              </div>
+              <h1 className="text-[1.8rem] font-extrabold text-[#0f172a] mb-3.5">
+                Pendaftaran &amp; Pembayaran Berhasil Dikirim!
+              </h1>
+              <p className="text-base text-[#64748b] leading-[1.7] mb-8">
+                Bukti pembayaran paket Premium kamu untuk <strong className="text-[#0f172a]">{form.name}</strong> sedang dalam proses verifikasi oleh Admin. Status Premium akan otomatis aktif setelah pembayaran disetujui.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-8 text-left text-[0.88rem] text-amber-900 w-full flex items-start gap-3">
+                <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block mb-1">Status Langganan: Pending Verifikasi</span>
+                  Kamu tetap bisa mengakses dashboard usaha kamu. Fitur Premium akan terbuka secara penuh setelah admin menyelesaikan verifikasi.
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-[90px] h-[90px] rounded-full bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white flex items-center justify-center mb-7 shadow-[0_8px_32px_rgba(22,163,74,0.3)] animate-[popIn_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+                <Check size={48} />
+              </div>
+              <h1 className="text-[1.8rem] font-extrabold text-[#0f172a] mb-3.5">
+                {isEditing ? "Usaha Berhasil Diperbarui!" : "Usaha Berhasil Didaftarkan!"}
+              </h1>
+              <p className="text-base text-[#64748b] leading-[1.7] mb-9">
+                {isEditing ? "Perubahan pada usaha kamu telah disimpan." : "Usaha kamu telah berhasil terdaftar dengan paket Free."}
+              </p>
+            </>
+          )}
+
+          <div className="flex gap-3.5 flex-wrap justify-center w-full">
+            <Link
+              to={"/business/" + createdId}
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-gradient-to-br from-[#007570] to-[#009990] text-white rounded-[14px] text-[0.95rem] font-semibold no-underline border-0 cursor-pointer transition-all duration-[0.25s] shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)] flex-1 min-w-[200px]"
+            >
+              Lihat Halaman Usaha
+            </Link>
+            <Link
+              to="/admin-user"
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white text-[#374151] rounded-[14px] text-[0.95rem] font-semibold no-underline border-[1.5px] border-[#e2e8f0] cursor-pointer transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8] flex-1 min-w-[200px]"
+            >
+              Ke Dashboard Admin
+            </Link>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── MAIN FORM ──
   return (
-    <div className="add-biz-page">
+    <div className="min-h-screen bg-[#f0f4f8] font-['Poppins',sans-serif]">
       <Navbar />
 
       {/* HERO */}
-      <div className="add-biz-hero">
-        <div className="add-biz-hero__inner">
-          <h1 className="add-biz-hero__title">{isEditing ? "Edit Usaha Kamu" : "Daftarkan Usaha Kamu"}</h1>
-          <p className="add-biz-hero__sub">{isEditing ? "Perbarui informasi usaha kamu" : "Jangkau lebih banyak pelanggan di seluruh Indonesia"}</p>
+      <div className="bg-gradient-to-br from-[#0a1428] via-[#004f4c] to-[#007570] pt-[110px] pb-14 px-6 text-center relative overflow-hidden">
+        <div className="absolute inset-0 [background-image:radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px]" />
+        <div className="relative z-[1]">
+          <h1 className="text-[clamp(1.8rem,4vw,2.8rem)] font-extrabold text-white tracking-[-0.03em] mb-2.5">
+            {isEditing ? "Edit Usaha Kamu" : "Pendaftaran Usaha Baru"}
+          </h1>
+          <p className="text-[1.05rem] text-white/75">
+            {isEditing ? "Perbarui informasi usaha kamu" : "Pilih paket dan kembangkan usaha kamu ke seluruh Indonesia"}
+          </p>
         </div>
       </div>
 
-      {/* BODY */}
-      <div className="add-biz-body">
+      {/* BODY CONTAINER */}
+      <div className="max-w-[920px] mx-auto px-6 pt-10 pb-20">
+
         {/* STEP INDICATOR */}
-        <div className="add-biz-steps">
-          {STEPS.map((s, i) => (
-            <div key={s.id} className="add-biz-steps__item">
-              <div className={"add-biz-step " + (step === s.id ? "active" : "") + " " + (step > s.id ? "done" : "")}>
-                <div className="add-biz-step__circle">
+        <div className="flex items-center justify-center mb-9 flex-wrap gap-y-4">
+          {currentSteps.map((s, i) => (
+            <div key={s.id} className="flex items-center">
+              <div className="flex flex-col items-center gap-2 cursor-default">
+                <div className={`w-[44px] h-[44px] rounded-full flex items-center justify-center border-2 transition-all duration-300
+                  ${step === s.id
+                    ? "bg-[#007570] border-[#007570] text-white shadow-[0_0_0_6px_rgba(0,117,112,0.15)]"
+                    : step > s.id
+                    ? "bg-[#16a34a] border-[#16a34a] text-white"
+                    : "bg-[#e2e8f0] border-[#e2e8f0] text-[#94a3b8]"
+                  }`}
+                >
                   {step > s.id ? <Check size={16} /> : s.icon}
                 </div>
-                <span className="add-biz-step__label">{s.label}</span>
+                <span className={`text-[0.78rem] font-semibold transition-colors duration-300 whitespace-nowrap
+                  ${step === s.id ? "text-[#007570]" : step > s.id ? "text-[#16a34a]" : "text-[#94a3b8]"}`}
+                >
+                  {s.label}
+                </span>
               </div>
-              {i < STEPS.length - 1 && <div className={"add-biz-steps__line " + (step > s.id ? "done" : "")} />}
+              {i < currentSteps.length - 1 && (
+                <div className={`w-10 sm:w-14 h-0.5 mx-1 mb-6 transition-colors duration-300
+                  ${step > s.id ? "bg-[#16a34a]" : "bg-[#e2e8f0]"}`}
+                />
+              )}
             </div>
           ))}
         </div>
 
         {/* ERROR MESSAGE */}
         {error && (
-          <div className="add-biz-error">
-            <AlertCircle size={18} />
+          <div className="flex items-center gap-2.5 bg-[#fef2f2] border border-[#fecaca] rounded-xl px-[18px] py-3.5 text-[#dc2626] text-[0.9rem] mb-6 animate-[slideDown_0.2s_ease]">
+            <AlertCircle size={18} className="shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* ── STEP 1: INFO DASAR ── */}
+        {/* ── STEP 1: PILIH PAKET ── */}
         {step === 1 && (
-          <div className="add-biz-card">
-            <div className="add-biz-card__header">
-              <Store size={24} className="add-biz-card__icon" />
+          <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,0.07)] p-6 sm:p-9 mb-6 border border-[#e2e8f0] animate-[fadeCard_0.25s_ease]">
+            <div className="flex items-start gap-4 mb-8 pb-6 border-b border-[#f1f5f9]">
+              <Crown size={28} className="text-[#007570] shrink-0 mt-1" />
               <div>
-                <h2>Informasi Dasar</h2>
-                <p>Isi data utama tentang usaha kamu</p>
+                <h2 className="text-[1.35rem] font-bold text-[#0f172a] mb-1">Pilihan Paket</h2>
+                <p className="text-[0.92rem] text-[#64748b]">Pilih paket yang sesuai dengan kebutuhan usaha kamu.</p>
               </div>
             </div>
-            <div className="add-biz-form">
-              <div className="form-row">
-                <div className="form-group form-group--full">
-                  <label>Nama Usaha <span>*</span></label>
-                  <input name="name" type="text" placeholder="Warung Makan Sederhana" value={form.name} onChange={handleFormChange} className="form-input" />
+
+            {plansLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 text-[#94a3b8]">
+                <Loader2 size={36} className={spinCls} />
+                <span className="text-sm font-medium mt-3">Memuat pilihan paket...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ── CARD FREE ── */}
+                <div
+                  onClick={() => setSelectedPackage({ id: 'free', name: 'Free', price: 0, isFree: true })}
+                  className={`relative rounded-2xl p-6 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                    selectedPackage?.isFree
+                      ? "bg-[#f0fffe] border-[#007570] shadow-[0_8px_24px_rgba(0,117,112,0.15)] -translate-y-1"
+                      : "bg-white border-[#e2e8f0] hover:border-[#007570]/50 hover:shadow-md"
+                  }`}
+                >
+                  {selectedPackage?.isFree && (
+                    <div className="absolute top-4 right-4 bg-[#007570] text-white p-1 rounded-full">
+                      <Check size={16} />
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="inline-block px-3 py-1 bg-slate-100 text-slate-700 font-bold text-[0.75rem] rounded-full mb-3 uppercase tracking-wider">
+                      GRATIS
+                    </div>
+                    <h3 className="text-xl font-extrabold text-[#0f172a] mb-1">FREE</h3>
+                    <div className="flex items-baseline gap-1 my-3">
+                      <span className="text-2xl font-black text-[#0f172a]">Rp0</span>
+                    </div>
+                    <p className="text-[0.88rem] text-[#64748b] mb-6 leading-relaxed">
+                      Untuk memulai dan mengenalkan usaha kamu.
+                    </p>
+
+                    <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[0.88rem]">
+                      <div className="flex items-center gap-2.5 text-slate-700 font-medium">
+                        <Check size={16} className="text-emerald-600 shrink-0" />
+                        <span>Profil usaha</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-slate-700 font-medium">
+                        <Check size={16} className="text-emerald-600 shrink-0" />
+                        <span>Informasi dasar usaha</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-slate-700 font-medium">
+                        <Check size={16} className="text-emerald-600 shrink-0" />
+                        <span>Alamat manual</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-slate-700 font-medium">
+                        <Check size={16} className="text-emerald-600 shrink-0" />
+                        <span>Fitur dasar</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
+                        <X size={16} className="text-slate-300 shrink-0" />
+                        <span>Video profil</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
+                        <X size={16} className="text-slate-300 shrink-0" />
+                        <span>Map / lokasi interaktif</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
+                        <X size={16} className="text-slate-300 shrink-0" />
+                        <span>Produk katalog</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
+                        <X size={16} className="text-slate-300 shrink-0" />
+                        <span>Fitur Chat</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPackage({ id: 'free', name: 'Free', price: 0, isFree: true });
+                      setStep(2);
+                    }}
+                    className={`mt-8 w-full py-3.5 px-4 rounded-xl text-[0.92rem] font-bold transition-all duration-200 border-0 cursor-pointer ${
+                      selectedPackage?.isFree
+                        ? "bg-[#007570] text-white shadow-lg shadow-[#007570]/30"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    Gunakan Paket Free
+                  </button>
+                </div>
+
+                {/* ── CARD PREMIUM (Dinamis dari API) ── */}
+                {plans.length === 0 ? (
+                  <div
+                    onClick={() => setSelectedPackage({ id: 1, name: "Premium Business", price: 50000, duration_value: 1, duration_unit: "month", formatted_duration: "1 Bulan", isFree: false })}
+                    className={`relative rounded-2xl p-6 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                      selectedPackage && !selectedPackage.isFree
+                        ? "bg-[#f0fffe] border-[#007570] shadow-[0_8px_24px_rgba(0,117,112,0.15)] -translate-y-1"
+                        : "bg-white border-[#e2e8f0] hover:border-[#007570]/50 hover:shadow-md"
+                    }`}
+                  >
+                    {selectedPackage && !selectedPackage.isFree && (
+                      <div className="absolute top-4 right-4 bg-[#007570] text-white p-1 rounded-full">
+                        <Check size={16} />
+                      </div>
+                    )}
+                    <div>
+                      <div className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 font-bold text-[0.75rem] rounded-full mb-3 uppercase tracking-wider">
+                        <Sparkles size={12} /> RECOMMENDED
+                      </div>
+                      <h3 className="text-xl font-extrabold text-[#0f172a] mb-1">Premium Business</h3>
+                      <div className="flex items-baseline gap-1.5 my-3">
+                        <span className="text-2xl font-black text-[#007570]">Rp50.000</span>
+                        <span className="text-xs font-semibold text-slate-500">/ 1 Bulan</span>
+                      </div>
+                      <p className="text-[0.88rem] text-[#64748b] mb-6 leading-relaxed">
+                        Tingkatkan jangkauan usaha dengan fitur lokasi interaktif, galeri foto/video, katalog produk, dan fitur chat.
+                      </p>
+
+                      <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[0.88rem]">
+                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
+                          <Check size={16} className="text-emerald-600 shrink-0" />
+                          <span>Map / Lokasi Interaktif</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
+                          <Check size={16} className="text-emerald-600 shrink-0" />
+                          <span>Galeri Foto Banner &amp; Video</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
+                          <Check size={16} className="text-emerald-600 shrink-0" />
+                          <span>Katalog Produk Usaha</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
+                          <Check size={16} className="text-emerald-600 shrink-0" />
+                          <span>Fitur Chat Langsung</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
+                          <Check size={16} className="text-emerald-600 shrink-0" />
+                          <span>Prioritas Tampilan Pencarian</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedPackage({ id: 1, name: "Premium Business", price: 50000, duration_value: 1, duration_unit: "month", formatted_duration: "1 Bulan", isFree: false });
+                        setStep(2);
+                      }}
+                      className={`mt-8 w-full py-3.5 px-4 rounded-xl text-[0.92rem] font-bold transition-all duration-200 border-0 cursor-pointer ${
+                        selectedPackage && !selectedPackage.isFree
+                          ? "bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-lg shadow-[#007570]/30"
+                          : "bg-[#007570] text-white hover:bg-[#005a58]"
+                      }`}
+                    >
+                      Pilih Paket Premium
+                    </button>
+                  </div>
+                ) : (
+                  plans.map((plan) => {
+                    const isSelected = selectedPackage?.id === plan.id;
+                    const durationText = plan.formatted_duration || `${plan.duration_value || 1} ${plan.duration_unit === 'year' || plan.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`;
+
+                    return (
+                      <div
+                        key={plan.id}
+                        onClick={() => setSelectedPackage({ ...plan, isFree: false })}
+                        className={`relative rounded-2xl p-6 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                          isSelected
+                            ? "bg-[#f0fffe] border-[#007570] shadow-[0_8px_24px_rgba(0,117,112,0.15)] -translate-y-1"
+                            : "bg-white border-[#e2e8f0] hover:border-[#007570]/50 hover:shadow-md"
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="absolute top-4 right-4 bg-[#007570] text-white p-1 rounded-full">
+                            <Check size={16} />
+                          </div>
+                        )}
+
+                        <div>
+                          <div className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 font-bold text-[0.75rem] rounded-full mb-3 uppercase tracking-wider">
+                            <Sparkles size={12} /> PREMIUM
+                          </div>
+                          <h3 className="text-xl font-extrabold text-[#0f172a] mb-1">{plan.name}</h3>
+                          <div className="flex items-baseline gap-1.5 my-3">
+                            <span className="text-2xl font-black text-[#007570]">
+                              Rp{Number(plan.price || 0).toLocaleString('id-ID')}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-500">/ {durationText}</span>
+                          </div>
+                          <p className="text-[0.88rem] text-[#64748b] mb-6 leading-relaxed">
+                            {plan.description || "Tingkatkan promosi usaha kamu dengan fitur terlengkap."}
+                          </p>
+
+                          <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[0.88rem]">
+                            <div className={`flex items-center gap-2.5 ${plan.can_add_map !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
+                              {plan.can_add_map !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
+                              <span>Map / Lokasi Interaktif</span>
+                            </div>
+                            <div className={`flex items-center gap-2.5 ${plan.can_add_gallery !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
+                              {plan.can_add_gallery !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
+                              <span>Galeri Foto &amp; Banner</span>
+                            </div>
+                            <div className={`flex items-center gap-2.5 ${plan.can_add_video !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
+                              {plan.can_add_video !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
+                              <span>Video Profil Usaha</span>
+                            </div>
+                            <div className={`flex items-center gap-2.5 ${plan.can_add_products !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
+                              {plan.can_add_products !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
+                              <span>Katalog Produk Usaha</span>
+                            </div>
+                            <div className={`flex items-center gap-2.5 ${plan.can_chat !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
+                              {plan.can_chat !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
+                              <span>Fitur Chat Pelanggan</span>
+                            </div>
+                            <div className={`flex items-center gap-2.5 ${plan.priority_listing ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
+                              {plan.priority_listing ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
+                              <span>Prioritas Tampilan Hasil Pencarian</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPackage({ ...plan, isFree: false });
+                            setStep(2);
+                          }}
+                          className={`mt-8 w-full py-3.5 px-4 rounded-xl text-[0.92rem] font-bold transition-all duration-200 border-0 cursor-pointer ${
+                            isSelected
+                              ? "bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-lg shadow-[#007570]/30"
+                              : "bg-[#007570] text-white hover:bg-[#005a58]"
+                          }`}
+                        >
+                          Pilih Paket
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── STEP 2: DATA BISNIS ── */}
+        {step === 2 && (
+          <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,0.07)] p-6 sm:p-9 mb-6 border border-[#e2e8f0] animate-[fadeCard_0.25s_ease]">
+            <div className="flex items-start justify-between pb-6 border-b border-[#f1f5f9] mb-8">
+              <div className="flex items-start gap-4">
+                <Store size={26} className="text-[#007570] shrink-0 mt-1" />
+                <div>
+                  <h2 className="text-[1.25rem] font-bold text-[#0f172a] mb-1">Informasi Data Bisnis</h2>
+                  <p className="text-[0.9rem] text-[#64748b]">Lengkapi informasi detail tentang usaha yang didaftarkan.</p>
+                </div>
+              </div>
+              {selectedPackage && (
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[#f0fffe] border border-[#007570]/30 rounded-full text-xs font-bold text-[#007570]">
+                  <Crown size={14} />
+                  <span>{selectedPackage.isFree ? "Free Package" : selectedPackage.name}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-8">
+              {/* ── SECTION 1: INFORMASI BISNIS ── */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 sm:p-6 space-y-5">
+                <div className="flex items-center gap-2.5 pb-3 border-b border-slate-200/80">
+                  <Store size={18} className="text-[#007570]" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">1. Informasi Bisnis</h3>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Nama Usaha */}
+                  <div className="flex flex-col gap-2">
+                    <label className={labelCls}>Nama Usaha <span className="text-[#dc2626]">*</span></label>
+                    <input name="name" type="text" placeholder="Contoh: Warung Makan Sederhana" value={form.name} onChange={handleFormChange} className={inputCls} />
+                  </div>
+
+                  {/* Deskripsi Usaha */}
+                  <div className="flex flex-col gap-2">
+                    <label className={labelCls}>Deskripsi Usaha <span className="text-[#dc2626]">*</span></label>
+                    <textarea name="description" rows={4} placeholder="Ceritakan keunggulan, produk utama, dan informasi usaha kamu secara lengkap..." value={form.description} onChange={handleFormChange}
+                      className="w-full px-4 py-3 border-[1.5px] border-[#e2e8f0] rounded-xl text-[0.95rem] text-[#0f172a] bg-[#fafafa] outline-none transition-all duration-200 leading-[1.6] resize-vertical min-h-[110px] focus:border-[#007570] focus:bg-white"
+                    />
+                  </div>
+
+                  {/* Kategori & Sub Kategori */}
+                  <div className="flex flex-col gap-2">
+                    <SubCategorySelector
+                      categories={categories}
+                      selectedMainCategory={selectedMainCategory}
+                      selectedSubCategory={selectedSubCategory}
+                      onMainCategoryChange={setSelectedMainCategory}
+                      onSubCategoryChange={setSelectedSubCategory}
+                      disabled={loading}
+                      loading={categoriesLoading}
+                      error={categoryError}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group form-group--full">
-                  <SubCategorySelector
-                    categories={categories}
-                    selectedMainCategory={selectedMainCategory}
-                    selectedSubCategory={selectedSubCategory}
-                    onMainCategoryChange={setSelectedMainCategory}
-                    onSubCategoryChange={setSelectedSubCategory}
-                    disabled={loading}
-                    loading={categoriesLoading}
-                    error={categoryError}
-                  />
+              {/* ── SECTION 2: JAM OPERASIONAL ── */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 sm:p-6 space-y-5">
+                <div className="flex items-center gap-2.5 pb-3 border-b border-slate-200/80">
+                  <Clock size={18} className="text-[#007570]" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">2. Jam Operasional</h3>
                 </div>
-              </div>
 
-              <div className="form-row">
-                <div className="form-group form-group--full">
-                  <label>Hari &amp; Jam Buka</label>
-                  <div className="opening-days-picker">
+                <div className="flex flex-col gap-2">
+                  <label className={labelCls}>Pilih Hari &amp; Jam Buka Usaha</label>
+                  <div className="flex flex-col gap-3 bg-white border-[1.5px] border-[#e2e8f0] rounded-xl p-4">
                     {openingDays.map((d, i) => (
-                      <div key={d.day} className="opening-day-row">
-                        <label className="opening-day-check">
+                      <div key={d.day} className="flex items-center gap-3.5 py-2.5 border-b border-[#e5e7eb] w-full flex-nowrap min-h-[44px] last:border-b-0">
+                        <label className="flex items-center gap-3 cursor-pointer min-w-[100px] shrink-0">
                           <input
                             type="checkbox"
                             checked={d.selected}
                             onChange={() => handleDayToggle(i)}
+                            className="w-5 h-5 accent-[#007570] cursor-pointer shrink-0"
                           />
-                          <span className="opening-day-label">{d.day}</span>
+                          <span className="text-[0.92rem] font-semibold text-[#0f172a] select-none min-w-[70px]">{d.day}</span>
                         </label>
-                        {d.selected && (
-                          <div className="opening-day-times">
+                        {d.selected ? (
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
                             <select
-                              className="opening-time-select"
+                              className="w-[120px] px-3 py-2 border-[1.5px] border-[#e2e8f0] rounded-lg text-sm text-[#0f172a] bg-[#fafafa] outline-none cursor-pointer"
                               value={d.open}
                               onChange={(e) => handleDayTimeChange(i, 'open', e.target.value)}
                             >
@@ -567,9 +1150,9 @@ export default function AddBusiness() {
                                 <option key={t} value={t}>{t}</option>
                               ))}
                             </select>
-                            <span className="opening-time-sep">s/d</span>
+                            <span className="text-xs text-slate-400 font-medium">s/d</span>
                             <select
-                              className="opening-time-select"
+                              className="w-[120px] px-3 py-2 border-[1.5px] border-[#e2e8f0] rounded-lg text-sm text-[#0f172a] bg-[#fafafa] outline-none cursor-pointer"
                               value={d.close}
                               onChange={(e) => handleDayTimeChange(i, 'close', e.target.value)}
                             >
@@ -578,276 +1161,632 @@ export default function AddBusiness() {
                               ))}
                             </select>
                           </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-md">Tutup</span>
                         )}
-                        {!d.selected && <span className="opening-day-closed">Tutup</span>}
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Kota <span>*</span></label>
-                  <input name="city" type="text" placeholder="Jakarta" value={form.city} onChange={handleFormChange} className="form-input" />
+              {/* ── SECTION 3: TAG & INFORMASI TAMBAHAN ── */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 sm:p-6 space-y-5">
+                <div className="flex items-center gap-2.5 pb-3 border-b border-slate-200/80">
+                  <Tag size={18} className="text-[#007570]" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">3. Tag &amp; Informasi Tambahan</h3>
                 </div>
-                <div className="form-group">
-                  <label>Provinsi <span>*</span></label>
-                  <input name="province" type="text" placeholder="DKI Jakarta" value={form.province} onChange={handleFormChange} className="form-input" />
-                </div>
-              </div>
 
-              <div className="form-row">
-                <div className="form-group form-group--full">
-                  <label>Deskripsi <span>*</span></label>
-                  <textarea name="description" rows={4} placeholder="Ceritakan tentang usaha kamu..." value={form.description} onChange={handleFormChange} className="form-input form-textarea" />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group form-group--full">
-                  <label>Tags</label>
-                  <div className="form-tags-input">
-                    <Tag size={16} className="form-tags-icon" />
-                    <input type="text" placeholder="Tambah tag" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }} className="form-tags-field" />
-                    <button type="button" onClick={addTag} className="form-tags-add"><Plus size={16} /></button>
+                <div className="flex flex-col gap-2">
+                  <label className={labelCls}>Tags / Kata Kunci Pencarian</label>
+                  <div className="flex items-center gap-2.5 border-[1.5px] border-[#e2e8f0] rounded-xl px-3.5 py-2 bg-white">
+                    <Tag size={16} className="text-[#94a3b8] shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Ketik tag (contoh: kuliner, murah) lalu tekan Enter"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                      className="flex-1 border-0 bg-transparent outline-none text-[0.95rem] text-[#0f172a]"
+                    />
+                    <button type="button" onClick={addTag} className="w-7 h-7 bg-[#007570] text-white border-0 rounded-lg cursor-pointer flex items-center justify-center hover:bg-[#005a58] transition-colors">
+                      <Plus size={16} />
+                    </button>
                   </div>
-                  <div className="form-tags-list">
+                  <div className="flex flex-wrap gap-2 min-h-6 mt-1">
                     {tags.map((t) => (
-                      <span key={t} className="form-tag">
+                      <span key={t} className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#e6fffc] border border-[#007570]/30 rounded-full text-xs font-semibold text-[#007570]">
                         {t}
-                        <button type="button" onClick={() => removeTag(t)}><X size={12} /></button>
+                        <button type="button" onClick={() => removeTag(t)} className="bg-transparent border-0 cursor-pointer text-[#007570] p-0 hover:text-red-500">
+                          <X size={12} />
+                        </button>
                       </span>
                     ))}
-                    {tags.length === 0 && <span className="form-tags-hint">Belum ada tag</span>}
                   </div>
                 </div>
               </div>
 
-              <div className="form-divider"><span>Kontak</span></div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label><Phone size={14} /> Telepon <span>*</span></label>
-                  <input name="phone" type="tel" placeholder="+62 812 3456 7890" value={form.phone} onChange={handleFormChange} className="form-input" />
+              {/* ── SECTION 4: ALAMAT & KONTAK ── */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 sm:p-6 space-y-5">
+                <div className="flex items-center gap-2.5 pb-3 border-b border-slate-200/80">
+                  <MapPin size={18} className="text-[#007570]" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">4. Alamat &amp; Kontak</h3>
                 </div>
-                <div className="form-group">
-                  <label><Phone size={14} /> WhatsApp</label>
-                  <input name="whatsapp" type="tel" placeholder="+62 812 3456 7890" value={form.whatsapp} onChange={handleFormChange} className="form-input" />
+
+                <div className="space-y-4">
+                  {/* Lokasi Alamat & Map */}
+                  <div className="flex flex-col gap-2">
+                    <label className={labelCls}><MapPin size={16} /> Alamat Lengkap Usaha <span className="text-[#dc2626]">*</span></label>
+                    <div className="flex gap-2.5">
+                      <input
+                        type="text"
+                        placeholder="Jl. Contoh No. 123, Kelurahan, Kecamatan, Kota"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && geocodeAddress()}
+                        className={inputCls}
+                      />
+                      <button
+                        type="button"
+                        onClick={geocodeAddress}
+                        disabled={geocoding}
+                        className="px-5 bg-[#007570] text-white border-0 rounded-xl font-semibold cursor-pointer shrink-0 hover:bg-[#005a58] flex items-center gap-2 transition-colors"
+                      >
+                        {geocoding ? <Loader2 size={16} className={spinCls} /> : <Search size={16} />}
+                        <span className="hidden sm:inline">Cari Peta</span>
+                      </button>
+                    </div>
+
+                    <div className="w-full max-w-full rounded-2xl overflow-hidden mt-3 border border-[#e2e8f0] relative isolate z-0 min-w-0">
+                      <MapContainer
+                        key={mapKey}
+                        center={coords ? [coords.lat, coords.lng] : DEFAULT_CENTER}
+                        zoom={coords ? 15 : 6}
+                        style={{ height: "280px", width: "100%", minWidth: 0, position: "relative", zIndex: 0 }}
+                        scrollWheelZoom
+                      >
+                        <MapResizeHandler />
+                        <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                        <MapClickHandler onMapClick={(latlng) => setCoords({ lat: latlng.lat, lng: latlng.lng })} />
+                        {coords && <Marker position={[coords.lat, coords.lng]} />}
+                      </MapContainer>
+                      <p className="text-xs text-slate-500 px-4 py-2.5 bg-white border-t border-slate-200 flex items-center gap-1.5">
+                        <MapPin size={14} className="text-[#007570]" />
+                        <span>Klik pada peta untuk menentukan posisi presisi lokasi usaha.</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Kota & Provinsi */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className={labelCls}>Kota <span className="text-[#dc2626]">*</span></label>
+                      <input name="city" type="text" placeholder="Contoh: Jakarta Selatan" value={form.city} onChange={handleFormChange} className={inputCls} />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className={labelCls}>Provinsi <span className="text-[#dc2626]">*</span></label>
+                      <input name="province" type="text" placeholder="Contoh: DKI Jakarta" value={form.province} onChange={handleFormChange} className={inputCls} />
+                    </div>
+                  </div>
+
+                  {/* Telepon & WhatsApp */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className={labelCls}><Phone size={14} /> Nomor Telepon Utama <span className="text-[#dc2626]">*</span></label>
+                      <input name="phone" type="tel" placeholder="+62 812 3456 7890" value={form.phone} onChange={handleFormChange} className={inputCls} />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className={labelCls}><Phone size={14} /> WhatsApp</label>
+                      <input name="whatsapp" type="tel" placeholder="+62 812 3456 7890" value={form.whatsapp} onChange={handleFormChange} className={inputCls} />
+                    </div>
+                  </div>
+
+                  {/* Email & Website */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className={labelCls}><Mail size={14} /> Email Usaha</label>
+                      <input name="email" type="email" placeholder="kontak@usaha.com" value={form.email} onChange={handleFormChange} className={inputCls} />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className={labelCls}><Globe size={14} /> Website Resmi</label>
+                      <input name="website" type="url" placeholder="https://usaha.com" value={form.website} onChange={handleFormChange} className={inputCls} />
+                    </div>
+                  </div>
+
+                  {/* Instagram & Facebook */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className={labelCls}><Camera size={14} /> Instagram</label>
+                      <input name="instagram" type="text" placeholder="@usahakamu" value={form.instagram} onChange={handleFormChange} className={inputCls} />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className={labelCls}><Camera size={14} /> Facebook</label>
+                      <input name="facebook" type="text" placeholder="Halaman Facebook" value={form.facebook} onChange={handleFormChange} className={inputCls} />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label><Mail size={14} /> Email</label>
-                  <input name="email" type="email" placeholder="usaha@email.com" value={form.email} onChange={handleFormChange} className="form-input" />
+              {/* ── SECTION 5: MEDIA BISNIS (ORDER: 1. LOGO, 2. BANNER, 3. GALLERY) ── */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 sm:p-6 space-y-6">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+                  <div className="flex items-center gap-2.5">
+                    <ImageIcon size={18} className="text-[#007570]" />
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">5. Media Bisnis</h3>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-500">Logo → Banner → Galeri</span>
                 </div>
-                <div className="form-group">
-                  <label><Globe size={14} /> Website</label>
-                  <input name="website" type="url" placeholder="https://usaha.com" value={form.website} onChange={handleFormChange} className="form-input" />
-                </div>
-              </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label><Camera size={14} /> Instagram</label>
-                  <input name="instagram" type="text" placeholder="@usahakamu" value={form.instagram} onChange={handleFormChange} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label><Camera size={14} /> Facebook</label>
-                  <input name="facebook" type="text" placeholder="Facebook page" value={form.facebook} onChange={handleFormChange} className="form-input" />
+                <div className="space-y-6">
+                  {/* 1. LOGO (Top Priority) */}
+                  <div className="flex flex-col gap-2 bg-white p-4 rounded-xl border border-slate-200">
+                    <label className={labelCls}><Camera size={16} className="text-[#007570]" /> 1. Logo / Thumbnail Utama Usaha</label>
+                    <p className="text-xs text-slate-500 mb-2">Gambar ini akan menjadi foto profil &amp; thumbnail utama di halaman pencarian.</p>
+                    {logoPreview ? (
+                      <div className="relative max-w-[180px] rounded-xl overflow-hidden border-2 border-[#007570] shadow-sm">
+                        <img src={logoPreview} alt="Logo" className="w-full aspect-square object-cover" />
+                        <button
+                          type="button"
+                          className="absolute top-2 right-2 flex items-center justify-center w-7 h-7 bg-red-600 text-white rounded-lg border-0 cursor-pointer shadow-md hover:bg-red-700 transition-colors"
+                          onClick={removeLogo}
+                          title="Hapus Logo"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer bg-slate-50 hover:bg-[#f0fffe] hover:border-[#007570] transition-colors max-w-[360px]"
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoChange} />
+                        <Camera size={28} className="mx-auto text-[#007570] mb-2" />
+                        <span className="text-sm font-bold text-slate-700 block">Upload Logo Usaha</span>
+                        <span className="text-xs text-slate-400">Format JPG, PNG (Maks 4MB)</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. BANNER (After Logo) */}
+                  <div className="flex flex-col gap-2 bg-white p-4 rounded-xl border border-slate-200">
+                    <label className={labelCls}><ImageIcon size={16} className="text-[#007570]" /> 2. Banner / Foto Latar Header (Maks. 4 Foto)</label>
+                    <p className="text-xs text-slate-500 mb-2">Banner akan ditampilkan sebagai latar belakang header halaman detail bisnis Anda.</p>
+                    <div
+                      className={`border-2 border-dashed border-slate-300 rounded-xl p-6 text-center transition-all bg-slate-50
+                        ${banners.length >= 4 ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-[#007570] hover:bg-[#f0fffe]"}`}
+                      {...createDropHandler(handleBannerAdd)}
+                      onClick={() => banners.length < 4 && bannerInputRef.current?.click()}
+                    >
+                      <input ref={bannerInputRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleBannerAdd(e.target.files)} />
+                      <Upload size={28} className="text-[#007570] mb-2 mx-auto" />
+                      <p className="text-sm font-bold text-slate-700">{banners.length >= 4 ? "Maksimum 4 foto banner telah tercapai" : "Klik atau drag & drop foto banner"}</p>
+                      <p className="text-xs text-slate-400">{banners.length}/4 foto terunggah</p>
+                    </div>
+                    {banners.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+                        {banners.map((b, i) => (
+                          <div key={i} className="relative rounded-xl overflow-hidden aspect-video border border-slate-200 shadow-2xs">
+                            <img src={b.preview} alt="" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeBanner(i)}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-600 text-white rounded-md flex items-center justify-center border-0 cursor-pointer shadow-md hover:bg-red-700 transition-colors"
+                              title="Hapus Banner"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. GALLERY (After Banner) */}
+                  <div className="flex flex-col gap-2 bg-white p-4 rounded-xl border border-slate-200">
+                    <label className={labelCls}><Video size={16} className="text-[#007570]" /> 3. Galeri Foto &amp; Video Opsional</label>
+                    <p className="text-xs text-slate-500 mb-2">Tambahkan foto suasana toko, produk unggulan, atau video promosi pendek.</p>
+                    <div
+                      className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-50 hover:border-[#007570] hover:bg-[#f0fffe]"
+                      {...createDropHandler(handleGalleryAdd)}
+                      onClick={() => galleryInputRef.current?.click()}
+                    >
+                      <input ref={galleryInputRef} type="file" accept="image/*,video/mp4,video/webm" multiple hidden onChange={(e) => handleGalleryAdd(e.target.files)} />
+                      <Upload size={28} className="text-[#007570] mb-2 mx-auto" />
+                      <p className="text-sm font-bold text-slate-700">Upload foto atau video galeri tambahan</p>
+                      <p className="text-xs text-slate-400">Gambar (JPG/PNG) &amp; Video (MP4) max 20MB</p>
+                    </div>
+                    {gallery.length > 0 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-2">
+                        {gallery.map((g, i) => (
+                          <div key={i} className="relative rounded-xl overflow-hidden aspect-square border border-slate-200 bg-slate-100 flex items-center justify-center shadow-2xs">
+                            {g.type === "image" ? (
+                              <img src={g.preview} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="text-center p-2">
+                                <Video size={24} className="mx-auto text-[#007570]" />
+                                <span className="text-[0.65rem] font-semibold text-slate-700 block truncate max-w-[80px] mt-1">{g.file.name}</span>
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeGallery(i)}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-600 text-white rounded-md flex items-center justify-center border-0 cursor-pointer shadow-md hover:bg-red-700 transition-colors"
+                              title="Hapus Galeri"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── STEP 2: THUMBNAIL & BANNER ── */}
-        {step === 2 && (
-          <div className="add-biz-card">
-            <div className="add-biz-card__header">
-              <ImageIcon size={24} className="add-biz-card__icon" />
+        {/* ── STEP 3 (FREE FLOW): REVIEW & DAFTARKAN ── */}
+        {step === 3 && isFreeSelection && (
+          <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,0.07)] p-6 sm:p-9 mb-6 border border-[#e2e8f0] animate-[fadeCard_0.25s_ease]">
+            <div className="flex items-start gap-4 mb-8 pb-6 border-b border-[#f1f5f9]">
+              <CheckCircle2 size={28} className="text-[#007570] shrink-0 mt-1" />
               <div>
-                <h2>Thumbnail &amp; Banner / Foto Utama</h2>
-                <p>Upload thumbnail (gambar utama) dan foto banner (maks. 4 foto)</p>
+                <h2 className="text-[1.35rem] font-bold text-[#0f172a] mb-1">Review Ringkasan Data Usaha</h2>
+                <p className="text-[0.9rem] text-[#64748b]">Periksa kembali data usaha kamu sebelum mendaftarkan dengan Paket Free.</p>
               </div>
             </div>
 
-            {/* ═══ THUMBNAIL / LOGO (Bagian Paling Atas) ═══ */}
-            <div className="add-biz-thumbnail-section">
-              <div className="add-biz-thumbnail-section__header">
-                <Camera size={20} className="add-biz-thumbnail-section__icon" />
+            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="add-biz-thumbnail-section__title">Thumbnail / Logo Usaha</h3>
-                  <p className="add-biz-thumbnail-section__desc">Gambar ini akan tampil sebagai foto utama di halaman pencarian</p>
+                  <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Paket Dipilih</span>
+                  <span className="text-sm font-extrabold text-[#007570] bg-[#e6fffc] px-3 py-1 rounded-full border border-[#007570]/30 inline-block">
+                    PAKET FREE (Rp0)
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Nama Usaha</span>
+                  <span className="text-sm font-bold text-slate-800">{form.name || "-"}</span>
+                </div>
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Kota &amp; Provinsi</span>
+                  <span className="text-sm font-medium text-slate-800">{form.city}, {form.province}</span>
+                </div>
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Nomor Telepon</span>
+                  <span className="text-sm font-medium text-slate-800">{form.phone || "-"}</span>
                 </div>
               </div>
-              {logoPreview ? (
-                <div className="thumbnail-preview-wrapper">
-                  <img src={logoPreview} alt="Logo" className="thumbnail-preview" />
-                  <button type="button" className="thumbnail-remove" onClick={removeLogo}><X size={16} /></button>
+
+              <div className="pt-4 border-t border-slate-200">
+                <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Alamat Lengkap</span>
+                <span className="text-sm font-medium text-slate-800">{address || "-"}</span>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200">
+                <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Deskripsi</span>
+                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{form.description}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 3 (PREMIUM FLOW): RINGKASAN PESANAN & KUPON ── */}
+        {step === 3 && !isFreeSelection && (
+          <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,0.07)] p-6 sm:p-9 mb-6 border border-[#e2e8f0] animate-[fadeCard_0.25s_ease]">
+            <div className="flex items-start gap-4 mb-8 pb-6 border-b border-[#f1f5f9]">
+              <FileText size={28} className="text-[#007570] shrink-0 mt-1" />
+              <div>
+                <h2 className="text-[1.35rem] font-bold text-[#0f172a] mb-1">Ringkasan Pesanan</h2>
+                <p className="text-[0.9rem] text-[#64748b]">Periksa detail pesanan paket Premium dan gunakan kode kupon jika ada.</p>
+              </div>
+            </div>
+
+            {/* Order Detail Card */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-6 space-y-3.5">
+              <div className="flex justify-between items-center text-sm pb-3 border-b border-slate-200">
+                <span className="text-slate-500 font-medium">Paket</span>
+                <span className="font-bold text-[#0f172a]">{selectedPackage?.name}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm pb-3 border-b border-slate-200">
+                <span className="text-slate-500 font-medium">Bisnis</span>
+                <span className="font-bold text-[#0f172a]">{form.name || "Usaha Baru"}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm pb-3 border-b border-slate-200">
+                <span className="text-slate-500 font-medium">Masa Aktif</span>
+                <span className="font-semibold text-slate-700">
+                  {selectedPackage?.formatted_duration || `${selectedPackage?.duration_value || 1} Bulan`}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-500 font-medium">Harga Normal</span>
+                <span className="font-extrabold text-[#0f172a]">
+                  Rp {Number(selectedPackage?.price || 0).toLocaleString('id-ID')}
+                </span>
+              </div>
+            </div>
+
+            {/* ── Kode Kupon / Diskon (Opsional) ── */}
+            <div className="border border-slate-200 rounded-2xl p-5 bg-white mb-6">
+              <label className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
+                <Tag size={16} className="text-[#007570]" />
+                Kode Kupon / Diskon <span className="text-xs font-normal text-slate-400">(Opsional)</span>
+              </label>
+
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold text-emerald-800 uppercase block">Kupon Terpasang: {appliedCoupon.code}</span>
+                      <span className="text-xs text-emerald-600 font-medium">Diskon Rp {appliedCoupon.discount_amount?.toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-xs font-semibold text-red-600 bg-white border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
+                  >
+                    Hapus
+                  </button>
                 </div>
               ) : (
-                <div className="upload-zone upload-zone--thumbnail" onClick={() => logoInputRef.current?.click()}>
-                  <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoChange} />
-                  <div className="upload-zone__thumbnail-icon">
-                    <Camera size={36} />
-                  </div>
-                  <p className="upload-zone__text">Klik untuk upload thumbnail</p>
-                  <p className="upload-zone__hint">Rekomendasi: 1:1 ratio, JPG/PNG/WEBP max 4MB</p>
-                </div>
-              )}
-            </div>
-
-            {/* ═══ BANNER (Di Bawah Thumbnail) ═══ */}
-            <div className="add-biz-banner-section">
-              <div className="add-biz-banner-section__header">
-                <ImageIcon size={20} className="add-biz-banner-section__icon" />
-                <div>
-                  <h3 className="add-biz-banner-section__title">Banner / Foto Latar</h3>
-                  <p className="add-biz-banner-section__desc">Upload beberapa foto banner untuk tampilan halaman usaha (maks. 4 foto)</p>
-                </div>
-              </div>
-              <div className={"upload-zone " + (banners.length >= 4 ? "upload-zone--disabled" : "")}
-                {...createDropHandler(handleBannerAdd)}
-                onClick={() => banners.length < 4 && bannerInputRef.current?.click()}>
-                <input ref={bannerInputRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleBannerAdd(e.target.files)} />
-                <Upload size={40} className="upload-zone__icon" />
-                <p className="upload-zone__text">{banners.length >= 4 ? "Batas maksimum 4 foto" : "Klik atau drag & drop foto banner"}</p>
-                <p className="upload-zone__hint">{banners.length}/4 foto</p>
-              </div>
-              {banners.length > 0 && (
-                <div className="banner-grid">
-                  {banners.map((b, i) => (
-                    <div key={i} className="banner-item">
-                      <img src={b.preview} alt="" className="banner-item__img" />
-                      <div className="banner-item__overlay">
-                        <button type="button" onClick={() => removeBanner(i)} className="banner-item__remove"><X size={16} /></button>
-                        <span className="banner-item__badge">Banner {i + 1}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {banners.length < 4 && (
-                    <button type="button" className="banner-add-more" onClick={() => bannerInputRef.current?.click()}>
-                      <Plus size={28} /><span>Tambah</span>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Masukkan kode kupon diskon"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#007570]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading}
+                      className="px-5 py-2.5 bg-[#007570] text-white rounded-xl text-sm font-semibold border-0 cursor-pointer hover:bg-[#005a58] disabled:opacity-60 flex items-center gap-2"
+                    >
+                      {couponLoading ? <Loader2 size={16} className={spinCls} /> : "Terapkan"}
                     </button>
+                  </div>
+                  {couponError && (
+                    <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+                      <AlertCircle size={13} /> {couponError}
+                    </p>
+                  )}
+                  {couponSuccessMsg && (
+                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                      <CheckCircle2 size={13} /> {couponSuccessMsg}
+                    </p>
                   )}
                 </div>
               )}
             </div>
+
+            {/* Total Pembayaran Calculation */}
+            <div className="bg-[#f0fffe] border border-[#007570]/30 rounded-2xl p-5 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Pembayaran</span>
+                {appliedCoupon && (
+                  <span className="text-xs text-slate-400 line-through">
+                    Rp {Number(selectedPackage?.price || 0).toLocaleString('id-ID')}
+                  </span>
+                )}
+              </div>
+              <span className="text-2xl font-black text-[#007570]">
+                Rp {((appliedCoupon ? appliedCoupon.final_amount : selectedPackage?.price) || 0).toLocaleString('id-ID')}
+              </span>
+            </div>
           </div>
         )}
 
-        {/* ── STEP 3: LOKASI ── */}
-        {step === 3 && (
-          <div className="add-biz-card">
-            <div className="add-biz-card__header">
-              <MapPin size={24} className="add-biz-card__icon" />
+        {/* ── STEP 4 (PREMIUM FLOW): METODE PEMBAYARAN ── */}
+        {step === 4 && !isFreeSelection && (
+          <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,0.07)] p-6 sm:p-9 mb-6 border border-[#e2e8f0] animate-[fadeCard_0.25s_ease]">
+            <div className="flex items-start gap-4 mb-8 pb-6 border-b border-[#f1f5f9]">
+              <CreditCard size={28} className="text-[#007570] shrink-0 mt-1" />
               <div>
-                <h2>Lokasi Usaha</h2>
-                <p>Masukkan alamat, lalu cari atau klik di peta</p>
+                <h2 className="text-[1.35rem] font-bold text-[#0f172a] mb-1">Pilihan Metode Pembayaran</h2>
+                <p className="text-[0.9rem] text-[#64748b]">Pilih metode pembayaran yang kamu inginkan.</p>
               </div>
             </div>
-            <div className="form-group form-group--full">
-              <label>Alamat Lengkap <span>*</span></label>
-              <div className="geocode-row">
-                <input type="text" placeholder="Jl. Contoh No. 123, Kota, Provinsi" value={address} onChange={(e) => setAddress(e.target.value)} onKeyDown={(e) => e.key === "Enter" && geocodeAddress()} className="form-input geocode-input" />
-                <button type="button" onClick={geocodeAddress} disabled={geocoding} className="btn-geocode">
-                  {geocoding ? <Loader2 size={18} className="spin" /> : <Search size={18} />}
-                  <span>{geocoding ? "Mencari..." : "Cari"}</span>
+
+            <div className="space-y-6">
+              {PAYMENT_METHODS.map((group) => (
+                <div key={group.category} className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">{group.category}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {group.items.map((item) => {
+                      const isSelected = selectedPaymentMethod === item.id;
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedPaymentMethod(item.id)}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
+                            isSelected
+                              ? "bg-[#f0fffe] border-[#007570] shadow-sm"
+                              : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2.5 py-1 text-xs font-black rounded-md ${item.badgeColor}`}>
+                              {item.id.split(' ')[0]}
+                            </span>
+                            <span className="text-sm font-bold text-slate-800">{item.name}</span>
+                          </div>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#007570] bg-[#007570]" : "border-slate-300"}`}>
+                            {isSelected && <Check size={12} className="text-white" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Instruction Card */}
+            <div className="mt-8 bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
+              <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <ShieldCheck size={18} className="text-[#007570]" /> Instruksi Pembayaran {currentAccount.name}
+              </h4>
+              <p className="text-xs text-slate-600">
+                Silakan lakukan transfer sebesar total tagihan ke rekening / Virtual Account berikut:
+              </p>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-slate-400 font-medium block">Nomor Rekening / Virtual Account</span>
+                  <span className="text-lg font-black text-[#0f172a]">{currentAccount.accountNumber}</span>
+                  <span className="text-xs text-slate-500 block mt-0.5">a.n {currentAccount.accountName}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentAccount.accountNumber.replace(/-/g, ''));
+                    setCopiedAccount(true);
+                    setTimeout(() => setCopiedAccount(false), 2500);
+                  }}
+                  className="px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5"
+                >
+                  {copiedAccount ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                  <span>{copiedAccount ? "Tersalin!" : "Salin No"}</span>
                 </button>
               </div>
-              <p className="geocode-hint"><MapPin size={13} />{coords ? "Koordinat: " + coords.lat.toFixed(6) + ", " + coords.lng.toFixed(6) : "Belum ada koordinat"}</p>
-            </div>
-            <div className="map-wrapper" style={{ isolation: "isolate", position: "relative", zIndex: 0 }}>
-              <MapContainer key={mapKey} center={coords ? [coords.lat, coords.lng] : DEFAULT_CENTER} zoom={coords ? 15 : 6} style={{ height: "420px", width: "100%", position: "relative", zIndex: 0 }} scrollWheelZoom>
-                <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <MapClickHandler onMapClick={(latlng) => setCoords({ lat: latlng.lat, lng: latlng.lng })} />
-                {coords && <Marker position={[coords.lat, coords.lng]} />}
-              </MapContainer>
-              <p className="map-hint"><MapPin size={13} /> Klik di peta untuk menentukan koordinat</p>
             </div>
           </div>
         )}
 
-        {/* ── STEP 4: GALERI ── */}
-        {step === 4 && (
-          <div className="add-biz-card">
-            <div className="add-biz-card__header">
-              <Video size={24} className="add-biz-card__icon" />
+        {/* ── STEP 5 (PREMIUM FLOW): UPLOAD BUKTI PEMBAYARAN ── */}
+        {step === 5 && !isFreeSelection && (
+          <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,0.07)] p-6 sm:p-9 mb-6 border border-[#e2e8f0] animate-[fadeCard_0.25s_ease]">
+            <div className="flex items-start gap-4 mb-8 pb-6 border-b border-[#f1f5f9]">
+              <Upload size={28} className="text-[#007570] shrink-0 mt-1" />
               <div>
-                <h2>Galeri Foto & Video</h2>
-                <p>Upload foto dan video tambahan</p>
+                <h2 className="text-[1.35rem] font-bold text-[#0f172a] mb-1">Upload Bukti Pembayaran</h2>
+                <p className="text-[0.9rem] text-[#64748b]">Unggah foto atau tangkapan layar bukti transfer kamu.</p>
               </div>
             </div>
-            <div className="upload-zone" {...createDropHandler(handleGalleryAdd)} onClick={() => galleryInputRef.current?.click()}>
-              <input ref={galleryInputRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" multiple hidden onChange={(e) => handleGalleryAdd(e.target.files)} />
-              <Upload size={40} className="upload-zone__icon" />
-              <p className="upload-zone__text">Klik atau drag & drop foto/video</p>
-              <p className="upload-zone__hint">Gambar: JPG, PNG | Video: MP4, WEBM, MOV | maks. 20MB</p>
+
+            {/* Summary Badge */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="text-xs text-slate-400 font-bold uppercase block">Total Harus Dibayar</span>
+                <span className="text-xl font-black text-[#007570]">
+                  Rp {((appliedCoupon ? appliedCoupon.final_amount : selectedPackage?.price) || 0).toLocaleString('id-ID')}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-slate-400 font-bold uppercase block">Metode Pembayaran</span>
+                <span className="text-sm font-bold text-slate-800">{currentAccount.name}</span>
+              </div>
             </div>
-            {gallery.length > 0 && (
-              <div className="gallery-grid">
-                {gallery.map((g, i) => (
-                  <div key={i} className={"gallery-item " + (g.type === "video" ? "gallery-item--video" : "")}>
-                    {g.type === "image" ? (
-                      <img src={g.preview} alt="" className="gallery-item__media" />
-                    ) : (
-                      <div className="gallery-item__video-thumb"><Video size={36} /><span>{g.file.name}</span></div>
-                    )}
-                    <div className="gallery-item__overlay">
-                      <button type="button" onClick={() => removeGallery(i)} className="gallery-item__remove"><X size={16} /></button>
-                      <span className="gallery-item__type-badge">{g.type === "video" ? "VIDEO" : "FOTO"}</span>
-                    </div>
+
+            {/* Upload Area */}
+            {proofPreview ? (
+              <div className="relative max-w-[320px] mx-auto rounded-2xl overflow-hidden border-2 border-slate-200 shadow-md">
+                <img src={proofPreview} alt="Bukti Pembayaran" className="w-full h-auto max-h-[300px] object-contain bg-slate-900" />
+                <div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
+                  <span className="text-xs font-semibold text-slate-700 truncate max-w-[180px]">{proofFile?.name}</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => proofInputRef.current?.click()}
+                      className="px-2.5 py-1 text-xs font-bold text-[#007570] bg-[#e6fffc] rounded-md border-0 cursor-pointer"
+                    >
+                      Ganti
+                    </button>
+                    <button
+                      type="button"
+                      onClick={removeProof}
+                      className="px-2.5 py-1 text-xs font-bold text-red-600 bg-red-50 rounded-md border-0 cursor-pointer"
+                    >
+                      Hapus
+                    </button>
                   </div>
-                ))}
+                </div>
+              </div>
+            ) : (
+              <div
+                className="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer bg-slate-50 hover:bg-[#f0fffe] hover:border-[#007570] transition-colors"
+                onClick={() => proofInputRef.current?.click()}
+              >
+                <input ref={proofInputRef} type="file" accept="image/*" hidden onChange={handleProofChange} />
+                <Upload size={40} className="mx-auto text-slate-400 mb-3" />
+                <p className="text-base font-semibold text-slate-800 mb-1">Klik atau drag &amp; drop bukti transfer</p>
+                <p className="text-xs text-slate-400">Format JPG, PNG, WEBP max 10MB</p>
               </div>
             )}
-            {gallery.length === 0 && <p className="gallery-empty">Belum ada file diunggah</p>}
-
-            {/* SUBMIT SUMMARY */}
-            <div className="submit-summary">
-              <h3>Ringkasan Pendaftaran</h3>
-              <div className="summary-grid">
-                <div className="summary-item"><span className="summary-label">Nama Usaha</span><span className="summary-value">{form.name || "-"}</span></div>
-                <div className="summary-item"><span className="summary-label">Kategori</span><span className="summary-value">{categories.find((c) => String(c.id) === String(form.category_id))?.name || "-"}</span></div>
-                <div className="summary-item"><span className="summary-label">Kota</span><span className="summary-value">{form.city || "-"}</span></div>
-                <div className="summary-item"><span className="summary-label">Hari Buka</span><span className="summary-value">{getOpeningDaysSummary()}</span></div>
-                <div className="summary-item"><span className="summary-label">Thumbnail</span><span className="summary-value">{logo ? "Ada" : "Belum"}</span></div>
-                <div className="summary-item"><span className="summary-label">Banner</span><span className="summary-value">{banners.length} foto</span></div>
-                <div className="summary-item"><span className="summary-label">Galeri</span><span className="summary-value">{gallery.length} file</span></div>
-                <div className="summary-item"><span className="summary-label">Koordinat</span><span className="summary-value">{coords ? coords.lat.toFixed(4) + ", " + coords.lng.toFixed(4) : "Belum"}</span></div>
-                <div className="summary-item"><span className="summary-label">Tags</span><span className="summary-value">{tags.join(", ") || "-"}</span></div>
-              </div>
-            </div>
           </div>
         )}
 
         {/* ── NAVIGATION BUTTONS ── */}
-        <div className="add-biz-nav">
+        <div className="flex items-center gap-3 mt-8">
           {step > 1 && (
-            <button type="button" onClick={prevStep} className="btn-nav btn-back">
+            <button
+              type="button"
+              onClick={prevStep}
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] border-[#e2e8f0] bg-white text-[#374151] transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8]"
+            >
               <ChevronLeft size={18} /> Kembali
             </button>
           )}
+
           <div style={{ flex: 1 }} />
+
           {isEditing && (
-            <button type="button" onClick={handleDelete} disabled={deleting} className="btn-nav btn-delete">
-              {deleting ? <><Loader2 size={18} className="spin" /> Menghapus...</> : <><Trash2 size={18} /> Hapus Usaha</>}
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] transition-all duration-[0.25s] bg-[#fef2f2] text-[#dc2626] border-[#fecaca] hover:bg-[#fee2e2] disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {deleting ? <><Loader2 size={18} className={spinCls} /> Menghapus...</> : <><Trash2 size={18} /> Hapus Usaha</>}
             </button>
           )}
-          {step < 4 ? (
-            <button type="button" onClick={nextStep} className="btn-nav btn-next">
-              Selanjutnya <ChevronRight size={18} />
-            </button>
+
+          {/* Dynamic Next / Submit Button */}
+          {isFreeSelection ? (
+            step < 3 ? (
+              <button
+                type="button"
+                onClick={nextStep}
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)]"
+              >
+                Selanjutnya <ChevronRight size={18} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleFreeSubmit}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white shadow-[0_4px_16px_rgba(22,163,74,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(22,163,74,0.4)] disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {loading ? <><Loader2 size={18} className={spinCls} /> Mendaftarkan...</> : <><Check size={18} /> Daftarkan Usaha (Free)</>}
+              </button>
+            )
           ) : (
-            <button type="button" onClick={handleSubmit} disabled={loading} className="btn-nav btn-submit">
-              {loading ? <><Loader2 size={18} className="spin" /> {isEditing ? "Menyimpan..." : "Mendaftarkan..."}</> : <><Check size={18} /> {isEditing ? "Simpan Perubahan" : "Daftarkan Usaha"}</>}
-            </button>
+            step < 5 ? (
+              <button
+                type="button"
+                onClick={nextStep}
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)]"
+              >
+                {step === 3 ? "Lanjut ke Pembayaran" : step === 4 ? "Lanjut Upload Bukti" : "Selanjutnya"} <ChevronRight size={18} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePremiumSubmit}
+                disabled={loading || !proofFile}
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white shadow-[0_4px_16px_rgba(22,163,74,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(22,163,74,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? <><Loader2 size={18} className={spinCls} /> Mengirim Bukti...</> : <><Check size={18} /> Kirim Bukti Pembayaran</>}
+              </button>
+            )
           )}
         </div>
       </div>
     </div>
   );
 }
-

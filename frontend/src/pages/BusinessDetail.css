@@ -386,15 +386,18 @@
 }
 
 .bd-photo-item {
-  border-radius: 10px;
+  position: relative;
+  border-radius: 12px;
   overflow: hidden;
   aspect-ratio: 16 / 10;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-  transition: transform 0.25s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  cursor: pointer;
 }
 
 .bd-photo-item:hover {
   transform: scale(1.015);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .bd-photo-item img {
@@ -402,6 +405,30 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.bd-photo-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.bd-photo-item:hover .bd-photo-overlay {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.bd-photo-overlay-text {
+  color: #ffffff;
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  user-select: none;
 }
 
 .bd-video-container {
@@ -573,6 +600,42 @@
   flex-direction: column;
   gap: 16px;
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.bd-location-card__map-wrapper {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  width: 100%;
+  max-width: 100%;
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+  box-sizing: border-box;
+}
+
+.bd-location-card__map-wrapper .leaflet-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 200px !important;
+  max-height: 200px !important;
+  border-radius: 14px;
+  overflow: hidden !important;
+  z-index: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.bd-location-card__map-wrapper .leaflet-pane {
+  z-index: 1 !important;
+}
+
+.bd-location-card__map-wrapper .leaflet-top,
+.bd-location-card__map-wrapper .leaflet-bottom {
+  z-index: 2 !important;
 }
 
 .bd-location-card__header {
@@ -1552,4 +1615,75 @@
   .bd-review-card {
     padding: 16px;
   }
+}
+
+/* ── PRODUCTS PAGINATION ── */
+.bd-products-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+}
+
+.bd-pagination-btn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #007570;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.bd-pagination-btn:hover:not(:disabled) {
+  background: #f0fdfa;
+  border-color: #007570;
+  transform: translateY(-1px);
+}
+
+.bd-pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
+.bd-pagination-numbers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bd-pagination-number {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bd-pagination-number:hover {
+  border-color: #007570;
+  color: #007570;
+  background: #f0fdfa;
+}
+
+.bd-pagination-number.active {
+  background: #007570;
+  border-color: #007570;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 117, 112, 0.25);
 }

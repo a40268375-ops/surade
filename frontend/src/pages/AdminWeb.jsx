@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
-import "./AdminWeb.css";
 import {
   LayoutDashboard,
   Users,
@@ -44,6 +43,142 @@ import {
 
 // ── Default avatar ──
 const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop";
+
+// ── Category Modal Form Component ──
+function CategoryModalForm({ category, onSubmit, onCancel, categories }) {
+  const [formData, setFormData] = useState({
+    name: category?.name || "",
+    slug: category?.slug || "",
+    icon: category?.icon || "",
+    parent_id: category?.parent_id || "",
+    is_active: category?.is_active !== undefined ? category.is_active : true,
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    const data = {
+      ...formData,
+      parent_id: formData.parent_id || null,
+    };
+
+    const result = await onSubmit(data);
+    setLoading(false);
+
+    if (!result.success) {
+      setError(result.error);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+
+    // Auto-generate slug from name if slug is empty
+    if (name === "name" && !formData.slug) {
+      const slug = value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      setFormData(prev => ({ ...prev, slug }));
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="admin-form">
+      {error && (
+        <div className="admin-form-error">
+          <AlertTriangle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="admin-form-group">
+        <label className="admin-form-label">Nama Kategori *</label>
+        <input
+          type="text"
+          name="name"
+          className="admin-form-input"
+          value={formData.name}
+          onChange={handleChange}
+          placeholder="Contoh: Kuliner"
+          required
+        />
+      </div>
+
+      <div className="admin-form-group">
+        <label className="admin-form-label">Slug</label>
+        <input
+          type="text"
+          name="slug"
+          className="admin-form-input"
+          value={formData.slug}
+          onChange={handleChange}
+          placeholder="Contoh: kuliner"
+        />
+        <small className="admin-form-hint">Slug akan digenerate otomatis dari nama jika dikosongkan</small>
+      </div>
+
+      <div className="admin-form-group">
+        <label className="admin-form-label">Icon</label>
+        <input
+          type="text"
+          name="icon"
+          className="admin-form-input"
+          value={formData.icon}
+          onChange={handleChange}
+          placeholder="Contoh: store, coffee, smartphone"
+        />
+        <small className="admin-form-hint">Nama icon dari Lucide React</small>
+      </div>
+
+      <div className="admin-form-group">
+        <label className="admin-form-label">Kategori Induk</label>
+        <select
+          name="parent_id"
+          className="admin-form-select"
+          value={formData.parent_id}
+          onChange={handleChange}
+        >
+          <option value="">Tidak ada</option>
+          {categories
+            .filter(c => c.id !== category?.id)
+            .map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+        </select>
+      </div>
+
+      <div className="admin-form-group admin-form-group--checkbox">
+        <label className="admin-form-checkbox">
+          <input
+            type="checkbox"
+            name="is_active"
+            checked={formData.is_active}
+            onChange={handleChange}
+          />
+          <span>Aktif</span>
+        </label>
+      </div>
+
+      <div className="admin-modal__footer">
+        <button type="button" className="admin-btn admin-btn--secondary" onClick={onCancel} disabled={loading}>
+          Batal
+        </button>
+        <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
+          {loading ? "Menyimpan..." : "Simpan"}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 // ── Sidebar menu items ──
 const MENU_ITEMS = [
@@ -128,10 +263,12 @@ export default function AdminWeb() {
   const [stats, setStats] = useState(MOCK_STATS);
   const [users, setUsers] = useState(MOCK_USERS);
   const [businesses, setBusinesses] = useState(MOCK_BUSINESSES);
-  const [categories, setCategories] = useState(MOCK_CATEGORIES);
+  const [categories, setCategories] = useState([]);
   const [payments, setPayments] = useState(MOCK_PAYMENTS);
   const [blogs, setBlogs] = useState(MOCK_BLOGS);
   const [loading, setLoading] = useState(true);
+  const [categoryLoading, setCategoryLoading] = useState(false);
+  const [categoryError, setCategoryError] = useState(null);
 
   // ── Modal state ──
   const [modal, setModal] = useState({ show: false, type: "", data: null });
@@ -141,15 +278,44 @@ export default function AdminWeb() {
     if (storedUser) {
       try { setUser(JSON.parse(storedUser)); } catch { }
     }
-    // Simulate loading
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
+    setLoading(false);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    navigate("/login");
+  // Fetch categories from API
+  useEffect(() => {
+    if (activeTab === "categories") {
+      fetchCategories();
+    }
+  }, [activeTab]);
+
+  const fetchCategories = async () => {
+    setCategoryLoading(true);
+    setCategoryError(null);
+    try {
+      const response = await api.get("/admin/categories");
+      setCategories(response.data.data || response.data || []);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      setCategoryError("Gagal memuat data kategori");
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.post('/logout');
+    } catch (_) {
+      // Proceed with local cleanup even if API call fails
+    } finally {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("admin_cache_"))
+        .forEach((k) => localStorage.removeItem(k));
+      window.dispatchEvent(new Event("userAuthChanged"));
+      navigate("/login");
+    }
   };
 
   const handleModal = (type, data = null) => {
@@ -158,6 +324,55 @@ export default function AdminWeb() {
 
   const closeModal = () => {
     setModal({ show: false, type: "", data: null });
+  };
+
+  // Category handlers
+  const handleAddCategory = async (formData) => {
+    try {
+      const response = await api.post("/admin/categories", formData);
+      await fetchCategories();
+      closeModal();
+      return { success: true };
+    } catch (error) {
+      console.error("Error adding category:", error);
+      return { success: false, error: error.response?.data?.message || "Gagal menambah kategori" };
+    }
+  };
+
+  const handleEditCategory = async (formData) => {
+    try {
+      const response = await api.put(`/admin/categories/${modal.data.id}`, formData);
+      await fetchCategories();
+      closeModal();
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating category:", error);
+      return { success: false, error: error.response?.data?.message || "Gagal mengupdate kategori" };
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    try {
+      await api.delete(`/admin/categories/${modal.data.id}`);
+      await fetchCategories();
+      closeModal();
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      const errorMessage = error.response?.data?.message || "Gagal menghapus kategori";
+      alert(errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  const handleToggleCategoryStatus = async (category) => {
+    try {
+      await api.put(`/admin/categories/${category.id}/toggle-status`);
+      await fetchCategories();
+    } catch (error) {
+      console.error("Error toggling category status:", error);
+      alert("Gagal mengubah status kategori");
+    }
   };
 
   // ── Render functions for each section ──
@@ -444,35 +659,86 @@ export default function AdminWeb() {
         </button>
       </div>
 
-      <div className="admin-table-container">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Nama Kategori</th>
-              <th>Jumlah Bisnis</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {categories.map((category) => (
-              <tr key={category.id}>
-                <td>{category.name}</td>
-                <td>{category.businessCount}</td>
-                <td>
-                  <div className="admin-table-actions">
-                    <button className="admin-table-action" onClick={() => handleModal("editCategory", category)} title="Edit">
-                      <Edit3 size={16} />
-                    </button>
-                    <button className="admin-table-action admin-table-action--danger" onClick={() => handleModal("deleteCategory", category)} title="Hapus">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="admin-search-bar">
+        <Search size={18} className="admin-search-bar__icon" />
+        <input
+          type="text"
+          placeholder="Cari kategori..."
+          className="admin-search-bar__input"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
       </div>
+
+      {categoryLoading ? (
+        <div className="admin-loading">
+          <div className="admin-loading__icon">⏳</div>
+          <p>Memuat data kategori...</p>
+        </div>
+      ) : categoryError ? (
+        <div className="admin-error">
+          <AlertTriangle size={20} />
+          <span>{categoryError}</span>
+          <button className="admin-btn admin-btn--secondary" onClick={fetchCategories}>
+            Coba Lagi
+          </button>
+        </div>
+      ) : categories.length === 0 ? (
+        <div className="admin-empty">
+          <Tags size={48} />
+          <p>Belum ada kategori</p>
+          <button className="admin-btn admin-btn--primary" onClick={() => handleModal("addCategory")}>
+            <Plus size={18} />
+            <span>Tambah Kategori Pertama</span>
+          </button>
+        </div>
+      ) : (
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Nama Kategori</th>
+                <th>Slug</th>
+                <th>Jumlah Bisnis</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories
+                .filter((c) =>
+                  c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  c.slug?.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((category) => (
+                  <tr key={category.id}>
+                    <td>{category.name}</td>
+                    <td>{category.slug}</td>
+                    <td>{category.businesses_count || category.businessCount || 0}</td>
+                    <td>
+                      <span className={`admin-badge admin-badge--${category.is_active ? "success" : "warning"}`}>
+                        {category.is_active ? "Aktif" : "Nonaktif"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="admin-table-actions">
+                        <button className="admin-table-action" onClick={() => handleModal("editCategory", category)} title="Edit">
+                          <Edit3 size={16} />
+                        </button>
+                        <button className="admin-table-action" onClick={() => handleToggleCategoryStatus(category)} title="Toggle Status">
+                          {category.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
+                        </button>
+                        <button className="admin-table-action admin-table-action--danger" onClick={() => handleModal("deleteCategory", category)} title="Hapus">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 
@@ -767,6 +1033,9 @@ export default function AdminWeb() {
   const renderModal = () => {
     if (!modal.show) return null;
 
+    const isCategoryModal = modal.type === "addCategory" || modal.type === "editCategory" || modal.type === "deleteCategory";
+    const isDeleteModal = modal.type && modal.type.includes("delete");
+
     return (
       <div className="admin-modal-overlay" onClick={closeModal}>
         <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
@@ -791,7 +1060,26 @@ export default function AdminWeb() {
             </button>
           </div>
           <div className="admin-modal__body">
-            {modal.type && modal.type.includes("delete") ? (
+            {isCategoryModal ? (
+              isDeleteModal ? (
+                <div className="admin-modal-delete">
+                  <AlertTriangle size={48} className="admin-modal-delete__icon" />
+                  <p>Apakah Anda yakin ingin menghapus kategori <strong>"{modal.data?.name}"</strong>?</p>
+                  <p className="admin-modal-delete__warning">
+                    {modal.data?.businesses_count > 0 
+                      ? `Peringatan: Kategori ini masih digunakan oleh ${modal.data.businesses_count} bisnis.`
+                      : "Kategori akan dihapus secara permanen."}
+                  </p>
+                </div>
+              ) : (
+                <CategoryModalForm 
+                  category={modal.data} 
+                  onSubmit={modal.type === "addCategory" ? handleAddCategory : handleEditCategory}
+                  onCancel={closeModal}
+                  categories={categories}
+                />
+              )
+            ) : isDeleteModal ? (
               <p>Apakah Anda yakin ingin menghapus item ini?</p>
             ) : (
               <div className="admin-form-group">
@@ -800,14 +1088,30 @@ export default function AdminWeb() {
               </div>
             )}
           </div>
-          <div className="admin-modal__footer">
-            <button className="admin-btn admin-btn--secondary" onClick={closeModal}>
-              Batal
-            </button>
-            <button className="admin-btn admin-btn--primary" onClick={closeModal}>
-              {modal.type && modal.type.includes("delete") ? "Hapus" : "Simpan"}
-            </button>
-          </div>
+          {!isCategoryModal && (
+            <div className="admin-modal__footer">
+              <button className="admin-btn admin-btn--secondary" onClick={closeModal}>
+                Batal
+              </button>
+              <button className="admin-btn admin-btn--primary" onClick={closeModal}>
+                {isDeleteModal ? "Hapus" : "Simpan"}
+              </button>
+            </div>
+          )}
+          {isCategoryModal && isDeleteModal && (
+            <div className="admin-modal__footer">
+              <button className="admin-btn admin-btn--secondary" onClick={closeModal}>
+                Batal
+              </button>
+              <button 
+                className="admin-btn admin-btn--danger" 
+                onClick={handleDeleteCategory}
+                disabled={modal.data?.businesses_count > 0}
+              >
+                Hapus
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );

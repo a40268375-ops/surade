@@ -3,6 +3,8 @@ import { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import { InlineSpinner } from "../components/LoadingScreen";
 import { getStorageUrl } from "../utils/constants";
+import { requireAuth } from "../utils/authCheck";
+import api from "../services/api";
 import {
   Search,
   MapPin,
@@ -118,49 +120,47 @@ export default function Category() {
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
-      try {
-        const catRes = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
-        const catData = await catRes.json();
-        if (Array.isArray(catData)) {
-          const mappedCategories = [
-            { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
-            ...catData.map(c => ({
-              id: c.slug,
-              label: c.name,
-              icon: getCategoryIcon(c.icon)
-            }))
-          ];
-          setCategories(mappedCategories);
-        }
-      } catch (err) {
-        console.error("Failed to fetch categories:", err);
-      }
 
-      try {
-        const bizRes = await fetch(`${import.meta.env.VITE_API_URL}/businesses?all=true`);
-        const bizJson = await bizRes.json();
-        const bizData = bizJson?.data || bizJson || [];
-        if (Array.isArray(bizData)) {
-          const mapped = bizData.map(b => ({
-            id: b.id,
-            name: b.name,
-            category: b.category?.name || "Umum",
-            categorySlug: b.category?.slug || "umum",
-            tags: [b.name],
-            location: b.city || "Indonesia",
-            views: b.views || 0,
-            status: "Buka Sekarang",
-            img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-            lat: b.lat,
-            lng: b.lng
-          }));
-          setBisnisData(mapped);
-        }
-      } catch (err) {
-        console.error("Failed to fetch businesses:", err);
-      } finally {
-        setLoadingData(false);
-      }
+      const fetchCategories = fetch(`${import.meta.env.VITE_API_URL}/categories`)
+        .then(res => res.json())
+        .then(catData => {
+          if (Array.isArray(catData)) {
+            const mappedCategories = [
+              { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
+              ...catData.map(c => ({
+                id: c.slug,
+                label: c.name,
+                icon: getCategoryIcon(c.icon)
+              }))
+            ];
+            setCategories(mappedCategories);
+          }
+        }).catch(err => console.error("Failed to fetch categories:", err));
+
+      const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?all=true`)
+        .then(res => res.json())
+        .then(bizJson => {
+          const bizData = bizJson?.data || bizJson || [];
+          if (Array.isArray(bizData)) {
+            const mapped = bizData.map(b => ({
+              id: b.id,
+              name: b.name,
+              category: b.category?.name || "Umum",
+              categorySlug: b.category?.slug || "umum",
+              tags: [b.name],
+              location: b.city || "Indonesia",
+              views: b.views || 0,
+              status: "Buka Sekarang",
+              img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+              lat: b.lat,
+              lng: b.lng
+            }));
+            setBisnisData(mapped);
+          }
+        }).catch(err => console.error("Failed to fetch businesses:", err));
+
+      await Promise.allSettled([fetchCategories, fetchBusinesses]);
+      setLoadingData(false);
     };
     fetchData();
   }, []);
@@ -250,9 +250,65 @@ export default function Category() {
     }
   };
 
-  function toggleSave(id) {
-    setSaved((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
+  const fetchUserFavoritesCategory = async () => {
+    const token = localStorage.getItem("token");
+    const bizSavedMap = {};
+    try {
+      const localBiz = JSON.parse(localStorage.getItem("saved_business_ids") || "[]");
+      (Array.isArray(localBiz) ? localBiz : []).forEach(id => { bizSavedMap[id] = true; });
+    } catch (e) {}
+
+    if (token) {
+      try {
+        const res = await api.get("/my-favorites");
+        const data = res.data?.data || res.data || [];
+        const list = Array.isArray(data) ? data : (data?.data || []);
+        list.forEach(fav => {
+          const bId = fav.business_id || fav.business?.id;
+          if (bId) bizSavedMap[bId] = true;
+        });
+      } catch (err) {
+        console.error("Failed to fetch favorites in Category:", err);
+      }
+    }
+    setSaved(bizSavedMap);
+  };
+
+  useEffect(() => {
+    fetchUserFavoritesCategory();
+    window.addEventListener("bookmarkChanged", fetchUserFavoritesCategory);
+    return () => window.removeEventListener("bookmarkChanged", fetchUserFavoritesCategory);
+  }, []);
+
+  const toggleSave = async (id) => {
+    if (!id) return;
+    if (!requireAuth()) return;
+    const isCurrentlySaved = !!saved[id];
+
+    setSaved((prev) => ({ ...prev, [id]: !isCurrentlySaved }));
+
+    let localBiz = JSON.parse(localStorage.getItem("saved_business_ids") || "[]");
+    if (isCurrentlySaved) {
+      localBiz = localBiz.filter(item => String(item) !== String(id));
+    } else {
+      if (!localBiz.includes(id)) localBiz.push(id);
+    }
+    localStorage.setItem("saved_business_ids", JSON.stringify(localBiz));
+    window.dispatchEvent(new Event("bookmarkChanged"));
+
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        if (isCurrentlySaved) {
+          await api.delete(`/favorites/${id}`);
+        } else {
+          await api.post(`/favorites/${id}`);
+        }
+      } catch (err) {
+        console.error("Failed to toggle favorite in Category:", err);
+      }
+    }
+  };
 
   const currentCategory = categories.find((c) => c.id === activeCategory);
 

@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Home from "../pages/Home";
 import Blog from "../pages/Blog";
 import BlogDetail from "../pages/BlogDetail";
@@ -41,35 +41,38 @@ function isAuthenticated() {
 
 /**
  * ProtectedRoute:
- * - If not authenticated, redirect to /login.
- * - If requiresRole is specified and user doesn't have it, redirect to appropriate dashboard.
- * - For admin routes, allow both 'admin' and 'super_admin' roles.
- * - For user routes, allow 'user', 'admin', or 'super_admin' roles.
+ * - If not authenticated (no token or no user), redirect to /login.
+ * - If requiredRole is 'admin': ONLY allow role === 'admin'. Users are redirected to /dashboard.
+ * - If requiredRole is 'user': ONLY allow role === 'user'. Admins are redirected to /admin/dashboard.
+ * This prevents any cross-contamination between admin and user sessions.
  */
 function ProtectedRoute({ children, requiredRole }) {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole) {
-    const user = getAuthUser();
-    if (!user) {
-      return <Navigate to="/login" replace />;
-    }
-    
-    // For admin routes, allow both 'admin' and 'super_admin'
-    // For user routes, allow 'user', 'admin', or 'super_admin'
-    const hasAccess = requiredRole === "admin" 
-      ? (user.role === "admin" || user.role === "super_admin")
-      : (user.role === requiredRole || user.role === "admin" || user.role === "super_admin");
-    
-    if (!hasAccess) {
-      // If admin tries to access user route, redirect to admin dashboard
-      if (user.role === "admin" || user.role === "super_admin") {
-        return <Navigate to="/admin/dashboard" replace />;
-      }
-      // If user tries to access admin route, redirect to user dashboard
+  const user = getAuthUser();
+  if (!user) {
+    // Token exists but no user data — clear storage and go to login
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    return <Navigate to="/login" replace />;
+  }
+
+  const role = user.role;
+
+  if (requiredRole === "admin") {
+    // Only strict admin role gets in
+    if (role !== "admin") {
       return <Navigate to="/dashboard" replace />;
+    }
+  } else if (requiredRole === "user") {
+    // Only strict user role gets in — admin must go to admin dashboard
+    if (role === "admin") {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    if (role !== "user") {
+      return <Navigate to="/login" replace />;
     }
   }
 
@@ -163,6 +166,22 @@ function AppRouter() {
         />
 
         {/* Admin Routes (only accessible by role 'admin' or 'super_admin') */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminWeb />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/:tab"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminWeb />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin/dashboard"
           element={

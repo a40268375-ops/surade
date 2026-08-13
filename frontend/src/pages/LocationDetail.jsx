@@ -19,19 +19,23 @@ export default function LocationDetail() {
   const fetchLocationData = async () => {
     setLoading(true);
     try {
-      // Fetch location data
-      const locRes = await fetch(`${import.meta.env.VITE_API_URL}/locations/${slug}`);
-      if (!locRes.ok) {
-        throw new Error('Location not found');
-      }
-      const locData = await locRes.json();
-      setLocation(locData.data || locData);
+      const fetchLoc = fetch(`${import.meta.env.VITE_API_URL}/locations/${slug}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Location not found');
+          return res.json();
+        })
+        .then(locData => {
+          setLocation(locData.data || locData);
+        });
 
-      // Fetch businesses for this location
-      const bizRes = await fetch(`${import.meta.env.VITE_API_URL}/businesses?location=${slug}`);
-      const bizData = await bizRes.json();
-      const businessesList = bizData?.data || bizData || [];
-      setBusinesses(Array.isArray(businessesList) ? businessesList : []);
+      const fetchBiz = fetch(`${import.meta.env.VITE_API_URL}/businesses?location=${slug}`)
+        .then(res => res.json())
+        .then(bizData => {
+          const businessesList = bizData?.data || bizData || [];
+          setBusinesses(Array.isArray(businessesList) ? businessesList : []);
+        });
+
+      await Promise.allSettled([fetchLoc, fetchBiz]);
     } catch (err) {
       console.error("Failed to fetch location data:", err);
       setError(err.message);

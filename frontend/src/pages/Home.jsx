@@ -2,10 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Home.css";
 import Navbar from "../components/Navbar";
+import HeroSection from "../components/home/HeroSection";
 import logoImg from "../assets/logo.png";
 import { getBusinesses } from "../services/businessService";
 import { InlineSpinner } from "../components/LoadingScreen";
 import { getStorageUrl } from "../utils/constants";
+import { requireAuth } from "../utils/authCheck";
+import api from "../services/api";
 import {
   Store,
   Coffee,
@@ -27,17 +30,6 @@ import {
   Building2,
   Landmark,
 } from "lucide-react";
-
-/* ── Indonesian cities ── */
-const KOTA_INDONESIA = [
-  "Semua", "Jakarta", "Surabaya", "Bandung", "Medan", "Bekasi", "Tangerang", "Depok",
-  "Semarang", "Palembang", "Makassar", "South Tangerang", "Batam", "Pekanbaru",
-  "Bandar Lampung", "Padang", "Malang", "Bogor", "Denpasar", "Samarinda",
-  "Tasikmalaya", "Pontianak", "Banjarmasin", "Balikpapan", "Jambi", "Surakarta",
-  "Mataram", "Manado", "Yogyakarta", "Ambon", "Kupang", "Jayapura", "Sorong",
-  "Ternate", "Gorontalo", "Kendari", "Palu", "Pekalongan", "Tegal", "Cirebon",
-  "Sukabumi", "Kabupaten Bogor", "Kabupaten Bekasi", "Kabupaten Tangerang",
-];
 
 /* ── Category tabs ── */
 const CATEGORIES = [
@@ -308,127 +300,139 @@ const getCategoryIcon = (iconName) => {
 export default function Home() {
   const navigate = useNavigate();
   const [selectedKota, setSelectedKota] = useState("Semua");
-  const [kotaSearch, setKotaSearch] = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
   const [saved, setSaved] = useState({});
   const [selectedCity, setSelectedCity] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedSearchCategory, setSelectedSearchCategory] = useState("all");
   const [searchHistory, setSearchHistory] = useState([]);
-  const [keywordDropdownOpen, setKeywordDropdownOpen] = useState(false);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
-  const dropdownRef = useRef(null);
-  const keywordDropdownRef = useRef(null);
   const [businesses, setBusinesses] = useState([]);
   const [categories, setCategories] = useState(CATEGORIES);
-  const [bisnisData, setBisnisData] = useState([]);
-  const [temukanData, setTemukanData] = useState([]);
+  const [bisnisData, setBisnisData] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cached_bisnis_data");
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [temukanData, setTemukanData] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cached_bisnis_data");
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [adsData, setAdsData] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loadingAds, setLoadingAds] = useState(true);
+  const [loadingData, setLoadingData] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cached_bisnis_data");
+      return cached && JSON.parse(cached).length > 0 ? false : true;
+    } catch (e) {
+      return true;
+    }
+  });
   const [blogsData, setBlogsData] = useState([]);
   const [testimonialsData, setTestimonialsData] = useState(TESTIMONIALS_DATA);
   const [smartCitiesData, setSmartCitiesData] = useState(SMART_CITIES);
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoadingData(true);
-      try {
-        // Fetch categories
-        const catRes = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
-        const catData = await catRes.json();
-        if (Array.isArray(catData)) {
-          const mappedCategories = [
-            { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
-            ...catData.map(c => ({
-              id: c.slug,
-              label: c.name,
-              icon: getCategoryIcon(c.icon)
-            }))
-          ];
-          setCategories(mappedCategories);
-        }
-      } catch (err) {
-        console.error("Failed to fetch categories:", err);
-      }
+      const fetchCategories = fetch(`${import.meta.env.VITE_API_URL}/categories`)
+        .then(res => res.json())
+        .then(catData => {
+          if (Array.isArray(catData)) {
+            const mappedCategories = [
+              { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
+              ...catData.map(c => ({
+                id: c.slug,
+                label: c.name,
+                icon: getCategoryIcon(c.icon)
+              }))
+            ];
+            setCategories(mappedCategories);
+          }
+        }).catch(err => console.error("Failed to fetch categories:", err));
 
-      try {
-        // Fetch businesses
-        const bizRes = await fetch(`${import.meta.env.VITE_API_URL}/businesses?all=true`);
-        const bizJson = await bizRes.json();
-        const bizData = bizJson?.data || bizJson || [];
-        if (Array.isArray(bizData)) {
-          const mapped = bizData.map(b => {
-            // Extract main category and subcategory
-            const mainCategory = b.category?.parent || b.category;
-            const subCategory = b.category?.parent ? b.category : null;
-            const categoryName = mainCategory?.name || b.category?.name || "Umum";
-            const subCategoryName = subCategory?.name || null;
+      const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?all=true`)
+        .then(res => res.json())
+        .then(bizJson => {
+          const bizData = bizJson?.data || bizJson || [];
+          if (Array.isArray(bizData)) {
+            const mapped = bizData.map(b => {
+              const mainCategory = b.category?.parent || b.category;
+              const subCategory = b.category?.parent ? b.category : null;
+              const categoryName = mainCategory?.name || b.category?.name || "Umum";
+              const subCategoryName = subCategory?.name || null;
 
-            return {
-              id: b.id,
-              name: b.name,
-              category: categoryName,
-              subCategory: subCategoryName,
-              categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
-              tags: [b.name],
-              location: b.city || "Indonesia",
-              views: b.views || 0,
-              status: "Buka Sekarang",
-              img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-              open: true,
-              featured: b.featured,
-              description: b.description
-            };
-          });
-          setBisnisData(mapped);
-          setTemukanData(mapped);
-          
-          // Dynamically update smart city business counts from database
-          const updatedSmartCities = SMART_CITIES.map(city => {
-            const count = mapped.filter(b => b.location && b.location.toLowerCase().includes(city.name.toLowerCase())).length;
-            return { ...city, bisnis: count };
-          });
-          setSmartCitiesData(updatedSmartCities);
-        }
-      } catch (err) {
-        console.error("Failed to fetch businesses:", err);
-      }
+              return {
+                id: b.id,
+                name: b.name,
+                category: categoryName,
+                subCategory: subCategoryName,
+                categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
+                tags: [b.name],
+                location: b.city || "Indonesia",
+                views: b.views || 0,
+                status: "Buka Sekarang",
+                img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+                open: true,
+                featured: b.featured,
+                description: b.description
+              };
+            });
+            setBisnisData(mapped);
+            setTemukanData(mapped);
+            try {
+              sessionStorage.setItem("cached_bisnis_data", JSON.stringify(mapped));
+            } catch (e) {}
+            
+            const updatedSmartCities = SMART_CITIES.map(city => {
+              const count = mapped.filter(b => b.location && b.location.toLowerCase().includes(city.name.toLowerCase())).length;
+              return { ...city, bisnis: count };
+            });
+            setSmartCitiesData(updatedSmartCities);
+          }
+        }).catch(err => console.error("Failed to fetch businesses:", err));
 
-      try {
-        // Fetch advertisements from API
-        const adsRes = await fetch(`${import.meta.env.VITE_API_URL}/advertisements`);
-        const adsJson = await adsRes.json();
-        const adsData = adsJson?.data || adsJson || [];
-        if (Array.isArray(adsData)) {
-          const mappedAds = adsData.map(ad => ({
-            id: ad.id,
-            businessId: ad.business?.id,
-            img: getStorageUrl(ad.business?.logo || ad.business?.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-            name: ad.business?.name || "Bisnis",
-            desc: ad.business?.description || "Portal Bisnis Terpercaya",
-            packageName: ad.package_name,
-            price: ad.price
-          }));
-          setAdsData(mappedAds);
-        }
-      } catch (err) {
-        console.error("Failed to fetch advertisements:", err);
-      }
+      const fetchAds = fetch(`${import.meta.env.VITE_API_URL}/advertisements`)
+        .then(res => res.json())
+        .then(adsJson => {
+          const adsData = adsJson?.data || adsJson || [];
+          if (Array.isArray(adsData)) {
+            const mappedAds = adsData.map(ad => ({
+              id: ad.id,
+              businessId: ad.business?.id,
+              img: getStorageUrl(ad.business?.logo || ad.business?.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+              name: ad.business?.name || "Bisnis",
+              desc: ad.business?.description || "Portal Bisnis Terpercaya",
+              packageName: ad.package_name,
+              price: ad.price
+            }));
+            setAdsData(mappedAds);
+          }
+        })
+        .catch(err => console.error("Failed to fetch advertisements:", err))
+        .finally(() => setLoadingAds(false));
 
-      try {
-        // Fetch blogs from API
-        const blogsRes = await fetch(`${import.meta.env.VITE_API_URL}/blogs`);
-        const blogsJson = await blogsRes.json();
-        const blogsData = blogsJson?.data || blogsJson || [];
-        if (Array.isArray(blogsData)) {
-          setBlogsData(blogsData);
-        }
-      } catch (err) {
-        console.error("Failed to fetch blogs:", err);
-      }
+      const fetchBlogs = fetch(`${import.meta.env.VITE_API_URL}/blogs`)
+        .then(res => res.json())
+        .then(blogsJson => {
+          const blogsData = blogsJson?.data || blogsJson || [];
+          if (Array.isArray(blogsData)) {
+            setBlogsData(blogsData);
+          }
+        }).catch(err => console.error("Failed to fetch blogs:", err));
 
+      // Primary data for hero & business grid
+      await Promise.allSettled([fetchCategories, fetchBusinesses]);
       setLoadingData(false);
+
+      // Non-blocking secondary data
+      Promise.allSettled([fetchAds, fetchBlogs]);
     };
     fetchData();
   }, []);
@@ -440,19 +444,6 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false); setKotaSearch("");
-      }
-      if (keywordDropdownRef.current && !keywordDropdownRef.current.contains(e.target)) {
-        setKeywordDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [searchHistory]);
-
-  useEffect(() => {
     const interval = setInterval(() => {
       if (adsData.length > 0) {
         setCurrentAdIndex((prev) => (prev + 1) % adsData.length);
@@ -460,10 +451,6 @@ export default function Home() {
     }, 5000);
     return () => clearInterval(interval);
   }, [adsData]);
-
-  const filteredKota = KOTA_INDONESIA.filter((k) =>
-    k.toLowerCase().includes(kotaSearch.toLowerCase())
-  );
 
   const filteredBisnis = activeCategory === "all"
     ? bisnisData
@@ -513,9 +500,90 @@ export default function Home() {
     return matchesSearch;
   });
 
-  function toggleSave(id) {
-    setSaved((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
+  const fetchUserSavedState = async () => {
+    const token = localStorage.getItem("token");
+    const bizSavedMap = {};
+    const blogSavedMap = {};
+
+    try {
+      const localBiz = JSON.parse(localStorage.getItem("saved_business_ids") || "[]");
+      (Array.isArray(localBiz) ? localBiz : []).forEach(id => { bizSavedMap[id] = true; });
+
+      const localBlogs = JSON.parse(localStorage.getItem("saved_blog_ids") || "[]");
+      (Array.isArray(localBlogs) ? localBlogs : []).forEach(id => { blogSavedMap[id] = true; });
+    } catch (e) {}
+
+    if (token) {
+      try {
+        const [resBiz, resBlog] = await Promise.all([
+          api.get("/my-favorites"),
+          api.get("/my-blog-favorites")
+        ]);
+        const bizData = resBiz.data?.data || resBiz.data || [];
+        const bizArr = Array.isArray(bizData) ? bizData : (bizData?.data || []);
+        bizArr.forEach(fav => {
+          const bId = fav.business_id || fav.business?.id;
+          if (bId) bizSavedMap[bId] = true;
+        });
+
+        const blogData = resBlog.data?.data || resBlog.data || [];
+        const blogArr = Array.isArray(blogData) ? blogData : (blogData?.data || []);
+        blogArr.forEach(fav => {
+          const bId = fav.blog_id || fav.blog?.id;
+          if (bId) blogSavedMap[bId] = true;
+        });
+      } catch (err) {
+        console.error("Failed to fetch favorites in Home:", err);
+      }
+    }
+
+    setSaved({ ...bizSavedMap, ...blogSavedMap });
+  };
+
+  useEffect(() => {
+    fetchUserSavedState();
+    window.addEventListener("bookmarkChanged", fetchUserSavedState);
+    return () => window.removeEventListener("bookmarkChanged", fetchUserSavedState);
+  }, []);
+
+  const toggleSave = async (id, isBlog = false, itemName = "") => {
+    if (!id) return;
+    if (!requireAuth()) return;
+
+    const isCurrentlySaved = !!saved[id];
+
+    setSaved((prev) => ({ ...prev, [id]: !isCurrentlySaved }));
+
+    const storageKey = isBlog ? "saved_blog_ids" : "saved_business_ids";
+    let localItems = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    if (isCurrentlySaved) {
+      localItems = localItems.filter(item => String(item) !== String(id));
+    } else {
+      if (!localItems.includes(id)) localItems.push(id);
+    }
+    localStorage.setItem(storageKey, JSON.stringify(localItems));
+
+    // Clear stale AdminUser cache so fresh bookmarks load immediately
+    localStorage.removeItem("cached_saved_items");
+    window.dispatchEvent(new Event("bookmarkChanged"));
+
+    if (isCurrentlySaved) {
+      alert(`${isBlog ? "Artikel/Event" : "Bisnis"}${itemName ? ` "${itemName}"` : ""} dihapus dari bookmark.`);
+    } else {
+      alert(`${isBlog ? "Artikel/Event" : "Bisnis"}${itemName ? ` "${itemName}"` : ""} berhasil disimpan ke bookmark!`);
+    }
+
+    try {
+      const endpoint = isBlog ? `/blog-favorites/${id}` : `/favorites/${id}`;
+      if (isCurrentlySaved) {
+        await api.delete(endpoint);
+      } else {
+        await api.post(endpoint);
+      }
+    } catch (err) {
+      console.error("Failed to toggle favorite API:", err);
+    }
+  };
 
   const handleSearchSubmit = () => {
     if (searchKeyword.trim()) {
@@ -537,176 +605,45 @@ export default function Home() {
       <Navbar />
 
       {/* ── HERO BANNER ── */}
-      <section className="home-hero">
-        <div className="home-hero__bg" />
-        <div className="home-hero__container">
-          <div className="home-hero__content">
-            {/* Badge / Pill */}
-            <div className="home-hero__badge">
-              <div className="home-hero__badge-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 1L3 5V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V5L12 1Z" fill="url(#heroBadgeGrad)"/>
-                  <path d="M9 11.8L11.2 14L15.5 9.5" stroke="#050a16" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <defs>
-                    <linearGradient id="heroBadgeGrad" x1="3" y1="1" x2="21" y2="23" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#00d2be"/>
-                      <stop offset="1" stopColor="#007570"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-              <span>Direktori Bisnis Terpercaya di Indonesia</span>
-            </div>
-
-            {/* Title & Subtitle */}
-            <h1 className="home-hero__title">
-              Info.co.id
-              <span className="home-hero__title-sub">Semua Ada Disini</span>
-            </h1>
-            <p className="home-hero__subtitle">
-              Temukan dan terhubung dengan berbagai<br />
-              pelaku usaha terbaik di Indonesia.
-            </p>
-
-            {/* Search Bar */}
-            <form className="home-search" onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(); }}>
-              <div className="home-search__group home-search__group--keyword" ref={keywordDropdownRef}>
-                <span className="home-search__label">Kata Kunci :</span>
-                <input
-                  className="home-search__input"
-                  type="text"
-                  placeholder="UMKM, Pelaku Usaha, Bisnis, dll"
-                  id="search-keyword"
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  onFocus={() => setKeywordDropdownOpen(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleSearchSubmit();
-                    }
-                  }}
-                />
-                {selectedSearchCategory !== "all" && (
-                  <span className="home-search__selected-category">
-                    {CATEGORIES.find(c => c.id === selectedSearchCategory)?.label || selectedSearchCategory}
-                  </span>
-                )}
-
-                {keywordDropdownOpen && (
-                  <div className="home-keyword-dropdown">
-                    {/* Riwayat Pencarian (Top) */}
-                    {searchHistory.length > 0 && (
-                      <div className="home-keyword-dropdown__section">
-                        <span className="home-keyword-dropdown__section-title">Riwayat Pencarian</span>
-                        <ul className="home-keyword-dropdown__list">
-                          {searchHistory.map((item, idx) => (
-                            <li
-                              key={idx}
-                              className="home-keyword-dropdown__item home-keyword-dropdown__item--history"
-                              onClick={() => {
-                                setSearchKeyword(item.keyword);
-                                setSelectedSearchCategory(item.category || "all");
-                                setKeywordDropdownOpen(false);
-                                navigate(`/category/${item.category || "all"}?q=${encodeURIComponent(item.keyword)}&location=${encodeURIComponent(selectedKota)}`);
-                              }}
-                            >
-                              <span className="home-keyword-dropdown__history-text">{item.keyword}</span>
-                              <span className="home-keyword-dropdown__history-cat">
-                                di {CATEGORIES.find(c => c.id === item.category)?.label || "Semua"}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Kategori Pilihan */}
-                    <div className="home-keyword-dropdown__section">
-                      <span className="home-keyword-dropdown__section-title">Cari berdasarkan Kategori</span>
-                      <ul className="home-keyword-dropdown__list">
-                        {categories.map((cat) => (
-                          <li
-                            key={cat.id}
-                            className="home-keyword-dropdown__item home-keyword-dropdown__item--category"
-                            onClick={() => {
-  setSelectedSearchCategory(cat.id);
-  setKeywordDropdownOpen(false);
-}}
-                          >
-                            <span className="home-keyword-dropdown__cat-icon">{cat.icon}</span>
-                            <span className="home-keyword-dropdown__cat-label">{cat.label}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="home-search__divider" />
-
-              <div className="home-search__group home-search__group--lokasi" ref={dropdownRef}>
-                <span className="home-search__label">Lokasi</span>
-                <button
-                  type="button"
-                  className="home-search__kota-btn"
-                  onClick={() => setDropdownOpen((v) => !v)}
-                >
-                  <span className="home-search__kota-text">{selectedKota}</span>
-                </button>
-
-                {dropdownOpen && (
-                  <div className="home-kota-dropdown" role="listbox">
-                    <div className="home-kota-dropdown__search">
-                      <Search size={13} className="home-kota-dropdown__icon" />
-                      <input
-                        autoFocus
-                        type="text"
-                        placeholder="Cari kota..."
-                        value={kotaSearch}
-                        onChange={(e) => setKotaSearch(e.target.value)}
-                        className="home-kota-dropdown__input"
-                      />
-                    </div>
-                    <ul className="home-kota-dropdown__list">
-                      {filteredKota.length > 0
-                        ? filteredKota.map((kota) => (
-                          <li
-                            key={kota}
-                            role="option"
-                            aria-selected={kota === selectedKota}
-                            className={`home-kota-dropdown__item${kota === selectedKota ? " selected" : ""}`}
-                            onClick={() => { setSelectedKota(kota); setDropdownOpen(false); setKotaSearch(""); }}
-                          >
-                            {kota}
-                          </li>
-                        ))
-                        : <li className="home-kota-dropdown__empty">Kota tidak ditemukan</li>
-                      }
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              <button 
-                className="home-search__button" 
-                type="submit" 
-                aria-label="Cari"
-              >
-                <Search size={18} strokeWidth={2.5} />
-              </button>
-            </form>
-          </div>
-        </div>
-      </section>
+      <HeroSection
+        searchKeyword={searchKeyword}
+        setSearchKeyword={setSearchKeyword}
+        selectedSearchCategory={selectedSearchCategory}
+        setSelectedSearchCategory={setSelectedSearchCategory}
+        selectedKota={selectedKota}
+        setSelectedKota={setSelectedKota}
+        searchHistory={searchHistory}
+        categories={categories}
+        handleSearchSubmit={handleSearchSubmit}
+      />
 
       {/* ── TERBARU / IKLAN SECTION ── */}
       <section className="reko-section">
-        <div className="reko-inner">
-          <h2 className="reko-title"></h2>
+        <div className="reko-inner min-h-[340px] flex flex-col justify-start">
+          <h2 className="reko-title">Iklan Unggulan &amp; Bisnis Pilihan</h2>
 
-          {/* Ads carousel */}
-          {adsData.length > 0 ? (
+          {/* Skeleton Loading State */}
+          {loadingAds ? (
+            <div className="w-full px-2 sm:px-12 py-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={`ad-skeleton-${n}`}
+                    className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden animate-pulse flex flex-col h-[260px]"
+                  >
+                    <div className="w-full h-[180px] bg-slate-200/80 relative">
+                      <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-300/80" />
+                    </div>
+                    <div className="p-4 space-y-2 flex-1 bg-white">
+                      <div className="h-4 bg-slate-300/80 rounded-md w-3/4" />
+                      <div className="h-3.5 bg-slate-200/80 rounded-md w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : adsData.length > 0 ? (
+            /* Active Ads carousel */
             <div className="ads-carousel">
               <button
                 className="ads-carousel__nav ads-carousel__nav--prev"
@@ -723,12 +660,17 @@ export default function Home() {
                       <div className="ad-card__img-overlay">
                         <button
                           type="button"
-                          className={`ad-card__save${saved[ad.id] ? " saved" : ""}`}
-                          onClick={(e) => { e.preventDefault(); toggleSave(ad.id); }}
+                          className={`ad-card__save${(saved[ad.businessId] || saved[ad.id]) ? " saved" : ""}`}
+                          onClick={(e) => { 
+                            e.preventDefault(); 
+                            e.stopPropagation(); 
+                            const targetBizId = ad.businessId || ad.id;
+                            toggleSave(targetBizId, false, ad.name); 
+                          }}
                           aria-label="Simpan"
                         >
-                          <Bookmark size={13} fill={saved[ad.id] ? "currentColor" : "none"} />
-                          <span>Simpan</span>
+                          <Bookmark size={13} fill={(saved[ad.businessId] || saved[ad.id]) ? "currentColor" : "none"} />
+                          <span>{(saved[ad.businessId] || saved[ad.id]) ? "Tersimpan" : "Simpan"}</span>
                         </button>
                         <span className="ad-card__views">
                           <Eye size={13} />
@@ -739,20 +681,21 @@ export default function Home() {
                     <div className="ad-card__body">
                       <h3 className="ad-card__name">{ad.name}</h3>
                       <p className="ad-card__category">{ad.desc}</p>
-                  </div>
-                </Link>
-              ))}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <button
+                className="ads-carousel__nav ads-carousel__nav--next"
+                onClick={() => setCurrentAdIndex((prev) => Math.min(adsData.length - 3, prev + 1))}
+                aria-label="Next slide"
+              >
+                ›
+              </button>
             </div>
-            <button
-              className="ads-carousel__nav ads-carousel__nav--next"
-              onClick={() => setCurrentAdIndex((prev) => Math.min(adsData.length - 3, prev + 1))}
-              aria-label="Next slide"
-            >
-              ›
-            </button>
-          </div>
           ) : (
-            <div className="ads-empty-state">
+            /* Empty State */
+            <div className="ads-empty-state min-h-[220px] flex flex-col items-center justify-center">
               <Megaphone size={48} style={{ opacity: 0.5 }} />
               <p>Belum ada bisnis yang sedang beriklan</p>
             </div>
@@ -860,11 +803,11 @@ export default function Home() {
                     <button
                       type="button"
                       className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
-                      onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(bisnis.id, false, bisnis.name); }}
                       aria-label="Simpan"
                     >
                       <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                      <span>Simpan</span>
+                      <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
                     </button>
                     <span className="biz-card__views">
                       <Eye size={13} />
@@ -968,9 +911,19 @@ export default function Home() {
           <div className="blog-grid">
             {blogsData.length > 0 ? (
               blogsData.map((post) => (
-              <Link key={post.id} to="/blog" className="blog-card blog-card--link">
-                <div className="blog-card__img-wrap">
-                  <img src={post.img} alt={post.title} className="blog-card__img" loading="lazy" />
+              <Link key={post.id} to={`/blog/${post.id}`} className="blog-card blog-card--link">
+                <div className="blog-card__img-wrap" style={{ position: "relative" }}>
+                  <img src={post.img || getStorageUrl(post.thumbnail)} alt={post.title} className="blog-card__img" loading="lazy" />
+                  <button
+                    type="button"
+                    className={`biz-card__save${saved[post.id] ? " saved" : ""}`}
+                    style={{ position: "absolute", top: "10px", right: "10px", zIndex: 5 }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(post.id, true); }}
+                    aria-label="Simpan Blog/Event"
+                  >
+                    <Bookmark size={13} fill={saved[post.id] ? "currentColor" : "none"} />
+                    <span>Simpan</span>
+                  </button>
                 </div>
                 <div className="blog-card__body">
                   <p className="blog-card__category">{post.category}</p>
