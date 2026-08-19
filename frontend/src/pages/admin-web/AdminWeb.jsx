@@ -149,6 +149,7 @@ const NAV_ITEMS = [
   { id: "ads", label: "Kelola Iklan", icon: <Megaphone size={20} strokeWidth={1.7} /> },
   { id: "premium", label: "Paket Premium", icon: <Crown size={20} strokeWidth={1.7} /> },
   { id: "coupons", label: "Kupon Diskon", icon: <Ticket size={20} strokeWidth={1.7} /> },
+  { id: "referrals", label: "Kelola Referral", icon: <Share2 size={20} strokeWidth={1.7} /> },
   { id: "blogs", label: "Blog & Event", icon: <FileText size={20} strokeWidth={1.7} /> },
   { id: "reports", label: "Laporan Report", icon: <AlertTriangle size={20} strokeWidth={1.7} /> },
   { id: "settings", label: "Pengaturan", icon: <Settings size={20} strokeWidth={1.7} /> },
@@ -180,6 +181,7 @@ export default function AdminWeb() {
     if (tab) return tab;
     const path = location.pathname;
     if (path.includes("/admin/coupons") || path.includes("/coupons")) return "coupons";
+    if (path.includes("/admin/referrals") || path.includes("/referrals")) return "referrals";
     const last = path.split("/").filter(Boolean).pop();
     if (last && NAV_ITEMS.some((i) => i.id === last)) {
       return last;
@@ -452,6 +454,68 @@ export default function AdminWeb() {
   const [premiumPlanFilter, setPremiumPlanFilter] = useState("");
   const [premiumPage, setPremiumPage] = useState(1);
 
+  // ── Referral Management States ──
+  const [referralSubTab, setReferralSubTab] = useState("codes");
+  const [referralStats, setReferralStats] = useState({
+    total_codes: 0,
+    active_codes: 0,
+    inactive_codes: 0,
+    suspended_codes: 0,
+    total_transactions: 0,
+    successful_referrals: 0,
+    pending_transactions: 0,
+    approved_transactions: 0,
+    rejected_transactions: 0,
+    total_discount: 0,
+    total_commission: 0,
+    pending_commission: 0,
+    approved_commission: 0,
+    paid_commission: 0,
+    rejected_commission: 0,
+  });
+
+  const [referralCodes, setReferralCodes] = useState([]);
+  const [referralCodesPage, setReferralCodesPage] = useState(1);
+  const [referralCodesTotalPages, setReferralCodesTotalPages] = useState(1);
+  const [referralCodesTotalItems, setReferralCodesTotalItems] = useState(0);
+  const [referralCodesSearch, setReferralCodesSearch] = useState("");
+  const [referralCodesStatus, setReferralCodesStatus] = useState("");
+  const [loadingReferralCodes, setLoadingReferralCodes] = useState(false);
+
+  const [referralTransactions, setReferralTransactions] = useState([]);
+  const [referralTrxPage, setReferralTrxPage] = useState(1);
+  const [referralTrxTotalPages, setReferralTrxTotalPages] = useState(1);
+  const [referralTrxTotalItems, setReferralTrxTotalItems] = useState(0);
+  const [referralTrxSearch, setReferralTrxSearch] = useState("");
+  const [referralTrxStatus, setReferralTrxStatus] = useState("");
+  const [referralTrxPaymentStatus, setReferralTrxPaymentStatus] = useState("");
+  const [loadingReferralTrx, setLoadingReferralTrx] = useState(false);
+
+  const [referralCommissions, setReferralCommissions] = useState([]);
+  const [referralComPage, setReferralComPage] = useState(1);
+  const [referralComTotalPages, setReferralComTotalPages] = useState(1);
+  const [referralComTotalItems, setReferralComTotalItems] = useState(0);
+  const [referralComSearch, setReferralComSearch] = useState("");
+  const [referralComPayoutStatus, setReferralComPayoutStatus] = useState("");
+  const [loadingReferralCom, setLoadingReferralCom] = useState(false);
+
+  const [referralSettings, setReferralSettings] = useState({
+    referral_enabled: true,
+    referral_discount_percentage: 5,
+    referral_commission_percentage: 10,
+    referral_approval_required: true,
+    referral_code_format: "NAME_RANDOM",
+  });
+  const [loadingReferralSettings, setLoadingReferralSettings] = useState(false);
+  const [savingReferralSettings, setSavingReferralSettings] = useState(false);
+
+  // Referral Modal Inputs
+  const [selectedReferralItem, setSelectedReferralItem] = useState(null);
+  const [editReferralCodeInput, setEditReferralCodeInput] = useState("");
+  const [referralReasonInput, setReferralReasonInput] = useState("");
+  const [referralAdjustAmountInput, setReferralAdjustAmountInput] = useState("");
+  const [referralAdjustReasonInput, setReferralAdjustReasonInput] = useState("");
+
   // ── Modal state ──
   const [modal, setModal] = useState({ show: false, type: "", data: null });
 
@@ -487,6 +551,13 @@ export default function AdminWeb() {
         if (repData.reports) setReportsList(repData.reports);
         if (repData.stats) setReportStats(repData.stats);
       }).catch(err => console.error("Failed reports fetch on tab switch:", err));
+    }
+    if (activeTab === "referrals") {
+      fetchReferralStats();
+      fetchReferralCodes(1);
+      fetchReferralTransactions(1);
+      fetchReferralCommissions(1);
+      fetchReferralSettings();
     }
   }, [activeTab]);
 
@@ -1283,6 +1354,262 @@ export default function AdminWeb() {
     } catch (err) {
       console.error("Gagal menghapus konten report:", err);
       alert(err.response?.data?.message || "Gagal menghapus konten yang dilaporkan.");
+    }
+  };
+
+  // ── Referral Handlers ──
+  const fetchReferralStats = async () => {
+    try {
+      const res = await api.get('/admin/referrals/stats');
+      if (res.data?.data) {
+        setReferralStats(res.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch referral stats:", err);
+    }
+  };
+
+  const fetchReferralCodes = async (page = 1) => {
+    setLoadingReferralCodes(true);
+    try {
+      const params = {
+        page,
+        per_page: 10,
+        search: referralCodesSearch,
+        status: referralCodesStatus,
+      };
+      const res = await api.get('/admin/referrals/codes', { params });
+      const data = res.data?.data || res.data || [];
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      setReferralCodes(list);
+      setReferralCodesPage(res.data?.current_page || page);
+      setReferralCodesTotalPages(res.data?.last_page || 1);
+      setReferralCodesTotalItems(res.data?.total || list.length);
+    } catch (err) {
+      console.error("Failed to fetch referral codes:", err);
+    } finally {
+      setLoadingReferralCodes(false);
+    }
+  };
+
+  const fetchReferralTransactions = async (page = 1) => {
+    setLoadingReferralTrx(true);
+    try {
+      const params = {
+        page,
+        per_page: 10,
+        search: referralTrxSearch,
+        referral_status: referralTrxStatus,
+        payment_status: referralTrxPaymentStatus,
+      };
+      const res = await api.get('/admin/referrals/transactions', { params });
+      const data = res.data?.data || res.data || [];
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      setReferralTransactions(list);
+      setReferralTrxPage(res.data?.current_page || page);
+      setReferralTrxTotalPages(res.data?.last_page || 1);
+      setReferralTrxTotalItems(res.data?.total || list.length);
+    } catch (err) {
+      console.error("Failed to fetch referral transactions:", err);
+    } finally {
+      setLoadingReferralTrx(false);
+    }
+  };
+
+  const fetchReferralCommissions = async (page = 1) => {
+    setLoadingReferralCom(true);
+    try {
+      const params = {
+        page,
+        per_page: 10,
+        search: referralComSearch,
+        payout_status: referralComPayoutStatus,
+      };
+      const res = await api.get('/admin/referrals/commissions', { params });
+      const data = res.data?.data || res.data || [];
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      setReferralCommissions(list);
+      setReferralComPage(res.data?.current_page || page);
+      setReferralComTotalPages(res.data?.last_page || 1);
+      setReferralComTotalItems(res.data?.total || list.length);
+    } catch (err) {
+      console.error("Failed to fetch referral commissions:", err);
+    } finally {
+      setLoadingReferralCom(false);
+    }
+  };
+
+  const fetchReferralSettings = async () => {
+    setLoadingReferralSettings(true);
+    try {
+      const res = await api.get('/admin/referrals/settings');
+      if (res.data?.data) {
+        setReferralSettings(res.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch referral settings:", err);
+    } finally {
+      setLoadingReferralSettings(false);
+    }
+  };
+
+  const handleEditReferralCode = (item) => {
+    setSelectedReferralItem(item);
+    setEditReferralCodeInput(item.referral_code || "");
+    setModal({ show: true, type: "editReferralCode", data: item });
+  };
+
+  const handleSaveReferralCode = async (e) => {
+    e.preventDefault();
+    if (!selectedReferralItem) return;
+    try {
+      await api.put(`/admin/referrals/codes/${selectedReferralItem.id}`, {
+        referral_code: editReferralCodeInput,
+      });
+      alert("Kode referral berhasil diperbarui!");
+      closeModal();
+      fetchReferralCodes(referralCodesPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal memperbarui kode referral.");
+    }
+  };
+
+  const handleToggleReferralStatus = async (item, newStatus) => {
+    try {
+      await api.patch(`/admin/referrals/codes/${item.id}/status`, { status: newStatus });
+      alert(`Status kode referral ${item.referral_code} berhasil diubah menjadi ${newStatus}.`);
+      fetchReferralCodes(referralCodesPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal mengubah status kode referral.");
+    }
+  };
+
+  const handleGenerateReferralCode = async (item) => {
+    if (!confirm(`Generate kode referral baru secara otomatis untuk user "${item.name}"?`)) return;
+    try {
+      const res = await api.post(`/admin/referrals/codes/${item.id}/generate`);
+      alert(res.data?.message || "Kode referral baru berhasil di-generate!");
+      fetchReferralCodes(referralCodesPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal meng-generate kode referral.");
+    }
+  };
+
+  const handleApproveReferralTrx = async (trx) => {
+    try {
+      await api.post(`/admin/referrals/transactions/${trx.id}/approve`);
+      alert("Transaksi referral berhasil disetujui!");
+      closeModal();
+      fetchReferralTransactions(referralTrxPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menyetujui transaksi referral.");
+    }
+  };
+
+  const handleRejectReferralTrx = async (e) => {
+    e.preventDefault();
+    if (!selectedReferralItem) return;
+    if (!referralReasonInput.trim()) {
+      alert("Harap masukkan alasan penolakan transaksi.");
+      return;
+    }
+    try {
+      await api.post(`/admin/referrals/transactions/${selectedReferralItem.id}/reject`, {
+        reason: referralReasonInput,
+      });
+      alert("Transaksi referral berhasil ditolak.");
+      closeModal();
+      fetchReferralTransactions(referralTrxPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menolak transaksi referral.");
+    }
+  };
+
+  const handleApproveCommission = async (com) => {
+    try {
+      await api.post(`/admin/referrals/commissions/${com.id}/approve`);
+      alert("Komisi referral berhasil disetujui!");
+      closeModal();
+      fetchReferralCommissions(referralComPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menyetujui komisi referral.");
+    }
+  };
+
+  const handleRejectCommission = async (e) => {
+    e.preventDefault();
+    if (!selectedReferralItem) return;
+    if (!referralReasonInput.trim()) {
+      alert("Harap masukkan alasan penolakan komisi.");
+      return;
+    }
+    try {
+      await api.post(`/admin/referrals/commissions/${selectedReferralItem.id}/reject`, {
+        reason: referralReasonInput,
+      });
+      alert("Komisi referral berhasil ditolak.");
+      closeModal();
+      fetchReferralCommissions(referralComPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menolak komisi referral.");
+    }
+  };
+
+  const handleMarkCommissionPaid = async (com) => {
+    try {
+      await api.post(`/admin/referrals/commissions/${com.id}/paid`);
+      alert("Komisi referral berhasil ditandai sebagai Lunas (Paid)!");
+      closeModal();
+      fetchReferralCommissions(referralComPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menandai komisi lunas.");
+    }
+  };
+
+  const handleAdjustCommission = async (e) => {
+    e.preventDefault();
+    if (!selectedReferralItem) return;
+    if (referralAdjustAmountInput === "" || Number(referralAdjustAmountInput) < 0) {
+      alert("Nominal komisi penyesuaian tidak valid.");
+      return;
+    }
+    if (!referralAdjustReasonInput.trim()) {
+      alert("Harap masukkan alasan penyesuaian nominal komisi.");
+      return;
+    }
+    try {
+      await api.post(`/admin/referrals/commissions/${selectedReferralItem.id}/adjust`, {
+        adjusted_amount: Number(referralAdjustAmountInput),
+        reason: referralAdjustReasonInput,
+      });
+      alert("Nominal komisi berhasil disesuaikan!");
+      closeModal();
+      fetchReferralCommissions(referralComPage);
+      fetchReferralStats();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menyesuaikan nominal komisi.");
+    }
+  };
+
+  const handleSaveReferralSettings = async (e) => {
+    e.preventDefault();
+    setSavingReferralSettings(true);
+    try {
+      await api.put('/admin/referrals/settings', referralSettings);
+      alert("Pengaturan sistem referral berhasil disimpan!");
+      fetchReferralSettings();
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menyimpan pengaturan referral.");
+    } finally {
+      setSavingReferralSettings(false);
     }
   };
 
@@ -3864,13 +4191,903 @@ export default function AdminWeb() {
     );
   };
 
+  // ── Render Referrals Section ──
+  const renderReferrals = () => {
+    return (
+      <div className="mb-[28px]">
+        {/* Header Title */}
+        <div className="flex items-center justify-between mb-[20px] flex-wrap gap-[12px]">
+          <div>
+            <h2 className="text-[18px] font-bold text-[#0f172a] relative pl-[14px] before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[20px] before:bg-[#007570] before:rounded-[2px]">
+              Pusat Kontrol &amp; Manajemen Referral
+            </h2>
+            <p className="text-[12px] text-[#64748b] mt-[2px] pl-[14px]">
+              Pusat pengelolaan referral user, validasi transaksi paket premium, persetujuan komisi, dan pengaturan program referral
+            </p>
+          </div>
+          <div className="flex items-center gap-[8px]">
+            <button
+              onClick={() => {
+                fetchReferralStats();
+                if (referralSubTab === "codes") fetchReferralCodes(referralCodesPage);
+                else if (referralSubTab === "transactions") fetchReferralTransactions(referralTrxPage);
+                else if (referralSubTab === "commissions") fetchReferralCommissions(referralComPage);
+                else if (referralSubTab === "settings") fetchReferralSettings();
+              }}
+              className="px-[14px] py-[8px] rounded-[8px] bg-white border border-[#e2e8f0] text-[#0f172a] hover:bg-[#f8fafc] text-[12.5px] font-semibold flex items-center gap-[6px] shadow-sm cursor-pointer transition-all"
+            >
+              <RefreshCw size={15} />
+              <span>Muat Ulang</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Stats Cards */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] max-md:grid-cols-2 max-sm:grid-cols-1 gap-[14px] mb-[24px]">
+          {/* Card 1: Total Referral Codes */}
+          <div className="group relative bg-white rounded-[14px] p-[18px] flex items-center gap-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[#e2e8f0]">
+            <div className="w-[46px] h-[46px] rounded-[12px] flex items-center justify-center text-white shrink-0 bg-gradient-to-br from-[#007570] to-[#00b3ab]">
+              <Ticket size={22} strokeWidth={2} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[22px] font-extrabold text-[#0f172a] block leading-[1.2]">{referralStats.total_codes}</span>
+              <span className="text-[11px] text-[#64748b] font-semibold uppercase tracking-[0.5px] block mt-[2px]">Kode Referral</span>
+              <span className="text-[11px] text-[#10b981] font-medium mt-[1px] block">
+                {referralStats.active_codes} Aktif • {referralStats.suspended_codes} Suspend
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: Total User Referral */}
+          <div className="group relative bg-white rounded-[14px] p-[18px] flex items-center gap-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[#e2e8f0]">
+            <div className="w-[46px] h-[46px] rounded-[12px] flex items-center justify-center text-white shrink-0 bg-gradient-to-br from-[#3b82f6] to-[#60a5fa]">
+              <Users size={22} strokeWidth={2} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[22px] font-extrabold text-[#0f172a] block leading-[1.2]">{referralStats.total_users}</span>
+              <span className="text-[11px] text-[#64748b] font-semibold uppercase tracking-[0.5px] block mt-[2px]">Pemilik Referral</span>
+              <span className="text-[11px] text-[#64748b] font-medium mt-[1px] block">
+                Pengguna terdaftar
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: Transaksi Referral */}
+          <div className="group relative bg-white rounded-[14px] p-[18px] flex items-center gap-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[#e2e8f0]">
+            <div className="w-[46px] h-[46px] rounded-[12px] flex items-center justify-center text-white shrink-0 bg-gradient-to-br from-[#8b5cf6] to-[#a78bfa]">
+              <FileText size={22} strokeWidth={2} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[22px] font-extrabold text-[#0f172a] block leading-[1.2]">{referralStats.total_transactions}</span>
+              <span className="text-[11px] text-[#64748b] font-semibold uppercase tracking-[0.5px] block mt-[2px]">Transaksi Referral</span>
+              <span className="text-[11px] text-[#d97706] font-medium mt-[1px] block">
+                {referralStats.pending_transactions} Menunggu Approval
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: Total Komisi */}
+          <div className="group relative bg-white rounded-[14px] p-[18px] flex items-center gap-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[#e2e8f0]">
+            <div className="w-[46px] h-[46px] rounded-[12px] flex items-center justify-center text-white shrink-0 bg-gradient-to-br from-[#10b981] to-[#34d399]">
+              <DollarSign size={22} strokeWidth={2} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[20px] font-extrabold text-[#0f172a] block leading-[1.2]">
+                Rp {Math.round(referralStats.total_commission).toLocaleString("id-ID")}
+              </span>
+              <span className="text-[11px] text-[#64748b] font-semibold uppercase tracking-[0.5px] block mt-[2px]">Total Komisi (10%)</span>
+              <span className="text-[11px] text-[#16a34a] font-medium mt-[1px] block">
+                Rp {Math.round(referralStats.paid_commission).toLocaleString("id-ID")} Lunas
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Subtabs Bar */}
+        <div className="bg-white rounded-[14px] p-[6px] mb-[20px] border border-[#e2e8f0] shadow-sm flex items-center gap-[6px] overflow-x-auto">
+          {[
+            { id: "codes", label: "Daftar Kode Referral", icon: Ticket, count: referralStats.total_codes },
+            { id: "transactions", label: "Transaksi Referral", icon: FileText, count: referralStats.total_transactions, badge: referralStats.pending_transactions > 0 ? `${referralStats.pending_transactions} Pending` : null },
+            { id: "commissions", label: "Manajemen Komisi", icon: DollarSign, count: null },
+            { id: "settings", label: "Pengaturan Sistem", icon: Settings, count: null },
+          ].map((tabItem) => {
+            const Icon = tabItem.icon;
+            const isActive = referralSubTab === tabItem.id;
+            return (
+              <button
+                key={tabItem.id}
+                onClick={() => {
+                  setReferralSubTab(tabItem.id);
+                  if (tabItem.id === "codes") fetchReferralCodes(1);
+                  else if (tabItem.id === "transactions") fetchReferralTransactions(1);
+                  else if (tabItem.id === "commissions") fetchReferralCommissions(1);
+                  else if (tabItem.id === "settings") fetchReferralSettings();
+                }}
+                className={`flex items-center gap-[8px] px-[16px] py-[10px] rounded-[10px] text-[13px] font-bold transition-all whitespace-nowrap cursor-pointer border-0 ${
+                  isActive
+                    ? "bg-[#007570] text-white shadow-sm"
+                    : "bg-transparent text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]"
+                }`}
+              >
+                <Icon size={16} />
+                <span>{tabItem.label}</span>
+                {tabItem.count !== null && (
+                  <span className={`px-[7px] py-[2px] rounded-full text-[11px] font-extrabold ${isActive ? "bg-white/20 text-white" : "bg-[#f1f5f9] text-[#64748b]"}`}>
+                    {tabItem.count}
+                  </span>
+                )}
+                {tabItem.badge && (
+                  <span className="px-[8px] py-[2px] rounded-full text-[10.5px] font-extrabold bg-[#fef3c7] text-[#b45309] border border-[#fde68a]">
+                    {tabItem.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Subtab 1: Referral Codes View */}
+        {referralSubTab === "codes" && (
+          <div className="bg-white rounded-[14px] border border-[#e2e8f0] shadow-sm overflow-hidden">
+            {/* Filter & Search */}
+            <div className="p-[16px] border-b border-[#e2e8f0] flex flex-wrap gap-[10px] items-center justify-between bg-[#fafbfc]">
+              <div className="flex items-center gap-[10px] flex-1 min-w-[240px] max-md:w-full">
+                <div className="flex items-center gap-[8px] flex-1 bg-white border border-[#e2e8f0] rounded-[8px] px-[12px] py-[8px]">
+                  <Search size={16} className="text-[#64748b] shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Cari user, email, atau kode referral..."
+                    value={referralCodesSearch}
+                    onChange={(e) => setReferralCodesSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') fetchReferralCodes(1); }}
+                    className="flex-1 border-0 outline-none text-[13px] text-[#0f172a]"
+                  />
+                  {referralCodesSearch && (
+                    <button onClick={() => { setReferralCodesSearch(""); fetchReferralCodes(1); }} className="text-[#94a3b8] hover:text-[#0f172a] border-0 bg-transparent cursor-pointer">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => fetchReferralCodes(1)}
+                  className="px-[14px] py-[8px] rounded-[8px] bg-[#007570] text-white text-[13px] font-semibold cursor-pointer border-0 hover:bg-[#005a58]"
+                >
+                  Cari
+                </button>
+              </div>
+
+              <div className="flex items-center gap-[10px] max-md:w-full">
+                <select
+                  value={referralCodesStatus}
+                  onChange={(e) => {
+                    setReferralCodesStatus(e.target.value);
+                    setTimeout(() => fetchReferralCodes(1), 50);
+                  }}
+                  className="px-[12px] py-[8px] bg-white border border-[#e2e8f0] rounded-[8px] text-[13px] text-[#0f172a] cursor-pointer outline-none focus:border-[#007570]"
+                >
+                  <option value="">Semua Status</option>
+                  <option value="active">Aktif (Active)</option>
+                  <option value="inactive">Nonaktif (Inactive)</option>
+                  <option value="suspended">Ditangguhkan (Suspended)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-[13px]">
+                <thead>
+                  <tr className="bg-[#f8fafc] text-[#64748b] text-[11.5px] uppercase tracking-wider border-b border-[#e2e8f0]">
+                    <th className="p-[14px_16px] font-bold">User / Pemilik</th>
+                    <th className="p-[14px_16px] font-bold">Kode Referral</th>
+                    <th className="p-[14px_16px] font-bold text-center">Penggunaan</th>
+                    <th className="p-[14px_16px] font-bold text-right">Total Transaksi</th>
+                    <th className="p-[14px_16px] font-bold text-right">Komisi Dihasilkan</th>
+                    <th className="p-[14px_16px] font-bold text-center">Status</th>
+                    <th className="p-[14px_16px] font-bold">Terdaftar</th>
+                    <th className="p-[14px_16px] font-bold text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e2e8f0]">
+                  {loadingReferralCodes ? (
+                    <tr>
+                      <td colSpan={8} className="p-[36px] text-center text-[#64748b]">
+                        <RefreshCw size={24} className="animate-spin mx-auto mb-[8px] text-[#007570]" />
+                        <span>Memuat daftar kode referral...</span>
+                      </td>
+                    </tr>
+                  ) : referralCodes.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-[36px] text-center text-[#64748b]">
+                        <Ticket size={36} className="mx-auto mb-[8px] text-[#cbd5e1]" />
+                        <p className="font-semibold text-[#0f172a]">Belum ada kode referral yang cocok</p>
+                        <p className="text-[12px] text-[#64748b] mt-[2px]">Coba ubah kata kunci pencarian atau filter status</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    referralCodes.map((item) => (
+                      <tr key={item.id} className="hover:bg-[#f8fafc] transition-colors">
+                        <td className="p-[14px_16px]">
+                          <div className="flex items-center gap-[10px]">
+                            <img
+                              src={item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=007570&color=fff`}
+                              alt={item.name}
+                              className="w-[34px] h-[34px] rounded-full object-cover border border-[#e2e8f0]"
+                            />
+                            <div>
+                              <div className="font-bold text-[#0f172a]">{item.name}</div>
+                              <div className="text-[11.5px] text-[#64748b]">{item.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-[14px_16px]">
+                          <div className="flex items-center gap-[6px]">
+                            <span className="font-mono font-bold px-[8px] py-[3px] rounded-[6px] bg-[#f0fdfa] text-[#007570] border border-[#ccfbf1] text-[12px]">
+                              {item.referral_code}
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.referral_code);
+                                alert(`Kode ${item.referral_code} berhasil disalin!`);
+                              }}
+                              className="p-[4px] rounded text-[#94a3b8] hover:text-[#007570] hover:bg-[#f1f5f9] border-0 bg-transparent cursor-pointer"
+                              title="Salin Kode"
+                            >
+                              <Copy size={13} />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="p-[14px_16px] text-center">
+                          <span className="inline-flex items-center px-[8px] py-[2px] rounded-full bg-[#eff6ff] text-[#1d4ed8] font-bold text-[11.5px]">
+                            {item.total_uses}x
+                          </span>
+                        </td>
+                        <td className="p-[14px_16px] text-right font-semibold text-[#0f172a]">
+                          Rp {Math.round(item.total_transactions).toLocaleString("id-ID")}
+                        </td>
+                        <td className="p-[14px_16px] text-right">
+                          <div className="font-bold text-[#16a34a]">
+                            Rp {Math.round(item.earned_commission).toLocaleString("id-ID")}
+                          </div>
+                          {item.total_commission > item.earned_commission && (
+                            <div className="text-[10.5px] text-[#64748b]">
+                              Total: Rp {Math.round(item.total_commission).toLocaleString("id-ID")}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-[14px_16px] text-center">
+                          <span
+                            className={`inline-flex items-center px-[8px] py-[3px] rounded-full text-[11px] font-bold ${
+                              item.status === "active"
+                                ? "bg-[#dcfce7] text-[#16a34a]"
+                                : item.status === "suspended"
+                                ? "bg-[#fee2e2] text-[#dc2626]"
+                                : "bg-[#f1f5f9] text-[#64748b]"
+                            }`}
+                          >
+                            {item.status === "active" ? "Aktif" : item.status === "suspended" ? "Suspended" : "Nonaktif"}
+                          </span>
+                        </td>
+                        <td className="p-[14px_16px] text-[#64748b] text-[12px] whitespace-nowrap">
+                          {item.created_at}
+                        </td>
+                        <td className="p-[14px_16px] text-center">
+                          <div className="flex items-center justify-center gap-[6px]">
+                            <button
+                              onClick={() => handleEditReferralCode(item)}
+                              className="p-[6px_10px] rounded-[6px] bg-[#f1f5f9] text-[#0f172a] hover:bg-[#e2e8f0] text-[11.5px] font-semibold flex items-center gap-[4px] border-0 cursor-pointer transition-all"
+                              title="Edit Kode"
+                            >
+                              <Edit size={13} />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleGenerateReferralCode(item)}
+                              className="p-[6px_10px] rounded-[6px] bg-[#eff6ff] text-[#2563eb] hover:bg-[#dbeafe] text-[11.5px] font-semibold flex items-center gap-[4px] border-0 cursor-pointer transition-all"
+                              title="Generate Ulang Kode"
+                            >
+                              <RefreshCw size={13} />
+                              <span>Regen</span>
+                            </button>
+                            <select
+                              value={item.status}
+                              onChange={(e) => handleToggleReferralStatus(item, e.target.value)}
+                              className="p-[4px_6px] rounded-[6px] bg-white border border-[#e2e8f0] text-[11px] font-semibold text-[#0f172a] cursor-pointer outline-none"
+                            >
+                              <option value="active">Set Aktif</option>
+                              <option value="inactive">Set Nonaktif</option>
+                              <option value="suspended">Set Suspend</option>
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="p-[12px_16px] border-t border-[#e2e8f0] flex items-center justify-between text-[12.5px] text-[#64748b] flex-wrap gap-[10px]">
+              <div>
+                Menampilkan halaman <strong>{referralCodesPage}</strong> dari <strong>{referralCodesTotalPages}</strong> (Total {referralCodesTotalItems} user)
+              </div>
+              <div className="flex items-center gap-[6px]">
+                <button
+                  disabled={referralCodesPage <= 1}
+                  onClick={() => fetchReferralCodes(referralCodesPage - 1)}
+                  className="px-[12px] py-[6px] rounded-[6px] bg-white border border-[#e2e8f0] text-[#0f172a] hover:bg-[#f8fafc] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Sebelumnya
+                </button>
+                <button
+                  disabled={referralCodesPage >= referralCodesTotalPages}
+                  onClick={() => fetchReferralCodes(referralCodesPage + 1)}
+                  className="px-[12px] py-[6px] rounded-[6px] bg-white border border-[#e2e8f0] text-[#0f172a] hover:bg-[#f8fafc] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Subtab 2: Referral Transactions View */}
+        {referralSubTab === "transactions" && (
+          <div className="bg-white rounded-[14px] border border-[#e2e8f0] shadow-sm overflow-hidden">
+            {/* Filter & Search */}
+            <div className="p-[16px] border-b border-[#e2e8f0] flex flex-wrap gap-[10px] items-center justify-between bg-[#fafbfc]">
+              <div className="flex items-center gap-[10px] flex-1 min-w-[240px] max-md:w-full">
+                <div className="flex items-center gap-[8px] flex-1 bg-white border border-[#e2e8f0] rounded-[8px] px-[12px] py-[8px]">
+                  <Search size={16} className="text-[#64748b] shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Cari pembeli, pemilik, kode referral, no transaksi..."
+                    value={referralTrxSearch}
+                    onChange={(e) => setReferralTrxSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') fetchReferralTransactions(1); }}
+                    className="flex-1 border-0 outline-none text-[13px] text-[#0f172a]"
+                  />
+                  {referralTrxSearch && (
+                    <button onClick={() => { setReferralTrxSearch(""); fetchReferralTransactions(1); }} className="text-[#94a3b8] hover:text-[#0f172a] border-0 bg-transparent cursor-pointer">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => fetchReferralTransactions(1)}
+                  className="px-[14px] py-[8px] rounded-[8px] bg-[#007570] text-white text-[13px] font-semibold cursor-pointer border-0 hover:bg-[#005a58]"
+                >
+                  Cari
+                </button>
+              </div>
+
+              <div className="flex items-center gap-[10px] flex-wrap max-md:w-full">
+                <select
+                  value={referralTrxStatus}
+                  onChange={(e) => {
+                    setReferralTrxStatus(e.target.value);
+                    setTimeout(() => fetchReferralTransactions(1), 50);
+                  }}
+                  className="px-[12px] py-[8px] bg-white border border-[#e2e8f0] rounded-[8px] text-[13px] text-[#0f172a] cursor-pointer outline-none focus:border-[#007570]"
+                >
+                  <option value="">Semua Status Referral</option>
+                  <option value="pending">Menunggu Approval (Pending)</option>
+                  <option value="approved">Disetujui (Approved)</option>
+                  <option value="rejected">Ditolak (Rejected)</option>
+                  <option value="cancelled">Dibatalkan (Cancelled)</option>
+                </select>
+
+                <select
+                  value={referralTrxPaymentStatus}
+                  onChange={(e) => {
+                    setReferralTrxPaymentStatus(e.target.value);
+                    setTimeout(() => fetchReferralTransactions(1), 50);
+                  }}
+                  className="px-[12px] py-[8px] bg-white border border-[#e2e8f0] rounded-[8px] text-[13px] text-[#0f172a] cursor-pointer outline-none focus:border-[#007570]"
+                >
+                  <option value="">Semua Status Bayar</option>
+                  <option value="paid">Sudah Dibayar (Paid)</option>
+                  <option value="pending">Menunggu Pembayaran</option>
+                  <option value="failed">Gagal / Ditolak</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-[13px]">
+                <thead>
+                  <tr className="bg-[#f8fafc] text-[#64748b] text-[11.5px] uppercase tracking-wider border-b border-[#e2e8f0]">
+                    <th className="p-[14px_16px] font-bold">ID Transaksi</th>
+                    <th className="p-[14px_16px] font-bold">Pembeli &amp; Usaha</th>
+                    <th className="p-[14px_16px] font-bold">Pemilik Referral</th>
+                    <th className="p-[14px_16px] font-bold text-right">Harga Normal</th>
+                    <th className="p-[14px_16px] font-bold text-right">Diskon (5%)</th>
+                    <th className="p-[14px_16px] font-bold text-right">Harga Final</th>
+                    <th className="p-[14px_16px] font-bold text-right">Komisi (10%)</th>
+                    <th className="p-[14px_16px] font-bold text-center">Status Bayar</th>
+                    <th className="p-[14px_16px] font-bold text-center">Status Referral</th>
+                    <th className="p-[14px_16px] font-bold text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e2e8f0]">
+                  {loadingReferralTrx ? (
+                    <tr>
+                      <td colSpan={10} className="p-[36px] text-center text-[#64748b]">
+                        <RefreshCw size={24} className="animate-spin mx-auto mb-[8px] text-[#007570]" />
+                        <span>Memuat daftar transaksi referral...</span>
+                      </td>
+                    </tr>
+                  ) : referralTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="p-[36px] text-center text-[#64748b]">
+                        <FileText size={36} className="mx-auto mb-[8px] text-[#cbd5e1]" />
+                        <p className="font-semibold text-[#0f172a]">Belum ada transaksi referral</p>
+                        <p className="text-[12px] text-[#64748b] mt-[2px]">Transaksi pembelian paket Premium dengan kode referral akan muncul di sini</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    referralTransactions.map((trx) => (
+                      <tr key={trx.id} className="hover:bg-[#f8fafc] transition-colors">
+                        <td className="p-[14px_16px] font-mono text-[12px] font-bold text-[#007570]">
+                          {trx.transaction_code}
+                          <div className="text-[11px] text-[#64748b] font-normal font-sans mt-[1px]">{trx.created_at}</div>
+                        </td>
+                        <td className="p-[14px_16px]">
+                          <div className="font-bold text-[#0f172a]">{trx.buyer.name}</div>
+                          <div className="text-[11.5px] text-[#64748b]">{trx.package_name} • {trx.business_name}</div>
+                        </td>
+                        <td className="p-[14px_16px]">
+                          <div className="font-semibold text-[#0f172a]">{trx.referrer.name}</div>
+                          <span className="font-mono text-[11px] text-[#007570] font-bold bg-[#f0fdfa] px-[6px] py-[1px] rounded border border-[#ccfbf1]">
+                            {trx.referral_code}
+                          </span>
+                        </td>
+                        <td className="p-[14px_16px] text-right text-[#64748b]">
+                          Rp {Math.round(trx.original_price).toLocaleString("id-ID")}
+                        </td>
+                        <td className="p-[14px_16px] text-right font-semibold text-[#dc2626]">
+                          - Rp {Math.round(trx.discount_amount).toLocaleString("id-ID")}
+                        </td>
+                        <td className="p-[14px_16px] text-right font-bold text-[#0f172a]">
+                          Rp {Math.round(trx.final_price).toLocaleString("id-ID")}
+                        </td>
+                        <td className="p-[14px_16px] text-right font-bold text-[#16a34a]">
+                          Rp {Math.round(trx.commission_amount).toLocaleString("id-ID")}
+                        </td>
+                        <td className="p-[14px_16px] text-center">
+                          <span
+                            className={`inline-flex items-center px-[8px] py-[2.5px] rounded-full text-[11px] font-bold ${
+                              trx.payment_status === "paid" || trx.payment_status === "approved"
+                                ? "bg-[#dcfce7] text-[#16a34a]"
+                                : trx.payment_status === "failed"
+                                ? "bg-[#fee2e2] text-[#dc2626]"
+                                : "bg-[#fef3c7] text-[#d97706]"
+                            }`}
+                          >
+                            {trx.payment_status === "paid" || trx.payment_status === "approved" ? "Lunas" : trx.payment_status === "failed" ? "Gagal" : "Pending"}
+                          </span>
+                        </td>
+                        <td className="p-[14px_16px] text-center">
+                          <span
+                            className={`inline-flex items-center px-[8px] py-[2.5px] rounded-full text-[11px] font-bold ${
+                              trx.referral_status === "approved" || trx.referral_status === "paid"
+                                ? "bg-[#dcfce7] text-[#16a34a]"
+                                : trx.referral_status === "rejected"
+                                ? "bg-[#fee2e2] text-[#dc2626]"
+                                : "bg-[#fef3c7] text-[#d97706]"
+                            }`}
+                          >
+                            {trx.referral_status === "approved" ? "Disetujui" : trx.referral_status === "rejected" ? "Ditolak" : trx.referral_status === "paid" ? "Paid" : "Pending"}
+                          </span>
+                        </td>
+                        <td className="p-[14px_16px] text-center">
+                          <div className="flex items-center justify-center gap-[6px]">
+                            {trx.referral_status === "pending" && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedReferralItem(trx);
+                                    setModal({ show: true, type: "confirmApproveReferralTrx", data: trx });
+                                  }}
+                                  className="p-[6px_10px] rounded-[6px] bg-[#dcfce7] text-[#16a34a] hover:bg-[#bbf7d0] text-[11.5px] font-bold flex items-center gap-[3px] border-0 cursor-pointer transition-all"
+                                  title="Setujui Referral"
+                                >
+                                  <Check size={13} />
+                                  <span>Approve</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedReferralItem(trx);
+                                    setReferralReasonInput("");
+                                    setModal({ show: true, type: "rejectReferralTrx", data: trx });
+                                  }}
+                                  className="p-[6px_10px] rounded-[6px] bg-[#fee2e2] text-[#dc2626] hover:bg-[#fecaca] text-[11.5px] font-bold flex items-center gap-[3px] border-0 cursor-pointer transition-all"
+                                  title="Tolak Referral"
+                                >
+                                  <X size={13} />
+                                  <span>Tolak</span>
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedReferralItem(trx);
+                                setModal({ show: true, type: "viewReferralDetail", data: trx });
+                              }}
+                              className="p-[6px_10px] rounded-[6px] bg-[#f1f5f9] text-[#0f172a] hover:bg-[#e2e8f0] text-[11.5px] font-semibold flex items-center gap-[4px] border-0 cursor-pointer transition-all"
+                              title="Lihat Detail & Timeline"
+                            >
+                              <Eye size={13} />
+                              <span>Detail</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="p-[12px_16px] border-t border-[#e2e8f0] flex items-center justify-between text-[12.5px] text-[#64748b] flex-wrap gap-[10px]">
+              <div>
+                Menampilkan halaman <strong>{referralTrxPage}</strong> dari <strong>{referralTrxTotalPages}</strong> (Total {referralTrxTotalItems} transaksi)
+              </div>
+              <div className="flex items-center gap-[6px]">
+                <button
+                  disabled={referralTrxPage <= 1}
+                  onClick={() => fetchReferralTransactions(referralTrxPage - 1)}
+                  className="px-[12px] py-[6px] rounded-[6px] bg-white border border-[#e2e8f0] text-[#0f172a] hover:bg-[#f8fafc] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Sebelumnya
+                </button>
+                <button
+                  disabled={referralTrxPage >= referralTrxTotalPages}
+                  onClick={() => fetchReferralTransactions(referralTrxPage + 1)}
+                  className="px-[12px] py-[6px] rounded-[6px] bg-white border border-[#e2e8f0] text-[#0f172a] hover:bg-[#f8fafc] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Subtab 3: Commissions View */}
+        {referralSubTab === "commissions" && (
+          <div className="bg-white rounded-[14px] border border-[#e2e8f0] shadow-sm overflow-hidden">
+            {/* Filter & Search */}
+            <div className="p-[16px] border-b border-[#e2e8f0] flex flex-wrap gap-[10px] items-center justify-between bg-[#fafbfc]">
+              <div className="flex items-center gap-[10px] flex-1 min-w-[240px] max-md:w-full">
+                <div className="flex items-center gap-[8px] flex-1 bg-white border border-[#e2e8f0] rounded-[8px] px-[12px] py-[8px]">
+                  <Search size={16} className="text-[#64748b] shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Cari pemilik komisi, pembeli, kode referral..."
+                    value={referralComSearch}
+                    onChange={(e) => setReferralComSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') fetchReferralCommissions(1); }}
+                    className="flex-1 border-0 outline-none text-[13px] text-[#0f172a]"
+                  />
+                  {referralComSearch && (
+                    <button onClick={() => { setReferralComSearch(""); fetchReferralCommissions(1); }} className="text-[#94a3b8] hover:text-[#0f172a] border-0 bg-transparent cursor-pointer">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => fetchReferralCommissions(1)}
+                  className="px-[14px] py-[8px] rounded-[8px] bg-[#007570] text-white text-[13px] font-semibold cursor-pointer border-0 hover:bg-[#005a58]"
+                >
+                  Cari
+                </button>
+              </div>
+
+              <div className="flex items-center gap-[10px] max-md:w-full">
+                <select
+                  value={referralComPayoutStatus}
+                  onChange={(e) => {
+                    setReferralComPayoutStatus(e.target.value);
+                    setTimeout(() => fetchReferralCommissions(1), 50);
+                  }}
+                  className="px-[12px] py-[8px] bg-white border border-[#e2e8f0] rounded-[8px] text-[13px] text-[#0f172a] cursor-pointer outline-none focus:border-[#007570]"
+                >
+                  <option value="">Semua Status Komisi</option>
+                  <option value="pending">Menunggu (Pending)</option>
+                  <option value="approved">Disetujui (Siap Cair)</option>
+                  <option value="paid">Lunas (Sudah Dibayarkan)</option>
+                  <option value="rejected">Ditolak (Rejected)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-[13px]">
+                <thead>
+                  <tr className="bg-[#f8fafc] text-[#64748b] text-[11.5px] uppercase tracking-wider border-b border-[#e2e8f0]">
+                    <th className="p-[14px_16px] font-bold">ID Transaksi</th>
+                    <th className="p-[14px_16px] font-bold">Penerima Komisi</th>
+                    <th className="p-[14px_16px] font-bold">Pembeli</th>
+                    <th className="p-[14px_16px] font-bold text-right">Harga Final</th>
+                    <th className="p-[14px_16px] font-bold text-right">Nominal Komisi (10%)</th>
+                    <th className="p-[14px_16px] font-bold text-center">Status Pencairan</th>
+                    <th className="p-[14px_16px] font-bold">Tanggal Cair</th>
+                    <th className="p-[14px_16px] font-bold text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e2e8f0]">
+                  {loadingReferralCom ? (
+                    <tr>
+                      <td colSpan={8} className="p-[36px] text-center text-[#64748b]">
+                        <RefreshCw size={24} className="animate-spin mx-auto mb-[8px] text-[#007570]" />
+                        <span>Memuat data komisi referral...</span>
+                      </td>
+                    </tr>
+                  ) : referralCommissions.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-[36px] text-center text-[#64748b]">
+                        <DollarSign size={36} className="mx-auto mb-[8px] text-[#cbd5e1]" />
+                        <p className="font-semibold text-[#0f172a]">Belum ada komisi referral</p>
+                        <p className="text-[12px] text-[#64748b] mt-[2px]">Data komisi dari transaksi referral akan tercatat di tabel ini</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    referralCommissions.map((com) => (
+                      <tr key={com.id} className="hover:bg-[#f8fafc] transition-colors">
+                        <td className="p-[14px_16px] font-mono text-[12px] font-bold text-[#007570]">
+                          {com.transaction_code}
+                          <div className="text-[11px] text-[#64748b] font-normal font-sans mt-[1px]">{com.created_at}</div>
+                        </td>
+                        <td className="p-[14px_16px]">
+                          <div className="font-bold text-[#0f172a]">{com.referrer.name}</div>
+                          <div className="text-[11.5px] text-[#64748b]">{com.referrer.email} • {com.referrer.phone}</div>
+                        </td>
+                        <td className="p-[14px_16px] text-[#0f172a] font-medium">
+                          {com.buyer_name}
+                        </td>
+                        <td className="p-[14px_16px] text-right font-semibold text-[#0f172a]">
+                          Rp {Math.round(com.final_price).toLocaleString("id-ID")}
+                        </td>
+                        <td className="p-[14px_16px] text-right">
+                          <div className="font-bold text-[#16a34a] text-[14px]">
+                            Rp {Math.round(com.commission_amount).toLocaleString("id-ID")}
+                          </div>
+                          {com.adjusted_amount !== null && (
+                            <span className="text-[10px] text-[#d97706] font-semibold block mt-[1px]" title={`Disesuaikan oleh ${com.adjusted_by}: ${com.adjustment_reason}`}>
+                              ✏️ Di-adjust Admin
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-[14px_16px] text-center">
+                          <span
+                            className={`inline-flex items-center px-[8px] py-[3px] rounded-full text-[11px] font-bold ${
+                              com.payout_status === "paid"
+                                ? "bg-[#dcfce7] text-[#16a34a]"
+                                : com.payout_status === "approved"
+                                ? "bg-[#dbeafe] text-[#1d4ed8]"
+                                : com.payout_status === "rejected"
+                                ? "bg-[#fee2e2] text-[#dc2626]"
+                                : "bg-[#fef3c7] text-[#d97706]"
+                            }`}
+                          >
+                            {com.payout_status === "paid" ? "Lunas (Paid)" : com.payout_status === "approved" ? "Disetujui" : com.payout_status === "rejected" ? "Ditolak" : "Pending"}
+                          </span>
+                        </td>
+                        <td className="p-[14px_16px] text-[12px] text-[#64748b]">
+                          {com.paid_at || "-"}
+                        </td>
+                        <td className="p-[14px_16px] text-center">
+                          <div className="flex items-center justify-center gap-[6px]">
+                            {com.payout_status !== "paid" && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedReferralItem(com);
+                                    setModal({ show: true, type: "confirmMarkPaidReferralCom", data: com });
+                                  }}
+                                  className="p-[6px_10px] rounded-[6px] bg-[#dcfce7] text-[#16a34a] hover:bg-[#bbf7d0] text-[11.5px] font-bold flex items-center gap-[3px] border-0 cursor-pointer transition-all"
+                                  title="Tandai Sudah Dibayarkan"
+                                >
+                                  <DollarSign size={13} />
+                                  <span>Bayar / Lunas</span>
+                                </button>
+                                {com.payout_status !== "approved" && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedReferralItem(com);
+                                      setModal({ show: true, type: "confirmApproveReferralCom", data: com });
+                                    }}
+                                    className="p-[6px_10px] rounded-[6px] bg-[#eff6ff] text-[#2563eb] hover:bg-[#dbeafe] text-[11.5px] font-semibold border-0 cursor-pointer"
+                                    title="Approve Komisi"
+                                  >
+                                    <Check size={13} />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedReferralItem(com);
+                                setReferralAdjustAmountInput(String(com.commission_amount));
+                                setReferralAdjustReasonInput(com.adjustment_reason || "");
+                                setModal({ show: true, type: "adjustReferralCom", data: com });
+                              }}
+                              className="p-[6px_10px] rounded-[6px] bg-[#f8fafc] border border-[#e2e8f0] text-[#64748b] hover:text-[#0f172a] hover:bg-[#f1f5f9] text-[11.5px] font-semibold flex items-center gap-[3px] cursor-pointer"
+                              title="Adjustment Komisi"
+                            >
+                              <Edit size={13} />
+                              <span>Adjust</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="p-[12px_16px] border-t border-[#e2e8f0] flex items-center justify-between text-[12.5px] text-[#64748b] flex-wrap gap-[10px]">
+              <div>
+                Menampilkan halaman <strong>{referralComPage}</strong> dari <strong>{referralComTotalPages}</strong> (Total {referralComTotalItems} item komisi)
+              </div>
+              <div className="flex items-center gap-[6px]">
+                <button
+                  disabled={referralComPage <= 1}
+                  onClick={() => fetchReferralCommissions(referralComPage - 1)}
+                  className="px-[12px] py-[6px] rounded-[6px] bg-white border border-[#e2e8f0] text-[#0f172a] hover:bg-[#f8fafc] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Sebelumnya
+                </button>
+                <button
+                  disabled={referralComPage >= referralComTotalPages}
+                  onClick={() => fetchReferralCommissions(referralComPage + 1)}
+                  className="px-[12px] py-[6px] rounded-[6px] bg-white border border-[#e2e8f0] text-[#0f172a] hover:bg-[#f8fafc] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Subtab 4: Referral Settings View */}
+        {referralSubTab === "settings" && (
+          <div className="bg-white rounded-[14px] border border-[#e2e8f0] shadow-sm p-[24px] max-w-[800px]">
+            <div className="mb-[20px] pb-[16px] border-b border-[#e2e8f0]">
+              <h3 className="text-[16px] font-bold text-[#0f172a]">Pengaturan Sistem Referral</h3>
+              <p className="text-[12.5px] text-[#64748b] mt-[2px]">
+                Konfigurasi persentase diskon, komisi, serta aturan approval program referral
+              </p>
+            </div>
+
+            {loadingReferralSettings ? (
+              <div className="p-[36px] text-center text-[#64748b]">
+                <RefreshCw size={24} className="animate-spin mx-auto mb-[8px] text-[#007570]" />
+                <span>Memuat pengaturan referral...</span>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveReferralSettings} className="flex flex-col gap-[20px]">
+                {/* 1. Status Fitur */}
+                <div className="flex items-center justify-between p-[16px] rounded-[12px] bg-[#f8fafc] border border-[#e2e8f0]">
+                  <div>
+                    <h4 className="text-[14px] font-bold text-[#0f172a]">Status Program Referral</h4>
+                    <p className="text-[12px] text-[#64748b] mt-[1px]">
+                      Aktifkan atau nonaktifkan penggunaan kode referral pada checkout paket Premium
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={referralSettings.referral_enabled}
+                      onChange={(e) => setReferralSettings({ ...referralSettings, referral_enabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-[44px] h-[24px] bg-[#cbd5e1] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#cbd5e1] after:border after:rounded-full after:h-[20px] after:w-[20px] after:transition-all peer-checked:bg-[#007570]"></div>
+                  </label>
+                </div>
+
+                {/* 2. Persentase Diskon Pembeli */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
+                  <div className="p-[16px] rounded-[12px] border border-[#e2e8f0] bg-white">
+                    <label className="block text-[12.5px] font-bold text-[#0f172a] mb-[4px]">
+                      Persentase Diskon Pembeli (%) *
+                    </label>
+                    <p className="text-[11.5px] text-[#64748b] mb-[10px]">
+                      Diskon yang didapatkan pengguna saat upgrade ke Premium (Default: 5%)
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        required
+                        value={referralSettings.referral_discount_percentage}
+                        onChange={(e) => setReferralSettings({ ...referralSettings, referral_discount_percentage: Number(e.target.value) })}
+                        className="w-full px-[14px] py-[10px] rounded-[8px] border border-[#e2e8f0] text-[14px] font-bold text-[#0f172a] outline-none focus:border-[#007570]"
+                      />
+                      <span className="absolute right-[14px] top-1/2 -translate-y-1/2 font-bold text-[#64748b]">%</span>
+                    </div>
+                  </div>
+
+                  {/* 3. Persentase Komisi Pemilik */}
+                  <div className="p-[16px] rounded-[12px] border border-[#e2e8f0] bg-white">
+                    <label className="block text-[12.5px] font-bold text-[#0f172a] mb-[4px]">
+                      Persentase Komisi Pemilik Kode (%) *
+                    </label>
+                    <p className="text-[11.5px] text-[#64748b] mb-[10px]">
+                      Komisi yang didapatkan dari harga setelah diskon (Default: 10%)
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        required
+                        value={referralSettings.referral_commission_percentage}
+                        onChange={(e) => setReferralSettings({ ...referralSettings, referral_commission_percentage: Number(e.target.value) })}
+                        className="w-full px-[14px] py-[10px] rounded-[8px] border border-[#e2e8f0] text-[14px] font-bold text-[#0f172a] outline-none focus:border-[#007570]"
+                      />
+                      <span className="absolute right-[14px] top-1/2 -translate-y-1/2 font-bold text-[#64748b]">%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Wajib Approval Manual */}
+                <div className="flex items-center justify-between p-[16px] rounded-[12px] bg-[#f8fafc] border border-[#e2e8f0]">
+                  <div>
+                    <h4 className="text-[14px] font-bold text-[#0f172a]">Wajib Approval Admin untuk Transaksi</h4>
+                    <p className="text-[12px] text-[#64748b] mt-[1px]">
+                      Setiap transaksi referral masuk status Pending dan memerlukan approval admin sebelum komisi dicairkan
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={referralSettings.referral_approval_required}
+                      onChange={(e) => setReferralSettings({ ...referralSettings, referral_approval_required: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-[44px] h-[24px] bg-[#cbd5e1] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#cbd5e1] after:border after:rounded-full after:h-[20px] after:w-[20px] after:transition-all peer-checked:bg-[#007570]"></div>
+                  </label>
+                </div>
+
+                {/* Submit button */}
+                <div className="flex justify-end pt-[10px]">
+                  <button
+                    type="submit"
+                    disabled={savingReferralSettings}
+                    className="px-[24px] py-[12px] rounded-[10px] bg-[#007570] text-white font-bold text-[13.5px] cursor-pointer border-0 shadow-md hover:bg-[#005a58] transition-all disabled:opacity-50 flex items-center gap-[8px]"
+                  >
+                    {savingReferralSettings && <RefreshCw size={16} className="animate-spin" />}
+                    <span>{savingReferralSettings ? "Menyimpan..." : "Simpan Pengaturan Referral"}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ── Modal Component ──
   const renderModal = () => {
     if (!modal.show) return null;
 
+    const isReferralModal = modal.type?.includes("Referral") || modal.type?.includes("referral");
+    const isDetailModal = modal.type === "viewReferralDetail" || modal.type === "viewReportDetail" || modal.type === "viewAdDetail";
+
     return (
       <div className="fixed inset-0 bg-black/55 backdrop-blur-[6px] flex items-center justify-center z-[500] p-[24px] animate-fade-in" onClick={closeModal}>
-        <div className="bg-white rounded-[16px] w-full max-w-[540px] shadow-[0_20px_60px_rgba(0,0,0,0.2)] animate-slide-up max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className={`bg-white rounded-[16px] w-full ${isDetailModal ? 'max-w-[640px]' : 'max-w-[540px]'} shadow-[0_20px_60px_rgba(0,0,0,0.2)] animate-slide-up max-h-[90vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between px-[20px] py-[18px] border-b border-[#e2e8f0]">
             <h3 className="text-[15px] font-bold text-[#0f172a]">
               {modal.type === "addUser" && "Tambah User"}
@@ -3899,6 +5116,14 @@ export default function AdminWeb() {
               {modal.type === "deleteCoupon" && "Hapus Kupon Diskon"}
               {modal.type === "viewReportDetail" && "Detail Laporan Report"}
               {modal.type === "deleteReportedContent" && "Konfirmasi Hapus Konten yang Dilaporkan"}
+              {modal.type === "editReferralCode" && "Edit Kode Referral User"}
+              {modal.type === "viewReferralDetail" && "Detail Transaksi & Timeline Referral"}
+              {modal.type === "rejectReferralTrx" && "Tolak Transaksi Referral"}
+              {modal.type === "rejectReferralCom" && "Tolak Komisi Referral"}
+              {modal.type === "adjustReferralCom" && "Penyesuaian (Adjustment) Komisi"}
+              {modal.type === "confirmApproveReferralTrx" && "Konfirmasi Setujui Transaksi Referral"}
+              {modal.type === "confirmApproveReferralCom" && "Konfirmasi Setujui Komisi"}
+              {modal.type === "confirmMarkPaidReferralCom" && "Konfirmasi Pembayaran Komisi"}
             </h3>
             <button className="bg-[#f1f5f9] border-0 text-[#64748b] cursor-pointer p-[7px] rounded-[8px] transition-all duration-200 flex hover:bg-[#fee2e2] hover:text-[#dc2626]" onClick={closeModal}>
               <CloseIcon size={20} strokeWidth={2} />
@@ -4895,6 +6120,284 @@ export default function AdminWeb() {
                   />
                 </div>
               </div>
+            ) : modal.type === "editReferralCode" ? (
+              <form onSubmit={handleSaveReferralCode} className="flex flex-col gap-[16px]">
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">User Pemilik</label>
+                  <div className="px-[14px] py-[10px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px] font-semibold text-[#0f172a]">
+                    {modal.data?.name} ({modal.data?.email})
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Kode Referral Baru *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editReferralCodeInput}
+                    onChange={(e) => setEditReferralCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                    placeholder="Contoh: SATRIA10"
+                    className="w-full px-[14px] py-[10px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-mono text-[14px] font-bold text-[#007570] outline-none focus:border-[#007570]"
+                  />
+                  <p className="text-[11.5px] text-[#64748b] mt-[4px]">
+                    Hanya gunakan huruf kapital dan angka tanpa spasi (3-25 karakter).
+                  </p>
+                </div>
+                <div className="flex items-center justify-end gap-[10px] pt-[12px] border-t border-[#e2e8f0]">
+                  <button type="button" onClick={closeModal} className="px-[16px] py-[8px] rounded-[8px] bg-[#f1f5f9] text-[#64748b] font-semibold text-[13px] border-0 cursor-pointer">
+                    Batal
+                  </button>
+                  <button type="submit" className="px-[18px] py-[8px] rounded-[8px] bg-[#007570] text-white font-bold text-[13px] border-0 cursor-pointer hover:bg-[#005a58]">
+                    Simpan Perubahan
+                  </button>
+                </div>
+              </form>
+            ) : modal.type === "viewReferralDetail" ? (
+              <div className="flex flex-col gap-[18px]">
+                {/* Header Information */}
+                <div className="flex items-center justify-between p-[14px] bg-[#f0fdfa] rounded-[10px] border border-[#ccfbf1]">
+                  <div>
+                    <span className="text-[11px] text-[#007570] font-bold uppercase tracking-wider block">Nomor Transaksi</span>
+                    <span className="font-mono text-[14px] font-extrabold text-[#007570]">{modal.data?.transaction_code}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] text-[#64748b] block">{modal.data?.created_at}</span>
+                    <span className="inline-flex items-center px-[8px] py-[2px] rounded-full text-[11px] font-bold bg-[#dcfce7] text-[#16a34a] mt-[2px]">
+                      {modal.data?.payment_status === "paid" ? "Sudah Dibayar" : modal.data?.payment_status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Buyer & Referrer Card */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-[12px]">
+                  <div className="p-[14px] bg-[#f8fafc] rounded-[10px] border border-[#e2e8f0]">
+                    <span className="text-[11px] text-[#64748b] font-bold uppercase tracking-wider block mb-[6px]">Pembeli &amp; Paket</span>
+                    <div className="font-bold text-[#0f172a] text-[13.5px]">{modal.data?.buyer?.name}</div>
+                    <div className="text-[12px] text-[#64748b]">{modal.data?.buyer?.email}</div>
+                    <div className="text-[12px] text-[#007570] font-semibold mt-[4px]">
+                      Paket: {modal.data?.package_name} ({modal.data?.business_name})
+                    </div>
+                  </div>
+
+                  <div className="p-[14px] bg-[#f8fafc] rounded-[10px] border border-[#e2e8f0]">
+                    <span className="text-[11px] text-[#64748b] font-bold uppercase tracking-wider block mb-[6px]">Pemilik Referral</span>
+                    <div className="font-bold text-[#0f172a] text-[13.5px]">{modal.data?.referrer?.name}</div>
+                    <div className="text-[12px] text-[#64748b]">{modal.data?.referrer?.email} • {modal.data?.referrer?.phone || "-"}</div>
+                    <div className="mt-[4px]">
+                      <span className="font-mono text-[11.5px] font-bold text-[#007570] bg-white px-[6px] py-[1px] rounded border border-[#ccfbf1]">
+                        Kode: {modal.data?.referral_code}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Financial Summary */}
+                <div className="p-[14px] bg-white rounded-[10px] border border-[#e2e8f0] flex flex-col gap-[8px]">
+                  <div className="flex justify-between text-[12.5px] text-[#64748b]">
+                    <span>Harga Paket Normal</span>
+                    <span className="font-semibold text-[#0f172a]">Rp {Math.round(modal.data?.original_price || 0).toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex justify-between text-[12.5px] text-[#dc2626]">
+                    <span>Diskon Referral (5%)</span>
+                    <span className="font-semibold">- Rp {Math.round(modal.data?.discount_amount || 0).toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex justify-between text-[13.5px] font-bold text-[#0f172a] pt-[6px] border-t border-[#e2e8f0]">
+                    <span>Harga Final Dibayar</span>
+                    <span>Rp {Math.round(modal.data?.final_price || 0).toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex justify-between text-[13px] font-bold text-[#16a34a] pt-[6px] border-t border-dashed border-[#e2e8f0]">
+                    <span>Komisi Pemilik Referral (10%)</span>
+                    <span>Rp {Math.round(modal.data?.commission_amount || 0).toLocaleString("id-ID")}</span>
+                  </div>
+                </div>
+
+                {/* Visual 4-Step Timeline */}
+                <div className="p-[16px] bg-[#fafbfc] rounded-[10px] border border-[#e2e8f0]">
+                  <span className="text-[11.5px] text-[#64748b] font-bold uppercase tracking-wider block mb-[14px]">Timeline &amp; Status Transaksi</span>
+                  <div className="flex flex-col gap-[14px]">
+                    <div className="flex items-start gap-[12px]">
+                      <div className="w-[24px] h-[24px] rounded-full bg-[#10b981] text-white flex items-center justify-center text-[12px] font-bold shrink-0">✓</div>
+                      <div>
+                        <div className="font-bold text-[#0f172a] text-[12.5px]">Kode Referral Digunakan</div>
+                        <div className="text-[11.5px] text-[#64748b]">Pembeli memasukkan kode {modal.data?.referral_code} pada saat checkout</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-[12px]">
+                      <div className={`w-[24px] h-[24px] rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 ${modal.data?.payment_status === 'paid' ? 'bg-[#10b981] text-white' : 'bg-[#f59e0b] text-white'}`}>
+                        {modal.data?.payment_status === 'paid' ? '✓' : '2'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#0f172a] text-[12.5px]">Pembayaran Pembeli</div>
+                        <div className="text-[11.5px] text-[#64748b]">Status pembayaran: <strong className="capitalize">{modal.data?.payment_status}</strong></div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-[12px]">
+                      <div className={`w-[24px] h-[24px] rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 ${modal.data?.referral_status === 'approved' ? 'bg-[#10b981] text-white' : modal.data?.referral_status === 'rejected' ? 'bg-[#ef4444] text-white' : 'bg-[#f59e0b] text-white'}`}>
+                        {modal.data?.referral_status === 'approved' ? '✓' : modal.data?.referral_status === 'rejected' ? '✕' : '3'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#0f172a] text-[12.5px]">Verifikasi Referral &amp; Approval Admin</div>
+                        <div className="text-[11.5px] text-[#64748b]">Status verifikasi: <strong className="capitalize">{modal.data?.referral_status}</strong></div>
+                        {modal.data?.rejection_reason && (
+                          <div className="text-[11.5px] text-[#dc2626] font-medium mt-[2px]">Alasan penolakan: {modal.data.rejection_reason}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-[12px]">
+                      <div className={`w-[24px] h-[24px] rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 ${modal.data?.payout_status === 'paid' ? 'bg-[#10b981] text-white' : 'bg-[#94a3b8] text-white'}`}>
+                        {modal.data?.payout_status === 'paid' ? '✓' : '4'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#0f172a] text-[12.5px]">Pencairan Komisi Pemilik</div>
+                        <div className="text-[11.5px] text-[#64748b]">Status komisi: <strong className="capitalize">{modal.data?.payout_status || 'Pending'}</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-[8px] border-t border-[#e2e8f0]">
+                  <button type="button" onClick={closeModal} className="px-[18px] py-[8px] rounded-[8px] bg-[#007570] text-white font-bold text-[13px] border-0 cursor-pointer hover:bg-[#005a58]">
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            ) : modal.type === "rejectReferralTrx" ? (
+              <form onSubmit={handleRejectReferralTrx} className="flex flex-col gap-[16px]">
+                <p className="text-[13px] text-[#0f172a]">
+                  Anda akan menolak transaksi referral <strong>{modal.data?.transaction_code}</strong>.
+                </p>
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Alasan Penolakan *</label>
+                  <textarea
+                    rows={3}
+                    required
+                    placeholder="Tuliskan alasan mengapa transaksi referral ini ditolak..."
+                    value={referralReasonInput}
+                    onChange={(e) => setReferralReasonInput(e.target.value)}
+                    className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] text-[13px] text-[#0f172a] outline-none focus:border-[#dc2626]"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-[10px] pt-[12px] border-t border-[#e2e8f0]">
+                  <button type="button" onClick={closeModal} className="px-[16px] py-[8px] rounded-[8px] bg-[#f1f5f9] text-[#64748b] font-semibold text-[13px] border-0 cursor-pointer">
+                    Batal
+                  </button>
+                  <button type="submit" className="px-[18px] py-[8px] rounded-[8px] bg-[#dc2626] text-white font-bold text-[13px] border-0 cursor-pointer hover:bg-[#b91c1c]">
+                    Tolak Transaksi
+                  </button>
+                </div>
+              </form>
+            ) : modal.type === "rejectReferralCom" ? (
+              <form onSubmit={handleRejectCommission} className="flex flex-col gap-[16px]">
+                <p className="text-[13px] text-[#0f172a]">
+                  Anda akan menolak pencairan komisi untuk <strong>{modal.data?.referrer?.name}</strong>.
+                </p>
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Alasan Penolakan *</label>
+                  <textarea
+                    rows={3}
+                    required
+                    placeholder="Tuliskan alasan mengapa komisi ini ditolak..."
+                    value={referralReasonInput}
+                    onChange={(e) => setReferralReasonInput(e.target.value)}
+                    className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] text-[13px] text-[#0f172a] outline-none focus:border-[#dc2626]"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-[10px] pt-[12px] border-t border-[#e2e8f0]">
+                  <button type="button" onClick={closeModal} className="px-[16px] py-[8px] rounded-[8px] bg-[#f1f5f9] text-[#64748b] font-semibold text-[13px] border-0 cursor-pointer">
+                    Batal
+                  </button>
+                  <button type="submit" className="px-[18px] py-[8px] rounded-[8px] bg-[#dc2626] text-white font-bold text-[13px] border-0 cursor-pointer hover:bg-[#b91c1c]">
+                    Tolak Komisi
+                  </button>
+                </div>
+              </form>
+            ) : modal.type === "adjustReferralCom" ? (
+              <form onSubmit={handleAdjustCommission} className="flex flex-col gap-[16px]">
+                <div className="p-[12px] bg-[#f8fafc] rounded-[8px] border border-[#e2e8f0]">
+                  <span className="text-[11px] text-[#64748b] uppercase font-bold tracking-wider block">Penerima Komisi</span>
+                  <div className="font-bold text-[#0f172a]">{modal.data?.referrer?.name} ({modal.data?.transaction_code})</div>
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Nominal Komisi Baru (Rp) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={referralAdjustAmountInput}
+                    onChange={(e) => setReferralAdjustAmountInput(e.target.value)}
+                    className="w-full px-[14px] py-[10px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-bold text-[14px] text-[#0f172a] outline-none focus:border-[#007570]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Alasan Penyesuaian *</label>
+                  <textarea
+                    rows={2}
+                    required
+                    placeholder="Contoh: Penyesuaian pembulatan / promo khusus admin..."
+                    value={referralAdjustReasonInput}
+                    onChange={(e) => setReferralAdjustReasonInput(e.target.value)}
+                    className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] text-[13px] text-[#0f172a] outline-none focus:border-[#007570]"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-[10px] pt-[12px] border-t border-[#e2e8f0]">
+                  <button type="button" onClick={closeModal} className="px-[16px] py-[8px] rounded-[8px] bg-[#f1f5f9] text-[#64748b] font-semibold text-[13px] border-0 cursor-pointer">
+                    Batal
+                  </button>
+                  <button type="submit" className="px-[18px] py-[8px] rounded-[8px] bg-[#007570] text-white font-bold text-[13px] border-0 cursor-pointer hover:bg-[#005a58]">
+                    Simpan Penyesuaian
+                  </button>
+                </div>
+              </form>
+            ) : modal.type === "confirmApproveReferralTrx" ? (
+              <div className="flex flex-col gap-[16px]">
+                <p className="text-[13px] text-[#0f172a]">
+                  Apakah Anda yakin ingin menyetujui transaksi referral <strong>{modal.data?.transaction_code}</strong>?
+                </p>
+                <div className="p-[12px] bg-[#f0fdfa] rounded-[8px] border border-[#ccfbf1] text-[12px] text-[#007570]">
+                  Status transaksi referral akan diubah menjadi <strong>Approved</strong> dan komisi pemilik sebesar <strong>Rp {Math.round(modal.data?.commission_amount || 0).toLocaleString("id-ID")}</strong> siap untuk dicairkan.
+                </div>
+                <div className="flex items-center justify-end gap-[10px] pt-[12px] border-t border-[#e2e8f0]">
+                  <button type="button" onClick={closeModal} className="px-[16px] py-[8px] rounded-[8px] bg-[#f1f5f9] text-[#64748b] font-semibold text-[13px] border-0 cursor-pointer">
+                    Batal
+                  </button>
+                  <button type="button" onClick={() => handleApproveReferralTrx(modal.data)} className="px-[18px] py-[8px] rounded-[8px] bg-[#16a34a] text-white font-bold text-[13px] border-0 cursor-pointer hover:bg-[#15803d]">
+                    Ya, Setujui
+                  </button>
+                </div>
+              </div>
+            ) : modal.type === "confirmApproveReferralCom" ? (
+              <div className="flex flex-col gap-[16px]">
+                <p className="text-[13px] text-[#0f172a]">
+                  Apakah Anda yakin ingin menyetujui komisi referral sebesar <strong>Rp {Math.round(modal.data?.commission_amount || 0).toLocaleString("id-ID")}</strong> untuk <strong>{modal.data?.referrer?.name}</strong>?
+                </p>
+                <div className="flex items-center justify-end gap-[10px] pt-[12px] border-t border-[#e2e8f0]">
+                  <button type="button" onClick={closeModal} className="px-[16px] py-[8px] rounded-[8px] bg-[#f1f5f9] text-[#64748b] font-semibold text-[13px] border-0 cursor-pointer">
+                    Batal
+                  </button>
+                  <button type="button" onClick={() => handleApproveCommission(modal.data)} className="px-[18px] py-[8px] rounded-[8px] bg-[#2563eb] text-white font-bold text-[13px] border-0 cursor-pointer hover:bg-[#1d4ed8]">
+                    Ya, Setujui Komisi
+                  </button>
+                </div>
+              </div>
+            ) : modal.type === "confirmMarkPaidReferralCom" ? (
+              <div className="flex flex-col gap-[16px]">
+                <p className="text-[13px] text-[#0f172a]">
+                  Tandai bahwa komisi sebesar <strong>Rp {Math.round(modal.data?.commission_amount || 0).toLocaleString("id-ID")}</strong> sudah berhasil dibayarkan / ditransfer kepada <strong>{modal.data?.referrer?.name}</strong>?
+                </p>
+                <div className="p-[12px] bg-[#dcfce7] rounded-[8px] border border-[#bbf7d0] text-[12px] text-[#16a34a]">
+                  Status pencairan komisi akan berubah menjadi <strong>Lunas (Paid)</strong> beserta stempel waktu pembayaran.
+                </div>
+                <div className="flex items-center justify-end gap-[10px] pt-[12px] border-t border-[#e2e8f0]">
+                  <button type="button" onClick={closeModal} className="px-[16px] py-[8px] rounded-[8px] bg-[#f1f5f9] text-[#64748b] font-semibold text-[13px] border-0 cursor-pointer">
+                    Batal
+                  </button>
+                  <button type="button" onClick={() => handleMarkCommissionPaid(modal.data)} className="px-[18px] py-[8px] rounded-[8px] bg-[#16a34a] text-white font-bold text-[13px] border-0 cursor-pointer hover:bg-[#15803d]">
+                    Tandai Lunas
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="mb-[14px]">
                 <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Nama</label>
@@ -4902,54 +6405,56 @@ export default function AdminWeb() {
               </div>
             )}
           </div>
-          <div className="flex justify-end gap-[10px] px-[20px] py-[16px] border-t border-[#e2e8f0]">
-            <button className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border bg-[#f1f5f9] text-[#0f172a] border-[#e2e8f0] hover:bg-[#e2e8f0] hover:-translate-y-[1px]" onClick={closeModal}>
-              Batal
-            </button>
-            <button
-              className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border-0 bg-[#007570] text-white shadow-[0_2px_8px_rgba(0,117,112,0.2)] hover:bg-[#005a58] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,117,112,0.25)]"
-              onClick={() => {
-                if (modal.type === "addUser" || modal.type === "editUser") {
-                  handleSaveUser();
-                } else if (modal.type === "deleteUser" && modal.data?.id) {
-                  handleDeleteUser(modal.data.id);
-                } else if (modal.type === "addCategory" || modal.type === "editCategory") {
-                  handleSaveCategory();
-                } else if (modal.type === "deleteCategory" && modal.data?.id) {
-                  handleDeleteCategory(modal.data.id);
-                } else if (modal.type === "addCoupon" || modal.type === "editCoupon") {
-                  handleSaveCoupon();
-                } else if (modal.type === "deleteCoupon" && modal.data?.id) {
-                  handleDeleteCoupon(modal.data.id);
-                } else if (modal.type === "addBlog" || modal.type === "editBlog") {
-                  handleSaveBlog();
-                } else if (modal.type === "deleteBlog" && modal.data?.id) {
-                  handleDeleteBlog(modal.data.id);
-                } else if (modal.type === "deleteReportedContent" && modal.data?.id) {
-                  handleDeleteReportedContent(modal.data.id);
-                } else if (modal.type === "addPackage" || modal.type === "editPackage") {
-                  handleSavePackage();
-                } else if (modal.type === "deletePackage" && modal.data?.id) {
-                  handleDeletePackage(modal.data.id);
-                } else if (modal.type === "addAdPackage" || modal.type === "editAdPackage") {
-                  handleSaveAdPackage();
-                } else if (modal.type === "deleteAdPackage" && modal.data?.id) {
-                  handleDeleteAdPackage(modal.data.id);
-                } else if (modal.type === "editAd" && modal.data?.id) {
-                  handleSaveEditAd();
-                } else if (modal.type === "deleteAd" && modal.data?.id) {
-                  handleDeleteAd(modal.data.id);
-                } else if (modal.type === "editSubscription" && modal.data?.id) {
-                  handleUpdateSubscriptionStatus(modal.data.id, modal.data.status, modal.data.ends_at);
-                  closeModal();
-                } else {
-                  closeModal();
-                }
-              }}
-            >
-              {modal.type.includes("delete") || modal.type.includes("reject") ? "Hapus/Tolak" : "Simpan"}
-            </button>
-          </div>
+          {!isReferralModal && (
+            <div className="flex justify-end gap-[10px] px-[20px] py-[16px] border-t border-[#e2e8f0]">
+              <button className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border bg-[#f1f5f9] text-[#0f172a] border-[#e2e8f0] hover:bg-[#e2e8f0] hover:-translate-y-[1px]" onClick={closeModal}>
+                Batal
+              </button>
+              <button
+                className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border-0 bg-[#007570] text-white shadow-[0_2px_8px_rgba(0,117,112,0.2)] hover:bg-[#005a58] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,117,112,0.25)]"
+                onClick={() => {
+                  if (modal.type === "addUser" || modal.type === "editUser") {
+                    handleSaveUser();
+                  } else if (modal.type === "deleteUser" && modal.data?.id) {
+                    handleDeleteUser(modal.data.id);
+                  } else if (modal.type === "addCategory" || modal.type === "editCategory") {
+                    handleSaveCategory();
+                  } else if (modal.type === "deleteCategory" && modal.data?.id) {
+                    handleDeleteCategory(modal.data.id);
+                  } else if (modal.type === "addCoupon" || modal.type === "editCoupon") {
+                    handleSaveCoupon();
+                  } else if (modal.type === "deleteCoupon" && modal.data?.id) {
+                    handleDeleteCoupon(modal.data.id);
+                  } else if (modal.type === "addBlog" || modal.type === "editBlog") {
+                    handleSaveBlog();
+                  } else if (modal.type === "deleteBlog" && modal.data?.id) {
+                    handleDeleteBlog(modal.data.id);
+                  } else if (modal.type === "deleteReportedContent" && modal.data?.id) {
+                    handleDeleteReportedContent(modal.data.id);
+                  } else if (modal.type === "addPackage" || modal.type === "editPackage") {
+                    handleSavePackage();
+                  } else if (modal.type === "deletePackage" && modal.data?.id) {
+                    handleDeletePackage(modal.data.id);
+                  } else if (modal.type === "addAdPackage" || modal.type === "editAdPackage") {
+                    handleSaveAdPackage();
+                  } else if (modal.type === "deleteAdPackage" && modal.data?.id) {
+                    handleDeleteAdPackage(modal.data.id);
+                  } else if (modal.type === "editAd" && modal.data?.id) {
+                    handleSaveEditAd();
+                  } else if (modal.type === "deleteAd" && modal.data?.id) {
+                    handleDeleteAd(modal.data.id);
+                  } else if (modal.type === "editSubscription" && modal.data?.id) {
+                    handleUpdateSubscriptionStatus(modal.data.id, modal.data.status, modal.data.ends_at);
+                    closeModal();
+                  } else {
+                    closeModal();
+                  }
+                }}
+              >
+                {modal.type.includes("delete") || modal.type.includes("reject") ? "Hapus/Tolak" : "Simpan"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -5065,6 +6570,7 @@ export default function AdminWeb() {
           {activeTab === "ads"           && renderAds()}
           {activeTab === "premium"       && renderPremium()}
           {activeTab === "coupons"       && renderCoupons()}
+          {activeTab === "referrals"     && renderReferrals()}
           {activeTab === "blogs"         && renderBlogs()}
           {activeTab === "reports"       && renderReports()}
           {activeTab === "settings"      && renderSettings()}

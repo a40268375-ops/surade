@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\AdPackageController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\AdminReferralController;
 
 // OTP-based registration (3-step flow)
 Route::post('/register/send-otp',     [AuthController::class, 'sendOtp']);
@@ -185,5 +186,30 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/ad-packages/{id}', [AdPackageController::class, 'update']);
         Route::delete('/ad-packages/{id}', [AdPackageController::class, 'destroy']);
         Route::put('/ad-packages/{id}/toggle-status', [AdPackageController::class, 'toggleStatus']);
+
+        // Admin Referral Management
+        Route::get('/referrals/stats', [AdminReferralController::class, 'stats']);
+        Route::get('/referrals/codes', [AdminReferralController::class, 'codes']);
+        Route::put('/referrals/codes/{user}', [AdminReferralController::class, 'updateCode']);
+        Route::patch('/referrals/codes/{user}/status', [AdminReferralController::class, 'toggleCodeStatus']);
+        Route::post('/referrals/codes/{user}/generate', [AdminReferralController::class, 'generateCode']);
+        Route::get('/referrals/transactions', [AdminReferralController::class, 'transactions']);
+        Route::get('/referrals/transactions/{referral}', [AdminReferralController::class, 'showTransaction']);
+        Route::post('/referrals/transactions/{referral}/approve', [AdminReferralController::class, 'approveTransaction']);
+        Route::put('/referrals/transactions/{referral}/approve', [AdminReferralController::class, 'approveTransaction']);
+        Route::post('/referrals/transactions/{referral}/reject', [AdminReferralController::class, 'rejectTransaction']);
+        Route::put('/referrals/transactions/{referral}/reject', [AdminReferralController::class, 'rejectTransaction']);
+        Route::get('/referrals/commissions', [AdminReferralController::class, 'commissions']);
+        Route::post('/referrals/commissions/{referral}/approve', [AdminReferralController::class, 'approveCommission']);
+        Route::put('/referrals/commissions/{referral}/approve', [AdminReferralController::class, 'approveCommission']);
+        Route::post('/referrals/commissions/{referral}/reject', [AdminReferralController::class, 'rejectCommission']);
+        Route::put('/referrals/commissions/{referral}/reject', [AdminReferralController::class, 'rejectCommission']);
+        Route::post('/referrals/commissions/{referral}/paid', [AdminReferralController::class, 'markCommissionPaid']);
+        Route::put('/referrals/commissions/{referral}/paid', [AdminReferralController::class, 'markCommissionPaid']);
+        Route::post('/referrals/commissions/{referral}/adjust', [AdminReferralController::class, 'adjustCommission']);
+        Route::put('/referrals/commissions/{referral}/adjust', [AdminReferralController::class, 'adjustCommission']);
+        Route::get('/referrals/settings', [AdminReferralController::class, 'getSettings']);
+        Route::put('/referrals/settings', [AdminReferralController::class, 'updateSettings']);
+        Route::post('/referrals/settings', [AdminReferralController::class, 'updateSettings']);
     });
 });
