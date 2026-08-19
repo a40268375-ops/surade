@@ -46,8 +46,13 @@
 }
 
 @keyframes scSpin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── NOT FOUND ── */
@@ -110,12 +115,10 @@
 .sc-hero__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(15, 23, 42, 0.4) 0%,
-    rgba(15, 23, 42, 0.85) 60%,
-    rgba(15, 23, 42, 0.98) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(15, 23, 42, 0.4) 0%,
+      rgba(15, 23, 42, 0.85) 60%,
+      rgba(15, 23, 42, 0.98) 100%);
   z-index: 1;
 }
 
@@ -746,8 +749,13 @@
 }
 
 @keyframes scSkeleton {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .sc-empty {
@@ -859,6 +867,7 @@
   .sc-hero__title {
     font-size: 2.5rem;
   }
+
   .sc-footer-cta__box {
     flex-direction: column;
     text-align: center;
@@ -870,9 +879,11 @@
   .sc-hero__title {
     font-size: 2rem;
   }
+
   .sc-city-grid {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
+
   .sc-grid {
     grid-template-columns: 1fr;
   }
