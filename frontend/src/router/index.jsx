@@ -109,7 +109,39 @@ function AppRouter() {
           }
         />
         <Route
+          path="/dashboard/inbox"
+          element={
+            <ProtectedRoute requiredRole="user">
+              <AdminUser />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:tab"
+          element={
+            <ProtectedRoute requiredRole="user">
+              <AdminUser />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin-user"
+          element={
+            <ProtectedRoute requiredRole="user">
+              <AdminUser />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-user/:tab"
+          element={
+            <ProtectedRoute requiredRole="user">
+              <AdminUser />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/premium"
           element={
             <ProtectedRoute requiredRole="user">
               <AdminUser />

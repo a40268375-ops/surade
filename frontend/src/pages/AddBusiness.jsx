@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import SubCategorySelector from "../components/SubCategorySelector";
 import api from "../services/api";
+import { getStorageUrl } from "../utils/constants";
 import {
   Store, MapPin, ImageIcon, Video, Tag, Phone, Mail,
   Globe, Camera, ChevronRight, ChevronLeft,
@@ -10,6 +11,15 @@ import {
   Crown, CreditCard, FileText, Sparkles, Copy, CheckCircle2, ShieldCheck, Clock
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
+
+function getYouTubeEmbedUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.trim().match(regExp);
+  return match && match[2].length === 11
+    ? `https://www.youtube.com/embed/${match[2]}`
+    : null;
+}
 
 function MapResizeHandler() {
   const map = useMap();
@@ -109,7 +119,7 @@ export default function AddBusiness() {
   const { id } = useParams();
   const isEditing = !!id;
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(isEditing ? 2 : 1);
   const [categories, setCategories] = useState([]);
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(false);
@@ -130,6 +140,13 @@ export default function AddBusiness() {
   const [couponError, setCouponError] = useState("");
   const [couponSuccessMsg, setCouponSuccessMsg] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+
+  // ── Referral State (Optional - Premium Only) ──
+  const [referralInput, setReferralInput] = useState("");
+  const [referralLoading, setReferralLoading] = useState(false);
+  const [referralError, setReferralError] = useState("");
+  const [referralSuccessMsg, setReferralSuccessMsg] = useState("");
+  const [appliedReferral, setAppliedReferral] = useState(null);
 
   // ── Payment Method & Proof State ──
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("DANA");
@@ -156,8 +173,14 @@ export default function AddBusiness() {
   const [geocoding, setGeocoding] = useState(false);
   const [mapKey, setMapKey] = useState(0);
   const DEFAULT_CENTER = [-6.2, 106.816];
-  const [gallery, setGallery] = useState([]);
-  const galleryInputRef = useRef();
+  const [photos, setPhotos] = useState([]);
+  const photoInputRef = useRef();
+  const [video, setVideo] = useState(null);
+  const videoInputRef = useRef();
+  const [videoSourceTab, setVideoSourceTab] = useState("file");
+  const [youtubeUrlInput, setYoutubeUrlInput] = useState("");
+  const [youtubeUrlError, setYoutubeUrlError] = useState("");
+  const [deletedMediaIds, setDeletedMediaIds] = useState([]);
 
   // Logo / Thumbnail
   const [logo, setLogo] = useState(null);
@@ -303,12 +326,52 @@ export default function AddBusiness() {
               }
             }
 
+            // Load existing media items
+            if (data.media && Array.isArray(data.media)) {
+              const existingBanners = data.media
+                .filter((m) => m.title === "Banner")
+                .map((m) => ({ id: m.id, preview: getStorageUrl(m.file_path), isExisting: true }));
+              if (existingBanners.length > 0) setBanners(existingBanners);
+
+              const existingPhotos = data.media
+                .filter((m) => m.title !== "Banner" && m.type === "image")
+                .map((m) => ({
+                  id: m.id,
+                  preview: getStorageUrl(m.file_path),
+                  url: getStorageUrl(m.file_path),
+                  isExisting: true,
+                }));
+              setPhotos(existingPhotos);
+
+              const existingVideoItem = data.media.find((m) => m.type === "video");
+              if (existingVideoItem) {
+                const rawPath = existingVideoItem.file_path;
+                const isUrl = rawPath.startsWith("http://") || rawPath.startsWith("https://");
+                const fullUrl = isUrl ? rawPath : getStorageUrl(rawPath);
+                const embed = getYouTubeEmbedUrl(fullUrl);
+
+                setVideo({
+                  id: existingVideoItem.id,
+                  type: embed || isUrl ? "youtube" : "file",
+                  preview: fullUrl,
+                  url: fullUrl,
+                  embedUrl: embed,
+                  isExisting: true,
+                });
+              }
+            }
+
+            if (data.logo) {
+              setLogoPreview(getStorageUrl(data.logo));
+            }
+
             // Set default package if editing
             if (data.is_premium) {
               setSelectedPackage({ id: 1, name: "Premium", price: 50000, isFree: false });
             } else {
               setSelectedPackage({ id: "free", name: "Free", price: 0, isFree: true });
             }
+            setStep(2);
           }
         })
         .catch((err) => {
@@ -403,22 +466,104 @@ export default function AddBusiness() {
     }
   };
 
-  const handleGalleryAdd = (files) => {
-    Array.from(files).forEach((file) => {
-      const isVideo = file.type.startsWith("video/");
-      setGallery((p) => [...p, {
-        file,
-        preview: isVideo ? null : URL.createObjectURL(file),
-        type: isVideo ? "video" : "image"
-      }]);
+  // Photo Gallery Handlers
+  const handlePhotoAdd = (files) => {
+    if (!files || files.length === 0) return;
+    const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    arr.forEach((file) => {
+      setPhotos((prev) => [
+        ...prev,
+        {
+          file,
+          preview: URL.createObjectURL(file),
+          isExisting: false,
+        },
+      ]);
     });
   };
 
-  const removeGallery = (i) => {
-    setGallery((p) => {
-      if (p[i].preview) URL.revokeObjectURL(p[i].preview);
-      return p.filter((_, idx) => idx !== i);
+  const removePhoto = (index) => {
+    setPhotos((prev) => {
+      const item = prev[index];
+      if (item?.isExisting && item?.id) {
+        setDeletedMediaIds((d) => [...d, item.id]);
+      } else if (item?.preview && item.preview.startsWith("blob:")) {
+        URL.revokeObjectURL(item.preview);
+      }
+      return prev.filter((_, idx) => idx !== index);
     });
+  };
+
+  // Video Handlers (Strictly 1 video limit)
+  const handleVideoFileAdd = (files) => {
+    if (!files || files.length === 0) return;
+    const file = Array.from(files).find((f) => f.type.startsWith("video/"));
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      setError("Ukuran file video maksimal 25MB.");
+      setTimeout(() => setError(""), 4000);
+      return;
+    }
+    if (video?.isExisting && video?.id) {
+      setDeletedMediaIds((d) => [...d, video.id]);
+    } else if (video?.preview && video.preview.startsWith("blob:")) {
+      URL.revokeObjectURL(video.preview);
+    }
+
+    setVideo({
+      type: "file",
+      file,
+      preview: URL.createObjectURL(file),
+      url: null,
+      embedUrl: null,
+      isExisting: false,
+    });
+    setError("");
+  };
+
+  const handleYouTubeAdd = () => {
+    const url = youtubeUrlInput.trim();
+    if (!url) {
+      setYoutubeUrlError("Masukkan URL YouTube terlebih dahulu.");
+      return;
+    }
+    const embed = getYouTubeEmbedUrl(url);
+    if (!embed) {
+      setYoutubeUrlError("URL YouTube tidak valid. Gunakan format link YouTube yang benar.");
+      return;
+    }
+    setYoutubeUrlError("");
+
+    if (video?.isExisting && video?.id) {
+      setDeletedMediaIds((d) => [...d, video.id]);
+    } else if (video?.preview && video.preview.startsWith("blob:")) {
+      URL.revokeObjectURL(video.preview);
+    }
+
+    setVideo({
+      type: "youtube",
+      file: null,
+      preview: null,
+      url,
+      embedUrl: embed,
+      isExisting: false,
+    });
+    setYoutubeUrlInput("");
+  };
+
+  const handleRemoveVideo = () => {
+    if (video?.isExisting && video?.id) {
+      setDeletedMediaIds((d) => [...d, video.id]);
+    } else if (video?.preview && video.preview.startsWith("blob:")) {
+      URL.revokeObjectURL(video.preview);
+    }
+    setVideo(null);
+    setYoutubeUrlInput("");
+    setYoutubeUrlError("");
+  };
+
+  const handleReplaceVideo = () => {
+    handleRemoveVideo();
   };
 
   // Coupon application logic
@@ -459,22 +604,66 @@ export default function AddBusiness() {
     setCouponError("");
   };
 
+  // Referral application logic (Premium Only)
+  const handleApplyReferral = async () => {
+    if (!referralInput.trim()) {
+      setReferralError("Masukkan kode referral terlebih dahulu.");
+      return;
+    }
+    if (isFreeSelection) {
+      setReferralError("Kode referral hanya berlaku untuk pembelian paket Premium.");
+      return;
+    }
+    setReferralLoading(true);
+    setReferralError("");
+    setReferralSuccessMsg("");
+    try {
+      const res = await api.post("/referrals/validate", {
+        code: referralInput.trim(),
+        product_type: "premium",
+        amount: selectedPackage?.price || 0,
+      });
+      if (res.data?.valid) {
+        setAppliedReferral(res.data);
+        setReferralSuccessMsg(res.data.message || "Kode referral valid! Diskon 5% berhasil diterapkan.");
+      } else {
+        setAppliedReferral(null);
+        setReferralError(res.data?.message || "Kode referral tidak valid.");
+      }
+    } catch (e) {
+      setAppliedReferral(null);
+      const msg = e?.response?.data?.message || "Kode referral hanya berlaku untuk pembelian paket Premium.";
+      setReferralError(msg);
+    } finally {
+      setReferralLoading(false);
+    }
+  };
+
+  const handleRemoveReferral = () => {
+    setAppliedReferral(null);
+    setReferralInput("");
+    setReferralSuccessMsg("");
+    setReferralError("");
+  };
+
   // Dynamic Step Indicator configuration based on Free vs Premium
   const isFreeSelection = selectedPackage?.isFree;
   
-  const currentSteps = isFreeSelection
-    ? [
-        { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
-        { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
-        { id: 3, label: "Review & Daftar", icon: <Check size={18} /> },
-      ]
-    : [
-        { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
-        { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
-        { id: 3, label: "Ringkasan", icon: <FileText size={18} /> },
-        { id: 4, label: "Pembayaran", icon: <CreditCard size={18} /> },
-        { id: 5, label: "Upload Bukti", icon: <Upload size={18} /> },
-      ];
+  const currentSteps = isEditing
+    ? [{ id: 2, label: "Edit Data Usaha", icon: <Store size={18} /> }]
+    : (isFreeSelection
+        ? [
+            { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
+            { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
+            { id: 3, label: "Review & Daftar", icon: <Check size={18} /> },
+          ]
+        : [
+            { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
+            { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
+            { id: 3, label: "Ringkasan", icon: <FileText size={18} /> },
+            { id: 4, label: "Pembayaran", icon: <CreditCard size={18} /> },
+            { id: 5, label: "Upload Bukti", icon: <Upload size={18} /> },
+          ]);
 
   const validateCurrentStep = () => {
     if (step === 1) {
@@ -561,10 +750,35 @@ export default function AddBusiness() {
         fd.append("banner", banner.file);
         await api.post(`/businesses/${bizId}/banner`, fd);
       }
-      if (gallery.length > 0) {
+      // Delete removed existing media items
+      if (deletedMediaIds.length > 0) {
+        for (const mediaId of deletedMediaIds) {
+          try {
+            await api.delete(`/business-media/${mediaId}`);
+          } catch (err) {
+            console.error("Failed to delete media item:", err);
+          }
+        }
+      }
+
+      // Upload new photo gallery files
+      const newPhotoFiles = photos.filter((p) => !p.isExisting && p.file).map((p) => p.file);
+      if (newPhotoFiles.length > 0) {
         const fd = new FormData();
-        gallery.forEach(({ file }) => fd.append("files[]", file));
+        newPhotoFiles.forEach((file) => fd.append("files[]", file));
         await api.post(`/businesses/${bizId}/gallery`, fd);
+      }
+
+      // Upload or save new video
+      if (video && !video.isExisting) {
+        const fd = new FormData();
+        if (video.type === "file" && video.file) {
+          fd.append("files[]", video.file);
+          await api.post(`/businesses/${bizId}/gallery`, fd);
+        } else if (video.type === "youtube" && video.url) {
+          fd.append("video_url", video.url);
+          await api.post(`/businesses/${bizId}/gallery`, fd);
+        }
       }
 
       setCreatedId(bizId);
@@ -625,10 +839,36 @@ export default function AddBusiness() {
         fd.append("banner", banner.file);
         await api.post(`/businesses/${bizId}/banner`, fd);
       }
-      if (gallery.length > 0) {
+
+      // Delete removed existing media items
+      if (deletedMediaIds.length > 0) {
+        for (const mediaId of deletedMediaIds) {
+          try {
+            await api.delete(`/business-media/${mediaId}`);
+          } catch (err) {
+            console.error("Failed to delete media item:", err);
+          }
+        }
+      }
+
+      // Upload new photo gallery files
+      const newPhotoFiles = photos.filter((p) => !p.isExisting && p.file).map((p) => p.file);
+      if (newPhotoFiles.length > 0) {
         const fd = new FormData();
-        gallery.forEach(({ file }) => fd.append("files[]", file));
+        newPhotoFiles.forEach((file) => fd.append("files[]", file));
         await api.post(`/businesses/${bizId}/gallery`, fd);
+      }
+
+      // Upload or save new video
+      if (video && !video.isExisting) {
+        const fd = new FormData();
+        if (video.type === "file" && video.file) {
+          fd.append("files[]", video.file);
+          await api.post(`/businesses/${bizId}/gallery`, fd);
+        } else if (video.type === "youtube" && video.url) {
+          fd.append("video_url", video.url);
+          await api.post(`/businesses/${bizId}/gallery`, fd);
+        }
       }
 
       // Submit Subscription + Payment Proof
@@ -637,6 +877,9 @@ export default function AddBusiness() {
       subFd.append("plan_id", selectedPackage.id);
       if (appliedCoupon?.code) {
         subFd.append("coupon_code", appliedCoupon.code);
+      }
+      if (appliedReferral?.referral_code) {
+        subFd.append("referral_code", appliedReferral.referral_code);
       }
       subFd.append("payment_method", selectedPaymentMethod);
       if (proofFile) {
@@ -652,6 +895,89 @@ export default function AddBusiness() {
       const msg = e?.response?.data?.message ||
         (e?.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(", ") : e.message) ||
         "Terjadi kesalahan saat mendaftarkan usaha dan mengirim pembayaran.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save Changes for Existing Business (Direct Edit - No Subscriptions or Payments)
+  const handleSaveEdit = async () => {
+    const err = validateCurrentStep();
+    if (err) {
+      setError(err);
+      setTimeout(() => setError(""), 3500);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const selectedDays = openingDays
+        .filter((d) => d.selected)
+        .map((d) => ({ day: d.day, open: d.open, close: d.close }));
+
+      const payload = {
+        ...form,
+        address,
+        tags,
+        opening_days: selectedDays,
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
+      };
+
+      await api.put(`/businesses/${id}`, payload);
+      const bizId = id;
+
+      if (logo) {
+        const fd = new FormData();
+        fd.append("logo", logo);
+        await api.post(`/businesses/${bizId}/logo`, fd);
+      }
+
+      for (const banner of banners) {
+        if (banner.file) {
+          const fd = new FormData();
+          fd.append("banner", banner.file);
+          await api.post(`/businesses/${bizId}/banner`, fd);
+        }
+      }
+
+      if (deletedMediaIds.length > 0) {
+        for (const mediaId of deletedMediaIds) {
+          try {
+            await api.delete(`/business-media/${mediaId}`);
+          } catch (err) {
+            console.error("Failed to delete media item:", err);
+          }
+        }
+      }
+
+      const newPhotoFiles = photos.filter((p) => !p.isExisting && p.file).map((p) => p.file);
+      if (newPhotoFiles.length > 0) {
+        const fd = new FormData();
+        newPhotoFiles.forEach((file) => fd.append("files[]", file));
+        await api.post(`/businesses/${bizId}/gallery`, fd);
+      }
+
+      if (video && !video.isExisting) {
+        const fd = new FormData();
+        if (video.type === "file" && video.file) {
+          fd.append("files[]", video.file);
+          await api.post(`/businesses/${bizId}/gallery`, fd);
+        } else if (video.type === "youtube" && video.url) {
+          fd.append("video_url", video.url);
+          await api.post(`/businesses/${bizId}/gallery`, fd);
+        }
+      }
+
+      setCreatedId(bizId);
+      setIsPendingVerification(false);
+      setSuccess(true);
+    } catch (e) {
+      const msg = e?.response?.data?.message ||
+        (e?.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(", ") : e.message) ||
+        "Terjadi kesalahan saat memperbarui data usaha.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -717,14 +1043,16 @@ export default function AddBusiness() {
             </>
           ) : (
             <>
-              <div className="w-[90px] h-[90px] rounded-full bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white flex items-center justify-center mb-7 shadow-[0_8px_32px_rgba(22,163,74,0.3)] animate-[popIn_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]">
-                <Check size={48} />
+              <div className="w-[90px] h-[90px] rounded-full bg-gradient-to-br from-[#d97706] to-[#f59e0b] text-white flex items-center justify-center mb-7 shadow-[0_8px_32px_rgba(217,119,6,0.3)] animate-[popIn_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+                <Clock size={48} />
               </div>
               <h1 className="text-[1.8rem] font-extrabold text-[#0f172a] mb-3.5">
-                {isEditing ? "Usaha Berhasil Diperbarui!" : "Usaha Berhasil Didaftarkan!"}
+                {isEditing ? "Usaha Berhasil Diperbarui!" : "Usaha Berhasil Dikirim!"}
               </h1>
               <p className="text-base text-[#64748b] leading-[1.7] mb-9">
-                {isEditing ? "Perubahan pada usaha kamu telah disimpan." : "Usaha kamu telah berhasil terdaftar dengan paket Free."}
+                {isEditing 
+                  ? "Perubahan data usaha kamu telah berhasil diajukan ulang dan menunggu peninjauan dari Admin."
+                  : "Usaha kamu telah berhasil terdaftar dan saat ini berstatus Menunggu Persetujuan Admin sebelum tampil di publik."}
               </p>
             </>
           )}
@@ -1067,14 +1395,23 @@ export default function AddBusiness() {
               <div className="flex items-start gap-4">
                 <Store size={26} className="text-[#007570] shrink-0 mt-1" />
                 <div>
-                  <h2 className="text-[1.25rem] font-bold text-[#0f172a] mb-1">Informasi Data Bisnis</h2>
-                  <p className="text-[0.9rem] text-[#64748b]">Lengkapi informasi detail tentang usaha yang didaftarkan.</p>
+                  <h2 className="text-[1.25rem] font-bold text-[#0f172a] mb-1">
+                    {isEditing ? `Edit Data Usaha: ${form.name || ""}` : "Informasi Data Bisnis"}
+                  </h2>
+                  <p className="text-[0.9rem] text-[#64748b]">
+                    {isEditing ? "Perbarui informasi detail tentang usaha kamu." : "Lengkapi informasi detail tentang usaha yang didaftarkan."}
+                  </p>
                 </div>
               </div>
-              {selectedPackage && (
+              {isEditing ? (
+                <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 bg-[#f0fffe] border border-[#007570]/30 rounded-full text-xs font-bold text-[#007570]">
+                  {selectedPackage?.isFree === false ? <Sparkles size={14} className="text-amber-500" /> : <Store size={14} />}
+                  <span>{selectedPackage?.isFree === false ? "Paket Premium Active" : "Paket Free"}</span>
+                </div>
+              ) : selectedPackage && (
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[#f0fffe] border border-[#007570]/30 rounded-full text-xs font-bold text-[#007570]">
                   <Crown size={14} />
-                  <span>{selectedPackage.isFree ? "Free Package" : selectedPackage.name}</span>
+                  <span>{selectedPackage.name}</span>
                 </div>
               )}
             </div>
@@ -1381,42 +1718,209 @@ export default function AddBusiness() {
                     )}
                   </div>
 
-                  {/* 3. GALLERY (After Banner) */}
-                  <div className="flex flex-col gap-2 bg-white p-4 rounded-xl border border-slate-200">
-                    <label className={labelCls}><Video size={16} className="text-[#007570]" /> 3. Galeri Foto &amp; Video Opsional</label>
-                    <p className="text-xs text-slate-500 mb-2">Tambahkan foto suasana toko, produk unggulan, atau video promosi pendek.</p>
-                    <div
-                      className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-50 hover:border-[#007570] hover:bg-[#f0fffe]"
-                      {...createDropHandler(handleGalleryAdd)}
-                      onClick={() => galleryInputRef.current?.click()}
-                    >
-                      <input ref={galleryInputRef} type="file" accept="image/*,video/mp4,video/webm" multiple hidden onChange={(e) => handleGalleryAdd(e.target.files)} />
-                      <Upload size={28} className="text-[#007570] mb-2 mx-auto" />
-                      <p className="text-sm font-bold text-slate-700">Upload foto atau video galeri tambahan</p>
-                      <p className="text-xs text-slate-400">Gambar (JPG/PNG) &amp; Video (MP4) max 20MB</p>
+                  {/* 3. GALERI USAHA */}
+                  <div className="flex flex-col gap-3.5 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <ImageIcon size={16} className="text-[#007570]" />
+                        <label className="text-[0.9rem] font-bold text-slate-800">
+                          3. Galeri Usaha
+                        </label>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {photos.length} foto {video ? " • 1 video" : ""}
+                      </span>
                     </div>
-                    {gallery.length > 0 && (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-2">
-                        {gallery.map((g, i) => (
-                          <div key={i} className="relative rounded-xl overflow-hidden aspect-square border border-slate-200 bg-slate-100 flex items-center justify-center shadow-2xs">
-                            {g.type === "image" ? (
-                              <img src={g.preview} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="text-center p-2">
-                                <Video size={24} className="mx-auto text-[#007570]" />
-                                <span className="text-[0.65rem] font-semibold text-slate-700 block truncate max-w-[80px] mt-1">{g.file.name}</span>
-                              </div>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeGallery(i)}
-                              className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-600 text-white rounded-md flex items-center justify-center border-0 cursor-pointer shadow-md hover:bg-red-700 transition-colors"
-                              title="Hapus Galeri"
-                            >
-                              <X size={14} />
-                            </button>
+
+                    <p className="text-xs text-slate-500">
+                      Tambahkan foto suasana toko, produk unggulan, dan 1 video profil usaha (opsional).
+                    </p>
+
+                    {/* Upload Controls Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Photo Upload Area */}
+                      <div
+                        className="border border-dashed border-slate-300 rounded-xl p-3.5 text-center cursor-pointer transition-all bg-slate-50 hover:border-[#007570] hover:bg-[#f0fffe] flex flex-col items-center justify-center min-h-[90px]"
+                        {...createDropHandler(handlePhotoAdd)}
+                        onClick={() => photoInputRef.current?.click()}
+                      >
+                        <input
+                          ref={photoInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          multiple
+                          hidden
+                          onChange={(e) => handlePhotoAdd(e.target.files)}
+                        />
+                        <div className="flex items-center gap-2 mb-1 text-[#007570]">
+                          <Upload size={18} />
+                          <span className="text-xs font-bold text-slate-700">Upload Foto Galeri</span>
+                        </div>
+                        <p className="text-[0.72rem] text-slate-400">JPG, PNG, WEBP (Bisa pilih beberapa foto)</p>
+                      </div>
+
+                      {/* Video Upload Area (Only if no video exists) */}
+                      {!video ? (
+                        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 flex flex-col justify-between min-h-[90px]">
+                          <div className="flex items-center justify-between gap-1 mb-2">
+                            <span className="text-[0.75rem] font-bold text-slate-700 flex items-center gap-1">
+                              <Video size={13} className="text-[#007570]" /> Video Profil (Maks 1)
+                            </span>
+                            <div className="flex rounded-lg p-0.5 bg-slate-200/80 text-[0.68rem] font-bold">
+                              <button
+                                type="button"
+                                onClick={() => { setVideoSourceTab("file"); setYoutubeUrlError(""); }}
+                                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                                  videoSourceTab === "file" ? "bg-white text-[#007570] shadow-2xs" : "text-slate-600"
+                                }`}
+                              >
+                                File
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setVideoSourceTab("youtube"); setYoutubeUrlError(""); }}
+                                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                                  videoSourceTab === "youtube" ? "bg-white text-[#007570] shadow-2xs" : "text-slate-600"
+                                }`}
+                              >
+                                YouTube
+                              </button>
+                            </div>
                           </div>
-                        ))}
+
+                          {videoSourceTab === "file" ? (
+                            <div
+                              className="border border-dashed border-slate-300 rounded-lg p-2 text-center cursor-pointer transition-all bg-white hover:border-[#007570]"
+                              {...createDropHandler(handleVideoFileAdd)}
+                              onClick={() => videoInputRef.current?.click()}
+                            >
+                              <input
+                                ref={videoInputRef}
+                                type="file"
+                                accept="video/mp4,video/webm,video/quicktime"
+                                hidden
+                                onChange={(e) => handleVideoFileAdd(e.target.files)}
+                              />
+                              <p className="text-xs font-bold text-slate-700 flex items-center justify-center gap-1">
+                                <Upload size={13} className="text-[#007570]" /> Upload File Video
+                              </p>
+                              <p className="text-[0.7rem] text-slate-400">MP4, WebM (Maks 25MB)</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="text"
+                                  value={youtubeUrlInput}
+                                  onChange={(e) => {
+                                    setYoutubeUrlInput(e.target.value);
+                                    if (youtubeUrlError) setYoutubeUrlError("");
+                                  }}
+                                  placeholder="Link YouTube (watch?v=...)"
+                                  className="w-full px-2.5 py-1 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:border-[#007570]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleYouTubeAdd}
+                                  className="px-3 py-1 bg-[#007570] hover:bg-[#005c58] text-white text-xs font-bold rounded-lg transition-colors shrink-0 cursor-pointer"
+                                >
+                                  Tambah
+                                </button>
+                              </div>
+                              {youtubeUrlError && (
+                                <p className="text-[0.7rem] font-medium text-red-600">{youtubeUrlError}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center justify-between min-h-[90px]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-[#007570]/10 text-[#007570] flex items-center justify-center font-bold">
+                              <Video size={16} />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-slate-800 block">1 Video Usaha Terpasang</span>
+                              <span className="text-[0.7rem] text-slate-400">Tampilan video ada pada grid galeri</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* UNIFIED MEDIA THUMBNAILS GRID (Photos + Video together!) */}
+                    {(photos.length > 0 || video !== null) && (
+                      <div className="pt-2 border-t border-slate-100">
+                        <span className="text-[0.75rem] font-bold text-slate-600 block mb-2">Media Galeri Usaha</span>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                          {/* Photo Thumbnails */}
+                          {photos.map((p, i) => (
+                            <div
+                              key={`photo-${i}`}
+                              className="relative rounded-xl overflow-hidden aspect-square border border-slate-200 bg-slate-100 shadow-2xs group"
+                            >
+                              <img src={p.preview} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => removePhoto(i)}
+                                className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-600/90 text-white rounded-md flex items-center justify-center border-0 cursor-pointer shadow-xs hover:bg-red-700 transition-colors"
+                                title="Hapus Foto"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))}
+
+                          {/* Video Thumbnail (Unified Square Grid Tile!) */}
+                          {video && (
+                            <div className="relative rounded-xl overflow-hidden aspect-square border-2 border-[#007570] bg-slate-950 shadow-2xs group flex items-center justify-center">
+                              {video.type === "youtube" || video.embedUrl ? (
+                                <iframe
+                                  src={video.embedUrl || getYouTubeEmbedUrl(video.url)}
+                                  title="Preview Video YouTube"
+                                  className="w-full h-full border-0 pointer-events-none"
+                                />
+                              ) : (
+                                <video
+                                  src={video.preview || video.url}
+                                  className="w-full h-full object-cover opacity-80"
+                                  muted
+                                  playsInline
+                                />
+                              )}
+
+                              {/* Play badge overlay */}
+                              <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center pointer-events-none p-1 text-center">
+                                <div className="w-8 h-8 rounded-full bg-[#007570] text-white flex items-center justify-center shadow-md mb-0.5">
+                                  <Video size={14} className="ml-0.5" />
+                                </div>
+                                <span className="text-[0.62rem] font-bold text-white uppercase tracking-wider bg-black/60 px-1.5 py-0.5 rounded">
+                                  {video.type === "youtube" ? "YouTube" : "Video"}
+                                </span>
+                              </div>
+
+                              {/* Action Buttons (Replace & Remove) */}
+                              <div className="absolute top-1.5 right-1.5 flex items-center gap-1 z-10">
+                                <button
+                                  type="button"
+                                  onClick={handleReplaceVideo}
+                                  className="w-6 h-6 bg-slate-800/90 text-white rounded-md flex items-center justify-center border-0 cursor-pointer shadow-xs hover:bg-[#007570] transition-colors"
+                                  title="Ganti Video"
+                                >
+                                  <Upload size={11} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveVideo}
+                                  className="w-6 h-6 bg-red-600/90 text-white rounded-md flex items-center justify-center border-0 cursor-pointer shadow-xs hover:bg-red-700 transition-colors"
+                                  title="Hapus Video"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1508,7 +2012,7 @@ export default function AddBusiness() {
             </div>
 
             {/* ── Kode Kupon / Diskon (Opsional) ── */}
-            <div className="border border-slate-200 rounded-2xl p-5 bg-white mb-6">
+            <div className="border border-slate-200 rounded-2xl p-5 bg-white mb-4">
               <label className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
                 <Tag size={16} className="text-[#007570]" />
                 Kode Kupon / Diskon <span className="text-xs font-normal text-slate-400">(Opsional)</span>
@@ -1564,20 +2068,94 @@ export default function AddBusiness() {
               )}
             </div>
 
-            {/* Total Pembayaran Calculation */}
-            <div className="bg-[#f0fffe] border border-[#007570]/30 rounded-2xl p-5 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Pembayaran</span>
-                {appliedCoupon && (
-                  <span className="text-xs text-slate-400 line-through">
-                    Rp {Number(selectedPackage?.price || 0).toLocaleString('id-ID')}
-                  </span>
-                )}
-              </div>
-              <span className="text-2xl font-black text-[#007570]">
-                Rp {((appliedCoupon ? appliedCoupon.final_amount : selectedPackage?.price) || 0).toLocaleString('id-ID')}
-              </span>
+            {/* ── Kode Referral (Opsional - Paket Premium) ── */}
+            <div className="border border-slate-200 rounded-2xl p-5 bg-white mb-6">
+              <label className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
+                <Sparkles size={16} className="text-[#007570]" />
+                Kode Referral <span className="text-xs font-normal text-slate-400">(Opsional - Diskon 5%)</span>
+              </label>
+
+              {appliedReferral ? (
+                <div className="flex items-center justify-between bg-teal-50 border border-teal-200 rounded-xl p-3.5">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 size={20} className="text-[#007570] shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold text-[#007570] uppercase block">Referral Terpasang: {appliedReferral.referral_code}</span>
+                      <span className="text-xs text-teal-700 font-medium">Diskon 5% (-Rp {appliedReferral.discount_amount?.toLocaleString('id-ID')})</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveReferral}
+                    className="text-xs font-semibold text-red-600 bg-white border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Masukkan kode referral"
+                      value={referralInput}
+                      onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                      className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#007570]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyReferral}
+                      disabled={referralLoading}
+                      className="px-5 py-2.5 bg-[#007570] text-white rounded-xl text-sm font-semibold border-0 cursor-pointer hover:bg-[#005a58] disabled:opacity-60 flex items-center gap-2"
+                    >
+                      {referralLoading ? <Loader2 size={16} className={spinCls} /> : "Terapkan"}
+                    </button>
+                  </div>
+                  {referralError && (
+                    <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+                      <AlertCircle size={13} /> {referralError}
+                    </p>
+                  )}
+                  {referralSuccessMsg && (
+                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                      <CheckCircle2 size={13} /> {referralSuccessMsg}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Total Pembayaran Calculation */}
+            {(() => {
+              const basePrice = Number(selectedPackage?.price || 0);
+              const couponDiscount = appliedCoupon ? Number(appliedCoupon.discount_amount || 0) : 0;
+              const refDiscount = appliedReferral ? Number(appliedReferral.discount_amount || 0) : 0;
+              const totalDiscount = couponDiscount + refDiscount;
+              const finalCalculatedPrice = Math.max(0, basePrice - totalDiscount);
+
+              return (
+                <div className="bg-[#f0fffe] border border-[#007570]/30 rounded-2xl p-5 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Pembayaran</span>
+                    {totalDiscount > 0 && (
+                      <span className="text-xs text-slate-400 line-through">
+                        Rp {basePrice.toLocaleString('id-ID')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-[#007570]">
+                      Rp {finalCalculatedPrice.toLocaleString('id-ID')}
+                    </span>
+                    {totalDiscount > 0 && (
+                      <span className="text-[11px] font-bold text-emerald-600 block">
+                        Hemat Rp {totalDiscount.toLocaleString('id-ID')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1669,18 +2247,27 @@ export default function AddBusiness() {
             </div>
 
             {/* Summary Badge */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <span className="text-xs text-slate-400 font-bold uppercase block">Total Harus Dibayar</span>
-                <span className="text-xl font-black text-[#007570]">
-                  Rp {((appliedCoupon ? appliedCoupon.final_amount : selectedPackage?.price) || 0).toLocaleString('id-ID')}
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="text-xs text-slate-400 font-bold uppercase block">Metode Pembayaran</span>
-                <span className="text-sm font-bold text-slate-800">{currentAccount.name}</span>
-              </div>
-            </div>
+            {(() => {
+              const basePrice = Number(selectedPackage?.price || 0);
+              const couponDiscount = appliedCoupon ? Number(appliedCoupon.discount_amount || 0) : 0;
+              const refDiscount = appliedReferral ? Number(appliedReferral.discount_amount || 0) : 0;
+              const finalPaymentTotal = Math.max(0, basePrice - couponDiscount - refDiscount);
+
+              return (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs text-slate-400 font-bold uppercase block">Total Harus Dibayar</span>
+                    <span className="text-xl font-black text-[#007570]">
+                      Rp {finalPaymentTotal.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-400 font-bold uppercase block">Metode Pembayaran</span>
+                    <span className="text-sm font-bold text-slate-800">{currentAccount.name}</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Upload Area */}
             {proofPreview ? (
@@ -1722,68 +2309,91 @@ export default function AddBusiness() {
 
         {/* ── NAVIGATION BUTTONS ── */}
         <div className="flex items-center gap-3 mt-8">
-          {step > 1 && (
-            <button
-              type="button"
-              onClick={prevStep}
-              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] border-[#e2e8f0] bg-white text-[#374151] transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8]"
-            >
-              <ChevronLeft size={18} /> Kembali
-            </button>
-          )}
-
-          <div style={{ flex: 1 }} />
-
-          {isEditing && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] transition-all duration-[0.25s] bg-[#fef2f2] text-[#dc2626] border-[#fecaca] hover:bg-[#fee2e2] disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {deleting ? <><Loader2 size={18} className={spinCls} /> Menghapus...</> : <><Trash2 size={18} /> Hapus Usaha</>}
-            </button>
-          )}
-
-          {/* Dynamic Next / Submit Button */}
-          {isFreeSelection ? (
-            step < 3 ? (
+          {isEditing ? (
+            <>
               <button
                 type="button"
-                onClick={nextStep}
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)]"
+                onClick={() => navigate("/admin-user")}
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] border-[#e2e8f0] bg-white text-[#374151] transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8]"
               >
-                Selanjutnya <ChevronRight size={18} />
+                <ChevronLeft size={18} /> Kembali ke Dashboard
               </button>
-            ) : (
+
+              <div style={{ flex: 1 }} />
+
               <button
                 type="button"
-                onClick={handleFreeSubmit}
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] transition-all duration-[0.25s] bg-[#fef2f2] text-[#dc2626] border-[#fecaca] hover:bg-[#fee2e2] disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {deleting ? <><Loader2 size={18} className={spinCls} /> Menghapus...</> : <><Trash2 size={18} /> Hapus Usaha</>}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveEdit}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white shadow-[0_4px_16px_rgba(22,163,74,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(22,163,74,0.4)] disabled:opacity-70 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)] disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {loading ? <><Loader2 size={18} className={spinCls} /> Mendaftarkan...</> : <><Check size={18} /> Daftarkan Usaha (Free)</>}
+                {loading ? <><Loader2 size={18} className={spinCls} /> Menyimpan...</> : <><Check size={18} /> Simpan Perubahan</>}
               </button>
-            )
+            </>
           ) : (
-            step < 5 ? (
-              <button
-                type="button"
-                onClick={nextStep}
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)]"
-              >
-                {step === 3 ? "Lanjut ke Pembayaran" : step === 4 ? "Lanjut Upload Bukti" : "Selanjutnya"} <ChevronRight size={18} />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handlePremiumSubmit}
-                disabled={loading || !proofFile}
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white shadow-[0_4px_16px_rgba(22,163,74,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(22,163,74,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? <><Loader2 size={18} className={spinCls} /> Mengirim Bukti...</> : <><Check size={18} /> Kirim Bukti Pembayaran</>}
-              </button>
-            )
+            <>
+              {step > 1 && (
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] border-[#e2e8f0] bg-white text-[#374151] transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8]"
+                >
+                  <ChevronLeft size={18} /> Kembali
+                </button>
+              )}
+
+              <div style={{ flex: 1 }} />
+
+              {/* Dynamic Next / Submit Button */}
+              {isFreeSelection ? (
+                step < 3 ? (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)]"
+                  >
+                    Selanjutnya <ChevronRight size={18} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleFreeSubmit}
+                    disabled={loading}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white shadow-[0_4px_16px_rgba(22,163,74,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(22,163,74,0.4)] disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {loading ? <><Loader2 size={18} className={spinCls} /> Mendaftarkan...</> : <><Check size={18} /> Daftarkan Usaha (Free)</>}
+                  </button>
+                )
+              ) : (
+                step < 5 ? (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)]"
+                  >
+                    {step === 3 ? "Lanjut ke Pembayaran" : step === 4 ? "Lanjut Upload Bukti" : "Selanjutnya"} <ChevronRight size={18} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handlePremiumSubmit}
+                    disabled={loading || !proofFile}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white shadow-[0_4px_16px_rgba(22,163,74,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(22,163,74,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? <><Loader2 size={18} className={spinCls} /> Mengirim Bukti...</> : <><Check size={18} /> Kirim Bukti Pembayaran</>}
+                  </button>
+                )
+              )}
+            </>
           )}
         </div>
       </div>

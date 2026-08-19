@@ -14,9 +14,10 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AdvertisementController;
 use App\Http\Controllers\Api\CouponController;
-use App\Http\Controllers\Api\ReportController;
-
+use App\Http\Controllers\Api\ReferralController;
+use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\AdPackageController;
+use App\Http\Controllers\Api\ReportController;
 
 // OTP-based registration (3-step flow)
 Route::post('/register/send-otp',     [AuthController::class, 'sendOtp']);
@@ -24,6 +25,9 @@ Route::post('/register/verify-otp',   [AuthController::class, 'verifyOtpAndRegis
 Route::post('/register/resend-otp',   [AuthController::class, 'resendOtp']);
 
 Route::post('/login', [AuthController::class, 'login']);
+
+Route::get('/smart-cities', [LocationController::class, 'smartCities']);
+Route::get('/locations/{slug}', [LocationController::class, 'showLocation']);
 
 Route::get('/businesses', [BusinessController::class, 'index']);
 Route::get('/businesses/{business}', [BusinessController::class, 'show']);
@@ -81,13 +85,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/my-ratings', [RatingController::class, 'myRatings']);
         Route::put('/ratings/{rating}', [RatingController::class, 'update']);
         Route::delete('/ratings/{rating}', [RatingController::class, 'destroy']);
+        Route::post('/businesses/{business}/conversation', [ConversationController::class, 'storeForBusiness']);
+        Route::get('/inbox', [ConversationController::class, 'index']);
+        Route::get('/inbox/unread-count', [ConversationController::class, 'unreadCount']);
+        Route::get('/inbox/{conversation}', [ConversationController::class, 'show']);
+        Route::post('/inbox/{conversation}/messages', [MessageController::class, 'store']);
+        Route::post('/inbox/{conversation}/read', [ConversationController::class, 'markRead']);
         Route::get('/conversations', [ConversationController::class, 'index']);
         Route::post('/conversations', [ConversationController::class, 'store']);
         Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
+        Route::post('/conversations/{conversation}/read', [ConversationController::class, 'markRead']);
         Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy']);
         Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
         Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
         Route::put('/messages/{message}/read', [MessageController::class, 'read']);
+        Route::post('/messages/{message}/read', [MessageController::class, 'read']);
         Route::delete('/messages/{message}', [MessageController::class, 'destroy']);
         Route::get('/my-advertisements', [AdvertisementController::class, 'myAdvertisements']);
         Route::post('/advertisements', [AdvertisementController::class, 'store']);
@@ -95,6 +107,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/advertisements/{id}', [AdvertisementController::class, 'destroy']);
         Route::match(['put', 'post'], '/advertisements/{id}/pay', [AdvertisementController::class, 'pay']);
         Route::post('/coupons/validate', [CouponController::class, 'validateCoupon']);
+        Route::post('/referrals/validate', [ReferralController::class, 'validateCode']);
+        Route::get('/referrals/my-stats', [ReferralController::class, 'myStats']);
         Route::post('/subscriptions', [BusinessController::class, 'subscribeBusiness']);
     });
 
@@ -107,6 +121,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/users/{user}', [AdminController::class, 'destroyUser']);
         Route::get('/businesses', [AdminController::class, 'allBusinesses']);
         Route::put('/businesses/{business}/approve', [AdminController::class, 'approveBusiness']);
+        Route::post('/businesses/{business}/approve', [AdminController::class, 'approveBusiness']);
+        Route::put('/businesses/{business}/reject', [AdminController::class, 'rejectBusiness']);
+        Route::post('/businesses/{business}/reject', [AdminController::class, 'rejectBusiness']);
         Route::put('/businesses/{business}/suspend', [AdminController::class, 'suspendBusiness']);
         Route::put('/businesses/{business}', [AdminController::class, 'updateBusiness']);
         Route::delete('/businesses/{business}', [AdminController::class, 'destroyBusiness']);
@@ -117,7 +134,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/categories/{category}', [AdminController::class, 'destroyCategory']);
         Route::get('/blogs', [AdminController::class, 'allBlogs']);
         Route::put('/blogs/{blog}/approve', [AdminController::class, 'approveBlog']);
+        Route::post('/blogs/{blog}/approve', [AdminController::class, 'approveBlog']);
         Route::put('/blogs/{blog}/reject', [AdminController::class, 'rejectBlog']);
+        Route::post('/blogs/{blog}/reject', [AdminController::class, 'rejectBlog']);
         Route::delete('/blogs/{blog}', [AdminController::class, 'destroyBlog']);
         Route::get('/reviews', [AdminController::class, 'allReviews']);
         Route::delete('/reviews/{rating}', [AdminController::class, 'destroyReview']);

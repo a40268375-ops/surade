@@ -4,7 +4,8 @@ import Navbar from "../components/Navbar";
 import { InlineSpinner } from "../components/LoadingScreen";
 import api from "../services/api";
 import { getStorageUrl, DEFAULT_AVATAR } from "../utils/constants";
-import { requireAuth } from "../utils/authCheck";
+import { requireAuth, isUserLoggedIn } from "../utils/authCheck";
+import toast from "react-hot-toast";
 import {
   MapPin,
   Phone,
@@ -27,6 +28,9 @@ import {
   Flag,
   ChevronLeft,
   ChevronRight,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  BadgeCheck,
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 
@@ -166,6 +170,7 @@ export default function BusinessDetail() {
   // Gallery Modal & Image Preview States
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(null);
+  const [activeGalleryTab, setActiveGalleryTab] = useState("photo");
 
   const getStorageUrl = (path) => {
     if (!path) return "";
@@ -199,6 +204,15 @@ export default function BusinessDetail() {
     return list;
   })();
 
+function getYouTubeEmbedUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.trim().match(regExp);
+  return match && match[2].length === 11
+    ? `https://www.youtube.com/embed/${match[2]}`
+    : null;
+}
+
   const galleryImages = (() => {
     if (!business) return [];
     const allMedia = Array.isArray(business.media) ? business.media : [];
@@ -207,6 +221,27 @@ export default function BusinessDetail() {
       return galleryMedia.map((m) => getStorageUrl(m.file_path));
     }
     return imagesList;
+  })();
+
+  const videoMedia = (() => {
+    if (!business) return null;
+    const allMedia = Array.isArray(business.media) ? business.media : (Array.isArray(business.gallery) ? business.gallery : []);
+    const videoItem = allMedia.find((m) => m.type === "video");
+    if (videoItem) {
+      const raw = videoItem.url || videoItem.file_path;
+      if (!raw) return null;
+      const isUrl = raw.startsWith("http://") || raw.startsWith("https://");
+      const fullUrl = isUrl ? raw : getStorageUrl(raw);
+      const embedUrl = getYouTubeEmbedUrl(fullUrl);
+      return { url: fullUrl, embedUrl };
+    }
+    if (business.video) {
+      const isUrl = business.video.startsWith("http://") || business.video.startsWith("https://");
+      const fullUrl = isUrl ? business.video : getStorageUrl(business.video);
+      const embedUrl = getYouTubeEmbedUrl(fullUrl);
+      return { url: fullUrl, embedUrl };
+    }
+    return null;
   })();
 
   // Product pagination derived state
@@ -384,26 +419,16 @@ export default function BusinessDetail() {
     fetchProducts();
   }, [business?.id]);
 
-  // Check if business has active advertisement
+  // Check if business has active advertisement from loaded business data
   useEffect(() => {
-    const checkAdvertisement = async () => {
-      if (!business || !business.id) return;
-      try {
-        const res = await api.get('/advertisements');
-        const adsData = res.data?.data || res.data || [];
-        const activeAd = adsData.find(ad => 
-          ad.business?.id === business.id && 
-          ad.status === 'approved' && 
-          ad.payment_status === 'paid'
-        );
-        setHasActiveAd(!!activeAd);
-      } catch (err) {
-        console.error("Failed to check advertisement:", err);
-        setHasActiveAd(false);
-      }
-    };
-    checkAdvertisement();
-  }, [business?.id]);
+    if (!business) return;
+    const hasAd = Boolean(
+      business.has_active_ad ||
+      business.is_advertised ||
+      (Array.isArray(business.advertisements) && business.advertisements.some(ad => ad.status === 'approved' && ad.payment_status === 'paid'))
+    );
+    setHasActiveAd(hasAd);
+  }, [business]);
 
   // Fetch reviews (ratings) for this business
   useEffect(() => {
@@ -495,6 +520,46 @@ export default function BusinessDetail() {
       alert("Terjadi kesalahan saat menyimpan bookmark.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const [startingChat, setStartingChat] = useState(false);
+
+  const handleChatWithSeller = async () => {
+    if (!isUserLoggedIn()) {
+      toast.error("Silakan login terlebih dahulu untuk mengirim pesan.", {
+        duration: 4000,
+        style: {
+          borderRadius: "12px",
+          background: "#0f172a",
+          color: "#fff",
+          fontSize: "14px",
+        },
+      });
+      navigate(`/login?redirect=/business/${business.id}`);
+      return;
+    }
+
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    if (business && business.user_id && currentUser.id === business.user_id) {
+      alert("Anda adalah pemilik bisnis ini.");
+      return;
+    }
+
+    setStartingChat(true);
+    try {
+      const res = await api.post(`/businesses/${business.id}/conversation`);
+      if (res.data && (res.data.conversation_id || res.data.id)) {
+        const convId = res.data.conversation_id || res.data.id;
+        navigate(`/dashboard?tab=inbox&conversation=${convId}`);
+      } else {
+        alert(res.data?.message || "Gagal membuka percakapan.");
+      }
+    } catch (err) {
+      console.error("Failed to start conversation:", err);
+      alert(err.response?.data?.message || "Terjadi kesalahan saat membuat percakapan.");
+    } finally {
+      setStartingChat(false);
     }
   };
 
@@ -729,6 +794,14 @@ export default function BusinessDetail() {
         banner: null,
       };
 
+  // Check if business belongs to premium user or is premium
+  const isPremiumUser = Boolean(
+    business.is_premium ||
+    business.premium_info?.status === "active" ||
+    business.user?.role === "premium" ||
+    business.user?.is_premium
+  );
+
   return (
     <div className="business-detail-page">
       <Navbar />
@@ -774,6 +847,12 @@ export default function BusinessDetail() {
                   <span className="bd-hero__category-separator">›</span>
                   <span className="bd-hero__category-sub">{subCategoryName}</span>
                 </>
+              )}
+              {isPremiumUser && (
+                <div className="bd-hero__verified-badge" title="Bisnis Terpercaya - Pengguna Premium">
+                  <BadgeCheck size={16} className="bd-verified-icon" />
+                  <span>Bisnis Terpercaya</span>
+                </div>
               )}
             </div>
             <div className="bd-hero__meta">
@@ -901,46 +980,89 @@ export default function BusinessDetail() {
 
             {/* Gallery */}
             <div className="bd-gallery-section">
-              <h2 className="bd-gallery-section__title">Galeri Foto &amp; Video</h2>
-              <div className="bd-photo-grid">
-                {galleryImages.length > 0 ? (
-                  galleryImages.slice(0, 4).map((src, i) => {
-                    const isLastItem = i === 3 && galleryImages.length > 4;
-                    const remainingCount = galleryImages.length - 4;
+              <h2 className="bd-gallery-section__title">Galeri Usaha</h2>
+              
+              {/* Gallery Tabs */}
+              <div className="bd-gallery-tabs-wrapper">
+                <div className="bd-gallery-tabs">
+                  <button
+                    type="button"
+                    className={`bd-gallery-tab ${activeGalleryTab === "photo" ? "active" : ""}`}
+                    onClick={() => setActiveGalleryTab("photo")}
+                  >
+                    <ImageIcon size={18} />
+                    <span>Foto ({galleryImages.length})</span>
+                  </button>
 
-                    return (
-                      <div
-                        key={i}
-                        className="bd-photo-item"
-                        onClick={() => {
-                          if (isLastItem) {
-                            setShowGalleryModal(true);
-                          } else {
-                            setPreviewImageIndex(i);
-                          }
-                        }}
-                      >
-                        <img src={src} alt={`${business.name} ${i + 1}`} loading="lazy" />
-                        {isLastItem && (
-                          <div className="bd-photo-overlay">
-                            <span className="bd-photo-overlay-text">+{remainingCount}</span>
-                          </div>
+                  <button
+                    type="button"
+                    className={`bd-gallery-tab ${activeGalleryTab === "video" ? "active" : ""}`}
+                    onClick={() => setActiveGalleryTab("video")}
+                  >
+                    <VideoIcon size={18} />
+                    <span>Video ({videoMedia ? 1 : 0})</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Gallery Content */}
+              {activeGalleryTab === "photo" ? (
+                <div className="bd-photo-grid">
+                  {galleryImages.length > 0 ? (
+                    galleryImages.slice(0, 4).map((src, i) => {
+                      const isLastItem = i === 3 && galleryImages.length > 4;
+                      const remainingCount = galleryImages.length - 4;
+
+                      return (
+                        <div
+                          key={i}
+                          className="bd-photo-item"
+                          onClick={() => {
+                            if (isLastItem) {
+                              setShowGalleryModal(true);
+                            } else {
+                              setPreviewImageIndex(i);
+                            }
+                          }}
+                        >
+                          <img src={src} alt={`${business.name} ${i + 1}`} loading="lazy" />
+                          {isLastItem && (
+                            <div className="bd-photo-overlay">
+                              <span className="bd-photo-overlay-text">+{remainingCount}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="bd-gallery-empty">Belum ada foto galeri.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="bd-video-tab-content">
+                  {videoMedia ? (
+                    <div className="bd-video-container">
+                      <div className="bd-video-player-wrapper">
+                        {videoMedia.embedUrl ? (
+                          <iframe
+                            src={videoMedia.embedUrl}
+                            title="Video Profil Usaha"
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        ) : (
+                          <video controls src={videoMedia.url} poster={business.img} className="bd-video-player">
+                            Your browser does not support the video tag.
+                          </video>
                         )}
                       </div>
-                    );
-                  })
-                ) : (
-                  <p className="bd-gallery-empty">Belum ada foto galeri.</p>
-                )}
-              </div>
-              {business.video && (
-                <div className="bd-video-container">
-                  <h3 className="bd-video-title">Video Profil</h3>
-                  <div className="bd-video-player-wrapper">
-                    <video controls src={business.video} poster={business.img} className="bd-video-player">
-                      Your browser does not support the video tag.
-                    </video>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-slate-400 font-medium text-sm">
+                      Belum ada video profil usaha.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1182,9 +1304,18 @@ export default function BusinessDetail() {
                 <MessageCircle size={18} />
                 <span>WhatsApp</span>
               </button>
-              <button type="button" className="bd-seller-btn" onClick={handleWhatsApp}>
-                <MessageCircle size={18} />
-                <span>Chat Dengan Penjual</span>
+              <button
+                type="button"
+                className="bd-seller-btn"
+                onClick={handleChatWithSeller}
+                disabled={startingChat}
+              >
+                {startingChat ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <MessageCircle size={18} />
+                )}
+                <span>{startingChat ? "Memproses..." : "Chat Dengan Penjual"}</span>
               </button>
               <button
                 type="button"
@@ -1678,7 +1809,7 @@ export default function BusinessDetail() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900">
-                  Galeri Foto ({galleryImages.length})
+                  Galeri Usaha ({galleryImages.length})
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Semua foto galeri dari {business?.name || "bisnis ini"}

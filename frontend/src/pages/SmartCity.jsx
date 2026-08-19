@@ -1,6 +1,7 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
-import logoImg from "../assets/logo.png";
+import Navbar from "../components/Navbar";
+import { getStorageUrl } from "../utils/constants";
 import {
   ChevronDown,
   MapPin,
@@ -14,285 +15,322 @@ import {
   Shirt,
   Wrench,
   Search,
-  Filter,
   ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  CheckCircle2,
+  Compass,
+  Eye,
+  SlidersHorizontal,
+  Info
 } from "lucide-react";
-import "./Home.css";
 import "./SmartCity.css";
 
 const getCategoryIcon = (iconName) => {
   switch (iconName) {
-    case "store": return <Store size={20} />;
-    case "coffee": return <Coffee size={20} />;
-    case "smartphone": return <Smartphone size={20} />;
-    case "shirt": return <Shirt size={20} />;
-    case "wrench": return <Wrench size={20} />;
-    default: return <Store size={20} />;
+    case "store": return <Store size={18} />;
+    case "coffee": return <Coffee size={18} />;
+    case "smartphone": return <Smartphone size={18} />;
+    case "shirt": return <Shirt size={18} />;
+    case "wrench": return <Wrench size={18} />;
+    default: return <Store size={18} />;
   }
 };
 
-function Navbar() {
-  return (
-    <header className="home-header">
-      <div className="home-header__inner">
-        <Link to="/" className="home-logo">
-          <img src={logoImg} alt="Info.co.id" className="home-logo__img" />
-        </Link>
-        <nav className="home-nav">
-          <Link to="/" className="home-nav__link">Home</Link>
-          <a href="#" className="home-nav__link home-nav__link--dropdown">
-            <span>Informasi</span>
-            <ChevronDown size={15} className="home-nav__caret" />
-          </a>
-          <Link to="/blog" className="home-nav__link">Blog</Link>
-          <Link to="/contact" className="home-nav__link">Hubungi Kami</Link>
-          <Link to="/login" className="home-nav__link home-nav__link--login">Login</Link>
-          <button type="button" className="home-nav__button">
-            <ChevronDown size={15} /><span>Add Bisnis</span>
-          </button>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
 export default function SmartCity() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [city, setCity] = useState(null);
   const [smartCities, setSmartCities] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCity, setSelectedCity] = useState(null);
-  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const [selectedCitySlug, setSelectedCitySlug] = useState(id || "jakarta");
   const [businesses, setBusinesses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
-  const cityDropdownRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
 
-  // Fetch smart cities from API
+  // Fetch all 8 Smart Cities
   useEffect(() => {
     const fetchSmartCities = async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/smart-cities`);
-        if (!res.ok) {
-          console.warn("Smart cities endpoint returned:", res.status);
-          setSmartCities([]);
-          return;
-        }
+        if (!res.ok) throw new Error("Failed to fetch smart cities");
         const data = await res.json();
         const citiesData = data?.data || data || [];
         if (Array.isArray(citiesData)) {
           setSmartCities(citiesData);
-          // Find current city by id
-          const foundCity = citiesData.find((c) => c.id === parseInt(id));
-          setCity(foundCity);
-          setSelectedCity(foundCity?.name || null);
+          
+          // Find city by param id (could be integer ID or slug)
+          let current = citiesData.find((c) => String(c.id) === String(id) || c.slug === id);
+          if (!current && citiesData.length > 0) {
+            current = citiesData[0];
+          }
+          setCity(current || null);
+          if (current) setSelectedCitySlug(current.slug);
         }
       } catch (err) {
-        console.error("Failed to fetch smart cities:", err);
-        setSmartCities([]);
+        console.error("Error fetching smart cities:", err);
+      } finally {
+        setLoading(false);
       }
     };
+
     fetchSmartCities();
   }, [id]);
 
-  // Fetch categories from API
+  // Fetch Categories from API
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
         const data = await res.json();
-        if (Array.isArray(data)) {
-          const mappedCategories = [
-            { id: "all", label: "Semua", icon: <Store size={20} /> },
-            ...data.map(c => ({
+        const list = Array.isArray(data) ? data : (data?.data || []);
+        if (Array.isArray(list)) {
+          const mapped = [
+            { id: "all", label: "Semua Kategori", icon: <Store size={18} /> },
+            ...list.map((c) => ({
               id: c.slug,
               label: c.name,
-              icon: getCategoryIcon(c.icon)
-            }))
+              icon: getCategoryIcon(c.icon),
+            })),
           ];
-          setCategories(mappedCategories);
+          setCategories(mapped);
         }
       } catch (err) {
-        console.error("Failed to fetch categories:", err);
+        console.error("Error fetching categories:", err);
       }
     };
     fetchCategories();
   }, []);
 
+  // Fetch businesses for the current city
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target)) {
-        setCityDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Fetch businesses from API
-  useEffect(() => {
-    const fetchBusinesses = async () => {
+    if (!city) return;
+    const fetchCityBusinesses = async () => {
       setLoadingBusinesses(true);
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/businesses`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/businesses?location=${city.slug}&all=true`);
         const data = await res.json();
-        const businessesData = data?.data || data || [];
-        const list = Array.isArray(businessesData) ? businessesData : (businessesData?.data || []);
+        const list = Array.isArray(data) ? data : (data?.data || []);
         setBusinesses(list);
       } catch (err) {
-        console.error("Failed to fetch businesses:", err);
+        console.error("Error fetching city businesses:", err);
         setBusinesses([]);
       } finally {
         setLoadingBusinesses(false);
       }
     };
 
-    fetchBusinesses();
-  }, []);
+    fetchCityBusinesses();
+  }, [city]);
 
-  if (!city) {
+  // Handle city selector click
+  const handleSelectCity = (c) => {
+    setCity(c);
+    setSelectedCitySlug(c.slug);
+    navigate(`/smart-city/${c.id}`);
+  };
+
+  const filteredBusinesses = businesses.filter((b) => {
+    const categoryName = (b.category?.name || b.category || "").toLowerCase();
+    const matchesCategory = selectedCategory === "all" || categoryName.includes(selectedCategory.toLowerCase());
+    
+    const matchesSearch = !searchQuery ||
+      (b.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.city || "").toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  });
+
+  if (loading) {
     return (
-      <div className="smart-city-page">
+      <div className="sc-page-loader">
         <Navbar />
-        <div className="smart-city__not-found">
-          <h2>Kota tidak ditemukan</h2>
-          <Link to="/" className="smart-city__back-link">Kembali ke Home</Link>
+        <div className="sc-spinner-container">
+          <div className="sc-spinner" />
+          <p>Memuat Data Smart City...</p>
         </div>
       </div>
     );
   }
 
-  const filteredBusinesses = businesses.filter((business) => {
-    const matchesCategory = selectedCategory === "all" || 
-                         (business.category?.name || "").toLowerCase().includes(selectedCategory) ||
-                         (business.category || "").toLowerCase().includes(selectedCategory);
-    const matchesSearch = !searchQuery || 
-                         (business.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         (business.city || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (business.location || "").toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCity = !selectedCity || 
-                       (business.city || "").toLowerCase().includes(selectedCity.toLowerCase()) ||
-                       (business.location || "").toLowerCase().includes(selectedCity.toLowerCase());
-    return matchesCategory && matchesSearch && matchesCity;
-  });
+  if (!city) {
+    return (
+      <div className="sc-page">
+        <Navbar />
+        <div className="sc-not-found">
+          <Info size={48} className="sc-not-found__icon" />
+          <h2>Kota Tidak Ditemukan</h2>
+          <p>Kota yang Anda cari tidak tersedia dalam program Smart City &amp; Village.</p>
+          <Link to="/" className="sc-btn sc-btn--primary">
+            <ArrowLeft size={18} /> Kembali ke Beranda
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="smart-city-page">
+    <div className="sc-page">
       <Navbar />
 
-      {/* Hero Section */}
+      {/* ── HERO BANNER ── */}
       <section className="sc-hero">
         <div className="sc-hero__bg">
-          <img src={city.img} alt={city.name} className="sc-hero__img" />
+          <img src={city.image || city.img} alt={city.name} className="sc-hero__img" />
           <div className="sc-hero__overlay" />
         </div>
-        <div className="sc-hero__content">
-          <div className="sc-hero__inner">
-            <Link to="/" className="sc-hero__breadcrumb">
-              <span>Home</span>
-              <ArrowRight size={16} />
-              <span>Smart City</span>
-              <ArrowRight size={16} />
-              <span>{city.name}</span>
-            </Link>
-            <h1 className="sc-hero__title">{city.name} Smart City</h1>
-            <p className="sc-hero__subtitle">{city.description}</p>
-            
-            <div className="sc-hero__stats">
-              <div className="sc-hero__stat">
-                <Building2 size={24} className="sc-hero__stat-icon" />
-                <div className="sc-hero__stat-content">
-                  <span className="sc-hero__stat-value">{city.bisnis.toLocaleString()}</span>
-                  <span className="sc-hero__stat-label">Bisnis Terdaftar</span>
-                </div>
+
+        <div className="sc-hero__container">
+          <div className="sc-hero__breadcrumb">
+            <Link to="/">Beranda</Link>
+            <ArrowRight size={14} />
+            <span className="active">Smart City &amp; Village</span>
+            <ArrowRight size={14} />
+            <span className="current">{city.name}</span>
+          </div>
+
+          <div className="sc-hero__header">
+            <div className="sc-hero__badge">
+              <Sparkles size={14} />
+              <span>Program Resmi Pemerintah</span>
+            </div>
+            <h1 className="sc-hero__title">
+              Smart City <span>{city.name}</span>
+            </h1>
+            <p className="sc-hero__desc">{city.description}</p>
+          </div>
+
+          {/* Key Stats Counter */}
+          <div className="sc-hero__stats">
+            <div className="sc-stat-card">
+              <div className="sc-stat-card__icon sc-stat-card__icon--teal">
+                <Building2 size={24} />
               </div>
-              <div className="sc-hero__stat">
-                <Users size={24} className="sc-hero__stat-icon" />
-                <div className="sc-hero__stat-content">
-                  <span className="sc-hero__stat-value">{city.population}</span>
-                  <span className="sc-hero__stat-label">Penduduk</span>
-                </div>
+              <div className="sc-stat-card__info">
+                <span className="sc-stat-card__num">{businesses.length > 0 ? businesses.length : (city.bisnis || 0)}</span>
+                <span className="sc-stat-card__label">Bisnis &amp; UMKM Terdaftar</span>
               </div>
-              <div className="sc-hero__stat">
-                <MapPin size={24} className="sc-hero__stat-icon" />
-                <div className="sc-hero__stat-content">
-                  <span className="sc-hero__stat-value">{city.area}</span>
-                  <span className="sc-hero__stat-label">Luas Wilayah</span>
-                </div>
+            </div>
+
+            <div className="sc-stat-card">
+              <div className="sc-stat-card__icon sc-stat-card__icon--blue">
+                <Users size={24} />
+              </div>
+              <div className="sc-stat-card__info">
+                <span className="sc-stat-card__num">{city.population || "1 Juta+"}</span>
+                <span className="sc-stat-card__label">Jumlah Penduduk</span>
+              </div>
+            </div>
+
+            <div className="sc-stat-card">
+              <div className="sc-stat-card__icon sc-stat-card__icon--amber">
+                <Compass size={24} />
+              </div>
+              <div className="sc-stat-card__info">
+                <span className="sc-stat-card__num">{city.area || "500 km²"}</span>
+                <span className="sc-stat-card__label">Luas Wilayah</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Content Section */}
-      <section className="sc-content">
-        <div className="sc-content__inner">
-          {/* Highlights */}
-          <div className="sc-highlights">
-            <h2 className="sc-section__title">Program Unggulan</h2>
-            <div className="sc-highlights__grid">
-              {city.highlights.map((highlight, index) => (
-                <div key={index} className="sc-highlight-card">
-                  <TrendingUp size={20} className="sc-highlight-card__icon" />
-                  <span className="sc-highlight-card__text">{highlight}</span>
-                </div>
-              ))}
+      {/* ── CITY QUICK SELECTOR (8 CITIES) ── */}
+      <section className="sc-cities-selector">
+        <div className="sc-container">
+          <div className="sc-section-header">
+            <div className="sc-section-header__title">
+              <MapPin size={22} className="text-teal" />
+              <h2>Jelajahi 8 Smart City &amp; Village Indonesia</h2>
             </div>
+            <p>Pilih daerah untuk melihat direktori bisnis, layanan publik, dan program digital unggulan.</p>
           </div>
 
-          {/* Search & Filter */}
-          <div className="sc-filter-bar">
-            <div className="sc-search-container">
-              <div className="sc-search-box">
-                <Search size={18} className="sc-search-box__icon" />
-                <input
-                  type="text"
-                  placeholder="Cari bisnis..."
-                  className="sc-search-box__input"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <div className="sc-city-filter" ref={cityDropdownRef}>
+          <div className="sc-city-grid">
+            {smartCities.map((c) => {
+              const isSelected = String(c.id) === String(city.id) || c.slug === city.slug;
+              return (
                 <button
-                  className="sc-city-btn"
-                  onClick={() => setCityDropdownOpen((v) => !v)}
+                  key={c.id}
+                  type="button"
+                  className={`sc-city-card ${isSelected ? "sc-city-card--active" : ""}`}
+                  onClick={() => handleSelectCity(c)}
                 >
-                  <MapPin size={16} />
-                  <span>{selectedCity}</span>
-                  <ChevronDown size={14} className={`sc-city-caret${cityDropdownOpen ? " open" : ""}`} />
+                  <div className="sc-city-card__thumb">
+                    <img src={c.image || c.img} alt={c.name} />
+                    <div className="sc-city-card__badge">{c.bisnis || 0} Bisnis</div>
+                  </div>
+                  <div className="sc-city-card__info">
+                    <h3>{c.name}</h3>
+                    <span className="sc-city-card__type">
+                      {c.type === "smart_village" ? "Smart Village" : "Smart City"}
+                    </span>
+                  </div>
+                  {isSelected && <CheckCircle2 size={18} className="sc-city-card__check" />}
                 </button>
-                {cityDropdownOpen && (
-                  <div className="sc-city-dropdown">
-                    <div className="sc-city-list">
-                      {smartCities.map((c) => (
-                        <button
-                          key={c.id}
-                          className={`sc-city-option${selectedCity === c.name ? " selected" : ""}`}
-                          onClick={() => {
-                            setSelectedCity(c.name);
-                            setCityDropdownOpen(false);
-                          }}
-                        >
-                          {c.name}
-                        </button>
-                      ))}
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── MAIN CONTENT (HIGHLIGHTS & BUSINESS DIRECTORY) ── */}
+      <main className="sc-main">
+        <div className="sc-container">
+          
+          {/* Program Highlights */}
+          {city.highlights && city.highlights.length > 0 && (
+            <div className="sc-highlights-section">
+              <div className="sc-section-header">
+                <div className="sc-section-header__title">
+                  <TrendingUp size={22} className="text-teal" />
+                  <h2>Program Unggulan {city.name}</h2>
+                </div>
+              </div>
+
+              <div className="sc-highlights-grid">
+                {city.highlights.map((item, idx) => (
+                  <div key={idx} className="sc-highlight-item">
+                    <div className="sc-highlight-item__num">{idx + 1}</div>
+                    <div className="sc-highlight-item__content">
+                      <p>{item}</p>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
-            <div className="sc-category-tabs">
+          )}
+
+          {/* Search & Filter Toolbar */}
+          <div className="sc-toolbar">
+            <div className="sc-search-bar">
+              <Search size={20} className="sc-search-bar__icon" />
+              <input
+                type="text"
+                placeholder={`Cari bisnis atau UMKM di ${city.name}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button type="button" className="sc-search-bar__clear" onClick={() => setSearchQuery("")}>
+                  &times;
+                </button>
+              )}
+            </div>
+
+            <div className="sc-category-pills">
               {categories.map((cat) => (
                 <button
                   key={cat.id}
-                  className={`sc-category-tab ${selectedCategory === cat.id ? "active" : ""}`}
+                  type="button"
+                  className={`sc-cat-pill ${selectedCategory === cat.id ? "sc-cat-pill--active" : ""}`}
                   onClick={() => setSelectedCategory(cat.id)}
                 >
                   {cat.icon}
@@ -302,73 +340,95 @@ export default function SmartCity() {
             </div>
           </div>
 
-          {/* Business Grid */}
-          <div className="sc-business-section">
-            <h2 className="sc-section__title">
-              Bisnis di {city.name}
-              <span className="sc-section__count">({filteredBusinesses.length})</span>
-            </h2>
+          {/* Business Grid Listing */}
+          <div className="sc-business-container">
+            <div className="sc-business-header">
+              <h3>
+                Daftar Bisnis Terverifikasi di {city.name}
+              </h3>
+              <span className="sc-count-badge">{filteredBusinesses.length} Bisnis Ditemukan</span>
+            </div>
+
             {loadingBusinesses ? (
-              <div className="sc-loading-state">
-                <p>Memuat bisnis...</p>
+              <div className="sc-loading-grid">
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <div key={n} className="sc-skeleton-card" />
+                ))}
+              </div>
+            ) : filteredBusinesses.length > 0 ? (
+              <div className="sc-grid">
+                {filteredBusinesses.map((b) => {
+                  const imgUrl = getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600&h=400&fit=crop";
+                  const categoryName = typeof b.category === "object" ? b.category?.name : b.category || "Umum";
+                  const rating = b.rating || b.average_rating || 5.0;
+
+                  return (
+                    <Link key={b.id} to={`/business/${b.id}`} className="sc-biz-card">
+                      <div className="sc-biz-card__cover">
+                        <img src={imgUrl} alt={b.name} loading="lazy" />
+                        <span className="sc-biz-card__badge">Buka</span>
+                        {b.is_verified && (
+                          <div className="sc-biz-card__verified" title="Bisnis Terverifikasi">
+                            <CheckCircle2 size={14} /> Terverifikasi
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="sc-biz-card__content">
+                        <div className="sc-biz-card__cat">{categoryName}</div>
+                        <h4 className="sc-biz-card__name">{b.name}</h4>
+                        <p className="sc-biz-card__desc">
+                          {b.description ? (b.description.length > 90 ? `${b.description.substring(0, 90)}...` : b.description) : "Informasi bisnis resmi terdaftar di direktori Smart City."}
+                        </p>
+
+                        <div className="sc-biz-card__footer">
+                          <div className="sc-biz-card__meta">
+                            <MapPin size={14} className="text-teal" />
+                            <span>{b.city || city.name}</span>
+                          </div>
+                          <div className="sc-biz-card__rating">
+                            <Star size={14} fill="#f59e0b" stroke="#f59e0b" />
+                            <span>{rating}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
-              <div className="sc-business-grid">
-                {filteredBusinesses.length > 0 ? (
-                  filteredBusinesses.map((business) => {
-                    const img = business.img || business.logo || business.banner || business.gallery?.[0]?.url || "";
-                    const categoryName = typeof business.category === "string" 
-                      ? business.category 
-                      : business.category?.name || business.category_name || "-";
-                    const rating = business.rating ?? business.average_rating ?? 0;
-                    const reviews = business.reviews ?? business.total_rating ?? 0;
-                    const location = business.city || business.location || "-";
-                    const isOpen = business.is_open ?? business.open ?? true;
-                    
-                    return (
-                      <Link key={business.id} to={`/business/${business.id}`} className="sc-business-card">
-                        <div className="sc-business-card__img-wrap">
-                          {img ? (
-                            <img src={img} alt={business.name} className="sc-business-card__img" />
-                          ) : (
-                            <div className="sc-business-card__img-placeholder">No Image</div>
-                          )}
-                          <div className="sc-business-card__overlay">
-                            <span className={`sc-business-card__status ${isOpen ? "open" : "closed"}`}>
-                              {isOpen ? "Buka Sekarang" : "Tutup"}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="sc-business-card__body">
-                          <h3 className="sc-business-card__name">{business.name}</h3>
-                          <p className="sc-business-card__category">{categoryName}</p>
-                          <div className="sc-business-card__meta">
-                            <div className="sc-business-card__rating">
-                              <Star size={14} fill="#fbbf24" stroke="#fbbf24" />
-                              <span>{rating}</span>
-                              <span className="sc-business-card__reviews">({reviews})</span>
-                            </div>
-                            <div className="sc-business-card__location">
-                              <MapPin size={14} />
-                              <span>{location}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })
-                ) : (
-                  <div className="sc-empty-state">
-                    <Search size={48} className="sc-empty-state__icon" />
-                    <h3 className="sc-empty-state__title">Tidak ada bisnis ditemukan</h3>
-                    <p className="sc-empty-state__text">Coba ubah kata kunci pencarian atau filter kategori</p>
-                  </div>
-                )}
+              <div className="sc-empty">
+                <Search size={48} className="sc-empty__icon" />
+                <h4>Belum Ada Bisnis Terdaftar</h4>
+                <p>Belum ada bisnis yang sesuai dengan pencarian di {city.name}.</p>
+                <button
+                  type="button"
+                  className="sc-btn sc-btn--secondary"
+                  onClick={() => { setSelectedCategory("all"); setSearchQuery(""); }}
+                >
+                  Reset Filter
+                </button>
               </div>
             )}
           </div>
+
         </div>
-      </section>
+      </main>
+
+      {/* ── FOOTER CTA ── */}
+      <footer className="sc-footer-cta">
+        <div className="sc-container">
+          <div className="sc-footer-cta__box">
+            <div className="sc-footer-cta__text">
+              <h3>Punya Usaha di {city.name}?</h3>
+              <p>Daftarkan bisnis Anda secara gratis dan tingkatkan visibilitas di program Smart City &amp; Village Indonesia.</p>
+            </div>
+            <Link to="/login" className="sc-btn sc-btn--accent">
+              Daftarkan Bisnis Sekarang <ArrowRight size={18} />
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

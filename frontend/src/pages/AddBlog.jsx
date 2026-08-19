@@ -256,14 +256,14 @@ export default function AddBlog() {
       <div className="add-blog-page">
         <Navbar />
         <div className="add-blog-success">
-          <div className="add-blog-success__icon">
-            <Check size={48} />
+          <div className="add-blog-success__icon" style={{ background: "linear-gradient(135deg, #d97706, #f59e0b)" }}>
+            <Clock size={48} />
           </div>
-          <h1>{contentType === "event" ? (isEditing ? "Event Berhasil Diperbarui!" : "Event Berhasil Dibuat!") : (isEditing ? "Blog Berhasil Diperbarui!" : "Blog Berhasil Dibuat!")}</h1>
+          <h1>{contentType === "event" ? (isEditing ? "Event Berhasil Diperbarui!" : "Event Berhasil Dikirim!") : (isEditing ? "Blog Berhasil Diperbarui!" : "Blog Berhasil Dikirim!")}</h1>
           <p>
             {contentType === "event"
-              ? (form.status === "published" ? "Event kamu sudah tayang dan bisa dilihat oleh pengunjung." : "Event tersimpan sebagai draft.")
-              : (form.status === "published" ? "Blog kamu sudah tayang dan bisa dilihat oleh pengunjung." : "Blog tersimpan sebagai draft. Kamu bisa publikasikan nanti.")}
+              ? "Event kamu telah berhasil dikirim dan berstatus Menunggu Persetujuan Admin sebelum tampil publik."
+              : "Blog kamu telah berhasil dikirim dan berstatus Menunggu Persetujuan Admin sebelum tampil publik."}
           </p>
           <div className="add-blog-success__actions">
             <Link to="/admin-user" className="btn-primary">

@@ -14,34 +14,12 @@ import {
 import "./Blog.css";
 import { DEFAULT_AVATAR } from "../utils/constants";
 
-const INITIAL_BLOG_CATEGORIES = [
-  { id: "all", label: "Semua" },
-  { id: "budaya", label: "Budaya" },
-  { id: "kuliner", label: "Kuliner" },
-  { id: "wisata", label: "Wisata" },
-  { id: "teknologi", label: "Teknologi" },
-];
-
 export default function Blog() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [blogs, setBlogs] = useState(() => {
-    try {
-      const cached = sessionStorage.getItem("cached_blogs_page_data");
-      return cached ? JSON.parse(cached) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-  const [categories, setCategories] = useState(INITIAL_BLOG_CATEGORIES);
-  const [loading, setLoading] = useState(() => {
-    try {
-      const cached = sessionStorage.getItem("cached_blogs_page_data");
-      return cached && JSON.parse(cached).length > 0 ? false : true;
-    } catch (e) {
-      return true;
-    }
-  });
+  const [blogs, setBlogs] = useState([]);
+  const [categories, setCategories] = useState([{ id: "all", label: "Semua" }]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -54,9 +32,15 @@ export default function Blog() {
       const raw = res.data?.data || res.data || [];
       const data = Array.isArray(raw) ? raw : (raw?.data || []);
       setBlogs(data);
-      try {
-        sessionStorage.setItem("cached_blogs_page_data", JSON.stringify(data));
-      } catch (e) {}
+
+      if (data.length > 0) {
+        const catNames = data.map(b => (typeof b.category === "object" ? b.category?.name : b.category)).filter(Boolean);
+        const uniqueCats = Array.from(new Set(catNames));
+        setCategories([
+          { id: "all", label: "Semua" },
+          ...uniqueCats.map(name => ({ id: name.toLowerCase(), label: name }))
+        ]);
+      }
     } catch (err) {
       console.error("Failed to fetch blogs:", err);
     } finally {

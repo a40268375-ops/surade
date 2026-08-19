@@ -22,6 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'banner',
         'role',
         'password',
+        'referral_code',
     ];
 
     protected $hidden = [
@@ -35,6 +36,42 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function getReferralCodeAttribute($value)
+    {
+        if (!empty($value)) {
+            return strtoupper($value);
+        }
+
+        $cleanUsername = preg_replace('/[^A-Za-z0-9]/', '', $this->username ?: $this->name);
+        if (empty($cleanUsername)) {
+            $cleanUsername = 'USER';
+        }
+        $generated = strtoupper("INFO-{$cleanUsername}-{$this->id}");
+
+        // Save generated code lazily
+        try {
+            $this->attributes['referral_code'] = $generated;
+            \Illuminate\Support\Facades\DB::table('users')
+                ->where('id', $this->id)
+                ->whereNull('referral_code')
+                ->update(['referral_code' => $generated]);
+        } catch (\Throwable $e) {
+            // ignore fallback
+        }
+
+        return $generated;
+    }
+
+    public function referralsGiven()
+    {
+        return $this->hasMany(Referral::class, 'referrer_id');
+    }
+
+    public function referralsReceived()
+    {
+        return $this->hasMany(Referral::class, 'user_id');
     }
 
     /*

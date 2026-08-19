@@ -815,6 +815,31 @@ body { background: #f5f6fa; }
   color: #fff; font-size: 0.72rem; font-weight: 500;
 }
 
+.biz-card__verified-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.biz-card__verified-icon {
+  color: #ffffff;
+  fill: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
 /* Card body */
 .biz-card__body { padding: 14px 16px 16px; }
 
@@ -1185,6 +1210,43 @@ body { background: #f5f6fa; }
   .temukan-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Lihat Semua Bisnis Button ── */
+.temukan-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 36px;
+}
+
+.temukan-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 34px;
+  background: #007570;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border-radius: 50px;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(0, 117, 112, 0.25);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.temukan-more-btn:hover {
+  background: #005f5b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 117, 112, 0.35);
+  color: #ffffff;
+}
+
+.temukan-more-btn svg {
+  transition: transform 0.25s ease;
+}
+
+.temukan-more-btn:hover svg {
+  transform: translateX(4px);
 }
 
 /* ─────────────────────────────────────────────

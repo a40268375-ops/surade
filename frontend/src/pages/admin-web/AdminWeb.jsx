@@ -306,9 +306,52 @@ export default function AdminWeb() {
   const [recentActivities, setRecentActivities] = useState(() => getAdminCache("activities", []));
   const [users, setUsers] = useState(() => getAdminCache("users", []));
   const [businesses, setBusinesses] = useState(() => getAdminCache("businesses", []));
+  const [businessStatusFilter, setBusinessStatusFilter] = useState("all");
   const [categories, setCategories] = useState(() => getAdminCache("categories", []));
   const [payments, setPayments] = useState(() => getAdminCache("payments", []));
   const [blogs, setBlogs] = useState(() => getAdminCache("blogs", []));
+  const [rejectionModal, setRejectionModal] = useState({
+    show: false,
+    type: "",
+    item: null,
+    reason: "",
+    submitting: false,
+  });
+
+  const handleOpenRejectModal = (type, item) => {
+    setRejectionModal({
+      show: true,
+      type,
+      item,
+      reason: "",
+      submitting: false,
+    });
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectionModal.reason || !rejectionModal.reason.trim()) {
+      alert("Alasan penolakan wajib diisi.");
+      return;
+    }
+    setRejectionModal((prev) => ({ ...prev, submitting: true }));
+    try {
+      const endpoint = rejectionModal.type === "business"
+        ? `/admin/businesses/${rejectionModal.item.id}/reject`
+        : `/admin/blogs/${rejectionModal.item.id}/reject`;
+
+      await api.post(endpoint, {
+        rejection_reason: rejectionModal.reason.trim(),
+      });
+
+      alert(rejectionModal.type === "business" ? "Bisnis berhasil ditolak." : "Blog berhasil ditolak.");
+      setRejectionModal({ show: false, type: "", item: null, reason: "", submitting: false });
+      fetchAllData();
+    } catch (err) {
+      console.error("Failed to reject:", err);
+      alert(err.response?.data?.message || "Gagal menolak data.");
+      setRejectionModal((prev) => ({ ...prev, submitting: false }));
+    }
+  };
   const [blogTab, setBlogTab] = useState("all");
   const [blogSearch, setBlogSearch] = useState("");
   const [blogStatusFilter, setBlogStatusFilter] = useState("");
@@ -1522,15 +1565,34 @@ export default function AdminWeb() {
         </button>
       </div>
 
-      <div className="flex items-center gap-[10px] bg-white border-[1.5px] border-[#e2e8f0] rounded-[10px] px-[14px] py-[9px] mb-[16px] transition-all duration-220 focus-within:border-[#007570] focus-within:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]">
-        <Search size={18} strokeWidth={2} className="text-[#007570] shrink-0" />
-        <input
-          type="text"
-          placeholder="Cari bisnis..."
-          className="flex-1 border-0 outline-none font-['Poppins','Inter',sans-serif] text-[13.5px] text-[#0f172a] bg-transparent placeholder:text-[#94a3b8]"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      {/* Filters & Search */}
+      <div className="flex flex-wrap items-center justify-between gap-[12px] mb-[16px]">
+        <div className="flex items-center gap-[6px] bg-[#f1f5f9] p-[4px] rounded-[10px]">
+          {['all', 'pending', 'approved', 'rejected'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setBusinessStatusFilter(tab)}
+              className={`px-[12px] py-[6px] rounded-[8px] text-[12px] font-semibold transition-all ${
+                businessStatusFilter === tab
+                  ? 'bg-[#007570] text-white shadow-xs'
+                  : 'text-[#64748b] hover:text-[#0f172a]'
+              }`}
+            >
+              {tab === 'all' ? 'Semua' : tab === 'pending' ? 'Pending' : tab === 'approved' ? 'Disetujui' : 'Ditolak'}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 min-w-[220px] flex items-center gap-[10px] bg-white border-[1.5px] border-[#e2e8f0] rounded-[10px] px-[14px] py-[8px] transition-all duration-220 focus-within:border-[#007570] focus-within:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]">
+          <Search size={18} strokeWidth={2} className="text-[#007570] shrink-0" />
+          <input
+            type="text"
+            placeholder="Cari bisnis..."
+            className="flex-1 border-0 outline-none font-['Poppins','Inter',sans-serif] text-[13.5px] text-[#0f172a] bg-transparent placeholder:text-[#94a3b8]"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[#e2e8f0] overflow-hidden overflow-x-auto">
@@ -1565,7 +1627,15 @@ export default function AdminWeb() {
                   const nameMatch = b.name?.toLowerCase().includes(query);
                   const catMatch = typeof b.category === "string" ? b.category.toLowerCase().includes(query) : b.category?.name?.toLowerCase().includes(query);
                   const ownerMatch = b.user?.name?.toLowerCase().includes(query) || b.owner?.toLowerCase().includes(query);
-                  return !searchQuery || nameMatch || catMatch || ownerMatch;
+
+                  const bStatus = (b.status || "").toLowerCase();
+                  const statusMatch = businessStatusFilter === "all" || !businessStatusFilter
+                    ? true
+                    : businessStatusFilter === "approved"
+                    ? bStatus === "approved" || bStatus === "published" || bStatus === "active"
+                    : bStatus === businessStatusFilter;
+
+                  return (!searchQuery || nameMatch || catMatch || ownerMatch) && statusMatch;
                 })
                 .map((business) => (
                   <tr key={business.id} className="transition-colors duration-150 hover:bg-[#f8fafc]">
@@ -1591,7 +1661,7 @@ export default function AdminWeb() {
                     </td>
                     <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
                       <span className={
-                        business.status === "published" || business.status === "active"
+                        business.status === "published" || business.status === "approved" || business.status === "active"
                           ? "inline-flex items-center gap-[4px] px-[9px] py-[3px] rounded-[7px] text-[11.5px] font-semibold bg-[#dcfce7] text-[#16a34a]"
                           : business.status === "pending"
                           ? "inline-flex items-center gap-[4px] px-[9px] py-[3px] rounded-[7px] text-[11.5px] font-semibold bg-[#fef3c7] text-[#d97706]"
@@ -1599,8 +1669,8 @@ export default function AdminWeb() {
                           ? "inline-flex items-center gap-[4px] px-[9px] py-[3px] rounded-[7px] text-[11.5px] font-semibold bg-[#fee2e2] text-[#dc2626]"
                           : "inline-flex items-center gap-[4px] px-[9px] py-[3px] rounded-[7px] text-[11.5px] font-semibold bg-[#f1f5f9] text-[#64748b]"
                       }>
-                        {business.status === "published" || business.status === "active"
-                          ? "Aktif"
+                        {business.status === "published" || business.status === "approved" || business.status === "active"
+                          ? "Disetujui"
                           : business.status === "pending"
                           ? "Pending"
                           : business.status === "suspended"
@@ -1637,23 +1707,23 @@ export default function AdminWeb() {
                     </td>
                     <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
                       <div className="flex items-center gap-[5px]">
-                        <button className="w-[30px] h-[30px] bg-[#f1f5f9] border-0 rounded-[7px] cursor-pointer text-[#64748b] transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#007570] hover:text-white hover:-translate-y-[1px] hover:shadow-[0_2px_8px_rgba(0,117,112,0.2)]" onClick={() => handleModal("viewBusiness", business)} title="Lihat Detail">
+                        <button className="w-[30px] h-[30px] bg-[#f1f5f9] border-0 rounded-[7px] cursor-pointer text-[#64748b] transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#007570] hover:text-white" onClick={() => handleModal("viewBusiness", business)} title="Lihat Detail">
                           <Eye size={16} strokeWidth={2} />
                         </button>
-                        <button className="w-[30px] h-[30px] bg-[#f1f5f9] border-0 rounded-[7px] cursor-pointer text-[#64748b] transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#007570] hover:text-white hover:-translate-y-[1px] hover:shadow-[0_2px_8px_rgba(0,117,112,0.2)]" onClick={() => handleModal("editBusiness", business)} title="Edit">
+                        <button className="w-[30px] h-[30px] bg-[#f1f5f9] border-0 rounded-[7px] cursor-pointer text-[#64748b] transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#007570] hover:text-white" onClick={() => handleModal("editBusiness", business)} title="Edit">
                           <Edit size={16} strokeWidth={2} />
                         </button>
-                        {business.status !== "published" && (
+                        {business.status !== "published" && business.status !== "approved" && (
                           <button className="w-[30px] h-[30px] bg-[#dcfce7] text-[#16a34a] border-0 rounded-[7px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#16a34a] hover:text-white" onClick={() => handleApproveBusiness(business.id)} title="Setujui (Approve)">
                             <Check size={16} strokeWidth={2} />
                           </button>
                         )}
-                        {business.status === "published" && (
-                          <button className="w-[30px] h-[30px] bg-[#fef3c7] text-[#d97706] border-0 rounded-[7px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#d97706] hover:text-white" onClick={() => handleSuspendBusiness(business.id)} title="Tangguhkan (Suspend)">
-                            <Ban size={16} strokeWidth={2} />
+                        {business.status !== "rejected" && (
+                          <button className="w-[30px] h-[30px] bg-[#fee2e2] text-[#dc2626] border-0 rounded-[7px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#dc2626] hover:text-white" onClick={() => handleOpenRejectModal("business", business)} title="Tolak (Reject)">
+                            <X size={16} strokeWidth={2} />
                           </button>
                         )}
-                        <button className="w-[30px] h-[30px] bg-[#fee2e2] text-[#dc2626] border-0 rounded-[7px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#dc2626] hover:text-white" onClick={() => handleDeleteBusiness(business.id)} title="Hapus">
+                        <button className="w-[30px] h-[30px] bg-[#fef2f2] text-[#dc2626] border-0 rounded-[7px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#dc2626] hover:text-white" onClick={() => handleDeleteBusiness(business.id)} title="Hapus">
                           <Trash2 size={16} strokeWidth={2} />
                         </button>
                       </div>
@@ -2490,23 +2560,23 @@ export default function AdminWeb() {
                         {/* Aksi */}
                         <td className="px-[16px] py-[12px] text-right">
                           <div className="flex items-center justify-end gap-[6px]">
-                            {row.status === "pending" && (
-                              <>
-                                <button
-                                  onClick={() => handleApproveBlog(row.id)}
-                                  className="px-[8px] py-[4px] bg-[#dcfce7] text-[#16a34a] rounded-[6px] text-[11px] font-bold hover:bg-[#bbf7d0]"
-                                  title="Setujui Publikasi"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleRejectBlog(row.id)}
-                                  className="px-[8px] py-[4px] bg-[#fee2e2] text-[#dc2626] rounded-[6px] text-[11px] font-bold hover:bg-[#fca5a5]"
-                                  title="Tolak Publikasi"
-                                >
-                                  Reject
-                                </button>
-                              </>
+                            {row.status !== "approved" && row.status !== "published" && (
+                              <button
+                                onClick={() => handleApproveBlog(row.id)}
+                                className="px-[8px] py-[4px] bg-[#dcfce7] text-[#16a34a] rounded-[6px] text-[11px] font-bold hover:bg-[#16a34a] hover:text-white transition-all flex items-center gap-[3px]"
+                                title="Setujui (Approve)"
+                              >
+                                <Check size={13} /> Setujui
+                              </button>
+                            )}
+                            {row.status !== "rejected" && (
+                              <button
+                                onClick={() => handleOpenRejectModal("blog", row)}
+                                className="px-[8px] py-[4px] bg-[#fee2e2] text-[#dc2626] rounded-[6px] text-[11px] font-bold hover:bg-[#dc2626] hover:text-white transition-all flex items-center gap-[3px]"
+                                title="Tolak (Reject)"
+                              >
+                                <X size={13} /> Tolak
+                              </button>
                             )}
 
                             <button
@@ -5003,7 +5073,7 @@ export default function AdminWeb() {
       </main>
 
       {/* Modal */}
-      {renderModal()}
+      {typeof renderModal === "function" && renderModal()}
     </div>
   );
 }

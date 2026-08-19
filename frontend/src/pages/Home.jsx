@@ -29,18 +29,11 @@ import {
   Calendar,
   Building2,
   Landmark,
+  BadgeCheck,
+  ArrowRight,
 } from "lucide-react";
 
-/* ── Category tabs ── */
-const CATEGORIES = [
-  { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
-  { id: "bisnis", label: "Bisnis & Market", icon: <Store size={26} strokeWidth={1.7} /> },
-  { id: "cafe", label: "Cafe & Restaurant", icon: <Coffee size={26} strokeWidth={1.7} /> },
-  { id: "elektronik", label: "Elektronik & Gadget", icon: <Smartphone size={26} strokeWidth={1.7} /> },
-  { id: "fashion", label: "Fashion", icon: <Shirt size={26} strokeWidth={1.7} /> },
-  { id: "servis", label: "Servis & Tukang", icon: <Wrench size={26} strokeWidth={1.7} /> },
-  { id: "wisata", label: "Wisata", icon: <MapPin size={26} strokeWidth={1.7} /> },
-];
+/* ── Categories loaded dynamically from API ── */
 
 /* ── How it works steps ── */
 const QUICK_STEPS = [
@@ -77,141 +70,8 @@ const FEATURES_DATA = [
   },
 ];
 
-/* ── Smart Cities data ── */
-const SMART_CITIES = [
-  {
-    id: 1,
-    slug: "aceh",
-    name: "Aceh",
-    description: "Provinsi Aceh mengembangkan Smart City dan Smart Village untuk meningkatkan layanan publik berbasis digital di seluruh kabupaten/kota.",
-    img: "https://images.unsplash.com/photo-1584982637256-4b2a4729f276?w=600&h=400&fit=crop",
-    bisnis: 312,
-    population: "5,5 Juta",
-    area: "57.956 km²",
-    highlights: ["Sistem informasi desa digital", "E-Government Aceh", "Digitalisasi layanan kependudukan"]
-  },
-  {
-    id: 2,
-    slug: "bali",
-    name: "Bali",
-    description: "Provinsi Bali mengintegrasikan teknologi smart tourism dengan program Smart City untuk mendukung sektor pariwisata dan ekonomi kreatif daerah.",
-    img: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600&h=400&fit=crop",
-    bisnis: 874,
-    population: "4,3 Juta",
-    area: "5.780 km²",
-    highlights: ["Smart Tourism Platform", "Digitalisasi UMKM pariwisata", "Sistem informasi wisata terpadu"]
-  },
-  {
-    id: 3,
-    slug: "bogor",
-    name: "Bogor",
-    description: "Kota Bogor mengembangkan Smart City dengan fokus pada pengelolaan transportasi, layanan publik digital, dan sistem pengelolaan sampah yang lebih efisien.",
-    img: "https://upload.wikimedia.org/wikipedia/commons/e/eb/Tugu_Kujang_1.jpg",
-    bisnis: 462,
-    population: "1,1 Juta",
-    area: "118 km²",
-    highlights: ["Sistem transportasi cerdas", "Digitalisasi layanan publik", "Pengelolaan sampah berbasis IoT"]
-  },
-  {
-    id: 4,
-    slug: "jakarta",
-    name: "Jakarta",
-    description: "DKI Jakarta sebagai pionir Smart City Indonesia telah mengoperasikan Jakarta Smart City Command Center yang memantau kota secara real-time melalui ribuan CCTV dan sensor.",
-    img: "https://images.unsplash.com/photo-1555993539-1732b0258235?w=600&h=400&fit=crop",
-    bisnis: 2140,
-    population: "10,6 Juta",
-    area: "664 km²",
-    highlights: ["Jakarta Smart City Command Center", "Sistem transportasi Transjakarta terintegrasi", "Qlue — platform pengaduan warga digital"]
-  },
-  {
-    id: 5,
-    slug: "jambi",
-    name: "Jambi",
-    description: "Kota Jambi menjalankan program Smart City dalam kerangka Gerakan Menuju 100 Smart City Kementerian Kominfo dengan fokus pada smart economy dan smart government.",
-    img: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Gentala_Arasy.jpg",
-    bisnis: 198,
-    population: "606 Ribu",
-    area: "205 km²",
-    highlights: ["Gerakan 100 Smart City Kemkominfo", "Sistem informasi perizinan online", "Digitalisasi UMKM lokal"]
-  },
-  {
-    id: 6,
-    slug: "kabupaten-kepulauan-mentawai",
-    name: "Kabupaten Kepulauan Mentawai",
-    description: "Kabupaten Kepulauan Mentawai mengembangkan program Smart Village untuk memperluas akses informasi dan layanan digital hingga ke desa-desa terpencil di kepulauan.",
-    img: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=600&h=400&fit=crop",
-    bisnis: 45,
-    population: "87 Ribu",
-    area: "6.011 km²",
-    highlights: ["Akses internet desa", "Sistem informasi potensi desa", "Pelayanan administrasi terpadu"]
-  },
-  {
-    id: 7,
-    slug: "magelang",
-    name: "Magelang",
-    description: "Kota Magelang terpilih dalam program Gerakan Menuju 100 Smart City dan mengembangkan sistem layanan publik digital serta pengelolaan kota berbasis data.",
-    img: "https://upload.wikimedia.org/wikipedia/commons/7/73/Borobudur_Temple.jpg",
-    bisnis: 187,
-    population: "123 Ribu",
-    area: "18 km²",
-    highlights: ["Data GO (Open Data)", "Sistem layanan kesehatan terpadu", "Magelang Cerdas (Aplikasi Publik)"]
-  },
-  {
-    id: 8,
-    slug: "medan",
-    name: "Medan",
-    description: "Kota Medan terus berinovasi dalam mengimplementasikan konsep Smart City melalui layanan Medan Smart City yang mengintegrasikan berbagai layanan publik dan administrasi kota.",
-    img: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Istana_Maimun_Medan.jpg",
-    bisnis: 934,
-    population: "2,4 Juta",
-    area: "265 km²",
-    highlights: ["Medan Smart City", "CCTV Terintegrasi", "E-Parkir dan layanan digital"]
-  },
-  {
-    id: 9,
-    slug: "papua-barat",
-    name: "Papua Barat",
-    description: "Provinsi Papua Barat menjalankan program Smart Village untuk mendekatkan layanan pemerintah kepada masyarakat desa dan meningkatkan konektivitas digital di wilayah terpencil.",
-    img: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=250&fit=crop",
-    bisnis: 87,
-    population: "1,1 Juta",
-    area: "97.024 km²",
-    highlights: ["Program Smart Village pedalaman", "Perluasan infrastruktur internet 4G", "Sistem informasi kampung digital"]
-  },
-  {
-    id: 10,
-    slug: "sulawesi-tengah",
-    name: "Sulawesi Tengah",
-    description: "Provinsi Sulawesi Tengah mengembangkan program Smart Village untuk memperkuat sistem informasi desa dan mendorong digitalisasi potensi ekonomi lokal pascabencana.",
-    img: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&h=250&fit=crop",
-    bisnis: 143,
-    population: "3,1 Juta",
-    area: "61.841 km²",
-    highlights: ["Sistem informasi desa pascabencana", "Digitalisasi potensi ekonomi lokal", "Program pemulihan berbasis teknologi"]
-  },
-  {
-    id: 11,
-    slug: "sumatera-utara",
-    name: "Sumatera Utara",
-    description: "Provinsi Sumatera Utara mendorong percepatan Smart City di Kota Medan dan Smart Village di berbagai kabupaten untuk meningkatkan pelayanan publik berbasis teknologi.",
-    img: "https://images.unsplash.com/photo-1588666309990-d68f08e3d4a6?w=400&h=250&fit=crop",
-    bisnis: 1240,
-    population: "15,1 Juta",
-    area: "72.981 km²",
-    highlights: ["Program Smart City Medan", "Digitalisasi desa di Kabupaten Toba", "Sistem informasi pariwisata Danau Toba"]
-  },
-  {
-    id: 12,
-    slug: "yogyakarta",
-    name: "Yogyakarta",
-    description: "Kota Yogyakarta masuk dalam program Gerakan Menuju 100 Smart City dan secara konsisten mengembangkan layanan publik digital serta ekosistem startup berbasis kota.",
-    img: "https://images.unsplash.com/photo-1602576666092-bf6447a729fc?w=400&h=250&fit=crop",
-    bisnis: 673,
-    population: "437 Ribu",
-    area: "33 km²",
-    highlights: ["Gerakan 100 Smart City Kemkominfo", "Ekosistem startup dan inovasi digital", "Sistem informasi pariwisata terpadu"]
-  },
-];
+/* ── Smart Cities data (Loaded dynamically from API) ── */
+const SMART_CITIES = [];
 
 /* ── Testimonials data ── */
 const TESTIMONIALS_DATA = [
@@ -308,47 +168,52 @@ export default function Home() {
   const [searchHistory, setSearchHistory] = useState([]);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const [businesses, setBusinesses] = useState([]);
-  const [categories, setCategories] = useState(CATEGORIES);
-  const [bisnisData, setBisnisData] = useState(() => {
-    try {
-      const cached = sessionStorage.getItem("cached_bisnis_data");
-      return cached ? JSON.parse(cached) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-  const [temukanData, setTemukanData] = useState(() => {
-    try {
-      const cached = sessionStorage.getItem("cached_bisnis_data");
-      return cached ? JSON.parse(cached) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  const [categories, setCategories] = useState([{ id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> }]);
+  const [bisnisData, setBisnisData] = useState([]);
+  const [temukanData, setTemukanData] = useState([]);
   const [adsData, setAdsData] = useState([]);
   const [loadingAds, setLoadingAds] = useState(true);
-  const [loadingData, setLoadingData] = useState(() => {
-    try {
-      const cached = sessionStorage.getItem("cached_bisnis_data");
-      return cached && JSON.parse(cached).length > 0 ? false : true;
-    } catch (e) {
-      return true;
-    }
-  });
+  const [loadingData, setLoadingData] = useState(true);
   const [blogsData, setBlogsData] = useState([]);
   const [testimonialsData, setTestimonialsData] = useState(TESTIMONIALS_DATA);
-  const [smartCitiesData, setSmartCitiesData] = useState(SMART_CITIES);
+  const [smartCitiesData, setSmartCitiesData] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
+      // 1. Categories with Client Cache
+      try {
+        sessionStorage.removeItem("cached_public_categories");
+      } catch (e) {}
+
+      const cachedCategories = sessionStorage.getItem("cached_public_categories_raw");
+      if (cachedCategories) {
+        try {
+          const rawList = JSON.parse(cachedCategories);
+          if (Array.isArray(rawList) && rawList.length > 0) {
+            setCategories([
+              { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
+              ...rawList.map(c => ({
+                id: c.slug || String(c.id),
+                label: c.name,
+                icon: getCategoryIcon(c.icon)
+              }))
+            ]);
+          }
+        } catch (e) {}
+      }
+
       const fetchCategories = fetch(`${import.meta.env.VITE_API_URL}/categories`)
         .then(res => res.json())
         .then(catData => {
-          if (Array.isArray(catData)) {
+          const list = Array.isArray(catData) ? catData : (Array.isArray(catData?.data) ? catData.data : []);
+          if (list.length > 0) {
+            try {
+              sessionStorage.setItem("cached_public_categories_raw", JSON.stringify(list));
+            } catch (e) {}
             const mappedCategories = [
               { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
-              ...catData.map(c => ({
-                id: c.slug,
+              ...list.map(c => ({
+                id: c.slug || String(c.id),
                 label: c.name,
                 icon: getCategoryIcon(c.icon)
               }))
@@ -357,7 +222,36 @@ export default function Home() {
           }
         }).catch(err => console.error("Failed to fetch categories:", err));
 
-      const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?all=true`)
+      // 2. Smart Cities with Client Cache
+      const cachedSmartCities = sessionStorage.getItem("cached_smart_cities");
+      if (cachedSmartCities) {
+        try {
+          setSmartCitiesData(JSON.parse(cachedSmartCities));
+        } catch (e) {}
+      }
+
+      const fetchSmartCities = fetch(`${import.meta.env.VITE_API_URL}/smart-cities`)
+        .then(res => res.json())
+        .then(scJson => {
+          const scData = scJson?.data || scJson || [];
+          if (Array.isArray(scData)) {
+            const mappedSc = scData.map(c => ({
+              id: c.id,
+              slug: c.slug,
+              name: c.name,
+              img: c.image || c.img,
+              bisnis: c.bisnis || 0,
+              description: c.description
+            }));
+            setSmartCitiesData(mappedSc);
+            try {
+              sessionStorage.setItem("cached_smart_cities", JSON.stringify(mappedSc));
+            } catch (e) {}
+          }
+        }).catch(err => console.error("Failed to fetch smart cities:", err));
+
+      // 3. Featured & Latest Businesses with limit=6
+      const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?limit=6`)
         .then(res => res.json())
         .then(bizJson => {
           const bizData = bizJson?.data || bizJson || [];
@@ -381,20 +275,12 @@ export default function Home() {
                 img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
                 open: true,
                 featured: b.featured,
-                description: b.description
+                description: b.description,
+                is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
               };
             });
             setBisnisData(mapped);
             setTemukanData(mapped);
-            try {
-              sessionStorage.setItem("cached_bisnis_data", JSON.stringify(mapped));
-            } catch (e) {}
-            
-            const updatedSmartCities = SMART_CITIES.map(city => {
-              const count = mapped.filter(b => b.location && b.location.toLowerCase().includes(city.name.toLowerCase())).length;
-              return { ...city, bisnis: count };
-            });
-            setSmartCitiesData(updatedSmartCities);
           }
         }).catch(err => console.error("Failed to fetch businesses:", err));
 
@@ -418,7 +304,7 @@ export default function Home() {
         .catch(err => console.error("Failed to fetch advertisements:", err))
         .finally(() => setLoadingAds(false));
 
-      const fetchBlogs = fetch(`${import.meta.env.VITE_API_URL}/blogs`)
+      const fetchBlogs = fetch(`${import.meta.env.VITE_API_URL}/blogs?limit=6`)
         .then(res => res.json())
         .then(blogsJson => {
           const blogsData = blogsJson?.data || blogsJson || [];
@@ -428,7 +314,7 @@ export default function Home() {
         }).catch(err => console.error("Failed to fetch blogs:", err));
 
       // Primary data for hero & business grid
-      await Promise.allSettled([fetchCategories, fetchBusinesses]);
+      await Promise.allSettled([fetchCategories, fetchBusinesses, fetchSmartCities]);
       setLoadingData(false);
 
       // Non-blocking secondary data
@@ -793,63 +679,79 @@ export default function Home() {
           {loadingData ? (
             <InlineSpinner text="Memuat data bisnis..." />
           ) : (
-          <div className="temukan-grid">
-            {filteredTemukanData.map((bisnis) => (
-              <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
-                {/* Image */}
-                <div className="biz-card__img-wrap">
-                  <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
-                  <div className="biz-card__img-overlay">
-                    <button
-                      type="button"
-                      className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(bisnis.id, false, bisnis.name); }}
-                      aria-label="Simpan"
-                    >
-                      <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                      <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
-                    </button>
-                    <span className="biz-card__views">
-                      <Eye size={13} />
-                      <span>Pratinjau</span>
-                    </span>
-                  </div>
-                </div>
+            <>
+              <div className="temukan-grid">
+                {filteredTemukanData.slice(0, 6).map((bisnis) => (
+                  <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
+                    {/* Image */}
+                    <div className="biz-card__img-wrap">
+                      <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
+                      {bisnis.is_premium && (
+                        <div className="biz-card__verified-badge" title="Bisnis Terpercaya - Pengguna Premium">
+                          <BadgeCheck size={14} className="biz-card__verified-icon" />
+                          <span>Terpercaya</span>
+                        </div>
+                      )}
+                      <div className="biz-card__img-overlay">
+                        <button
+                          type="button"
+                          className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(bisnis.id, false, bisnis.name); }}
+                          aria-label="Simpan"
+                        >
+                          <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
+                          <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
+                        </button>
+                        <span className="biz-card__views">
+                          <Eye size={13} />
+                          <span>Pratinjau</span>
+                        </span>
+                      </div>
+                    </div>
 
-                {/* Body */}
-                <div className="biz-card__body">
-                  <h3 className="biz-card__name">{bisnis.name}</h3>
-                  <div className="biz-card__categories">
-                    <p className="biz-card__category">
-                      <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor }} />
-                      {bisnis.category}
-                    </p>
-                    {bisnis.subCategory && (
-                      <p className="biz-card__category biz-card__category--sub">
-                        <span className="biz-card__cat-separator">›</span>
-                        {bisnis.subCategory}
-                      </p>
-                    )}
-                  </div>
-                  <div className="biz-card__tags">
-                    {bisnis.tags.map((tag) => (
-                      <span key={tag} className="biz-card__tag">
-                        <Tag size={11} />{tag}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="biz-card__footer">
-                    <span className="biz-card__location">
-                      <MapPin size={12} />{bisnis.location}
-                    </span>
-                    <span className={`biz-card__cta${bisnis.open ? "" : " closed"}`}>
-                      {bisnis.open ? "Buka Sekarang →" : "Tutup Sekarang!"}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                    {/* Body */}
+                    <div className="biz-card__body">
+                      <h3 className="biz-card__name">{bisnis.name}</h3>
+                      <div className="biz-card__categories">
+                        <p className="biz-card__category">
+                          <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor }} />
+                          {bisnis.category}
+                        </p>
+                        {bisnis.subCategory && (
+                          <p className="biz-card__category biz-card__category--sub">
+                            <span className="biz-card__cat-separator">›</span>
+                            {bisnis.subCategory}
+                          </p>
+                        )}
+                      </div>
+                      <div className="biz-card__tags">
+                        {bisnis.tags.map((tag) => (
+                          <span key={tag} className="biz-card__tag">
+                            <Tag size={11} />{tag}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="biz-card__footer">
+                        <span className="biz-card__location">
+                          <MapPin size={12} />{bisnis.location}
+                        </span>
+                        <span className={`biz-card__cta${bisnis.open ? "" : " closed"}`}>
+                          {bisnis.open ? "Buka Sekarang →" : "Tutup Sekarang!"}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Lihat Semua Bisnis Button */}
+              <div className="temukan-more-wrap">
+                <Link to="/category/all" className="temukan-more-btn">
+                  <span>Lihat Semua Bisnis</span>
+                  <ArrowRight size={18} />
+                </Link>
+              </div>
+            </>
           )}
         </div>
       </section>

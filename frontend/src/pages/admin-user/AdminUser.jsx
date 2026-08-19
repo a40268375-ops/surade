@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, useParams, Link } from "react-router-dom";
 import {
   LayoutDashboard,
   Briefcase,
@@ -46,6 +46,14 @@ import {
   CreditCard,
   ShieldCheck,
   Copy,
+  Gift,
+  Wallet,
+  DollarSign,
+  ArrowUpRight,
+  CheckCircle2,
+  MessageCircle,
+  Send,
+  AlertCircle,
 } from "lucide-react";
 
 import logoImg from "../../assets/logo.png";
@@ -53,12 +61,53 @@ import logoImg from "../../assets/logo.png";
 import api from "../../services/api";
 import { DEFAULT_AVATAR, DEFAULT_BANNER, getStorageUrl } from "../../utils/constants";
 
+const UPGRADE_PAYMENT_METHODS = [
+  {
+    category: "E-Wallet",
+    items: [
+      { id: "DANA", name: "DANA", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#008cff] text-white" },
+      { id: "GoPay", name: "GoPay", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#00a5cf] text-white" },
+      { id: "OVO", name: "OVO", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#4c2a86] text-white" },
+    ]
+  },
+  {
+    category: "Virtual Account / Transfer Bank",
+    items: [
+      { id: "BCA VA", name: "BCA Virtual Account", accountName: "PT Info Media", accountNumber: "8830-1234-5678", badgeColor: "bg-[#00529c] text-white" },
+      { id: "Mandiri VA", name: "Mandiri Virtual Account", accountName: "PT Info Media", accountNumber: "137-00-1234-5678", badgeColor: "bg-[#003d79] text-white" },
+    ]
+  }
+];
+
+const getCategoryDisplayName = (cat) => {
+  if (!cat) return "Usaha";
+  if (typeof cat === "string") return cat;
+  if (typeof cat === "object") return cat.name || cat.title || "Usaha";
+  return String(cat);
+};
 
 export default function AdminUser() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { tab: paramTab } = useParams();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (window.location.pathname.includes("/inbox")) return "inbox";
+    if (window.location.pathname.includes("/premium")) return "premium";
+    return searchParams.get("tab") || paramTab || "dashboard";
+  });
+
+  useEffect(() => {
+    if (window.location.pathname.includes("/inbox")) {
+      setActiveTab("inbox");
+    } else if (window.location.pathname.includes("/premium")) {
+      setActiveTab("premium");
+    } else if (paramTab) {
+      setActiveTab(paramTab);
+    } else if (searchParams.get("tab")) {
+      setActiveTab(searchParams.get("tab"));
+    }
+  }, [searchParams, paramTab]);
   const [searchQuery, setSearchQuery] = useState("");
   const [blogEventTab, setBlogEventTab] = useState("blog"); // Sub-tab for blog/event combined view
 
@@ -117,7 +166,13 @@ export default function AdminUser() {
   const [businesses, setBusinesses] = useState(() => {
     try {
       const cached = localStorage.getItem("cached_my_businesses");
-      return cached ? JSON.parse(cached) : [];
+      if (!cached) return [];
+      const parsed = JSON.parse(cached);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(b => ({
+        ...b,
+        category: getCategoryDisplayName(b.category)
+      }));
     } catch (e) {
       return [];
     }
@@ -208,7 +263,98 @@ export default function AdminUser() {
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [reviewsCurrentPage, setReviewsCurrentPage] = useState(1);
   const [reviewsBusinessFilter, setReviewsBusinessFilter] = useState("all");
+  const [reviewsError, setReviewsError] = useState("");
   const [resellers, setResellers] = useState([]);
+
+  // States for Referral Feature
+
+  const [referralSearch, setReferralSearch] = useState("");
+  const [referralStatusFilter, setReferralStatusFilter] = useState("all");
+  const [referralPage, setReferralPage] = useState(1);
+  const [referralCopyToast, setReferralCopyToast] = useState(false);
+  const [referralLinkCopyToast, setReferralLinkCopyToast] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawForm, setWithdrawForm] = useState({
+    bank: "BCA",
+    accountNumber: "",
+    accountHolder: user?.name || "",
+    amount: "50000",
+  });
+  const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+  const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState("");
+  const [selectedReferralTx, setSelectedReferralTx] = useState(null);
+
+  // Real Referral State from Backend API
+  const [referralStats, setReferralStats] = useState({
+    referral_code: user?.referral_code || "",
+    total_usages: 0,
+    successful_referrals: 0,
+    earned_commission: 0,
+    pending_commission: 0,
+    paid_commission: 0,
+  });
+  const [referralTransactions, setReferralTransactions] = useState([]);
+  const [loadingReferrals, setLoadingReferrals] = useState(false);
+  const [referralError, setReferralError] = useState("");
+
+  const fetchReferralStats = async () => {
+    setLoadingReferrals(true);
+    setReferralError("");
+    try {
+      const res = await api.get("/referrals/my-stats");
+      if (res.data && res.data.success) {
+        const data = res.data.data;
+        setReferralStats({
+          referral_code: data.referral_code || user?.referral_code || "",
+          total_usages: data.total_usages || 0,
+          successful_referrals: data.successful_referrals || 0,
+          earned_commission: data.earned_commission || 0,
+          pending_commission: data.pending_commission || 0,
+          paid_commission: data.paid_commission || 0,
+        });
+        setReferralTransactions(data.transactions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch referral stats:", err);
+      setReferralError("Gagal memuat data referral.");
+    } finally {
+      setLoadingReferrals(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "referral" || activeTab === "reseller") {
+      fetchReferralStats();
+    }
+  }, [activeTab]);
+
+  const referralCode = referralStats.referral_code || user?.referral_code || "INFO-REF";
+  const totalReferralEarnings = referralStats.earned_commission;
+  const pendingReferralEarnings = referralStats.pending_commission;
+  const paidReferralEarnings = referralStats.paid_commission;
+  const totalReferralUsage = referralStats.total_usages;
+  const successReferralCount = referralStats.successful_referrals;
+
+  const filteredReferralTransactions = useMemo(() => {
+    return referralTransactions.filter((tx) => {
+      const q = referralSearch.toLowerCase();
+      const matchesSearch =
+        !q ||
+        (tx.id && tx.id.toLowerCase().includes(q)) ||
+        (tx.userName && tx.userName.toLowerCase().includes(q)) ||
+        (tx.service && tx.service.toLowerCase().includes(q)) ||
+        (tx.businessName && tx.businessName.toLowerCase().includes(q));
+
+      const matchesStatus =
+        referralStatusFilter === "all" ||
+        (referralStatusFilter === "success" && (tx.status === "approved" || tx.status === "earned" || tx.status === "paid" || tx.status === "success")) ||
+        (referralStatusFilter === "pending" && tx.status === "pending") ||
+        (referralStatusFilter === "cancelled" && tx.status === "cancelled");
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [referralTransactions, referralSearch, referralStatusFilter]);
+  /* ── Simpan / Bookmark States ── */
   const [savedItems, setSavedItems] = useState(() => {
     try {
       const cached = localStorage.getItem("cached_saved_items");
@@ -219,13 +365,591 @@ export default function AdminUser() {
   });
   const [savedBizPage, setSavedBizPage] = useState(1);
   const [savedBlogPage, setSavedBlogPage] = useState(1);
-  const [messages, setMessages] = useState([]);
-  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [loadingSavedItems, setLoadingSavedItems] = useState(false);
+  const [savedItemsError, setSavedItemsError] = useState("");
+  /* ── Ulasan / Reviews Handlers ── */
 
-  // States for Premium Plans from API (AdminWeb sync)
+  const fetchReviews = async () => {
+    setLoadingReviews(true);
+    setReviewsError("");
+    try {
+      const res = await api.get("/my-ratings");
+      if (res.data) {
+        const rawData = Array.isArray(res.data)
+          ? res.data
+          : res.data.data || [];
+        const formatted = rawData.map((r) => ({
+          id: r.id,
+          business_id: r.business_id || r.business?.id,
+          businessName: r.business ? r.business.name : "Bisnis",
+          businessLogo: r.business
+            ? r.business.logo
+              ? getStorageUrl(r.business.logo)
+              : null
+            : null,
+          businessSlug: r.business ? r.business.slug : null,
+          rating: r.rating || 0,
+          review: r.review || "",
+          user: r.user ? r.user.name : "Pengguna",
+          created_at: r.created_at,
+          date: r.created_at
+            ? new Date(r.created_at).toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })
+            : "",
+        }));
+        setReviews(formatted);
+      }
+    } catch (err) {
+      console.error("Failed to fetch reviews:", err);
+      setReviewsError("Gagal memuat ulasan.");
+      setReviews([]);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "ulasan") {
+      fetchReviews();
+    }
+  }, [activeTab]);
+
+  /* ── Real Inbox / Chat States & Handlers ── */
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(
+    searchParams.get("conversation") || null
+  );
+  const [activeChatData, setActiveChatData] = useState(null);
+  const [chatMessageInput, setChatMessageInput] = useState("");
+  const [sendingChatMessage, setSendingChatMessage] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [loadingChatDetails, setLoadingChatDetails] = useState(false);
+  const [inboxSearchQuery, setInboxSearchQuery] = useState("");
+  const chatMessagesEndRef = useRef(null);
+
+  // Persistent Cache for Messages to ensure 0ms instant loading & zero flickering
+  const chatMessagesCacheRef = useRef({});
+
+  // Sync activeConversationId from searchParams when URL changes
+  useEffect(() => {
+    const convParam = searchParams.get("conversation");
+    if (convParam) {
+      setActiveConversationId(convParam);
+    }
+  }, [searchParams]);
+
+  // Fetch Conversations List
+  const fetchConversationsList = async (showLoading = false) => {
+    if (showLoading && conversations.length === 0) setLoadingConversations(true);
+    try {
+      const res = await api.get("/inbox");
+      if (res.data && res.data.success) {
+        setConversations(res.data.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch conversations:", err);
+    } finally {
+      if (showLoading) setLoadingConversations(false);
+    }
+  };
+
+  // Fetch Single Conversation Messages & Details
+  const fetchActiveChatDetails = async (convId, showLoading = false, isPoll = false) => {
+    if (!convId) return;
+
+    // Check if we have cached messages for instant rendering
+    const cachedMessages = chatMessagesCacheRef.current[convId] || [];
+
+    // Find conversation header info from list
+    const foundConv = conversations.find(
+      (c) => String(c.id) === String(convId) || String(c.conversation_id) === String(convId)
+    );
+
+    // Hydrate activeChatData immediately without wiping existing messages
+    if (!isPoll) {
+      setActiveChatData((prev) => {
+        if (prev && String(prev.id) === String(convId) && prev.messages && prev.messages.length > 0) {
+          return prev;
+        }
+
+        if (foundConv) {
+          return {
+            id: foundConv.id,
+            conversation_id: foundConv.id,
+            business_id: foundConv.business_id,
+            business: { id: foundConv.business_id, name: foundConv.business_name, logo: foundConv.business_logo },
+            counterparty_name: foundConv.counterparty_name,
+            counterparty_avatar: foundConv.counterparty_avatar,
+            counterparty_role: foundConv.counterparty_role,
+            messages: cachedMessages,
+          };
+        }
+
+        return prev;
+      });
+
+      if (showLoading && cachedMessages.length === 0 && (!activeChatData?.messages || activeChatData.messages.length === 0)) {
+        setLoadingChatDetails(true);
+      }
+    }
+
+    try {
+      const currentMsgs = chatMessagesCacheRef.current[convId] || activeChatData?.messages || [];
+      const latestRealMsg = [...currentMsgs].reverse().find(m => m && m.id && !String(m.id).startsWith("temp-"));
+      const latestMsgId = latestRealMsg ? latestRealMsg.id : null;
+
+      const url = (isPoll && latestMsgId)
+        ? `/inbox/${convId}?after_id=${latestMsgId}`
+        : `/inbox/${convId}?limit=30`;
+
+      const res = await api.get(url);
+      if (res.data && res.data.success) {
+        const fetchedData = res.data.data;
+        const newMessages = fetchedData.messages || [];
+
+        if (isPoll && latestMsgId) {
+          if (newMessages.length > 0) {
+            setActiveChatData((prev) => {
+              if (!prev || String(prev.id) !== String(convId)) return prev;
+              const existingIds = new Set((prev.messages || []).map(m => m.id));
+              const incoming = newMessages.filter(m => !existingIds.has(m.id));
+              if (incoming.length === 0) return prev;
+              const merged = [...(prev.messages || []), ...incoming];
+              chatMessagesCacheRef.current[convId] = merged;
+              return { ...prev, messages: merged };
+            });
+          }
+        } else {
+          chatMessagesCacheRef.current[convId] = newMessages;
+          setActiveChatData(fetchedData);
+        }
+
+        // Clear unread count locally for active conversation
+        setConversations((prev) =>
+          prev.map((c) =>
+            String(c.id) === String(convId) || String(c.conversation_id) === String(convId)
+              ? { ...c, unread_count: 0, is_unread: false }
+              : c
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to fetch active chat details:", err);
+    } finally {
+      if (showLoading) setLoadingChatDetails(false);
+    }
+  };
+
+  // On tab switch to inbox: fetch list
+  useEffect(() => {
+    if (activeTab === "inbox") {
+      fetchConversationsList(conversations.length === 0);
+    }
+  }, [activeTab]);
+
+  // On activeConversationId or activeTab change: fetch active chat
+  useEffect(() => {
+    if (activeTab === "inbox" && activeConversationId) {
+      fetchActiveChatDetails(activeConversationId, true);
+    } else if (activeTab !== "inbox") {
+      setActiveChatData(null);
+    }
+  }, [activeTab, activeConversationId]);
+
+  // Auto select first conversation if activeConversationId is not set
+  useEffect(() => {
+    if (activeTab === "inbox" && !activeConversationId && conversations.length > 0) {
+      setActiveConversationId(conversations[0].id);
+    }
+  }, [activeTab, conversations.length, activeConversationId]);
+
+  // Silent background sync every 8 seconds when Inbox tab is active
+  useEffect(() => {
+    if (activeTab !== "inbox") return;
+
+    const interval = setInterval(() => {
+      fetchConversationsList(false);
+      if (activeConversationId) {
+        fetchActiveChatDetails(activeConversationId, false, true);
+      }
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, activeConversationId]);
+
+  // Scroll to bottom when messages update
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [activeChatData?.messages?.length]);
+
+  // Calculate Total Unread Messages for sidebar badge & header count
+  const totalInboxUnreadCount = useMemo(() => {
+    return conversations.reduce((acc, conv) => acc + (conv.unread_count || 0), 0);
+  }, [conversations]);
+
+  // Filtered conversations by search query
+  const filteredConversations = useMemo(() => {
+    if (!inboxSearchQuery.trim()) return conversations;
+    const q = inboxSearchQuery.toLowerCase();
+    return conversations.filter(
+      (c) =>
+        (c.business_name && c.business_name.toLowerCase().includes(q)) ||
+        (c.counterparty_name && c.counterparty_name.toLowerCase().includes(q)) ||
+        (c.last_message && c.last_message.toLowerCase().includes(q))
+    );
+  }, [conversations, inboxSearchQuery]);
+
+  const formatChatTimestamp = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+      return date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    if (isYesterday) {
+      return "Kemarin " + date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    return date.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // True Optimistic UI Message Sender
+  const handleSendChatMessage = async (e) => {
+    e.preventDefault();
+    if (!chatMessageInput.trim() || !activeConversationId || sendingChatMessage) return;
+
+    const messageText = chatMessageInput.trim();
+    const tempId = "temp-" + Date.now();
+    setChatMessageInput("");
+    setSendingChatMessage(true);
+
+    const optimisticMessage = {
+      id: tempId,
+      conversation_id: activeConversationId,
+      sender_id: user.id,
+      message: messageText,
+      status: "sending",
+      created_at: new Date().toISOString(),
+      sender: {
+        id: user.id,
+        name: user.name || user.username || "Saya",
+        avatar: user.avatar,
+      },
+    };
+
+    // 1. Instantly append to state & cache (0ms delay)
+    setActiveChatData((prev) => {
+      if (!prev) return prev;
+      const updatedMessages = [...(prev.messages || []), optimisticMessage];
+      chatMessagesCacheRef.current[activeConversationId] = updatedMessages;
+      return {
+        ...prev,
+        messages: updatedMessages,
+      };
+    });
+
+    // 2. Instantly update conversation preview locally
+    setConversations((prev) =>
+      prev.map((c) =>
+        String(c.id) === String(activeConversationId) || String(c.conversation_id) === String(activeConversationId)
+          ? { ...c, last_message: messageText, last_message_at: new Date().toISOString() }
+          : c
+      )
+    );
+
+    // 3. Asynchronously post message to backend
+    try {
+      const res = await api.post(`/inbox/${activeConversationId}/messages`, {
+        message: messageText,
+      });
+
+      if (res.data && res.data.success) {
+        const savedMessage = { ...res.data.data, status: "sent" };
+        setActiveChatData((prev) => {
+          if (!prev) return prev;
+          const updatedMessages = (prev.messages || []).map((m) =>
+            m.id === tempId ? savedMessage : m
+          );
+          chatMessagesCacheRef.current[activeConversationId] = updatedMessages;
+          return {
+            ...prev,
+            messages: updatedMessages,
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Failed to send chat message:", err);
+      setActiveChatData((prev) => {
+        if (!prev) return prev;
+        const updatedMessages = (prev.messages || []).map((m) =>
+          m.id === tempId ? { ...m, status: "failed" } : m
+        );
+        chatMessagesCacheRef.current[activeConversationId] = updatedMessages;
+        return {
+          ...prev,
+          messages: updatedMessages,
+        };
+      });
+    } finally {
+      setSendingChatMessage(false);
+    }
+  };
+
+  // States for Premium Upgrade Wizard (similar to AddBusiness flow)
   const [premiumPlans, setPremiumPlans] = useState([]);
   const [loadingPremiumPlans, setLoadingPremiumPlans] = useState(false);
+  const [premiumStep, setPremiumStep] = useState(1); // 1: Pilih Bisnis & Paket, 2: Ringkasan & Kupon/Referral, 3: Metode Bayar, 4: Upload Bukti & Konfirmasi, 5: Sukses
   const [selectedUpgradeBusiness, setSelectedUpgradeBusiness] = useState("");
+  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState(null);
+
+  // Coupon
+  const [upgradeCouponInput, setUpgradeCouponInput] = useState("");
+  const [upgradeCouponLoading, setUpgradeCouponLoading] = useState(false);
+  const [upgradeCouponError, setUpgradeCouponError] = useState("");
+  const [upgradeCouponSuccessMsg, setUpgradeCouponSuccessMsg] = useState("");
+  const [appliedUpgradeCoupon, setAppliedUpgradeCoupon] = useState(null);
+
+  // Referral (5% discount)
+  const [upgradeReferralInput, setUpgradeReferralInput] = useState("");
+  const [upgradeReferralLoading, setUpgradeReferralLoading] = useState(false);
+  const [upgradeReferralError, setUpgradeReferralError] = useState("");
+  const [upgradeReferralSuccessMsg, setUpgradeReferralSuccessMsg] = useState("");
+  const [appliedUpgradeReferral, setAppliedUpgradeReferral] = useState(null);
+
+  // Payment method & Proof
+  const [upgradePaymentMethod, setUpgradePaymentMethod] = useState("DANA");
+  const [upgradeProofFile, setUpgradeProofFile] = useState(null);
+  const [upgradeProofPreview, setUpgradeProofPreview] = useState(null);
+  const [copiedUpgradeAccount, setCopiedUpgradeAccount] = useState(false);
+  const [submittingUpgrade, setSubmittingUpgrade] = useState(false);
+  const [upgradeError, setUpgradeError] = useState("");
+  const [upgradeSuccessData, setUpgradeSuccessData] = useState(null);
+  const upgradeProofInputRef = useRef(null);
+
+  // Coupon application logic for Upgrade
+  const handleApplyUpgradeCoupon = async () => {
+    if (!upgradeCouponInput.trim()) {
+      setUpgradeCouponError("Masukkan kode kupon terlebih dahulu.");
+      return;
+    }
+    setUpgradeCouponLoading(true);
+    setUpgradeCouponError("");
+    setUpgradeCouponSuccessMsg("");
+    const planPrice = Number(selectedUpgradePlan?.price || 0);
+    try {
+      const res = await api.post("/coupons/validate", {
+        code: upgradeCouponInput.trim(),
+        product_type: "premium",
+        amount: planPrice,
+      });
+      if (res.data?.valid) {
+        setAppliedUpgradeCoupon(res.data);
+        setUpgradeCouponSuccessMsg(res.data.message || "Kupon berhasil diterapkan!");
+      } else {
+        setAppliedUpgradeCoupon(null);
+        setUpgradeCouponError(res.data?.message || "Kode kupon tidak valid atau sudah tidak berlaku.");
+      }
+    } catch (e) {
+      setAppliedUpgradeCoupon(null);
+      setUpgradeCouponError(e?.response?.data?.message || "Kode kupon tidak valid atau sudah tidak berlaku.");
+    } finally {
+      setUpgradeCouponLoading(false);
+    }
+  };
+
+  const handleRemoveUpgradeCoupon = () => {
+    setAppliedUpgradeCoupon(null);
+    setUpgradeCouponInput("");
+    setUpgradeCouponSuccessMsg("");
+    setUpgradeCouponError("");
+  };
+
+  // Referral application logic for Upgrade (Premium Only - 5% discount)
+  const handleApplyUpgradeReferral = async () => {
+    if (!upgradeReferralInput.trim()) {
+      setUpgradeReferralError("Masukkan kode referral terlebih dahulu.");
+      return;
+    }
+    setUpgradeReferralLoading(true);
+    setUpgradeReferralError("");
+    setUpgradeReferralSuccessMsg("");
+    const planPrice = Number(selectedUpgradePlan?.price || 0);
+    try {
+      const res = await api.post("/referrals/validate", {
+        code: upgradeReferralInput.trim(),
+        product_type: "premium",
+        amount: planPrice,
+      });
+      if (res.data?.valid) {
+        setAppliedUpgradeReferral(res.data);
+        setUpgradeReferralSuccessMsg(res.data.message || "Kode referral valid! Diskon 5% berhasil diterapkan.");
+      } else {
+        setAppliedUpgradeReferral(null);
+        setUpgradeReferralError(res.data?.message || "Kode referral tidak valid.");
+      }
+    } catch (e) {
+      setAppliedUpgradeReferral(null);
+      setUpgradeReferralError(e?.response?.data?.message || "Kode referral hanya berlaku untuk pembelian paket Premium.");
+    } finally {
+      setUpgradeReferralLoading(false);
+    }
+  };
+
+  const handleRemoveUpgradeReferral = () => {
+    setAppliedUpgradeReferral(null);
+    setUpgradeReferralInput("");
+    setUpgradeReferralSuccessMsg("");
+    setUpgradeReferralError("");
+  };
+
+  // Calculate Upgrade prices
+  const calculateUpgradePrice = () => {
+    const basePrice = Number(selectedUpgradePlan?.price || 0);
+    let couponDiscount = 0;
+    if (appliedUpgradeCoupon) {
+      if (appliedUpgradeCoupon.discount_amount != null) {
+        couponDiscount = Number(appliedUpgradeCoupon.discount_amount);
+      } else if (appliedUpgradeCoupon.discount_type === 'percentage') {
+        couponDiscount = (basePrice * Number(appliedUpgradeCoupon.discount_value)) / 100;
+      } else if (appliedUpgradeCoupon.discount_value) {
+        couponDiscount = Number(appliedUpgradeCoupon.discount_value);
+      }
+    }
+
+    let referralDiscount = 0;
+    if (appliedUpgradeReferral) {
+      if (appliedUpgradeReferral.discount_amount != null) {
+        referralDiscount = Number(appliedUpgradeReferral.discount_amount);
+      } else {
+        referralDiscount = Math.round(basePrice * 0.05);
+      }
+    }
+
+    const finalPrice = Math.max(0, basePrice - couponDiscount - referralDiscount);
+    return {
+      basePrice,
+      couponDiscount,
+      referralDiscount,
+      finalPrice
+    };
+  };
+
+  const handleUpgradeProofChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        setUpgradeError("Ukuran file bukti pembayaran maksimal 10MB.");
+        return;
+      }
+      setUpgradeProofFile(file);
+      setUpgradeProofPreview(URL.createObjectURL(file));
+      setUpgradeError("");
+    }
+  };
+
+  const handleRemoveUpgradeProof = () => {
+    setUpgradeProofFile(null);
+    if (upgradeProofPreview) URL.revokeObjectURL(upgradeProofPreview);
+    setUpgradeProofPreview(null);
+  };
+
+  // Submit Upgrade to Premium
+  const handleSubmitUpgrade = async () => {
+    const targetBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
+    if (!targetBizId) {
+      setUpgradeError("Silakan pilih usaha yang ingin di-upgrade terlebih dahulu.");
+      return;
+    }
+    if (!selectedUpgradePlan) {
+      setUpgradeError("Silakan pilih paket premium terlebih dahulu.");
+      return;
+    }
+    if (!upgradeProofFile) {
+      setUpgradeError("Wajib mengunggah bukti pembayaran sebelum mengirim permohonan.");
+      return;
+    }
+
+    setSubmittingUpgrade(true);
+    setUpgradeError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("business_id", targetBizId);
+      formData.append("plan_id", selectedUpgradePlan.id);
+      if (appliedUpgradeCoupon?.code) {
+        formData.append("coupon_code", appliedUpgradeCoupon.code);
+      }
+      if (appliedUpgradeReferral?.referral_code) {
+        formData.append("referral_code", appliedUpgradeReferral.referral_code);
+      }
+      formData.append("payment_method", upgradePaymentMethod);
+      formData.append("proof", upgradeProofFile);
+
+      const res = await api.post("/subscriptions", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      const bizObj = businesses.find(b => String(b.id) === String(targetBizId));
+      setUpgradeSuccessData({
+        businessName: bizObj?.name || "Usaha Anda",
+        planName: selectedUpgradePlan.name,
+        finalPrice: calculateUpgradePrice().finalPrice,
+        paymentMethod: upgradePaymentMethod,
+        submittedAt: new Date().toLocaleString("id-ID"),
+        message: res.data?.message || "Permohonan upgrade premium berhasil diajukan!"
+      });
+      setPremiumStep(5);
+      fetchBusinesses();
+    } catch (err) {
+      console.error("Failed to submit upgrade:", err);
+      setUpgradeError(err.response?.data?.message || "Gagal mengajukan upgrade. Silakan periksa kembali file bukti transfer Anda.");
+    } finally {
+      setSubmittingUpgrade(false);
+    }
+  };
+
+  const handleResetUpgrade = () => {
+    setPremiumStep(1);
+    setSelectedUpgradePlan(null);
+    setUpgradeCouponInput("");
+    setAppliedUpgradeCoupon(null);
+    setUpgradeCouponSuccessMsg("");
+    setUpgradeCouponError("");
+    setUpgradeReferralInput("");
+    setAppliedUpgradeReferral(null);
+    setUpgradeReferralSuccessMsg("");
+    setUpgradeReferralError("");
+    setUpgradeProofFile(null);
+    if (upgradeProofPreview) URL.revokeObjectURL(upgradeProofPreview);
+    setUpgradeProofPreview(null);
+    setUpgradeError("");
+    setUpgradeSuccessData(null);
+  };
 
   // Modal states for Dashboard details
   const [showChartDetailModal, setShowChartDetailModal] = useState(false);
@@ -441,38 +1165,19 @@ export default function AdminUser() {
   }, [businesses, blogs, events, userStats]);
 
   // Fetch active Premium Plans from API (Created/updated by AdminWeb)
-  useEffect(() => {
-    const fetchPremiumPlans = async () => {
-      setLoadingPremiumPlans(true);
-      try {
-        const res = await api.get('/plans');
-        const data = res.data?.data || res.data || [];
-        const activePlans = (Array.isArray(data) ? data : []).filter(p => p.is_active !== false && p.is_active !== 0);
-        setPremiumPlans(activePlans);
-      } catch (err) {
-        console.error("Failed to fetch premium plans:", err);
-      } finally {
-        setLoadingPremiumPlans(false);
-      }
-    };
-    fetchPremiumPlans();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "premium") {
-      const fetchPremiumPlans = async () => {
-        try {
-          const res = await api.get('/plans');
-          const data = res.data?.data || res.data || [];
-          const activePlans = (Array.isArray(data) ? data : []).filter(p => p.is_active !== false && p.is_active !== 0);
-          setPremiumPlans(activePlans);
-        } catch (err) {
-          console.error("Failed to fetch premium plans on tab switch:", err);
-        }
-      };
-      fetchPremiumPlans();
+  const fetchPremiumPlans = async () => {
+    setLoadingPremiumPlans(true);
+    try {
+      const res = await api.get('/plans');
+      const data = res.data?.data || res.data || [];
+      const activePlans = (Array.isArray(data) ? data : []).filter(p => p.is_active !== false && p.is_active !== 0);
+      setPremiumPlans(activePlans);
+    } catch (err) {
+      console.error("Failed to fetch premium plans:", err);
+    } finally {
+      setLoadingPremiumPlans(false);
     }
-  }, [activeTab]);
+  };
 
   // Fetch businesses from API (only user's own businesses)
   const fetchBusinesses = async () => {
@@ -527,11 +1232,6 @@ export default function AdminUser() {
     }
   };
 
-  // Fetch businesses on mount
-  useEffect(() => {
-    fetchBusinesses();
-  }, []);
-
   // Fetch advertisements from API
   const fetchAdvertisements = async () => {
     setLoadingAdvertisements(true);
@@ -561,66 +1261,72 @@ export default function AdminUser() {
 
   // Fetch saved items (business favorites & blog/event favorites) from API
   const fetchSavedItems = async () => {
+    setLoadingSavedItems(true);
+    setSavedItemsError("");
     try {
-      const [resBiz, resBlog] = await Promise.all([
+      const [resBiz, resBlog] = await Promise.allSettled([
         api.get("/my-favorites"),
         api.get("/my-blog-favorites")
       ]);
 
-      const bizData = resBiz.data?.data || resBiz.data || [];
-      const bizList = Array.isArray(bizData) ? bizData : (bizData?.data || []);
+      let mappedBiz = [];
+      if (resBiz.status === "fulfilled" && resBiz.value.data) {
+        const bizData = resBiz.value.data?.data || resBiz.value.data || [];
+        const bizList = Array.isArray(bizData) ? bizData : (bizData?.data || []);
+        mappedBiz = (Array.isArray(bizList) ? bizList : [])
+          .map(fav => {
+            const b = fav.business || fav;
+            if (!b || !b.id) return null;
+            const mainCategory = b.category?.parent || b.category;
+            const subCategory = b.category?.parent ? b.category : null;
+            const categoryName = mainCategory?.name || b.category?.name || "Umum";
+            const subCategoryName = subCategory?.name || null;
+            return {
+              id: b.id,
+              favoriteId: fav.id,
+              itemType: "business",
+              type: "Bisnis",
+              title: b.name || "Bisnis",
+              name: b.name || "Bisnis",
+              category: categoryName,
+              subCategory: subCategoryName,
+              city: b.city || b.address || "Indonesia",
+              owner: b.user?.name || b.owner?.name || "Pemilik Usaha",
+              image: b.logo ? getStorageUrl(b.logo) : (b.image ? getStorageUrl(b.image) : (b.banner ? getStorageUrl(b.banner) : null)),
+              date: fav.created_at ? new Date(fav.created_at).toLocaleDateString("id-ID") : "Tersimpan",
+              raw: b
+            };
+          })
+          .filter(Boolean);
+      }
 
-      const mappedBiz = (Array.isArray(bizList) ? bizList : [])
-        .map(fav => {
-          const b = fav.business || fav;
-          if (!b || !b.id) return null;
-          const mainCategory = b.category?.parent || b.category;
-          const subCategory = b.category?.parent ? b.category : null;
-          const categoryName = mainCategory?.name || b.category?.name || "Umum";
-          const subCategoryName = subCategory?.name || null;
-          return {
-            id: b.id,
-            favoriteId: fav.id,
-            itemType: "business",
-            type: "Bisnis",
-            title: b.name || "Bisnis",
-            name: b.name || "Bisnis",
-            category: categoryName,
-            subCategory: subCategoryName,
-            city: b.city || b.address || "Indonesia",
-            owner: b.user?.name || b.owner?.name || "Pemilik Usaha",
-            image: b.logo ? getStorageUrl(b.logo) : (b.image ? getStorageUrl(b.image) : (b.banner ? getStorageUrl(b.banner) : null)),
-            date: fav.created_at ? new Date(fav.created_at).toLocaleDateString("id-ID") : "Tersimpan",
-            raw: b
-          };
-        })
-        .filter(Boolean);
-
-      const blogData = resBlog.data?.data || resBlog.data || [];
-      const blogList = Array.isArray(blogData) ? blogData : (blogData?.data || []);
-
-      const mappedBlogs = (Array.isArray(blogList) ? blogList : [])
-        .map(fav => {
-          const b = fav.blog || fav;
-          if (!b || !b.id) return null;
-          const isEvent = b.type === "event" || (b.blog_category && b.blog_category.toLowerCase().includes("event"));
-          return {
-            id: b.id,
-            blogId: b.id,
-            favoriteId: fav.id,
-            itemType: isEvent ? "event" : "blog",
-            type: isEvent ? "Event" : "Blog",
-            title: b.title || "Artikel",
-            category: b.blog_category || "Umum",
-            author: b.user?.name || b.author || "Admin",
-            location: b.event_location || "Indonesia",
-            eventDate: b.event_date ? new Date(b.event_date).toLocaleDateString("id-ID") : null,
-            image: b.thumbnail ? getStorageUrl(b.thumbnail) : null,
-            date: fav.created_at ? new Date(fav.created_at).toLocaleDateString("id-ID") : "Tersimpan",
-            raw: b
-          };
-        })
-        .filter(Boolean);
+      let mappedBlogs = [];
+      if (resBlog.status === "fulfilled" && resBlog.value.data) {
+        const blogData = resBlog.value.data?.data || resBlog.value.data || [];
+        const blogList = Array.isArray(blogData) ? blogData : (blogData?.data || []);
+        mappedBlogs = (Array.isArray(blogList) ? blogList : [])
+          .map(fav => {
+            const b = fav.blog || fav;
+            if (!b || !b.id) return null;
+            const isEvent = b.type === "event" || (b.blog_category && b.blog_category.toLowerCase().includes("event"));
+            return {
+              id: b.id,
+              blogId: b.id,
+              favoriteId: fav.id,
+              itemType: isEvent ? "event" : "blog",
+              type: isEvent ? "Event" : "Blog",
+              title: b.title || "Artikel",
+              category: b.blog_category || "Umum",
+              author: b.user?.name || b.author || "Admin",
+              location: b.event_location || "Indonesia",
+              eventDate: b.event_date ? new Date(b.event_date).toLocaleDateString("id-ID") : null,
+              image: b.thumbnail ? getStorageUrl(b.thumbnail) : null,
+              date: fav.created_at ? new Date(fav.created_at).toLocaleDateString("id-ID") : "Tersimpan",
+              raw: b
+            };
+          })
+          .filter(Boolean);
+      }
 
       const combined = [...mappedBiz, ...mappedBlogs];
       setSavedItems(combined);
@@ -629,6 +1335,9 @@ export default function AdminUser() {
       } catch (e) {}
     } catch (err) {
       console.error("Failed to fetch saved items:", err);
+      setSavedItemsError("Gagal memuat bookmark tersimpan.");
+    } finally {
+      setLoadingSavedItems(false);
     }
   };
 
@@ -658,24 +1367,127 @@ export default function AdminUser() {
     }
   };
 
-  // Fetch advertisements, ad packages, saved items, and user stats on mount
-  useEffect(() => {
-    fetchAdvertisements();
-    fetchAdPackages();
-    fetchSavedItems();
-    fetchUserStats();
-    window.addEventListener("bookmarkChanged", fetchSavedItems);
-    return () => {
-      window.removeEventListener("bookmarkChanged", fetchSavedItems);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "simpan") {
-      fetchSavedItems();
-    } else if (activeTab === "dashboard") {
-      fetchUserStats();
+  // Fetch blogs from API (only user's own blogs)
+  const fetchBlogs = async () => {
+    setLoadingBlogs(true);
+    try {
+      const res = await api.get("/my-blogs");
+      const blogResponse = res.data?.data || res.data;
+      const list = Array.isArray(blogResponse) ? blogResponse : (blogResponse?.data || []);
+      if (Array.isArray(list)) {
+        const mapped = list.map(b => ({
+          id: b.id,
+          title: b.title,
+          category: b.blog_category || "Umum",
+          author: b.user?.name || b.author || "Admin",
+          date: b.created_at ? new Date(b.created_at).toLocaleDateString("id-ID") : "-",
+          status: b.status === "published" ? "published" : "draft",
+          thumbnail: b.thumbnail ? getStorageUrl(b.thumbnail) : null
+        }));
+        setBlogs(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch blogs:", err);
+    } finally {
+      setLoadingBlogs(false);
     }
+  };
+
+  // Fetch events from API (blogs with type=event)
+  const fetchEvents = async () => {
+    setLoadingEvents(true);
+    try {
+      const res = await api.get("/my-blogs?type=event");
+      const evResponse = res.data?.data || res.data;
+      const list = Array.isArray(evResponse) ? evResponse : (evResponse?.data || []);
+      if (Array.isArray(list)) {
+        const mapped = list.map(e => ({
+          id: e.id,
+          title: e.title,
+          date: e.event_date || (e.created_at ? new Date(e.created_at).toLocaleDateString("id-ID") : "-"),
+          location: e.event_location || "Indonesia",
+          category: e.blog_category || "Umum",
+          author: e.user?.name || e.author || "Admin",
+          status: e.status === "published" ? "upcoming" : "past",
+          thumbnail: e.thumbnail ? getStorageUrl(e.thumbnail) : null
+        }));
+        setEvents(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch events:", err);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  // Fetch my ratings from API
+  const fetchMyRatings = async () => {
+    setLoadingReviews(true);
+    try {
+      const res = await api.get('/my-ratings');
+      const data = res.data?.data || res.data || [];
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      const mapped = list.map(r => ({
+        id: r.id,
+        rating: r.rating,
+        review: r.review || '',
+        business_id: r.business_id,
+        businessName: r.business?.name || 'Bisnis tidak diketahui',
+        businessLogo: r.business?.logo_url
+          ? r.business.logo_url
+          : (r.business?.logo ? getStorageUrl(r.business.logo) : null),
+        businessSlug: r.business?.slug || '',
+        created_at: r.created_at,
+        date: r.created_at
+          ? new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+          : '-',
+      }));
+      setReviews(mapped);
+      setReviewsCurrentPage(1);
+    } catch (err) {
+      console.error('Failed to fetch ratings:', err);
+      setReviews([]);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  // Lazy Tab-based Data Loader (Prevents 7 parallel API requests on mount)
+  useEffect(() => {
+    if (activeTab === "dashboard") {
+      fetchUserStats();
+    } else if (activeTab === "bisnis") {
+      fetchBusinesses();
+    } else if (activeTab === "iklan") {
+      fetchAdvertisements();
+      fetchAdPackages();
+      fetchBusinesses();
+    } else if (activeTab === "blog-event") {
+      fetchBlogs();
+      fetchEvents();
+    } else if (activeTab === "simpan") {
+      fetchSavedItems();
+    } else if (activeTab === "inbox") {
+      fetchConversationsList(conversations.length === 0);
+    } else if (activeTab === "premium") {
+      fetchPremiumPlans();
+      fetchBusinesses();
+    } else if (activeTab === "ulasan") {
+      fetchMyRatings();
+    } else if (activeTab === "referral" || activeTab === "reseller") {
+      fetchReferralStats();
+    }
+  }, [activeTab]);
+
+  // Listen to bookmark changes globally
+  useEffect(() => {
+    const handleBookmarkChange = () => {
+      if (activeTab === "simpan") fetchSavedItems();
+    };
+    window.addEventListener("bookmarkChanged", handleBookmarkChange);
+    return () => {
+      window.removeEventListener("bookmarkChanged", handleBookmarkChange);
+    };
   }, [activeTab]);
 
   // Submit advertisement request
@@ -882,107 +1694,6 @@ export default function AdminUser() {
   useEffect(() => {
     if (activeTab === "profile") {
       fetchUserProfile();
-    }
-  }, [activeTab]);
-
-  // Fetch blogs from API (only user's own blogs)
-  useEffect(() => {
-    const fetchBlogs = async () => {
-      setLoadingBlogs(true);
-      try {
-        const res = await api.get("/my-blogs");
-        const blogResponse = res.data?.data || res.data;
-        const list = Array.isArray(blogResponse) ? blogResponse : (blogResponse?.data || []);
-        if (Array.isArray(list)) {
-          const mapped = list.map(b => ({
-            id: b.id,
-            title: b.title,
-            category: b.blog_category || "Umum",
-            author: b.user?.name || b.author || "Admin",
-            date: b.created_at ? new Date(b.created_at).toLocaleDateString("id-ID") : "-",
-            status: b.status === "published" ? "published" : "draft",
-            thumbnail: b.thumbnail ? getStorageUrl(b.thumbnail) : null
-          }));
-          setBlogs(mapped);
-        }
-      } catch (err) {
-        console.error("Failed to fetch blogs:", err);
-      } finally {
-        setLoadingBlogs(false);
-      }
-    };
-    fetchBlogs();
-  }, []);
-
-  // Fetch events from API (blogs with type=event)
-  useEffect(() => {
-    const fetchEvents = async () => {
-      setLoadingEvents(true);
-      try {
-        const res = await api.get("/my-blogs?type=event");
-        const evResponse = res.data?.data || res.data;
-        const list = Array.isArray(evResponse) ? evResponse : (evResponse?.data || []);
-        if (Array.isArray(list)) {
-          const mapped = list.map(e => ({
-            id: e.id,
-            title: e.title,
-            date: e.event_date || (e.created_at ? new Date(e.created_at).toLocaleDateString("id-ID") : "-"),
-            location: e.event_location || "Indonesia",
-            category: e.blog_category || "Umum",
-            author: e.user?.name || e.author || "Admin",
-            status: e.status === "published" ? "upcoming" : "past",
-            thumbnail: e.thumbnail ? getStorageUrl(e.thumbnail) : null
-          }));
-          setEvents(mapped);
-        }
-      } catch (err) {
-        console.error("Failed to fetch events:", err);
-      } finally {
-        setLoadingEvents(false);
-      }
-    };
-    fetchEvents();
-  }, []);
-
-  // Fetch my ratings from API
-  const fetchMyRatings = async () => {
-    setLoadingReviews(true);
-    try {
-      const res = await api.get('/my-ratings');
-      const data = res.data?.data || res.data || [];
-      const list = Array.isArray(data) ? data : (data?.data || []);
-      const mapped = list.map(r => ({
-        id: r.id,
-        rating: r.rating,
-        review: r.review || '',
-        business_id: r.business_id,
-        businessName: r.business?.name || 'Bisnis tidak diketahui',
-        businessLogo: r.business?.logo_url
-          ? r.business.logo_url
-          : (r.business?.logo ? getStorageUrl(r.business.logo) : null),
-        businessSlug: r.business?.slug || '',
-        created_at: r.created_at,
-        date: r.created_at
-          ? new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-          : '-',
-      }));
-      setReviews(mapped);
-      setReviewsCurrentPage(1);
-    } catch (err) {
-      console.error('Failed to fetch ratings:', err);
-      setReviews([]);
-    } finally {
-      setLoadingReviews(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMyRatings();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'ulasan') {
-      fetchMyRatings();
     }
   }, [activeTab]);
 
@@ -1515,8 +2226,9 @@ export default function AdminUser() {
         return { title: "Manajemen Blog & Event", desc: "Kelola artikel blog dan acara dalam satu halaman" };
       case "inbox":
         return { title: "Kotak Masuk Pesan", desc: "Lihat dan balas pesan keluhan atau pertanyaan pengguna" };
+      case "referral":
       case "reseller":
-        return { title: "Direktori Reseller", desc: "Kelola kemitraan dan agen reseller wilayah portal" };
+        return { title: "Program Referral", desc: "Kelola kode referral Anda, pantau pendapatan komisi, penggunaan kode, dan riwayat transaksi." };
       case "premium":
         return { title: "Premium", desc: "Upgrade ke akun premium untuk fitur lebih" };
       case "iklan":
@@ -1541,8 +2253,8 @@ export default function AdminUser() {
     { id: "dashboard", name: "Dashboard", icon: LayoutDashboard },
     { id: "bisnis", name: "Bisnis", icon: Briefcase },
     { id: "blog-event", name: "Blog & Event", icon: FileText },
-    { id: "inbox", name: "Inbox", icon: Mail },
-    { id: "reseller", name: "Reseller", icon: Users },
+    { id: "inbox", name: totalInboxUnreadCount > 0 ? `Inbox (${totalInboxUnreadCount})` : "Inbox", icon: Mail },
+    { id: "referral", name: "Referral", icon: Share2 },
     { id: "premium", name: "Premium", icon: Crown },
     { id: "iklan", name: "Iklan", icon: Megaphone },
     { id: "produk", name: "Produk", icon: Package },
@@ -2003,8 +2715,10 @@ export default function AdminUser() {
                           </thead>
                           <tbody className="divide-y divide-[#f1f5f9]">
                             {currentItems.map((biz) => {
-                              const isActive = biz.status === "active" || biz.status === "Aktif";
-                              const isPending = biz.status === "pending" || biz.status === "Menunggu";
+                              const st = (biz.status || biz.raw?.status || "").toLowerCase();
+                              const isApproved = st === "approved" || st === "published" || st === "active" || st === "aktif" || st === "disetujui";
+                              const isPending = st === "pending" || st === "menunggu";
+                              const isRejected = st === "rejected" || st === "ditolak";
 
                               return (
                                 <tr key={biz.id} className="hover:bg-[#f8fafc] transition-colors">
@@ -2048,6 +2762,16 @@ export default function AdminUser() {
                                         </span>
                                       )}
                                     </div>
+                                    {isRejected && (
+                                      <div className="mt-[6px] p-[8px_10px] bg-[#fef2f2] border border-[#fca5a5] rounded-[8px] text-[11.5px] text-[#b91c1c] max-w-[280px]">
+                                        <div className="font-bold flex items-center gap-[4px]">
+                                          <AlertTriangle size={13} /> Status: Ditolak
+                                        </div>
+                                        <div className="mt-[2px] text-[11px] leading-snug">
+                                          <strong>Alasan:</strong> "{biz.rejection_reason || biz.raw?.rejection_reason || "Silakan periksa dan perbarui data usaha Anda."}"
+                                        </div>
+                                      </div>
+                                    )}
                                   </td>
 
                                   {/* Lokasi */}
@@ -2070,19 +2794,21 @@ export default function AdminUser() {
                                   <td className="px-[14px] py-[12px] text-center whitespace-nowrap">
                                     <span
                                       className={`inline-flex items-center gap-[5px] px-[9px] py-[3px] rounded-full text-[11px] font-bold ${
-                                        isActive
+                                        isApproved
                                           ? "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]"
                                           : isPending
                                           ? "bg-[#fefce8] text-[#a16207] border border-[#fef08a]"
-                                          : "bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca]"
+                                          : isRejected
+                                          ? "bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]"
+                                          : "bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]"
                                       }`}
                                     >
                                       <span
                                         className={`w-[6px] h-[6px] rounded-full ${
-                                          isActive ? "bg-[#16a34a]" : isPending ? "bg-[#ca8a04]" : "bg-[#dc2626]"
+                                          isApproved ? "bg-[#16a34a]" : isPending ? "bg-[#ca8a04]" : "bg-[#dc2626]"
                                         }`}
                                       />
-                                      {isActive ? "Aktif" : isPending ? "Menunggu" : "Nonaktif"}
+                                      {isApproved ? "Disetujui" : isPending ? "Menunggu Persetujuan" : isRejected ? "Ditolak" : "Nonaktif"}
                                     </span>
                                   </td>
 
@@ -2374,7 +3100,10 @@ export default function AdminUser() {
                             <tbody className="divide-y divide-slate-100">
                               {currentData.map((item, idx) => {
                                 const rowNumber = startIndex + idx + 1;
-                                const isPublished = item.status === "published" || item.status === "upcoming";
+                                const st = (item.status || "").toLowerCase();
+                                const isApproved = st === "approved" || st === "published" || st === "terbit";
+                                const isPending = st === "pending" || st === "menunggu";
+                                const isRejected = st === "rejected" || st === "ditolak";
 
                                 return (
                                   <tr key={`${item.itemType}-${item.id}`} className="hover:bg-slate-50/60 transition-colors">
@@ -2417,6 +3146,14 @@ export default function AdminUser() {
                                       >
                                         {item.title}
                                       </span>
+                                      {isRejected && (
+                                        <div className="mt-1.5 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 max-w-xs">
+                                          <div className="font-bold flex items-center gap-1"><AlertTriangle size={13} /> Status: Ditolak</div>
+                                          <div className="mt-0.5 text-[11px] leading-snug">
+                                            <strong>Alasan:</strong> "{item.rejection_reason || "Silakan periksa dan perbarui artikel/event Anda."}"
+                                          </div>
+                                        </div>
+                                      )}
                                     </td>
 
                                     {/* KATEGORI */}
@@ -2448,12 +3185,16 @@ export default function AdminUser() {
                                     <td className="py-4 px-4 align-middle">
                                       <span
                                         className={`px-3 py-1 rounded-md text-xs font-bold inline-block whitespace-nowrap ${
-                                          isPublished
+                                          isApproved
                                             ? "bg-[#e6f4ea] text-[#137333]"
-                                            : "bg-[#fef7e0] text-[#b06000]"
+                                            : isPending
+                                            ? "bg-[#fef7e0] text-[#b06000]"
+                                            : isRejected
+                                            ? "bg-[#fce8e6] text-[#c5221f]"
+                                            : "bg-slate-100 text-slate-600"
                                         }`}
                                       >
-                                        {isPublished ? "Terbit" : "Draft"}
+                                        {isApproved ? "Disetujui" : isPending ? "Menunggu Persetujuan" : isRejected ? "Ditolak" : "Draft"}
                                       </span>
                                     </td>
 
@@ -2572,108 +3313,562 @@ export default function AdminUser() {
             </div>
           )}
 
-          {/* 4. INBOX VIEW */}
+          {/* 4. INBOX / CHAT VIEW */}
           {activeTab === "inbox" && (
-            <div className="grid grid-cols-[300px_1fr] max-md:grid-cols-1 gap-[16px] h-[calc(100vh-160px)] max-md:h-auto">
-              {/* Inbox List */}
-              <div className="bg-white border border-[#e2e8f0] rounded-[12px] flex flex-col overflow-hidden">
-                <div className="p-[16px_18px] border-b border-[#e2e8f0]">
-                  <h2 className="text-[15px] font-bold text-[#0f172a]">Kotak Masuk ({messages.filter((m) => m.unread).length})</h2>
+            <div className="grid grid-cols-1 md:grid-cols-[340px_1fr] gap-4 md:gap-5 h-[calc(100vh-140px)] min-h-[550px] max-h-[850px] overflow-hidden">
+              {/* LEFT PANEL: Daftar Conversation */}
+              <div className={`bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden shadow-sm ${activeConversationId ? "max-md:hidden" : "w-full"}`}>
+                <div className="p-4 border-b border-slate-100 space-y-3 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Mail size={18} className="text-[#007570]" />
+                      Kotak Masuk
+                    </h2>
+                    {totalInboxUnreadCount > 0 && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-bold text-xs shadow-xs animate-pulse">
+                        {totalInboxUnreadCount} baru
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={inboxSearchQuery}
+                      onChange={(e) => setInboxSearchQuery(e.target.value)}
+                      placeholder="Cari pesan atau bisnis..."
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#007570] focus:ring-1 focus:ring-[#007570]"
+                    />
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`p-[14px_16px] cursor-pointer border-b border-[#f1f5f9] transition-all duration-[280ms] hover:bg-[#f8fafc] ${selectedMessage?.id === msg.id ? "bg-[#f0fdfa]" : ""} ${msg.unread ? "border-l-[3px] border-l-[#007570]" : ""}`}
-                      onClick={() => selectMessage(msg)}
-                    >
-                      <div className="flex justify-between items-center mb-[4px]">
-                        <span className="text-[13px] font-semibold text-[#0f172a]">{msg.sender}</span>
-                        <span className="text-[11px] text-[#64748b]">{msg.time}</span>
-                      </div>
-                      <div className="text-[12.5px] font-medium text-[#0f172a] mb-[3px]">{msg.subject}</div>
-                      <div className="text-[11.5px] text-[#64748b] whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px]">{msg.body}</div>
+
+                {/* Conversation List Container */}
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                  {loadingConversations ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-2">
+                      <Loader2 size={28} className="animate-spin text-[#007570]" />
+                      <p className="text-xs font-medium">Memuat percakapan...</p>
                     </div>
-                  ))}
+                  ) : filteredConversations.length > 0 ? (
+                    filteredConversations.map((conv) => {
+                      const isActive = String(activeConversationId) === String(conv.id);
+                      return (
+                        <div
+                          key={conv.id}
+                          onClick={() => {
+                            setActiveConversationId(conv.id);
+                            navigate(`/dashboard?tab=inbox&conversation=${conv.id}`, { replace: true });
+                          }}
+                          className={`p-3.5 cursor-pointer transition-all flex items-start gap-3 relative ${isActive ? "bg-teal-50/70 border-l-4 border-l-[#007570]" : "hover:bg-slate-50"} ${conv.unread_count > 0 ? "bg-slate-50/90 font-semibold" : ""}`}
+                        >
+                          {/* Avatar / Logo */}
+                          <div className="relative shrink-0">
+                            <img
+                              src={conv.business_logo ? getStorageUrl(conv.business_logo) : (conv.counterparty_avatar ? getStorageUrl(conv.counterparty_avatar) : DEFAULT_AVATAR)}
+                              alt={conv.business_name}
+                              className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-xs"
+                              onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
+                            />
+                            {conv.unread_count > 0 && (
+                              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white font-black text-[10px] flex items-center justify-center border-2 border-white shadow-xs">
+                                {conv.unread_count}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Content info */}
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <h4 className="text-xs font-bold text-slate-900 truncate">
+                                {conv.business_name}
+                              </h4>
+                              <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                                {formatChatTimestamp(conv.last_message_at)}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1">
+                              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-bold shrink-0">
+                                {conv.counterparty_role}
+                              </span>
+                              <span className="truncate">{conv.counterparty_name}</span>
+                            </div>
+                            <p className={`text-xs truncate ${conv.unread_count > 0 ? "font-bold text-slate-900" : "text-slate-500"}`}>
+                              {conv.last_message || "Belum ada pesan."}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400 space-y-3">
+                      <Mail size={40} className="text-slate-300 stroke-[1.5]" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-slate-700">Belum Ada Pesan</p>
+                        <p className="text-xs text-slate-500 max-w-[200px]">
+                          Pesan dari bisnis yang Anda hubungi akan muncul di sini.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Inbox Details */}
-              <div className="bg-white border border-[#e2e8f0] rounded-[12px] flex flex-col overflow-hidden">
-                {selectedMessage ? (
+              {/* RIGHT PANEL: Chat Detail & Window */}
+              <div className={`bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden shadow-sm ${!activeConversationId ? "max-md:hidden" : "w-full"}`}>
+                {activeConversationId && activeChatData ? (
                   <>
-                    <div className="p-[18px_22px] border-b border-[#e2e8f0]">
-                      <div className="text-[16px] font-bold text-[#0f172a] mb-[12px]">{selectedMessage.subject}</div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-[10px]">
-                          <div className="w-[36px] h-[36px] rounded-full bg-[rgba(0,117,112,0.12)] text-[#007570] flex items-center justify-center text-[14px] font-bold">{selectedMessage.sender.charAt(0)}</div>
-                          <div>
-                            <div className="text-[13px] font-semibold text-[#0f172a]">{selectedMessage.sender}</div>
-                            <div className="text-[12px] text-[#64748b]">{selectedMessage.email}</div>
-                          </div>
+                    {/* Header Chat Window */}
+                    <div className="p-3.5 md:p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Mobile Back Button */}
+                        <button
+                          onClick={() => {
+                            setActiveConversationId(null);
+                            navigate(`/dashboard?tab=inbox`, { replace: true });
+                          }}
+                          className="md:hidden p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+                          title="Kembali ke Daftar Pesan"
+                        >
+                          <ChevronLeft size={20} />
+                        </button>
+
+                        <img
+                          src={activeChatData.business?.logo ? getStorageUrl(activeChatData.business.logo) : DEFAULT_AVATAR}
+                          alt={activeChatData.business?.name}
+                          className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0 shadow-xs"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
+                        />
+
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-bold text-slate-900 truncate">
+                            {activeChatData.business?.name || "Detail Bisnis"}
+                          </h3>
+                          <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                            <span className="px-2 py-0.5 rounded-full bg-teal-100 text-[#007570] font-bold text-[10px]">
+                              {activeChatData.counterparty_role}
+                            </span>
+                            <span className="truncate">{activeChatData.counterparty_name}</span>
+                          </p>
                         </div>
-                        <div className="text-[11px] text-[#64748b]">{selectedMessage.time}</div>
                       </div>
                     </div>
-                    <div className="flex-1 p-[22px] text-[13.5px] leading-[1.7] text-[#0f172a] overflow-y-auto">
-                      {selectedMessage.body.split("\n").map((para, i) => (
-                        <p key={i} className="mb-[12px]">
-                          {para}
-                        </p>
-                      ))}
+
+                    {/* Body: Messages List */}
+                    <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-3.5 bg-slate-50/40">
+                      {loadingChatDetails ? (
+                        <div className="flex items-center justify-center h-full text-slate-400 space-y-2">
+                          <Loader2 size={24} className="animate-spin text-[#007570]" />
+                          <span className="text-xs ml-2 font-semibold">Memuat pesan...</span>
+                        </div>
+                      ) : activeChatData.messages && activeChatData.messages.length > 0 ? (
+                        activeChatData.messages.map((msg) => {
+                          const isMine = String(msg.sender_id) === String(user?.id);
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"}`}
+                            >
+                              {!isMine && (
+                                <img
+                                  src={msg.sender?.avatar ? getStorageUrl(msg.sender.avatar) : DEFAULT_AVATAR}
+                                  alt={msg.sender?.name}
+                                  className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0 mb-1"
+                                  onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
+                                />
+                              )}
+                              <div
+                                className={`max-w-[78%] md:max-w-[68%] rounded-2xl p-3.5 shadow-xs space-y-1 ${
+                                  isMine
+                                    ? "bg-gradient-to-r from-[#007570] to-teal-700 text-white rounded-br-none"
+                                    : "bg-white text-slate-800 border border-slate-200/90 rounded-bl-none"
+                                }`}
+                              >
+                                <p className="text-xs leading-relaxed font-normal whitespace-pre-wrap break-words">
+                                  {msg.message}
+                                </p>
+                                <div className={`text-[10px] font-medium flex items-center justify-end gap-1 ${isMine ? "text-teal-200" : "text-slate-400"}`}>
+                                  <span>{formatChatTimestamp(msg.created_at)}</span>
+                                  {isMine && <CheckCircle size={11} className="text-teal-200" />}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 space-y-2 py-10">
+                          <MessageCircle size={36} className="text-slate-300" />
+                          <p className="text-xs font-semibold text-slate-600">Belum ada pesan dalam percakapan ini.</p>
+                          <p className="text-[11px] text-slate-400">Kirim pesan pertama Anda di bawah ini.</p>
+                        </div>
+                      )}
+                      <div ref={chatMessagesEndRef} />
                     </div>
-                    <div className="flex gap-[10px] p-[14px_22px] border-t border-[#e2e8f0]">
-                      <input type="text" className="flex-1 px-[14px] py-[9px] border border-[#e2e8f0] rounded-[8px] font-['Poppins',sans-serif] text-[13px] outline-none transition-all duration-[280ms] focus:border-[#007570]" placeholder={`Tulis balasan untuk ${selectedMessage.sender}...`} />
-                      <button className="inline-flex items-center justify-center gap-[6px] px-[18px] py-[9px] rounded-[8px] bg-[#007570] text-white border-0 font-['Poppins',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-[280ms] hover:bg-[#005a58]">Kirim Balasan</button>
-                    </div>
+
+                    {/* Input Bar */}
+                    <form
+                      onSubmit={handleSendChatMessage}
+                      className="p-3 md:p-4 border-t border-slate-100 bg-white flex items-center gap-2 md:gap-3 shrink-0"
+                    >
+                      <input
+                        type="text"
+                        value={chatMessageInput}
+                        onChange={(e) => setChatMessageInput(e.target.value)}
+                        placeholder={`Tulis pesan untuk ${activeChatData.counterparty_name || "pemilik"}...`}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-xs md:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#007570] focus:ring-1 focus:ring-[#007570]"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!chatMessageInput.trim() || sendingChatMessage}
+                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs md:text-sm transition-all shadow-md cursor-pointer disabled:opacity-50 active:scale-95"
+                      >
+                        {sendingChatMessage ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Send size={16} />
+                        )}
+                        <span>Kirim</span>
+                      </button>
+                    </form>
                   </>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-[12px] text-[#cbd5e1] p-[40px] text-center">
-                    <Mail size={48} className="opacity-50 text-[#64748b]" />
-                    <p className="text-[13px] text-[#64748b]">Pilih pesan dari menu kiri untuk membaca detail isi email.</p>
+                  /* Empty state when no conversation is selected */
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400 p-8 text-center bg-slate-50/30">
+                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-1">
+                      <Mail size={32} className="stroke-[1.5]" />
+                    </div>
+                    <div className="space-y-1 max-w-sm">
+                      <h4 className="text-sm font-bold text-slate-800">Ruang Obrolan</h4>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Pilih pesan dari menu sebelah kiri untuk membaca detail isi percakapan atau membalas pesan.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* 5. RESELLER VIEW */}
-          {activeTab === "reseller" && (
-            <div>
-              <div className="flex items-center justify-between flex-wrap gap-[12px] mb-[25px]">
-                <div className="flex items-center gap-[8px] px-[14px] py-[8px] border border-[#e2e8f0] rounded-[8px] bg-white min-w-[260px] flex-1">
-                  <Search size={18} className="text-[#64748b] shrink-0" />
-                  <input type="text" className="border-none outline-none font-['Poppins',sans-serif] text-[13px] text-[#0f172a] bg-transparent flex-1 placeholder:text-[#94a3b8]" placeholder="Cari nama reseller atau wilayah..." />
-                </div>
-                <button className="inline-flex items-center justify-center gap-[6px] px-[18px] py-[9px] rounded-[8px] bg-[#007570] text-white border-0 font-['Poppins',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-[280ms] hover:bg-[#005a58]">
-                  <Plus size={16} /> Tambah Reseller
-                </button>
-              </div>
-
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-[16px]">
-                {resellers.map((reseller) => (
-                  <div className="bg-white border border-[#e2e8f0] rounded-[12px] p-[22px_18px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-[280ms] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:-translate-y-[2px]" key={reseller.id}>
-                    <img src={reseller.avatar} alt={reseller.name} className="w-[68px] h-[68px] rounded-full object-cover mb-[12px] border-[3px] border-[#f0fdfa] mx-auto" />
-                    <div className="text-[14px] font-semibold text-[#0f172a] mb-[4px]">{reseller.name}</div>
-                    <div className="flex items-center justify-center gap-[4px] text-[12px] text-[#64748b] mb-[14px]">
-                      <MapPin size={14} className="text-[#94a3b8]" />
-                      <span>{reseller.region}</span>
+          {/* 5. REFERRAL VIEW */}
+          {(activeTab === "referral" || activeTab === "reseller") && (
+            <div className="space-y-6 w-full max-w-full">
+              {/* Header Banner Program Referral */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white p-6 md:p-8 shadow-xl border border-teal-800/40">
+                <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div className="space-y-2 max-w-2xl">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-semibold">
+                      <Gift size={14} /> Program Kemitraan & Referral
                     </div>
-                    <div className="flex justify-center gap-[20px] mb-[16px]">
-                      <div className="flex flex-col items-center gap-[2px]">
-                        <span className="text-[15px] font-bold text-[#0f172a]">{reseller.sales}</span>
-                        <span className="text-[11px] text-[#64748b]">Penjualan</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-[2px]">
-                        <span className="text-[15px] font-bold text-[#0f172a]">★ {reseller.rating}</span>
-                        <span className="text-[11px] text-[#64748b]">Rating</span>
-                      </div>
-                    </div>
-                    <button className="w-full inline-flex items-center justify-center gap-[6px] px-[16px] py-[9px] rounded-[8px] bg-transparent text-[#64748b] border border-[#e2e8f0] font-['Poppins',sans-serif] text-[13px] font-medium cursor-pointer transition-all duration-[280ms] hover:bg-[#f8fafc] hover:text-[#0f172a]">
-                      Hubungi Agen
+                    <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+                      Dapatkan Komisi 10% Dari Setiap Referral!
+                    </h2>
+                    <p className="text-sm text-slate-300 leading-relaxed font-normal">
+                      Bagikan kode unik Anda kepada rekan usaha atau kerabat. Teman Anda mendapat potongan harga saat bertransaksi, dan Anda otomatis menerima komisi tunai sebesar 10%.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto shrink-0">
+                    <button
+                      onClick={() => setShowWithdrawModal(true)}
+                      className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-bold text-sm transition-all shadow-lg hover:shadow-teal-500/25 active:scale-95 cursor-pointer"
+                    >
+                      <Wallet size={18} />
+                      <span>Tarik Saldo Komisi</span>
                     </button>
                   </div>
-                ))}
+                </div>
+              </div>
+
+              {/* 4 Stat Overview Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+                {/* Card 1: Kode Referral Saya */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Kode Referral Saya</span>
+                    <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#007570] flex items-center justify-center font-bold">
+                      <Gift size={20} />
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-900 rounded-xl flex items-center justify-between gap-2 border border-slate-800">
+                    <span className="font-mono text-base md:text-lg font-black text-teal-400 tracking-wider">
+                      {referralCode}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(referralCode);
+                        setReferralCopyToast(true);
+                        setTimeout(() => setReferralCopyToast(false), 2500);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Salin Kode Referral"
+                    >
+                      {referralCopyToast ? <Check size={14} /> : <Copy size={14} />}
+                      <span>{referralCopyToast ? "Tersalin!" : "Salin"}</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                    <span className="text-slate-500">Bonus Teman: <strong className="text-slate-800">Diskon 5%</strong></span>
+                    <button
+                      onClick={() => {
+                        const link = `${window.location.origin}/register?ref=${referralCode}`;
+                        navigator.clipboard.writeText(link);
+                        setReferralLinkCopyToast(true);
+                        setTimeout(() => setReferralLinkCopyToast(false), 2500);
+                      }}
+                      className="text-[#007570] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Share2 size={12} />
+                      <span>{referralLinkCopyToast ? "Link Tersalin!" : "Bagikan Link"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Card 2: Total Pendapatan */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Pendapatan (Komisi)</span>
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                      <TrendingUp size={20} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight">
+                      Rp {totalReferralEarnings.toLocaleString("id-ID")}
+                    </div>
+                    <p className="text-xs text-emerald-600 font-semibold mt-1 flex items-center gap-1">
+                      <CheckCircle2 size={13} /> komisi terverifikasi
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>Minimal penarikan: Rp 50.000</span>
+                  </div>
+                </div>
+
+                {/* Card 3: Berapa Kali Kode Dipakai */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Penggunaan Kode</span>
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                      <Users size={20} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight">
+                      {totalReferralUsage} Kali Dipakai
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                      <strong className="text-slate-800">{successReferralCount}</strong> transaksi berhasil diselesaikan
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>Status: <strong className="text-emerald-600">Aktif</strong></span>
+                  </div>
+                </div>
+
+                {/* Card 4: Estimasi Pending Earning */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Komisi Pending</span>
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                      <Clock size={20} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-amber-600 tracking-tight">
+                      Rp {pendingReferralEarnings.toLocaleString("id-ID")}
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                      Menunggu verifikasi pembayaran transaksi
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>Status: <span className="text-amber-600 font-semibold">Sedang Diproses</span></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Panduan Cara Kerja Program Referral */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Target size={18} className="text-[#007570]" />
+                  Cara Kerja Program Referral 3 Langkah Mudah
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
+                    <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                      1
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-slate-900">Bagikan Kode Unik</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Salin kode <strong className="text-slate-800">{referralCode}</strong> atau link pendaftaran dan bagikan ke rekan bisnis Anda.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
+                    <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                      2
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-slate-900">Teman Mendaftar & Transaksi</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Pengguna mendaftar dengan kode Anda dan membeli Paket Premium dengan potongan diskon 5%.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
+                    <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                      3
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-slate-900">Nikmati Komisi 10%</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Komisi tunai 10% otomatis masuk setelah pembayaran diverifikasi admin dan dapat ditarik kapan saja.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabel Riwayat Transaksi Referral */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <FileText size={18} className="text-[#007570]" />
+                      Riwayat Transaksi Kode Referral
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Daftar transaksi pengguna yang menggunakan kode referral Anda
+                    </p>
+                  </div>
+
+                  {/* Filter & Search */}
+                  <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={referralSearch}
+                        onChange={(e) => setReferralSearch(e.target.value)}
+                        placeholder="Cari ID, nama, atau layanan..."
+                        className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#007570] focus:ring-1 focus:ring-[#007570]"
+                      />
+                    </div>
+                    <select
+                      value={referralStatusFilter}
+                      onChange={(e) => setReferralStatusFilter(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#007570] cursor-pointer"
+                    >
+                      <option value="all">Semua Status</option>
+                      <option value="success">Berhasil</option>
+                      <option value="pending">Menunggu Verifikasi</option>
+                      <option value="cancelled">Dibatalkan</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Table Content */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        <th className="py-3 px-4">ID Transaksi</th>
+                        <th className="py-3 px-4">Pengguna / Pembeli</th>
+                        <th className="py-3 px-4">Layanan & Bisnis</th>
+                        <th className="py-3 px-4">Tanggal</th>
+                        <th className="py-3 px-4 text-right">Total Transaksi</th>
+                        <th className="py-3 px-4 text-right">Komisi Anda (10%)</th>
+                        <th className="py-3 px-4 text-center">Status</th>
+                        <th className="py-3 px-4 text-center">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {loadingReferrals ? (
+                        <tr>
+                          <td colSpan={8} className="py-12 text-center text-slate-500">
+                            <Loader2 size={24} className="animate-spin mx-auto text-[#007570] mb-2" />
+                            <p className="text-xs font-medium">Memuat data referral...</p>
+                          </td>
+                        </tr>
+                      ) : filteredReferralTransactions.length > 0 ? (
+                        filteredReferralTransactions.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-3.5 px-4 font-mono font-bold text-[#007570]">
+                              {tx.id}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <img
+                                  src={tx.userAvatar}
+                                  alt={tx.userName}
+                                  className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                                />
+                                <div>
+                                  <div className="font-bold text-slate-900">{tx.userName}</div>
+                                  <div className="text-[11px] text-slate-500">{tx.userEmail}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-semibold text-slate-800">{tx.service}</div>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                                <Briefcase size={11} className="text-slate-400" />
+                                {tx.businessName}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
+                              {tx.date}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-bold text-slate-800">
+                              Rp {tx.amount.toLocaleString("id-ID")}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600">
+                              + Rp {tx.commission.toLocaleString("id-ID")}
+                            </td>
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              {(tx.status === "approved" || tx.status === "earned" || tx.status === "paid" || tx.status === "success") && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
+                                  <CheckCircle size={12} /> Berhasil
+                                </span>
+                              )}
+                              {tx.status === "pending" && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200">
+                                  <Clock size={12} /> Menunggu Verifikasi
+                                </span>
+                              )}
+                              {(tx.status === "cancelled" || tx.status === "failed") && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200">
+                                  <X size={12} /> Dibatalkan
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                onClick={() => setSelectedReferralTx(tx)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                <Eye size={13} />
+                                <span>Detail</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={8} className="py-12 text-center text-slate-500 space-y-2">
+                            <Share2 size={36} className="mx-auto text-slate-300" />
+                            <p className="font-bold text-sm text-slate-800">Belum ada referral yang berhasil.</p>
+                            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                              Bagikan kode referral Anda ({referralCode}) ke rekan bisnis untuk mulai mendapatkan komisi 10% dari setiap pembelian Paket Premium.
+                            </p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -2696,7 +3891,28 @@ export default function AdminUser() {
 
               {/* Main Container Card */}
               <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-8">
-                {(() => {
+                {savedItemsError ? (
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                      <AlertCircle size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">{savedItemsError}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">Terjadi kesalahan saat memuat data bookmark.</p>
+                    </div>
+                    <button
+                      onClick={fetchSavedItems}
+                      className="px-4 py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      Coba Lagi
+                    </button>
+                  </div>
+                ) : loadingSavedItems ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-2.5">
+                    <Loader2 size={32} className="animate-spin text-[#007570]" />
+                    <p className="text-xs font-semibold text-slate-600">Memuat bookmark tersimpan...</p>
+                  </div>
+                ) : (() => {
                   const savedBusinessesList = (savedItems || []).filter(item => item.itemType === "business" || item.type === "Bisnis");
                   const savedBlogsAndEventsList = (savedItems || []).filter(item => item.itemType === "blog" || item.itemType === "event" || item.type === "Blog" || item.type === "Event");
 
@@ -2984,7 +4200,8 @@ export default function AdminUser() {
             </div>
           )}
             {/* 7. ULASAN VIEW */}
-          {activeTab === "ulasan" && (() => {
+          {activeTab === "ulasan" && (
+            (() => {
             const REVIEWS_PER_PAGE = 8;
 
             // Build unique business list from reviews for filter dropdown
@@ -3096,11 +4313,24 @@ export default function AdminUser() {
                   <span className="text-[11.5px] text-[#94a3b8] shrink-0">{filtered.length} ulasan ditemukan</span>
                 </div>
 
-                {/* ── Table ── */}
-                {loadingReviews ? (
+                {/* ── Table / Loading / Error / Empty ── */}
+                {reviewsError ? (
+                  <div className="bg-white border border-rose-200 rounded-[13px] p-[36px_24px] flex flex-col items-center justify-center text-center">
+                    <div className="w-[50px] h-[50px] rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-[10px]">
+                      <AlertCircle size={24} />
+                    </div>
+                    <h4 className="text-[14px] font-bold text-slate-800 mb-[4px]">{reviewsError}</h4>
+                    <button
+                      onClick={fetchReviews}
+                      className="mt-[8px] px-[14px] py-[6px] bg-[#007570] text-white font-semibold rounded-[8px] text-[12px] hover:bg-[#005a58] transition-colors cursor-pointer"
+                    >
+                      Coba Lagi
+                    </button>
+                  </div>
+                ) : loadingReviews ? (
                   <div className="flex flex-col items-center justify-center py-[50px] gap-[10px] bg-white border border-[#e2e8f0] rounded-[13px]">
                     <Loader2 size={28} className="text-[#007570] animate-spin" />
-                    <span className="text-[13px] text-[#64748b]">Memuat ulasan...</span>
+                    <span className="text-[13px] text-[#64748b]">Tunggu, sedang memuat ulasan...</span>
                   </div>
                 ) : filtered.length === 0 ? (
                   <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-[48px_24px] flex flex-col items-center justify-center text-center">
@@ -3233,7 +4463,8 @@ export default function AdminUser() {
                 )}
               </div>
             );
-          })()}
+            })()
+          )}
 
 
           {/* 8. PREMIUM VIEW */}
@@ -3244,142 +4475,904 @@ export default function AdminUser() {
                 <Crown size={32} className="text-[#f59e0b] shrink-0" />
                 <div>
                   <h2 className="text-[18px] font-bold text-[#0f172a]">Upgrade Usaha ke Premium</h2>
-                  <p className="text-[13px] text-[#64748b]">Tingkatkan visibilitas dan nikmati fitur eksklusif untuk setiap usaha Anda</p>
+                  <p className="text-[13px] text-[#64748b]">Tingkatkan visibilitas, jangkauan pelanggan, dan nikmati fitur eksklusif untuk usaha Anda</p>
                 </div>
               </div>
 
-              {/* Business Selector Card (Per Usaha) */}
-              <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[20px] shadow-sm flex flex-col gap-[8px]">
-                <label className="text-[12px] font-bold text-[#0f172a] uppercase tracking-[0.4px]">
-                  Pilih Usaha Yang Ingin Di-Upgrade *
-                </label>
-                {businesses && businesses.length > 0 ? (
-                  <select
-                    value={selectedUpgradeBusiness || (businesses[0]?.id || "")}
-                    onChange={(e) => setSelectedUpgradeBusiness(e.target.value)}
-                    className="w-full px-[14px] py-[10px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] text-[13.5px] font-semibold text-[#0f172a] outline-none focus:border-[#007570] transition-all cursor-pointer"
-                  >
-                    {businesses.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.category || "Usaha"}) — {b.city || "Lokasi"} {b.is_premium ? "⭐ [Sudah Premium]" : ""}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="p-[12px_16px] bg-[#fffbeb] border border-[#fef3c7] text-[#b45309] text-[12.5px] font-medium rounded-[10px]">
-                    Anda belum memiliki usaha terdaftar. Silakan daftarkan usaha terlebih dahulu pada menu Bisnis sebelum melakukan upgrade.
+              {/* Multi-Step Indicator (Step 1 to 4) */}
+              {premiumStep < 5 && (
+                <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[16px_20px] shadow-sm overflow-x-auto">
+                  <div className="flex items-center justify-between min-w-[560px] gap-[10px]">
+                    {[
+                      { stepNum: 1, label: "1. Pilih Paket & Usaha", icon: Crown },
+                      { stepNum: 2, label: "2. Ringkasan & Promo", icon: FileText },
+                      { stepNum: 3, label: "3. Metode Bayar", icon: CreditCard },
+                      { stepNum: 4, label: "4. Upload Bukti", icon: Upload },
+                    ].map((s, idx) => {
+                      const Icon = s.icon;
+                      const isActive = premiumStep === s.stepNum;
+                      const isCompleted = premiumStep > s.stepNum;
+                      return (
+                        <div key={s.stepNum} className="flex items-center gap-[10px] flex-1 last:flex-initial">
+                          <div className="flex items-center gap-[8px]">
+                            <div
+                              className={`w-[32px] h-[32px] rounded-full flex items-center justify-center text-[13px] font-bold transition-all ${
+                                isCompleted
+                                  ? "bg-[#10b981] text-white"
+                                  : isActive
+                                  ? "bg-[#007570] text-white shadow-[0_0_0_3px_rgba(0,117,112,0.2)]"
+                                  : "bg-[#f1f5f9] text-[#94a3b8]"
+                              }`}
+                            >
+                              {isCompleted ? <Check size={16} /> : <Icon size={16} />}
+                            </div>
+                            <span
+                              className={`text-[12.5px] font-semibold whitespace-nowrap ${
+                                isActive ? "text-[#007570]" : isCompleted ? "text-[#0f172a]" : "text-[#94a3b8]"
+                              }`}
+                            >
+                              {s.label}
+                            </span>
+                          </div>
+                          {idx < 3 && (
+                            <div
+                              className={`flex-1 h-[2px] mx-[6px] rounded-full transition-all ${
+                                isCompleted ? "bg-[#10b981]" : "bg-[#e2e8f0]"
+                              }`}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
-
-              {/* Dynamic Premium Plans Grid */}
-              {loadingPremiumPlans ? (
-                <div className="flex flex-col items-center justify-center py-[48px] gap-[12px] text-[#64748b]">
-                  <Loader2 size={36} className="animate-spin text-[#007570]" />
-                  <p className="text-[13px] font-medium">Memuat paket premium terbaru...</p>
                 </div>
-              ) : premiumPlans.length > 0 ? (
-                <div className={`grid grid-cols-1 ${premiumPlans.length === 1 ? 'max-w-[480px] mx-auto w-full' : premiumPlans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-[20px]`}>
-                  {premiumPlans.map((plan) => {
-                    const isFree = Number(plan.price) === 0;
-                    const isPopular = plan.priority_listing || plan.name.toLowerCase().includes("premium");
-                    const formattedDuration = plan.formatted_duration || (
-                      plan.duration_value
-                        ? `${plan.duration_value} ${plan.duration_unit === 'day' || plan.duration_unit === 'hari' ? 'Hari' : plan.duration_unit === 'year' || plan.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`
-                        : "1 Bulan"
-                    );
+              )}
 
-                    return (
-                      <div
-                        key={plan.id}
-                        className={`bg-white rounded-[16px] p-[28px] flex flex-col justify-between shadow-sm relative border-2 ${
-                          isPopular ? "border-[#007570] shadow-md" : "border-[#e2e8f0]"
-                        }`}
-                      >
-                        {isPopular && (
-                          <div className="absolute -top-[12px] right-[24px] bg-[#007570] text-white text-[11px] font-bold px-[12px] py-[3px] rounded-full uppercase tracking-wider">
-                            POPULER
+              {/* ── STEP 1: PILIH USAHA & PAKET PREMIUM ── */}
+              {premiumStep === 1 && (
+                <div className="flex flex-col gap-[20px]">
+                  {/* Business Selector Card */}
+                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[16px]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-[13px] font-bold text-[#0f172a] uppercase tracking-[0.4px]">
+                          1. Pilih Usaha Yang Ingin Di-Upgrade *
+                        </label>
+                        <p className="text-[12px] text-[#64748b] mt-[2px]">Pilih salah satu profil usaha terdaftar milik Anda yang ingin ditingkatkan statusnya</p>
+                      </div>
+                    </div>
+
+                    {businesses && businesses.length > 0 ? (
+                      <div className="flex flex-col gap-[12px]">
+                        <select
+                          value={selectedUpgradeBusiness || (businesses[0]?.id || "")}
+                          onChange={(e) => setSelectedUpgradeBusiness(e.target.value)}
+                          className="w-full px-[16px] py-[12px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[12px] text-[14px] font-semibold text-[#0f172a] outline-none focus:border-[#007570] focus:bg-white transition-all cursor-pointer"
+                        >
+                          {(businesses || []).map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name} ({getCategoryDisplayName(b.category)}) — {b.city || "Lokasi"} {b.is_premium ? "⭐ [Sudah Premium]" : ""}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* Selected Business Preview Card */}
+                        {(() => {
+                          const currentBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
+                          const currentBiz = (businesses || []).find(b => String(b.id) === String(currentBizId)) || businesses?.[0];
+                          if (!currentBiz) return null;
+
+                          return (
+                            <div className="flex items-center justify-between p-[14px_16px] rounded-[12px] bg-[#f8fafc] border border-[#e2e8f0]">
+                              <div className="flex items-center gap-[12px]">
+                                <img
+                                  src={currentBiz.logo ? getStorageUrl(currentBiz.logo) : DEFAULT_AVATAR}
+                                  alt={currentBiz.name || "Bisnis"}
+                                  className="w-[44px] h-[44px] rounded-[10px] object-cover border border-[#e2e8f0]"
+                                />
+                                <div>
+                                  <h4 className="text-[14px] font-bold text-[#0f172a]">{currentBiz.name}</h4>
+                                  <p className="text-[12px] text-[#64748b] flex items-center gap-[4px] mt-[1px]">
+                                    <MapPin size={12} className="text-[#007570]" />
+                                    <span>{currentBiz.city || "Indonesia"}</span>
+                                    <span>•</span>
+                                    <span>{getCategoryDisplayName(currentBiz.category)}</span>
+                                  </p>
+                                </div>
+                              </div>
+                              <div>
+                                {currentBiz.is_premium ? (
+                                  <span className="px-[10px] py-[4px] bg-[#fef3c7] text-[#b45309] rounded-full text-[11.5px] font-bold flex items-center gap-[4px]">
+                                    ⭐ Premium Aktif
+                                  </span>
+                                ) : (
+                                  <span className="px-[10px] py-[4px] bg-[#f1f5f9] text-[#64748b] rounded-full text-[11.5px] font-semibold">
+                                    Paket Reguler / Free
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="p-[16px] bg-[#fffbeb] border border-[#fef3c7] text-[#b45309] text-[13px] font-medium rounded-[12px] flex items-center gap-[10px]">
+                        <AlertCircle size={20} className="shrink-0" />
+                        <div>
+                          Anda belum memiliki usaha terdaftar. Silakan{" "}
+                          <button
+                            onClick={() => navigate("/add-business")}
+                            className="font-bold underline cursor-pointer text-[#b45309] hover:text-[#92400e]"
+                          >
+                            Daftarkan Usaha Baru
+                          </button>{" "}
+                          terlebih dahulu sebelum melakukan upgrade ke paket Premium.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dynamic Premium Plans Grid */}
+                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[16px]">
+                    <div>
+                      <label className="text-[13px] font-bold text-[#0f172a] uppercase tracking-[0.4px]">
+                        2. Pilih Paket Premium *
+                      </label>
+                      <p className="text-[12px] text-[#64748b] mt-[2px]">Pilih durasi dan fasilitas paket yang paling sesuai dengan kebutuhan usaha Anda</p>
+                    </div>
+
+                    {loadingPremiumPlans ? (
+                      <div className="flex flex-col items-center justify-center py-[48px] gap-[12px] text-[#64748b]">
+                        <Loader2 size={36} className="animate-spin text-[#007570]" />
+                        <p className="text-[13px] font-medium">Memuat paket premium terbaru...</p>
+                      </div>
+                    ) : premiumPlans.length > 0 ? (
+                      <div className={`grid grid-cols-1 ${premiumPlans.length === 1 ? 'max-w-[480px] mx-auto w-full' : premiumPlans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-[20px]`}>
+                        {premiumPlans.map((plan) => {
+                          const isFree = Number(plan.price) === 0;
+                          const isPopular = plan.priority_listing || plan.name.toLowerCase().includes("premium");
+                          const isSelected = selectedUpgradePlan?.id === plan.id;
+                          const formattedDuration = plan.formatted_duration || (
+                            plan.duration_value
+                              ? `${plan.duration_value} ${plan.duration_unit === 'day' || plan.duration_unit === 'hari' ? 'Hari' : plan.duration_unit === 'year' || plan.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`
+                              : "1 Bulan"
+                          );
+
+                          return (
+                            <div
+                              key={plan.id}
+                              onClick={() => {
+                                if (!isFree) setSelectedUpgradePlan(plan);
+                              }}
+                              className={`bg-white rounded-[16px] p-[24px] flex flex-col justify-between shadow-sm relative border-2 transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-[#007570] shadow-[0_0_0_3px_rgba(0,117,112,0.15)] bg-[#f0fdfa]/40"
+                                  : isPopular
+                                  ? "border-[#007570] hover:shadow-md"
+                                  : "border-[#e2e8f0] hover:border-[#cbd5e1]"
+                              }`}
+                            >
+                              {isPopular && (
+                                <div className="absolute -top-[12px] right-[20px] bg-[#007570] text-white text-[10.5px] font-bold px-[12px] py-[3px] rounded-full uppercase tracking-wider shadow-sm">
+                                  POPULER
+                                </div>
+                              )}
+                              <div>
+                                <div className="flex items-center justify-between mb-[4px]">
+                                  <h3 className="text-[17px] font-bold text-[#0f172a]">{plan.name}</h3>
+                                  <div
+                                    className={`w-[20px] h-[20px] rounded-full border-2 flex items-center justify-center transition-all ${
+                                      isSelected
+                                        ? "border-[#007570] bg-[#007570] text-white"
+                                        : "border-[#cbd5e1] bg-white"
+                                    }`}
+                                  >
+                                    {isSelected && <Check size={12} strokeWidth={3} />}
+                                  </div>
+                                </div>
+                                <div className="text-[26px] font-extrabold text-[#007570] mt-[8px]">
+                                  {isFree ? "Rp 0" : `Rp ${Number(plan.price).toLocaleString("id-ID")}`}
+                                </div>
+                                <div className="text-[12px] text-[#64748b] font-medium">{isFree ? "selamanya" : `/ ${formattedDuration}`}</div>
+                                {plan.description && (
+                                  <p className="text-[12px] text-[#64748b] mt-[6px] italic leading-relaxed">{plan.description}</p>
+                                )}
+
+                                <ul className="flex flex-col gap-[9px] my-[20px] pt-[16px] border-t border-[#f1f5f9]">
+                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
+                                    {plan.can_add_map ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
+                                    <span className={plan.can_add_map ? "" : "line-through text-[#94a3b8]"}>Integrasi Google Maps</span>
+                                  </li>
+                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
+                                    {plan.can_add_gallery ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
+                                    <span className={plan.can_add_gallery ? "" : "line-through text-[#94a3b8]"}>Galeri Foto Profil</span>
+                                  </li>
+                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
+                                    {plan.can_add_video ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
+                                    <span className={plan.can_add_video ? "" : "line-through text-[#94a3b8]"}>Embed Video Profil</span>
+                                  </li>
+                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
+                                    {plan.can_add_products !== false ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
+                                    <span className={plan.can_add_products !== false ? "" : "line-through text-[#94a3b8]"}>Katalog Produk Usaha</span>
+                                  </li>
+                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
+                                    {plan.can_chat !== false ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
+                                    <span className={plan.can_chat !== false ? "" : "line-through text-[#94a3b8]"}>Akses Chat & Kontak Direct</span>
+                                  </li>
+                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
+                                    {plan.priority_listing ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
+                                    <span className={plan.priority_listing ? "" : "line-through text-[#94a3b8]"}>Pencarian Prioritas & Badge</span>
+                                  </li>
+                                </ul>
+                              </div>
+
+                              {isFree ? (
+                                <button className="w-full py-[10px] rounded-[10px] bg-[#f1f5f9] text-[#94a3b8] font-semibold text-[13px] cursor-not-allowed border-0" disabled>
+                                  Paket Reguler Saat Ini
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedUpgradePlan(plan);
+                                  }}
+                                  className={`w-full py-[11px] rounded-[10px] font-semibold text-[13.5px] cursor-pointer border-0 transition-all ${
+                                    isSelected
+                                      ? "bg-[#007570] text-white shadow-sm"
+                                      : "bg-[#f0fdfa] text-[#007570] hover:bg-[#007570] hover:text-white"
+                                  }`}
+                                >
+                                  {isSelected ? "✓ Paket Terpilih" : "Pilih Paket Ini"}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[14px] p-[36px] text-center flex flex-col items-center gap-[10px]">
+                        <Crown size={36} className="text-[#94a3b8]" />
+                        <div className="text-[14px] font-bold text-[#0f172a]">Belum Ada Paket Premium Aktif</div>
+                        <p className="text-[12.5px] text-[#64748b] max-w-[360px]">
+                          Saat ini belum ada paket premium yang diaktifkan oleh admin. Silakan periksa kembali nanti.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 1 Action Bar */}
+                  <div className="flex items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm">
+                    <div className="text-[13px] text-[#64748b]">
+                      {selectedUpgradePlan ? (
+                        <span>
+                          Paket terpilih: <strong className="text-[#007570]">{selectedUpgradePlan.name}</strong> (Rp {Number(selectedUpgradePlan.price).toLocaleString("id-ID")})
+                        </span>
+                      ) : (
+                        <span>Pilih salah satu paket premium di atas untuk melanjutkan</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!selectedUpgradePlan || (businesses?.length || 0) === 0}
+                      onClick={() => {
+                        const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
+                        if (!targetBizId) {
+                          alert("Silakan daftarkan atau pilih usaha Anda terlebih dahulu.");
+                          return;
+                        }
+                        if (!selectedUpgradePlan) {
+                          alert("Silakan pilih salah satu paket premium terlebih dahulu.");
+                          return;
+                        }
+                        setUpgradeError("");
+                        setPremiumStep(2);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="px-[24px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0"
+                    >
+                      <span>Lanjut ke Ringkasan Pesanan</span>
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 2: RINGKASAN PESANAN & PROMO (KUPON / REFERRAL) ── */}
+              {premiumStep === 2 && (
+                <div className="flex flex-col gap-[20px]">
+                  {/* Summary of Chosen Business & Plan */}
+                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[16px]">
+                    <h3 className="text-[15px] font-bold text-[#0f172a] border-b border-[#f1f5f9] pb-[12px]">
+                      Ringkasan Pemesanan Upgrade
+                    </h3>
+
+                    {(() => {
+                      const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
+                      const bizObj = (businesses || []).find(b => String(b.id) === String(targetBizId)) || businesses?.[0];
+                      const formattedDuration = selectedUpgradePlan?.formatted_duration || (
+                        selectedUpgradePlan?.duration_value
+                          ? `${selectedUpgradePlan.duration_value} ${selectedUpgradePlan.duration_unit === 'day' || selectedUpgradePlan.duration_unit === 'hari' ? 'Hari' : selectedUpgradePlan.duration_unit === 'year' || selectedUpgradePlan.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`
+                          : "1 Bulan"
+                      );
+
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
+                          <div className="p-[16px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[12px] flex items-center gap-[14px]">
+                            <img
+                              src={bizObj?.logo ? getStorageUrl(bizObj.logo) : DEFAULT_AVATAR}
+                              alt={bizObj?.name || "Bisnis"}
+                              className="w-[48px] h-[48px] rounded-[10px] object-cover border border-[#e2e8f0]"
+                            />
+                            <div>
+                              <span className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Usaha Yang Di-Upgrade</span>
+                              <h4 className="text-[15px] font-bold text-[#0f172a]">{bizObj?.name || "Usaha Anda"}</h4>
+                              <p className="text-[12px] text-[#64748b]">{getCategoryDisplayName(bizObj?.category)} • {bizObj?.city || "Indonesia"}</p>
+                            </div>
+                          </div>
+
+                          <div className="p-[16px] bg-[#f0fdfa] border border-[#ccfbf1] rounded-[12px] flex items-center justify-between">
+                            <div>
+                              <span className="text-[11px] font-bold text-[#007570] uppercase tracking-wider">Paket Premium Pilihan</span>
+                              <h4 className="text-[15px] font-bold text-[#0f172a]">{selectedUpgradePlan?.name}</h4>
+                              <p className="text-[12px] text-[#64748b]">Masa Aktif: {formattedDuration}</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[11px] text-[#64748b]">Harga Normal</span>
+                              <div className="text-[16px] font-bold text-[#007570]">
+                                Rp {Number(selectedUpgradePlan?.price || 0).toLocaleString("id-ID")}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Promo & Discounts Section: Coupon & Referral */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[20px]">
+                    {/* Kupon Diskon Card */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[20px] shadow-sm flex flex-col justify-between gap-[12px]">
+                      <div>
+                        <div className="flex items-center gap-[8px] mb-[4px]">
+                          <Gift size={18} className="text-[#007570]" />
+                          <label className="text-[13px] font-bold text-[#0f172a]">Kupon Diskon (Opsional)</label>
+                        </div>
+                        <p className="text-[12px] text-[#64748b] mb-[12px]">Masukkan kode kupon promosi jika Anda memilikinya</p>
+
+                        {!appliedUpgradeCoupon ? (
+                          <div className="flex gap-[8px]">
+                            <input
+                              type="text"
+                              value={upgradeCouponInput}
+                              onChange={(e) => setUpgradeCouponInput(e.target.value.toUpperCase())}
+                              placeholder="CONTOH: PROMO50"
+                              className="flex-1 px-[14px] py-[10px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] text-[13px] font-bold text-[#0f172a] uppercase outline-none focus:border-[#007570] focus:bg-white transition-all placeholder:font-normal placeholder:normal-case"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleApplyUpgradeCoupon}
+                              disabled={upgradeCouponLoading || !upgradeCouponInput.trim()}
+                              className="px-[16px] py-[10px] bg-[#007570] text-white text-[13px] font-bold rounded-[10px] transition-all hover:bg-[#005a58] disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0 cursor-pointer flex items-center gap-[6px]"
+                            >
+                              {upgradeCouponLoading ? <Loader2 size={16} className="animate-spin" /> : "Terapkan"}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between p-[10px_14px] bg-[#f0fdf4] border border-[#bbf7d0] rounded-[10px]">
+                            <div className="flex items-center gap-[8px]">
+                              <CheckCircle2 size={18} className="text-[#10b981]" />
+                              <div>
+                                <span className="text-[12px] font-bold text-[#15803d]">Kupon: {appliedUpgradeCoupon.code}</span>
+                                <p className="text-[11px] text-[#16a34a]">
+                                  Potongan: Rp {Number(appliedUpgradeCoupon.discount_amount || 0).toLocaleString("id-ID")}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleRemoveUpgradeCoupon}
+                              className="text-[11.5px] font-bold text-[#ef4444] hover:underline cursor-pointer bg-transparent border-0"
+                            >
+                              Hapus
+                            </button>
                           </div>
                         )}
-                        <div>
-                          <h3 className="text-[18px] font-bold text-[#0f172a]">{plan.name}</h3>
-                          <div className="text-[28px] font-extrabold text-[#007570] mt-[8px]">
-                            {isFree ? "Rp 0" : `Rp ${Number(plan.price).toLocaleString("id-ID")}`}
-                          </div>
-                          <div className="text-[12px] text-[#64748b]">{isFree ? "selamanya" : `/ ${formattedDuration}`}</div>
-                          {plan.description && (
-                            <p className="text-[12px] text-[#64748b] mt-[4px] italic">{plan.description}</p>
-                          )}
 
-                          <ul className="flex flex-col gap-[10px] my-[24px] pt-[16px] border-t border-[#f1f5f9]">
-                            <li className="flex items-center gap-[10px] text-[13px] text-[#0f172a]">
-                              {plan.can_add_map ? <Check size={16} className="text-[#10b981] shrink-0" /> : <X size={16} className="text-[#ef4444] shrink-0" />}
-                              <span className={plan.can_add_map ? "" : "line-through text-[#94a3b8]"}>Integrasi Google Maps</span>
-                            </li>
-                            <li className="flex items-center gap-[10px] text-[13px] text-[#0f172a]">
-                              {plan.can_add_gallery ? <Check size={16} className="text-[#10b981] shrink-0" /> : <X size={16} className="text-[#ef4444] shrink-0" />}
-                              <span className={plan.can_add_gallery ? "" : "line-through text-[#94a3b8]"}>Galeri Foto Profil</span>
-                            </li>
-                            <li className="flex items-center gap-[10px] text-[13px] text-[#0f172a]">
-                              {plan.can_add_video ? <Check size={16} className="text-[#10b981] shrink-0" /> : <X size={16} className="text-[#ef4444] shrink-0" />}
-                              <span className={plan.can_add_video ? "" : "line-through text-[#94a3b8]"}>Embed Video Profil</span>
-                            </li>
-                            <li className="flex items-center gap-[10px] text-[13px] text-[#0f172a]">
-                              {plan.can_add_products !== false ? <Check size={16} className="text-[#10b981] shrink-0" /> : <X size={16} className="text-[#ef4444] shrink-0" />}
-                              <span className={plan.can_add_products !== false ? "" : "line-through text-[#94a3b8]"}>Katalog Produk Usaha</span>
-                            </li>
-                            <li className="flex items-center gap-[10px] text-[13px] text-[#0f172a]">
-                              {plan.can_chat !== false ? <Check size={16} className="text-[#10b981] shrink-0" /> : <X size={16} className="text-[#ef4444] shrink-0" />}
-                              <span className={plan.can_chat !== false ? "" : "line-through text-[#94a3b8]"}>Akses Chat & Kontak Direct</span>
-                            </li>
-                            <li className="flex items-center gap-[10px] text-[13px] text-[#0f172a]">
-                              {plan.priority_listing ? <Check size={16} className="text-[#10b981] shrink-0" /> : <X size={16} className="text-[#ef4444] shrink-0" />}
-                              <span className={plan.priority_listing ? "" : "line-through text-[#94a3b8]"}>Pencarian Prioritas & Badge Premium</span>
-                            </li>
-                          </ul>
-                        </div>
-
-                        {isFree ? (
-                          <button className="w-full py-[12px] rounded-[10px] bg-[#f1f5f9] text-[#94a3b8] font-semibold text-[14px] cursor-not-allowed border-0" disabled>
-                            Paket Dasar Saat Ini
-                          </button>
-                        ) : (
-                          <button
-                            onClick={async () => {
-                              const targetBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
-                              if (!targetBizId) {
-                                alert("Silakan daftarkan atau pilih bisnis Anda terlebih dahulu.");
-                                return;
-                              }
-                              const bizObj = businesses.find(b => String(b.id) === String(targetBizId));
-                              try {
-                                const res = await api.post('/subscriptions', {
-                                  business_id: targetBizId,
-                                  plan_id: plan.id,
-                                });
-                                alert(res.data?.message || `Usaha "${bizObj?.name}" berhasil di-upgrade ke paket ${plan.name}!`);
-                                fetchBusinesses();
-                              } catch (err) {
-                                console.error("Subscription error:", err);
-                                alert(err.response?.data?.message || "Gagal melakukan upgrade. Silakan coba lagi.");
-                              }
-                            }}
-                            className="w-full py-[12px] rounded-[10px] bg-[#007570] text-white font-semibold text-[14px] cursor-pointer border-0 transition-all hover:bg-[#005a58] hover:shadow-md"
-                          >
-                            Upgrade {plan.name}
-                          </button>
+                        {upgradeCouponError && (
+                          <p className="text-[11.5px] font-medium text-[#ef4444] mt-[6px] flex items-center gap-[4px]">
+                            <AlertCircle size={14} /> {upgradeCouponError}
+                          </p>
+                        )}
+                        {upgradeCouponSuccessMsg && !appliedUpgradeCoupon && (
+                          <p className="text-[11.5px] font-medium text-[#10b981] mt-[6px] flex items-center gap-[4px]">
+                            <CheckCircle2 size={14} /> {upgradeCouponSuccessMsg}
+                          </p>
                         )}
                       </div>
+                    </div>
+
+                    {/* Kode Referral (Eksklusif Diskon 5%) */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[20px] shadow-sm flex flex-col justify-between gap-[12px]">
+                      <div>
+                        <div className="flex items-center gap-[8px] mb-[4px]">
+                          <Share2 size={18} className="text-[#007570]" />
+                          <label className="text-[13px] font-bold text-[#0f172a]">Kode Referral (Diskon 5%)</label>
+                        </div>
+                        <p className="text-[12px] text-[#64748b] mb-[12px]">Gunakan kode referral rekan bisnis untuk diskon langsung 5%</p>
+
+                        {!appliedUpgradeReferral ? (
+                          <div className="flex gap-[8px]">
+                            <input
+                              type="text"
+                              value={upgradeReferralInput}
+                              onChange={(e) => setUpgradeReferralInput(e.target.value.toUpperCase())}
+                              placeholder="CONTOH: REF12345"
+                              className="flex-1 px-[14px] py-[10px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] text-[13px] font-bold text-[#0f172a] uppercase outline-none focus:border-[#007570] focus:bg-white transition-all placeholder:font-normal placeholder:normal-case"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleApplyUpgradeReferral}
+                              disabled={upgradeReferralLoading || !upgradeReferralInput.trim()}
+                              className="px-[16px] py-[10px] bg-[#007570] text-white text-[13px] font-bold rounded-[10px] transition-all hover:bg-[#005a58] disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0 cursor-pointer flex items-center gap-[6px]"
+                            >
+                              {upgradeReferralLoading ? <Loader2 size={16} className="animate-spin" /> : "Terapkan"}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between p-[10px_14px] bg-[#f0fdf4] border border-[#bbf7d0] rounded-[10px]">
+                            <div className="flex items-center gap-[8px]">
+                              <CheckCircle2 size={18} className="text-[#10b981]" />
+                              <div>
+                                <span className="text-[12px] font-bold text-[#15803d]">Referral: {appliedUpgradeReferral.referral_code}</span>
+                                <p className="text-[11px] text-[#16a34a]">
+                                  Diskon 5%: Rp {Number(appliedUpgradeReferral.discount_amount || Math.round(Number(selectedUpgradePlan?.price || 0) * 0.05)).toLocaleString("id-ID")}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleRemoveUpgradeReferral}
+                              className="text-[11.5px] font-bold text-[#ef4444] hover:underline cursor-pointer bg-transparent border-0"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        )}
+
+                        {upgradeReferralError && (
+                          <p className="text-[11.5px] font-medium text-[#ef4444] mt-[6px] flex items-center gap-[4px]">
+                            <AlertCircle size={14} /> {upgradeReferralError}
+                          </p>
+                        )}
+                        {upgradeReferralSuccessMsg && !appliedUpgradeReferral && (
+                          <p className="text-[11.5px] font-medium text-[#10b981] mt-[6px] flex items-center gap-[4px]">
+                            <CheckCircle2 size={14} /> {upgradeReferralSuccessMsg}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Breakdown Card */}
+                  {(() => {
+                    const { basePrice, couponDiscount, referralDiscount, finalPrice } = calculateUpgradePrice();
+
+                    return (
+                      <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[14px]">
+                        <h4 className="text-[14px] font-bold text-[#0f172a] border-b border-[#f1f5f9] pb-[10px]">
+                          Rincian Perhitungan Pembayaran
+                        </h4>
+
+                        <div className="flex flex-col gap-[8px] text-[13.5px]">
+                          <div className="flex items-center justify-between text-[#64748b]">
+                            <span>Harga Normal Paket ({selectedUpgradePlan?.name})</span>
+                            <span className="font-semibold text-[#0f172a]">Rp {basePrice.toLocaleString("id-ID")}</span>
+                          </div>
+
+                          {couponDiscount > 0 && (
+                            <div className="flex items-center justify-between text-[#10b981]">
+                              <span>Potongan Kupon ({appliedUpgradeCoupon?.code})</span>
+                              <span className="font-bold">- Rp {couponDiscount.toLocaleString("id-ID")}</span>
+                            </div>
+                          )}
+
+                          {referralDiscount > 0 && (
+                            <div className="flex items-center justify-between text-[#10b981]">
+                              <span>Diskon Referral 5% ({appliedUpgradeReferral?.referral_code})</span>
+                              <span className="font-bold">- Rp {referralDiscount.toLocaleString("id-ID")}</span>
+                            </div>
+                          )}
+
+                          <div className="h-[1px] bg-[#e2e8f0] my-[6px]" />
+
+                          <div className="flex items-center justify-between text-[16px]">
+                            <span className="font-bold text-[#0f172a]">Total Tagihan Akhir</span>
+                            <span className="text-[22px] font-extrabold text-[#007570]">
+                              Rp {finalPrice.toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     );
-                  })}
+                  })()}
+
+                  {/* Step 2 Actions */}
+                  <div className="flex items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPremiumStep(1);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="px-[20px] py-[12px] rounded-[12px] border border-[#cbd5e1] bg-white text-[#0f172a] font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#f8fafc]"
+                    >
+                      <ChevronLeft size={18} />
+                      <span>Kembali</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPremiumStep(3);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="px-[24px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md border-0"
+                    >
+                      <span>Lanjut ke Metode Pembayaran</span>
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[40px] text-center shadow-sm flex flex-col items-center gap-[12px]">
-                  <Crown size={40} className="text-[#94a3b8]" />
-                  <div className="text-[14px] font-bold text-[#0f172a]">Belum Ada Paket Premium Aktif</div>
-                  <p className="text-[12.5px] text-[#64748b] max-w-[360px]">
-                    Saat ini belum ada paket premium yang diaktifkan oleh admin. Silakan periksa kembali nanti.
-                  </p>
+              )}
+
+              {/* ── STEP 3: METODE PEMBAYARAN & REKENING TUJUAN ── */}
+              {premiumStep === 3 && (
+                <div className="flex flex-col gap-[20px]">
+                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[18px]">
+                    <div>
+                      <h3 className="text-[16px] font-bold text-[#0f172a]">Pilih Metode Pembayaran</h3>
+                      <p className="text-[12.5px] text-[#64748b] mt-[2px]">Silakan pilih saluran transfer bank atau e-wallet tujuan transfer pembayaran Anda</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[24px]">
+                      {UPGRADE_PAYMENT_METHODS.map((cat) => (
+                        <div key={cat.category} className="flex flex-col gap-[12px]">
+                          <span className="text-[12px] font-bold text-[#64748b] uppercase tracking-wider">
+                            {cat.category}
+                          </span>
+                          <div className="flex flex-col gap-[10px]">
+                            {cat.items.map((item) => {
+                              const isSelected = upgradePaymentMethod === item.id;
+                              return (
+                                <div
+                                  key={item.id}
+                                  onClick={() => setUpgradePaymentMethod(item.id)}
+                                  className={`p-[14px_16px] rounded-[12px] border-2 cursor-pointer transition-all flex items-center justify-between ${
+                                    isSelected
+                                      ? "border-[#007570] bg-[#f0fdfa] shadow-sm"
+                                      : "border-[#e2e8f0] bg-white hover:border-[#cbd5e1]"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-[12px]">
+                                    <div className={`px-[10px] py-[4px] rounded-[6px] font-bold text-[12px] ${item.badgeColor}`}>
+                                      {item.name}
+                                    </div>
+                                    <span className="text-[13px] font-semibold text-[#0f172a]">{item.accountName}</span>
+                                  </div>
+                                  <div
+                                    className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center ${
+                                      isSelected
+                                        ? "border-[#007570] bg-[#007570] text-white"
+                                        : "border-[#cbd5e1] bg-white"
+                                    }`}
+                                  >
+                                    {isSelected && <Check size={12} strokeWidth={3} />}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Destination Account Details Box */}
+                  {(() => {
+                    let selectedAcc = null;
+                    for (const cat of UPGRADE_PAYMENT_METHODS) {
+                      const found = cat.items.find(i => i.id === upgradePaymentMethod);
+                      if (found) {
+                        selectedAcc = found;
+                        break;
+                      }
+                    }
+                    if (!selectedAcc) selectedAcc = UPGRADE_PAYMENT_METHODS[0].items[0];
+
+                    const { finalPrice } = calculateUpgradePrice();
+
+                    return (
+                      <div className="bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white rounded-[16px] p-[24px] shadow-md flex flex-col gap-[16px]">
+                        <div className="flex items-center justify-between border-b border-slate-700 pb-[12px]">
+                          <div className="flex items-center gap-[10px]">
+                            <CreditCard size={22} className="text-[#5eead4]" />
+                            <span className="text-[14px] font-bold">Rekening / E-Wallet Tujuan Transfer</span>
+                          </div>
+                          <span className="px-[10px] py-[3px] rounded-full text-[11px] font-bold bg-[#007570] text-white">
+                            {selectedAcc.name}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
+                          <div>
+                            <span className="text-[12px] text-slate-400">Nomor Rekening / No VA:</span>
+                            <div className="text-[20px] font-mono font-bold tracking-wider text-[#5eead4] mt-[4px]">
+                              {selectedAcc.accountNumber}
+                            </div>
+                            <span className="text-[12px] text-slate-400 mt-[2px] block">
+                              Atas Nama: <strong className="text-white">{selectedAcc.accountName}</strong>
+                            </span>
+                          </div>
+
+                          <div className="sm:text-right flex flex-col sm:items-end justify-center">
+                            <span className="text-[12px] text-slate-400">Total Yang Harus Ditransfer:</span>
+                            <div className="text-[24px] font-extrabold text-white mt-[2px]">
+                              Rp {finalPrice.toLocaleString("id-ID")}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-[10px] border-t border-slate-700/80">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(selectedAcc.accountNumber.replace(/-/g, ''));
+                              setCopiedUpgradeAccount(true);
+                              setTimeout(() => setCopiedUpgradeAccount(false), 3000);
+                            }}
+                            className="px-[16px] py-[8px] rounded-[8px] bg-slate-800 hover:bg-slate-700 text-[#5eead4] text-[12.5px] font-bold flex items-center gap-[6px] border border-slate-600 transition-all cursor-pointer"
+                          >
+                            {copiedUpgradeAccount ? <Check size={14} /> : <Copy size={14} />}
+                            <span>{copiedUpgradeAccount ? "Nomor Tersalin!" : "Salin No Rekening"}</span>
+                          </button>
+
+                          <span className="text-[11.5px] text-slate-400">
+                            Simpan bukti transfer untuk di-upload di langkah berikutnya
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Step 3 Actions */}
+                  <div className="flex items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPremiumStep(2);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="px-[20px] py-[12px] rounded-[12px] border border-[#cbd5e1] bg-white text-[#0f172a] font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#f8fafc]"
+                    >
+                      <ChevronLeft size={18} />
+                      <span>Kembali ke Ringkasan</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPremiumStep(4);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="px-[24px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md border-0"
+                    >
+                      <span>Lanjut Upload Bukti Transfer</span>
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 4: UPLOAD BUKTI PEMBAYARAN & KONFIRMASI ── */}
+              {premiumStep === 4 && (
+                <div className="flex flex-col gap-[20px]">
+                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[18px]">
+                    <div>
+                      <h3 className="text-[16px] font-bold text-[#0f172a]">Unggah Bukti Pembayaran</h3>
+                      <p className="text-[12.5px] text-[#64748b] mt-[2px]">
+                        Unggah struk / tangkapan layar bukti transfer pembayaran Anda untuk diverifikasi oleh admin
+                      </p>
+                    </div>
+
+                    {/* Upload Box */}
+                    <div className="flex flex-col gap-[12px]">
+                      <input
+                        type="file"
+                        ref={upgradeProofInputRef}
+                        onChange={handleUpgradeProofChange}
+                        accept="image/jpeg,image/png,image/jpg,image/webp"
+                        className="hidden"
+                      />
+
+                      {!upgradeProofPreview ? (
+                        <div
+                          onClick={() => upgradeProofInputRef.current?.click()}
+                          className="border-2 border-dashed border-[#cbd5e1] hover:border-[#007570] bg-[#f8fafc] hover:bg-[#f0fdfa]/30 rounded-[14px] p-[36px] text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-[10px]"
+                        >
+                          <div className="w-[48px] h-[48px] rounded-full bg-[#f0fdfa] text-[#007570] flex items-center justify-center">
+                            <Upload size={24} />
+                          </div>
+                          <div>
+                            <span className="text-[14px] font-bold text-[#0f172a]">Klik untuk memilih file bukti transfer</span>
+                            <p className="text-[12px] text-[#64748b] mt-[2px]">Format: JPG, PNG, WEBP (Maksimal 10MB)</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-[16px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[14px] flex items-center justify-between gap-[16px]">
+                          <div className="flex items-center gap-[14px] overflow-hidden">
+                            <img
+                              src={upgradeProofPreview}
+                              alt="Bukti Transfer"
+                              className="w-[72px] h-[72px] rounded-[10px] object-cover border border-[#cbd5e1] shrink-0"
+                            />
+                            <div className="overflow-hidden">
+                              <span className="text-[13px] font-bold text-[#0f172a] block truncate">
+                                {upgradeProofFile?.name || "Bukti Transfer Terpilih"}
+                              </span>
+                              <span className="text-[11.5px] text-[#10b981] font-semibold flex items-center gap-[4px] mt-[2px]">
+                                <CheckCircle2 size={13} /> Siap diunggah ({(upgradeProofFile?.size / 1024).toFixed(1)} KB)
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-[8px] shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => upgradeProofInputRef.current?.click()}
+                              className="px-[12px] py-[8px] bg-white border border-[#cbd5e1] text-[#0f172a] rounded-[8px] text-[12px] font-bold hover:bg-[#f1f5f9] cursor-pointer"
+                            >
+                              Ganti
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRemoveUpgradeProof}
+                              className="px-[12px] py-[8px] bg-[#fee2e2] text-[#ef4444] rounded-[8px] text-[12px] font-bold hover:bg-[#fecaca] cursor-pointer border-0"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {upgradeError && (
+                        <div className="p-[12px_16px] bg-[#fef2f2] border border-[#fecaca] text-[#dc2626] rounded-[10px] text-[12.5px] font-medium flex items-center gap-[8px]">
+                          <AlertCircle size={16} className="shrink-0" />
+                          <span>{upgradeError}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Final Recap Box */}
+                    {(() => {
+                      const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
+                      const bizObj = (businesses || []).find(b => String(b.id) === String(targetBizId)) || businesses?.[0];
+                      const { finalPrice } = calculateUpgradePrice();
+
+                      return (
+                        <div className="p-[16px] bg-[#f0fdfa] border border-[#ccfbf1] rounded-[12px] flex items-center justify-between text-[13.5px]">
+                          <div>
+                            <span className="text-[11px] font-bold text-[#007570] uppercase tracking-wider">Ringkasan Pengajuan</span>
+                            <div className="font-bold text-[#0f172a] mt-[2px]">
+                              {bizObj?.name} ➔ Paket {selectedUpgradePlan?.name} ({upgradePaymentMethod})
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[11px] text-[#64748b]">Total Pembayaran</span>
+                            <div className="text-[18px] font-extrabold text-[#007570]">
+                              Rp {finalPrice.toLocaleString("id-ID")}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Step 4 Actions */}
+                  <div className="flex items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm">
+                    <button
+                      type="button"
+                      disabled={submittingUpgrade}
+                      onClick={() => {
+                        setPremiumStep(3);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="px-[20px] py-[12px] rounded-[12px] border border-[#cbd5e1] bg-white text-[#0f172a] font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#f8fafc] disabled:opacity-50"
+                    >
+                      <ChevronLeft size={18} />
+                      <span>Kembali ke Metode Bayar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={submittingUpgrade || !upgradeProofFile}
+                      onClick={handleSubmitUpgrade}
+                      className="px-[28px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0"
+                    >
+                      {submittingUpgrade ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          <span>Mengirim Bukti...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck size={18} />
+                          <span>Kirim Bukti Pembayaran & Selesaikan</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 5: KONFIRMASI BERHASIL DIAJUKAN ── */}
+              {premiumStep === 5 && (
+                <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[36px_24px] shadow-sm text-center flex flex-col items-center gap-[20px]">
+                  <div className="w-[72px] h-[72px] rounded-full bg-[#f0fdf4] text-[#10b981] flex items-center justify-center shadow-inner">
+                    <CheckCircle2 size={44} />
+                  </div>
+
+                  <div className="max-w-[500px]">
+                    <h3 className="text-[20px] font-bold text-[#0f172a]">Permohonan Upgrade Berhasil Diajukan!</h3>
+                    <p className="text-[13px] text-[#64748b] mt-[6px] leading-relaxed">
+                      Bukti pembayaran paket Premium untuk usaha <strong>"{upgradeSuccessData?.businessName}"</strong> telah kami terima. Admin kami akan memverifikasi pembayaran Anda dalam waktu 1x24 jam.
+                    </p>
+                  </div>
+
+                  {upgradeSuccessData && (
+                    <div className="w-full max-w-[460px] p-[18px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[12px] text-left flex flex-col gap-[8px] text-[13px]">
+                      <div className="flex justify-between text-[#64748b]">
+                        <span>Nama Usaha:</span>
+                        <strong className="text-[#0f172a]">{upgradeSuccessData.businessName}</strong>
+                      </div>
+                      <div className="flex justify-between text-[#64748b]">
+                        <span>Paket Dipilih:</span>
+                        <strong className="text-[#007570]">{upgradeSuccessData.planName}</strong>
+                      </div>
+                      <div className="flex justify-between text-[#64748b]">
+                        <span>Metode Pembayaran:</span>
+                        <strong className="text-[#0f172a]">{upgradeSuccessData.paymentMethod}</strong>
+                      </div>
+                      <div className="flex justify-between text-[#64748b]">
+                        <span>Total Pembayaran:</span>
+                        <strong className="text-[#007570] font-bold">Rp {Number(upgradeSuccessData.finalPrice).toLocaleString("id-ID")}</strong>
+                      </div>
+                      <div className="flex justify-between text-[#64748b] pt-[6px] border-t border-[#e2e8f0]">
+                        <span>Waktu Pengajuan:</span>
+                        <span>{upgradeSuccessData.submittedAt}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-[12px] flex-wrap justify-center mt-[8px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab("bisnis");
+                        handleResetUpgrade();
+                      }}
+                      className="px-[20px] py-[11px] rounded-[10px] bg-[#007570] text-white font-bold text-[13.5px] cursor-pointer hover:bg-[#005a58] transition-all border-0"
+                    >
+                      Lihat Daftar Usaha Saya
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetUpgrade}
+                      className="px-[20px] py-[11px] rounded-[10px] bg-[#f1f5f9] text-[#0f172a] font-bold text-[13.5px] cursor-pointer hover:bg-[#e2e8f0] transition-all border-0"
+                    >
+                      Upgrade Usaha Lainnya
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -5272,6 +7265,238 @@ export default function AdminUser() {
               >
                 <Camera size={16} />
                 <span>Jepret Foto Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── MODAL PENARIKAN SALDO REFERRAL ── */}
+      {showWithdrawModal && (
+        <div
+          className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[1100] flex items-center justify-center p-4"
+          onClick={() => setShowWithdrawModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200 space-y-5 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Wallet size={20} className="text-[#007570]" />
+                Penarikan Saldo Komisi Referral
+              </h3>
+              <button
+                onClick={() => setShowWithdrawModal(false)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {withdrawSuccessMsg ? (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-3">
+                <CheckCircle className="w-12 h-12 text-emerald-600 mx-auto" />
+                <h4 className="font-bold text-slate-900 text-sm">Pengajuan Penarikan Berhasil!</h4>
+                <p className="text-xs text-slate-600 leading-relaxed">{withdrawSuccessMsg}</p>
+                <button
+                  onClick={() => {
+                    setWithdrawSuccessMsg("");
+                    setShowWithdrawModal(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-[#007570] text-white font-bold text-xs cursor-pointer hover:bg-[#005a58]"
+                >
+                  Tutup Window
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setSubmittingWithdraw(true);
+                  setTimeout(() => {
+                    setSubmittingWithdraw(false);
+                    setWithdrawSuccessMsg(
+                      `Permohonan penarikan Rp ${Number(withdrawForm.amount).toLocaleString("id-ID")} ke ${withdrawForm.bank} (${withdrawForm.accountNumber}) atas nama ${withdrawForm.accountHolder} telah diterima dan sedang diproses admin.`
+                    );
+                  }, 1200);
+                }}
+                className="space-y-4"
+              >
+                <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl flex items-center justify-between">
+                  <span className="text-xs font-semibold text-teal-800">Saldo Komisi Tersedia:</span>
+                  <span className="text-base font-black text-[#007570]">
+                    Rp {totalReferralEarnings.toLocaleString("id-ID")}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Metode Penarikan (Bank / E-Wallet)</label>
+                  <select
+                    value={withdrawForm.bank}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, bank: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#007570]"
+                  >
+                    <option value="BCA">Bank BCA</option>
+                    <option value="Mandiri">Bank Mandiri</option>
+                    <option value="BRI">Bank BRI</option>
+                    <option value="BNI">Bank BNI</option>
+                    <option value="DANA">DANA</option>
+                    <option value="GoPay">GoPay</option>
+                    <option value="OVO">OVO</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Nomor Rekening / HP E-Wallet</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: 8830123456"
+                    value={withdrawForm.accountNumber}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, accountNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#007570]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Nama Pemilik Rekening</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Sesuai nama di buku tabungan / akun"
+                    value={withdrawForm.accountHolder}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, accountHolder: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#007570]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Jumlah Penarikan (Rp)</label>
+                  <input
+                    type="number"
+                    required
+                    min={50000}
+                    max={totalReferralEarnings || 50000}
+                    value={withdrawForm.amount}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007570]"
+                  />
+                  <p className="text-[11px] text-slate-400">Minimal penarikan Rp 50.000</p>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowWithdrawModal(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200 transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingWithdraw}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    {submittingWithdraw ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Memproses...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle size={15} />
+                        <span>Kirim Pengajuan</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL DETAIL TRANSAKSI REFERRAL ── */}
+      {selectedReferralTx && (
+        <div
+          className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[1100] flex items-center justify-center p-4"
+          onClick={() => setSelectedReferralTx(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-slate-200 space-y-5 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <FileText size={18} className="text-[#007570]" />
+                  Detail Transaksi Referral
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">{selectedReferralTx.id}</p>
+              </div>
+              <button
+                onClick={() => setSelectedReferralTx(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-4 bg-slate-50 rounded-xl space-y-3 border border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Pembeli / Pengguna:</span>
+                  <span className="font-bold text-slate-900">{selectedReferralTx.userName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Email:</span>
+                  <span className="font-semibold text-slate-800">{selectedReferralTx.userEmail}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Bisnis Terkait:</span>
+                  <span className="font-semibold text-slate-800">{selectedReferralTx.businessName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Layanan Pembelian:</span>
+                  <span className="font-bold text-[#007570]">{selectedReferralTx.service}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Waktu Transaksi:</span>
+                  <span className="font-semibold text-slate-700">{selectedReferralTx.date}</span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Harga Layanan (Normal):</span>
+                  <span className="font-bold text-slate-900">Rp {(selectedReferralTx.original_amount || selectedReferralTx.amount || 0).toLocaleString("id-ID")}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Diskon Kode Referral (5%):</span>
+                  <span className="font-semibold text-rose-600">- Rp {(selectedReferralTx.discount_amount || selectedReferralTx.discount || 0).toLocaleString("id-ID")}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Total Dibayar Pembeli:</span>
+                  <span className="font-bold text-slate-900">Rp {(selectedReferralTx.final_price || selectedReferralTx.amount || 0).toLocaleString("id-ID")}</span>
+                </div>
+                <div className="pt-2 border-t border-emerald-200 flex items-center justify-between text-sm">
+                  <span className="font-extrabold text-emerald-900">Komisi Hak Anda (10%):</span>
+                  <span className="font-black text-emerald-700 text-base">+ Rp {(selectedReferralTx.commission_amount || selectedReferralTx.commission || 0).toLocaleString("id-ID")}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-slate-100 rounded-xl">
+                <span className="text-slate-600 font-semibold">Status Payout Saldo:</span>
+                <span className="font-bold text-[#007570]">{selectedReferralTx.payoutStatus || selectedReferralTx.payout_status}</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setSelectedReferralTx(null)}
+                className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer"
+              >
+                Tutup
               </button>
             </div>
           </div>

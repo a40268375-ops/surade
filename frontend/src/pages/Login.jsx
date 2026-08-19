@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "./Login.css";
 import logoImg from "../assets/logo.png";
 import {
@@ -16,6 +16,7 @@ import {
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   /* ── Login form state ── */
   const [email, setEmail] = useState("");
@@ -113,7 +114,9 @@ export default function Login() {
       window.dispatchEvent(new Event("userAuthChanged"));
 
       const role = data.user?.role;
-      const redirectUrl = role === "admin" ? "/admin/dashboard" : "/dashboard";
+      const redirectParam = searchParams.get("redirect");
+      const defaultRedirect = role === "admin" ? "/admin/dashboard" : "/dashboard";
+      const redirectUrl = redirectParam || defaultRedirect;
       navigate(redirectUrl);
     } catch (err) {
       setError("Terjadi kesalahan koneksi. Silakan coba lagi.");
@@ -127,14 +130,14 @@ export default function Login() {
     e.preventDefault();
     setRegError("");
 
-    const gmailOnlyRegex = /^[^\s@]+@gmail\.com$/i;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!regFirstName.trim() || !regLastName.trim()) {
       setRegError("Nama wajib diisi.");
       return;
     }
-    if (!regEmail.trim() || !gmailOnlyRegex.test(regEmail.trim())) {
-      setRegError("Email harus menggunakan Gmail (contoh: nama@gmail.com).");
+    if (!regEmail.trim() || !emailRegex.test(regEmail.trim())) {
+      setRegError("Format email tidak valid (contoh: nama@email.com).");
       return;
     }
     if (!regPassword || regPassword.length < 8) {
@@ -499,7 +502,7 @@ export default function Login() {
                     id="reg-email"
                     type="email"
                     className="login-input"
-                    placeholder="Email Gmail (contoh@gmail.com)"
+                    placeholder="Alamat Email (contoh@gmail.com)"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     autoComplete="email"
