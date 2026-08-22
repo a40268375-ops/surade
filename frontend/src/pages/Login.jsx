@@ -5,6 +5,7 @@ import "./Login.css";
 import businessIllustration from "../assets/business-illustration.svg";
 import Loading from "../components/Loading";
 import { usePageLoading } from "../hooks/usePageLoading";
+import api from "../utils/api";
 import {
   Eye,
   EyeOff,
@@ -50,10 +51,43 @@ export default function Login() {
 
     setLoading(true);
     try {
-      await login(email, password);
-      navigate("/dashboard");
+      const response = await api.post("/login", {
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      // api.post() mengembalikan body JSON-nya langsung (bukan dibungkus
+      // { data: ... } gaya Axios), jadi field-nya diakses langsung dari
+      // response, bukan response.data.
+      if (response.access_token) {
+        localStorage.setItem("token", response.access_token);
+        await login(email, password);
+        navigate("/dashboard");
+      }
     } catch (err) {
-      setError(err?.data?.message || err?.message || "Email atau kata sandi salah. Silakan coba lagi.");
+      // Cek jika perlu verifikasi email
+      // PENTING: api.js (fetch-based) melempar error sebagai { status, data },
+      // BUKAN gaya Axios { response: { data } }. Sebelumnya kode ini baca
+      // err.response.data yang selalu undefined, jadi redirect ke halaman
+      // OTP dan pesan error asli dari backend nggak pernah kepakai.
+      if (err?.data?.requires_verification) {
+        navigate("/verify-otp", {
+          state: {
+            email: email.trim(),
+            purpose: "register",
+            fromLogin: true,
+            emailSent: err?.data?.email_sent !== false,
+            debugOtpCode: err?.data?.debug_otp_code || null,
+          },
+        });
+        return;
+      }
+
+      setError(
+        err?.data?.message || 
+        err?.message || 
+        "Email atau kata sandi salah. Silakan coba lagi."
+      );
     } finally {
       setLoading(false);
     }
@@ -177,7 +211,7 @@ export default function Login() {
 
               {/* Forgot Password */}
               <div className="login-forgot">
-              <Link to="/forgot-password">Lupa kata sandi?</Link>
+                <Link to="/forgot-password">Lupa kata sandi?</Link>
               </div>
 
               {/* Divider */}
@@ -188,15 +222,10 @@ export default function Login() {
               </div>
 
             {/* Create Account */}
-              <button
-                id="login-create-account"
-                type="button"
-                className="login-create-btn"
-                onClick={() => setShowRegister(true)}
-              >
+              <Link to="/register" className="login-create-btn">
                 <UserPlus size={18} />
                 Buat Akun Baru
-              </button>
+              </Link>
 
               {/* Back to Website */}
               <Link to="/" className="login-back-btn">

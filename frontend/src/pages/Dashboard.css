@@ -264,6 +264,26 @@
   margin: 0 0 22px;
 }
 
+.biz-form-divider-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 12px 0;
+}
+
+.biz-form-divider-or::before,
+.biz-form-divider-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
 .biz-form-section-label {
   font-size: 11.5px;
   font-weight: 800;
@@ -3064,6 +3084,35 @@
   color: var(--text-main);
   min-height: 48px;
 }
+
+.db-input-with-btn {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.db-input-with-btn input {
+  flex: 1;
+}
+
+.db-input-btn {
+  white-space: nowrap;
+  padding: 0 1rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--gray-border);
+  background: #f8fafc;
+  color: #007570;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.db-input-btn:hover {
+  background: #007570;
+  color: #fff;
+  border-color: #007570;
+}
+
 
 .db-form-group input:focus,
 .db-form-group select:focus,
@@ -8448,4 +8497,46 @@
     padding: 1rem;
     min-height: 250px;
   }
+}
+/* === TAB: ULASAN (business owner review reply box) === */
+.db-textarea {
+  width: 100%;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: #1f2937;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.db-textarea:focus {
+  border-color: #12766c;
+}
+/* === Generic status badge (dipakai di tabel Iklan & Kupon Diskon) === */
+.db-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.db-badge--category {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.db-badge--success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.db-badge--warning {
+  background: #fef3c7;
+  color: #b45309;
 }

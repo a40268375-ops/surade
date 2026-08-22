@@ -18,6 +18,12 @@ class Subscription extends Model
         'discount_amount',
         'referral_code',
         'referrer_id',
+        'referral_status',
+        'referral_approved_at',
+        'referral_approved_by',
+        'referral_rejected_at',
+        'referral_rejected_by',
+        'referral_rejection_reason',
         'payment_method',
         'notes',
         'proof_path',
@@ -40,6 +46,8 @@ class Subscription extends Model
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
         'verified_at' => 'datetime',
+        'referral_approved_at' => 'datetime',
+        'referral_rejected_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -55,5 +63,55 @@ class Subscription extends Model
     public function transaction()
     {
         return $this->hasOne(PaymentTransaction::class);
+    }
+
+    // Referral relationships
+    public function referrer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'referrer_id');
+    }
+
+    public function referralApprovedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'referral_approved_by');
+    }
+
+    public function referralRejectedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'referral_rejected_by');
+    }
+
+    public function referralCommission()
+    {
+        return $this->hasOne(ReferralCommission::class);
+    }
+
+    // Referral status constants
+    const REFERRAL_STATUS_PENDING = 'pending';
+    const REFERRAL_STATUS_APPROVED = 'approved';
+    const REFERRAL_STATUS_REJECTED = 'rejected';
+    const REFERRAL_STATUS_CANCELLED = 'cancelled';
+
+    // Check if subscription has referral
+    public function hasReferral(): bool
+    {
+        return !empty($this->referral_code) && !empty($this->referrer_id);
+    }
+
+    // Check if referral is approved
+    public function isReferralApproved(): bool
+    {
+        return $this->referral_status === self::REFERRAL_STATUS_APPROVED;
+    }
+
+    // Scopes for referral filtering
+    public function scopeWithReferral($query)
+    {
+        return $query->whereNotNull('referrer_id');
+    }
+
+    public function scopeReferralStatus($query, $status)
+    {
+        return $query->where('referral_status', $status);
     }
 }

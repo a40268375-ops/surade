@@ -300,6 +300,32 @@ body { background: #f5f6fa; }
   z-index: 2;
 }
 
+/* Badge penanda tipe konten (Blog/Event), ditaruh di kanan atas biar tidak
+   numpuk sama badge kategori yang sudah ada di kiri atas. */
+.blog-card__type-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  z-index: 2;
+  backdrop-filter: blur(8px);
+}
+
+.blog-card__type-badge--blog {
+  background: rgba(21, 128, 61, 0.92);
+}
+
+.blog-card__type-badge--event {
+  background: rgba(180, 83, 9, 0.92);
+}
+
 .blog-card__body {
   padding: 24px;
 }

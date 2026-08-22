@@ -19,7 +19,7 @@ const api = {
     const headers = {
       'Accept': 'application/json',
     };
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('token');
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -58,7 +58,7 @@ const api = {
     }
 
     if (response.status === 401) {
-      localStorage.removeItem('access_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.dispatchEvent(new Event('auth-change'));
     }
@@ -81,6 +81,23 @@ const api = {
   },
 
   put(endpoint, body, options = {}) {
+    // PENTING: PHP TIDAK PERNAH mem-parsing body multipart/form-data
+    // (dipakai kalau ada upload file) untuk request dengan method PUT asli
+    // - ini keterbatasan PHP sendiri, bukan Laravel. Akibatnya kalau body-nya
+    // FormData (ada file di dalamnya) dan dikirim sebagai PUT betulan,
+    // backend Laravel akan melihat SEMUA field (termasuk teks biasa seperti
+    // judul/deskripsi) sebagai kosong - bukan cuma gambarnya yang gagal,
+    // TAPI SELURUH proses edit/update gagal diam-diam.
+    //
+    // Solusinya: kalau body berupa FormData, kirim sebagai POST biasa
+    // (yang PHP bisa parsing dengan benar) sambil menyisipkan field
+    // "_method=PUT" - ini konvensi resmi Laravel ("method spoofing") untuk
+    // tetap diarahkan ke route/controller method PUT yang sama persis,
+    // tanpa perlu ubah apapun di sisi backend.
+    if (body instanceof FormData) {
+      body.append('_method', 'PUT');
+      return this.request(endpoint, { ...options, method: 'POST', body });
+    }
     return this.request(endpoint, { ...options, method: 'PUT', body });
   },
 

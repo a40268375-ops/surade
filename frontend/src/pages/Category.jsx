@@ -1,6 +1,7 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import api, { getImageUrl } from "../utils/api";
+import { useAuth } from "../context/AuthContext";
 import { DEFAULT_CATEGORY_TABS, iconForCategory } from "../utils/categoryIcons.jsx";
 import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
@@ -107,7 +108,9 @@ export default function Category() {
   useEffect(() => {
     setActiveCategory(categoryId || "all");
   }, [categoryId]);
-  const [saved, setSaved] = useState({});
+  const [saved, setSaved] = useState({}); // { [businessId]: savedRecordId }
+  const [savingIds, setSavingIds] = useState({}); // { [businessId]: true } while in-flight
+  const { user: authUser } = useAuth();
   const [searchKeyword, setSearchKeyword] = useState(queryQ);
   const [sortBy, setSortBy] = useState("relevan");
   const [priceRange, setPriceRange] = useState("all");
@@ -130,6 +133,28 @@ export default function Category() {
   useEffect(() => {
     setSearchKeyword(queryQ);
   }, [queryQ]);
+
+  // Muat daftar bisnis yang sudah disimpan user, supaya ikon "Simpan"
+  // langsung kelihatan aktif untuk bisnis yang sebelumnya sudah disimpan.
+  useEffect(() => {
+    if (!authUser) {
+      setSaved({});
+      return;
+    }
+    let cancelled = false;
+    api.get("/my-saved-businesses")
+      .then((rows) => {
+        if (cancelled) return;
+        const map = {};
+        (rows || []).forEach((row) => {
+          const bizId = row.business_id || row.business?.id;
+          if (bizId) map[bizId] = row.id;
+        });
+        setSaved(map);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [authUser]);
 
   useEffect(() => {
     async function loadData() {
@@ -192,6 +217,16 @@ export default function Category() {
   const categoriesList = [
     ...DEFAULT_CATEGORY_TABS,
     ...dbCategories
+      // PERBAIKAN: endpoint "/categories" mengembalikan SEMUA baris kategori
+      // secara rata (flat) - termasuk subkategori seperti "Agen Properti",
+      // "Apotek", "Bank", "Bengkel Mobil", dst (yang punya parent_id terisi).
+      // Sebelumnya semua itu ikut ditambahkan sebagai kotak kategori UTAMA
+      // di grid ikon, padahal seharusnya cuma 14 kategori utama saja yang
+      // tampil di sana (subkategori nempel di dalam menu "Informasi" /
+      // halaman kategori masing-masing, bukan jadi kotak sendiri). Sekarang
+      // difilter: cuma kategori yang TIDAK punya induk (parent_id kosong)
+      // yang boleh ikut jadi kotak kategori utama tambahan.
+      .filter((c) => !c.parent_id)
       .filter((c) => {
         const norm = normalizeLabel(c.name);
         if (DEFAULT_CATEGORY_TABS.some((tab) => tab.id === c.slug)) return false;
@@ -221,7 +256,7 @@ export default function Category() {
         views: "Pratinjau",
         status: b.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
         img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
-        images: (b.images || []).map((p) => getImageUrl(p)),
+        images: Array.isArray(b.images) ? b.images.map((p) => getImageUrl(p)) : [],
         hours: b.operating_hours || "",
         rating: b.rating ?? null,
         reviewCount: b.review_count ?? null,
@@ -354,8 +389,31 @@ export default function Category() {
     });
   };
 
-  function toggleSave(id) {
-    setSaved((prev) => ({ ...prev, [id]: !prev[id] }));
+  async function toggleSave(id) {
+    if (!authUser) {
+      window.location.href = "/login";
+      return;
+    }
+    if (savingIds[id]) return;
+    setSavingIds((prev) => ({ ...prev, [id]: true }));
+    try {
+      const existingRecordId = saved[id];
+      if (existingRecordId) {
+        await api.delete(`/saved-businesses/${existingRecordId}`);
+        setSaved((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      } else {
+        const result = await api.post("/saved-businesses", { business_id: id });
+        setSaved((prev) => ({ ...prev, [id]: result.id }));
+      }
+    } catch (err) {
+      alert(err?.data?.message || "Gagal memperbarui daftar favorit. Silakan coba lagi.");
+    } finally {
+      setSavingIds((prev) => ({ ...prev, [id]: false }));
+    }
   }
 
   const currentCategory = categoriesList.find((c) => c.id === activeCategory);
@@ -500,10 +558,11 @@ export default function Category() {
                             type="button"
                             className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
                             onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
+                            disabled={!!savingIds[bisnis.id]}
                             aria-label="Simpan"
                           >
                             <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                            <span>Simpan</span>
+                            <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
                           </button>
                           <span className="biz-card__views">
                             <Eye size={13} />

@@ -176,7 +176,7 @@ class PaymentController extends Controller
             
             default:
                 // Fallback to upload step
-                $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
+                $frontendUrl = config('app.frontend_url', 'http://surade.latihan.co.id');
                 return "{$frontendUrl}/premium-upgrade?step=3&ticket_id={$ticket->id}&payment_method={$method}";
         }
     }

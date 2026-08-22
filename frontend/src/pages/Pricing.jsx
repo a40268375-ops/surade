@@ -169,8 +169,8 @@ export default function Pricing() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
-  // PERBAIKAN: perbandingan Free vs Premium sekarang sudah ditampilkan
-  // langsung di tab Premium Dashboard, jadi kalau user datang dari sana
+  // PERBAIKAN: perbandingan Free vs BISNIS TERVERIFIKASI sekarang sudah ditampilkan
+  // langsung di tab BISNIS TERVERIFIKASI Dashboard, jadi kalau user datang dari sana
   // (sudah lihat perbandingannya), halaman ini boleh langsung mulai dari
   // step 2 (isi data) lewat parameter ?step=2 di URL.
   const initialStep = Number(searchParams.get("step")) === 2 ? 2 : 1;
@@ -287,7 +287,7 @@ export default function Pricing() {
       await api.post("/subscriptions", payload);
 
       alert(
-        "Bukti pembayaran berhasil dikirim! Premium akan aktif otomatis setelah admin memverifikasi pembayaran Anda (biasanya 1x24 jam)."
+        "Bukti pembayaran berhasil dikirim! BISNIS TERVERIFIKASI akan aktif otomatis setelah admin memverifikasi pembayaran Anda (biasanya 1x24 jam)."
       );
       navigate("/dashboard?tab=premium");
     } catch (err) {
@@ -379,7 +379,7 @@ export default function Pricing() {
               <div className="pricing-card pricing-card--premium">
                 <div className="pricing-card__hot-badge">HOT</div>
                 <div className="pricing-card__header">
-                  <span className="pricing-card__badge pricing-card__badge--premium">PREMIUM</span>
+                  <span className="pricing-card__badge pricing-card__badge--premium">BISNIS TERVERIFIKASI</span>
                   <h2 className="pricing-card__title">{plans ? formatRupiah(plans.monthly.amount) : "..."}</h2>
                   <p className="pricing-card__subtitle">Mulai dari / Bulan</p>
                 </div>
@@ -400,7 +400,7 @@ export default function Pricing() {
                   ))}
                 </div>
                 <button className="pricing-card__button pricing-card__button--premium" onClick={() => handlePlanSelect("premium")}>
-                  PILIH PREMIUM
+                  PILIH BISNIS TERVERIFIKASI
                 </button>
               </div>
             </div>
@@ -414,7 +414,7 @@ export default function Pricing() {
             <div className="pricing-form-container">
               <div className="pricing-form-card">
                 <div className="pricing-form-header">
-                  <h3>{business ? `Upgrade ${business.title} ke Premium` : "Upgrade Bisnis ke Premium"}</h3>
+                  <h3>{business ? `Upgrade ${business.title} ke BISNIS TERVERIFIKASI` : "Upgrade Bisnis ke BISNIS TERVERIFIKASI"}</h3>
                   <p>Pilih bisnis dan durasi berlangganan sesuai kebutuhan Anda</p>
                 </div>
 
@@ -435,7 +435,7 @@ export default function Pricing() {
                     </select>
                     {myBusinesses.length === 0 && (
                       <p className="pricing-form-hint">
-                        Semua bisnis Anda sudah premium, atau Anda belum punya bisnis Free.
+                        Semua bisnis Anda sudah BISNIS TERVERIFIKASI, atau Anda belum punya bisnis Free.
                       </p>
                     )}
                   </div>

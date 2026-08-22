@@ -16,11 +16,14 @@ class BusinessReview extends Model
         'rating',
         'comment',
         'helpful_count',
+        'owner_reply',
+        'owner_reply_at',
     ];
 
     protected $casts = [
         'rating' => 'integer',
         'helpful_count' => 'integer',
+        'owner_reply_at' => 'datetime',
     ];
 
     public function business(): BelongsTo

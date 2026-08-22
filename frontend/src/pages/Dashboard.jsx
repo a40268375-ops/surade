@@ -92,6 +92,8 @@ import {
   DollarSign,
   Image as ImageIcon,
   Package,
+  AlertTriangle,
+  Ticket,
 } from "lucide-react";
 import emptyStateIcon from "../assets/icon-empty-state.png";
 import logoImg from "../assets/logo.png";
@@ -229,8 +231,15 @@ export default function Dashboard() {
   const [userRegistrationChart, setUserRegistrationChart] = useState(null);
   const [businessRegistrationChart, setBusinessRegistrationChart] = useState(null);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [premiumHistory, setPremiumHistory] = useState({ history: [], approved_count: 0, active_businesses: 0, expired_businesses: 0, rejected_count: 0 });
   const [plans, setPlans] = useState({});
   const [resellerData, setResellerData] = useState(null); // legacy, unused now that Reseller tab is removed
+
+  // Data statistik referral milik user sendiri (tab "Referral"), diambil dari
+  // GET /api/my-referral-stats - bukan dummy data.
+  const [referralStats, setReferralStats] = useState(null);
+  const [referralStatsLoading, setReferralStatsLoading] = useState(false);
+  const [referralStatsError, setReferralStatsError] = useState(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
   // PERMINTAAN: grafik-grafik di Dashboard supaya bisa "lihat detail" biar
   // kelihatan rincian perkembangannya, bukan cuma garis kecil. State ini
@@ -243,9 +252,37 @@ export default function Dashboard() {
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [showAllPremiumHistory, setShowAllPremiumHistory] = useState(false);
   const [tickets, setTickets] = useState([]);
+  // PERBAIKAN: seluruh state untuk fitur "Kupon Diskon" (admin) ternyata
+  // tidak pernah dideklarasikan sama sekali walau sudah dipakai di banyak
+  // tempat (handleOpenCouponAdminModal, handleSaveCouponAdmin, tabel kupon,
+  // dst). Ini yang bikin "ReferenceError: showCouponAdminModal is not
+  // defined" dan bikin SELURUH halaman Dashboard nge-crash jadi blank
+  // begitu bagian ini ke-render (React otomatis meng-unmount seluruh
+  // tampilan begitu ada error saat render, karena tidak ada error
+  // boundary). Sekarang semua state yang dibutuhkan sudah dideklarasikan.
+  const [platformCoupons, setPlatformCoupons] = useState([]);
+  const [siteSettings, setSiteSettings] = useState({});
+  const [settingsDraft, setSettingsDraft] = useState({});
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [showCouponAdminModal, setShowCouponAdminModal] = useState(false);
+  const [selectedPlatformCoupon, setSelectedPlatformCoupon] = useState(null);
+  const [pcCode, setPcCode] = useState("");
+  const [pcName, setPcName] = useState("");
+  const [pcType, setPcType] = useState("percentage");
+  const [pcValue, setPcValue] = useState("");
+  const [pcAppliesTo, setPcAppliesTo] = useState("semua");
+  const [pcMinPurchase, setPcMinPurchase] = useState("");
+  const [pcMaxUses, setPcMaxUses] = useState("");
+  const [pcExpiresAt, setPcExpiresAt] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Jaring pengaman: gabungkan hasil pending/approved/rejected tanpa duplikat.
+  // Kalau suatu saat ada iklan yang kebetulan muncul di lebih dari satu hasil
+  // query (mis. karena bug di backend), key React tetap unik.
+  const dedupeAdsById = (list) =>
+    Array.from(new Map(list.map((ad) => [ad.id, ad])).values());
 
   // Form pengaturan profil (tab "profile")
   const [profileForm, setProfileForm] = useState({
@@ -417,6 +454,9 @@ export default function Dashboard() {
   const [inboxDraft, setInboxDraft] = useState("");
   const [sendingInboxReply, setSendingInboxReply] = useState(false);
   const [savedBusinesses, setSavedBusinesses] = useState([]);
+  const [businessReviews, setBusinessReviews] = useState([]);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replySubmittingId, setReplySubmittingId] = useState(null);
   const [premiumPackages, setPremiumPackages] = useState([]);
   const [contentItems, setContentItems] = useState([]);
   const [contentHistory, setContentHistory] = useState([]);
@@ -549,6 +589,7 @@ export default function Dashboard() {
   const [bizGalleryFiles, setBizGalleryFiles] = useState([]); // newly-selected File objects
   const [bizGalleryPreviews, setBizGalleryPreviews] = useState([]); // { url, isExisting, path? }
   const [bizVideoUrl, setBizVideoUrl] = useState("");
+  const [bizVideoFile, setBizVideoFile] = useState(null); // video diunggah langsung (menang atas link kalau dua-duanya diisi)
   const [bizClosedDays, setBizClosedDays] = useState([]);
   const [bizTags, setBizTags] = useState("");
   const [bizInstagram, setBizInstagram] = useState("");
@@ -660,11 +701,10 @@ export default function Dashboard() {
   const [contentTypeFilter, setContentTypeFilter] = useState("blog");
   const [contentSearch, setContentSearch] = useState("");
 
-  useEffect(() => {
-    if (!isAdmin && contentTypeFilter === "event") {
-      setContentTypeFilter("blog");
-    }
-  }, [isAdmin, contentTypeFilter]);
+  // (Effect lama yang otomatis membalikkan contentTypeFilter ke "blog" kalau
+  // bukan admin sudah DIHAPUS - itu sisa dari waktu tab Event masih
+  // admin-only. Sekarang tab Event tampil untuk semua role, jadi effect itu
+  // yang bikin klik "Event" langsung "balik lagi" ke Blog.)
 
   // Order Form state  
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -763,10 +803,10 @@ export default function Dashboard() {
         } else if (activeTab === "ads") {
           const [pending, approved, rejected] = await Promise.all([
             api.get("/advertisements?status=pending"),
-            api.get("/advertisements?status=verified"),
+            api.get("/advertisements?status=approved"),
             api.get("/advertisements?status=rejected"),
           ]);
-          setAds([...pending, ...approved, ...rejected]);
+          setAds(dedupeAdsById([...pending, ...approved, ...rejected]));
           const myBiz = await api.get(isAdmin ? "/businesses?status=all" : "/my-businesses");
           setBusinesses(myBiz);
         } else if (activeTab === "tickets") {
@@ -780,7 +820,18 @@ export default function Dashboard() {
           setUnreadNotifications(notifResponse.unread_count || 0);
         } else if (activeTab === "riwayat" && isAdmin) {
           const data = await api.get("/admin/premium-history");
-          setSubscriptions(data);
+          setPremiumHistory(data);
+        } else if (activeTab === "referral") {
+          setReferralStatsLoading(true);
+          setReferralStatsError(null);
+          try {
+            const res = await api.get("/my-referral-stats");
+            setReferralStats(res.data || null);
+          } catch (err) {
+            setReferralStatsError(err?.message || "Gagal memuat data referral.");
+          } finally {
+            setReferralStatsLoading(false);
+          }
         }
       } catch (err) {
         console.error("Failed to load tab data:", err);
@@ -822,7 +873,11 @@ export default function Dashboard() {
           };
         }
         break;
-      } catch {
+      } catch (err) {
+        // Sesi login habis/tidak valid (401/403) - jangan coba lagi, karena
+        // percobaan ulang tidak akan pernah berhasil sampai user login ulang.
+        // AuthContext akan menangani redirect ke halaman login.
+        if (err?.status === 401 || err?.status === 403) break;
         if (attempt < quickAttempts) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
       }
     }
@@ -859,8 +914,10 @@ export default function Dashboard() {
         }
         clearInterval(bgAnalyticsRetryRef.current);
         bgAnalyticsRetryRef.current = null;
-      } catch {
-        if (bgAttempts >= 24) {
+      } catch (err) {
+        // Sama seperti di atas: kalau sesi login habis/tidak valid,
+        // berhenti langsung - jangan tunggu sampai 24x percobaan.
+        if (err?.status === 401 || err?.status === 403 || bgAttempts >= 24) {
           clearInterval(bgAnalyticsRetryRef.current);
           bgAnalyticsRetryRef.current = null;
         }
@@ -905,10 +962,10 @@ export default function Dashboard() {
             setCategories(catData);
             const [pending, approved, rejected] = await Promise.all([
               api.get("/advertisements?status=pending"),
-              api.get("/advertisements?status=verified"),
+              api.get("/advertisements?status=approved"),
               api.get("/advertisements?status=rejected"),
             ]);
-            setAds([...pending, ...approved, ...rejected]);
+            setAds(dedupeAdsById([...pending, ...approved, ...rejected]));
             const subData = await api.get("/subscriptions");
             setSubscriptions(subData);
             // Fetch payment tickets for admin history
@@ -968,10 +1025,10 @@ export default function Dashboard() {
         // Regular user: only their own ads across every status.
         const [pending, approved, rejected] = await Promise.all([
           api.get("/advertisements?status=pending"),
-          api.get("/advertisements?status=verified"),
+          api.get("/advertisements?status=approved"),
           api.get("/advertisements?status=rejected"),
         ]);
-        setAds([...pending, ...approved, ...rejected]);
+        setAds(dedupeAdsById([...pending, ...approved, ...rejected]));
         const myBiz = await api.get(isAdmin ? "/businesses?status=all" : "/my-businesses");
         setBusinesses(myBiz);
       } else if (activeTab === "premium") {
@@ -1009,6 +1066,9 @@ export default function Dashboard() {
       } else if (activeTab === "saved") {
         const data = await api.get("/my-saved-businesses");
         setSavedBusinesses(data);
+      } else if (activeTab === "reviews") {
+        const data = await api.get("/my-business-reviews");
+        setBusinessReviews(data);
       } else if (activeTab === "tickets" && isAdmin) {
         const data = await api.get("/admin/payment-tickets");
         setTickets(data);
@@ -1016,13 +1076,28 @@ export default function Dashboard() {
         const data = await api.get("/admin/premium-packages");
         setPremiumPackages(data);
       } else if (activeTab === "riwayat" && isAdmin) {
-        // Fetch all subscription history and payment tickets for admin
-        const [ticketData, subData] = await Promise.all([
+        // PERBAIKAN: sebelumnya di sini malah manggil /subscriptions (cuma
+        // array polos daftar langganan), padahal tabel "Riwayat Premium &
+        // Pembayaran" di bawah butuh bentuk data khusus dari
+        // /admin/premium-history (field history/approved_count/
+        // active_businesses/rejected_count - lihat effect loadTabData di
+        // atas yang sudah benar). Karena ada dua effect yang sama-sama
+        // dengar activeTab, hasil salah dari sini kadang menimpa hasil
+        // benar dari effect satunya - makanya riwayat sering keliatan
+        // kosong/salah. Sekarang disamakan supaya konsisten.
+        const [ticketData, historyData] = await Promise.all([
           api.get("/admin/payment-tickets"),
-          api.get("/subscriptions")
+          api.get("/admin/premium-history"),
         ]);
         setTickets(ticketData);
-        setSubscriptions(subData);
+        setPremiumHistory(historyData);
+      } else if (activeTab === "coupons" && isAdmin) {
+        const data = await api.get("/admin/platform-coupons");
+        setPlatformCoupons(data);
+      } else if (activeTab === "settings" && isAdmin) {
+        const data = await api.get("/admin/settings");
+        setSiteSettings(data);
+        setSettingsDraft(data);
       } else if (activeTab === "content") {
         const [blogData, eventData] = await Promise.all([
           api.get("/blogs"),
@@ -1094,9 +1169,10 @@ export default function Dashboard() {
       setBizImagePreview(biz.image ? getImageUrl(biz.image) : "");
       setBizGalleryFiles([]);
       setBizGalleryPreviews(
-        (biz.images || []).map((path) => ({ url: getImageUrl(path), isExisting: true, path }))
+        Array.isArray(biz.images) ? biz.images.map((path) => ({ url: getImageUrl(path), isExisting: true, path })) : []
       );
-      setBizVideoUrl(biz.video_url || "");
+      setBizVideoUrl(biz.video_url && !biz.video_url.startsWith('/storage/') ? biz.video_url : "");
+      setBizVideoFile(null);
       setBizClosedDays(biz.closed_days || []);
       setBizTags((biz.tags || []).join(", "));
       
@@ -1135,6 +1211,7 @@ export default function Dashboard() {
       setBizGalleryFiles([]);
       setBizGalleryPreviews([]);
       setBizVideoUrl("");
+      setBizVideoFile(null);
       setBizClosedDays([]);
       setBizTags("");
       
@@ -1213,7 +1290,11 @@ export default function Dashboard() {
         formData.append("image", bizImageFile);
       }
       
-      if (bizVideoUrl) formData.append("video_url", bizVideoUrl);
+      if (bizVideoFile) {
+        formData.append("video", bizVideoFile);
+      } else if (bizVideoUrl) {
+        formData.append("video_url", bizVideoUrl);
+      }
       
       // Tags
       bizTags.split(",").map((t) => t.trim()).filter(Boolean).forEach((tag) => formData.append("tags[]", tag));
@@ -1800,7 +1881,7 @@ export default function Dashboard() {
       // If we're on riwayat tab or need to refresh premium history, do it
       if (activeTab === "riwayat") {
         const historyData = await api.get("/admin/premium-history");
-        setSubscriptions(historyData);
+        setPremiumHistory(historyData);
       }
       
       // Refresh notifications as well
@@ -1823,7 +1904,7 @@ export default function Dashboard() {
     // Create full image URL
     const imageUrl = proofPath.startsWith('http') 
       ? proofPath 
-      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/storage/${proofPath}`;
+      : `${import.meta.env.VITE_API_BASE_URL || 'http://surade.latihan.co.id'}/storage/${proofPath}`;
     
     // Open in new window/tab
     window.open(imageUrl, '_blank');
@@ -1986,10 +2067,10 @@ export default function Dashboard() {
       // Refresh ads data instead of full reload
       const [pending, approved, rejected] = await Promise.all([
         api.get("/advertisements?status=pending"),
-        api.get("/advertisements?status=verified"),
+        api.get("/advertisements?status=approved"),
         api.get("/advertisements?status=rejected"),
       ]);
-      setAds([...pending, ...approved, ...rejected]);
+      setAds(dedupeAdsById([...pending, ...approved, ...rejected]));
     } catch (err) {
       alert(err?.data?.message || "Gagal menyimpan iklan.");
     } finally {
@@ -2005,10 +2086,10 @@ export default function Dashboard() {
       // Refresh ads data instead of full reload
       const [pending, approved, rejected] = await Promise.all([
         api.get("/advertisements?status=pending"),
-        api.get("/advertisements?status=verified"),
+        api.get("/advertisements?status=approved"),
         api.get("/advertisements?status=rejected"),
       ]);
-      setAds([...pending, ...approved, ...rejected]);
+      setAds(dedupeAdsById([...pending, ...approved, ...rejected]));
     } catch (err) {
       alert("Gagal menghapus iklan.");
     }
@@ -2021,10 +2102,10 @@ export default function Dashboard() {
       // Refresh ads data instead of full reload
       const [pending, approved, rejected] = await Promise.all([
         api.get("/advertisements?status=pending"),
-        api.get("/advertisements?status=verified"),
+        api.get("/advertisements?status=approved"),
         api.get("/advertisements?status=rejected"),
       ]);
-      setAds([...pending, ...approved, ...rejected]);
+      setAds(dedupeAdsById([...pending, ...approved, ...rejected]));
     } catch (err) {
       alert("Gagal mengubah status iklan.");
     }
@@ -2067,50 +2148,86 @@ export default function Dashboard() {
     setShowContentModal(true);
   };
 
+  // ref penampung query terakhir yang benar-benar dicari & controller untuk
+  // membatalkan request sebelumnya yang belum selesai - supaya kalau user
+  // sudah lanjut mengetik, hasil pencarian yang lama (usang) tidak menimpa
+  // posisi peta yang seharusnya sudah untuk kata kunci terbaru.
+  const lastGeocodeQueryRef = useRef("");
+  const geocodeAbortRef = useRef(null);
+
   const handleLocationSearch = async (locationText) => {
-    if (!locationText || locationText.length < 2) return;
-    
-    try {
-      console.log('Searching for location:', locationText);
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationText + ', Indonesia')}&limit=1`);
-      const data = await response.json();
-      
-      console.log('Geocoding result:', data);
-      
-      if (data && data.length > 0) {
-        const { lat, lon } = data[0];
-        const newPosition = [parseFloat(lat), parseFloat(lon)];
-        console.log('Setting map position to:', newPosition);
-        setMapPosition(newPosition);
-      } else {
-        console.log('No results found for:', locationText);
-        // Try without Indonesia suffix
-        const response2 = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationText)}&limit=1`);
-        const data2 = await response2.json();
-        
-        if (data2 && data2.length > 0) {
-          const { lat, lon } = data2[0];
+    const trimmed = locationText.trim();
+    if (trimmed.length < 2) return;
+    // Kalau kata kunci sama persis dengan pencarian terakhir (mis. user
+    // cuma menambah lalu menghapus spasi di akhir), tidak perlu request lagi.
+    if (trimmed === lastGeocodeQueryRef.current) return;
+    lastGeocodeQueryRef.current = trimmed;
+
+    geocodeAbortRef.current?.abort();
+    const controller = new AbortController();
+    geocodeAbortRef.current = controller;
+
+    // Coba maksimal 2x (1x percobaan awal + 1x retry) kalau gagalnya karena
+    // masalah jaringan sesaat (mis. backend baru saja restart) - supaya
+    // hiccup koneksi singkat tidak langsung bikin pencarian gagal total.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log('Searching for location:', trimmed, attempt > 1 ? `(percobaan ke-${attempt})` : '');
+        // PERBAIKAN: sebelumnya fetch langsung ke nominatim.openstreetmap.org
+        // dari browser - sering kena CORS/429 (Too Many Requests) karena
+        // Nominatim mewajibkan header User-Agent tertentu yang tidak bisa
+        // diatur browser, dan membatasi rate request. Sekarang lewat proxy
+        // GET /api/geocode di backend sendiri (lihat GeocodeController.php),
+        // yang mengatur User-Agent dan meng-cache hasilnya.
+        const data = await api.get(`/geocode?q=${encodeURIComponent(trimmed)}`, { signal: controller.signal });
+
+        console.log('Geocoding result:', data);
+
+        if (data && data.length > 0) {
+          const { lat, lon } = data[0];
           const newPosition = [parseFloat(lat), parseFloat(lon)];
-          console.log('Setting map position to (fallback):', newPosition);
+          console.log('Setting map position to:', newPosition);
           setMapPosition(newPosition);
+        } else {
+          console.log('No results found for:', trimmed);
         }
+        return; // berhasil (baik ada hasil maupun tidak) - tidak perlu retry
+      } catch (error) {
+        if (error?.name === 'AbortError') return; // dibatalkan karena user lanjut mengetik, bukan error sungguhan
+        const isNetworkHiccup = error?.isNetworkError || error?.status === 0;
+        if (isNetworkHiccup && attempt === 1) {
+          console.warn('Geocoding gagal konek, mencoba lagi sekali...', error);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue; // coba sekali lagi
+        }
+        console.error('Geocoding error:', error);
+        return;
       }
-    } catch (error) {
-      console.error('Geocoding error:', error);
     }
   };
 
-  // Debounce function for location search
-  let locationTimeout;
+  // Debounce function for location search.
+  // PERBAIKAN: sebelumnya `locationTimeout` adalah variabel biasa (let) di
+  // dalam body komponen - setiap render (yang terjadi tiap kali user
+  // mengetik 1 huruf, karena setContentLocation memicu re-render) membuat
+  // closure BARU dengan `locationTimeout` yang baru pula (selalu undefined).
+  // Akibatnya clearTimeout() tidak pernah benar-benar membatalkan timer dari
+  // huruf sebelumnya, jadi SEMUA huruf yang diketik akhirnya tetap memicu
+  // request geocoding masing-masing 500ms kemudian - itu penyebab lag dan
+  // banjir request ke Nominatim. useRef menyimpan timeout id yang sama across
+  // render, jadi clearTimeout benar-benar membatalkan timer sebelumnya.
+  // Delay juga dinaikkan jadi 800ms supaya request baru benar-benar dikirim
+  // setelah user berhenti mengetik.
+  const locationTimeoutRef = useRef(null);
   const handleLocationChange = (e) => {
     const value = e.target.value;
     setContentLocation(value);
-    
-    clearTimeout(locationTimeout);
-    locationTimeout = setTimeout(() => {
+
+    clearTimeout(locationTimeoutRef.current);
+    locationTimeoutRef.current = setTimeout(() => {
       console.log('Triggering location search for:', value);
       handleLocationSearch(value);
-    }, 500); // Reduced to 500ms for faster response
+    }, 800);
   };
 
   const handleSaveContent = async (e) => {
@@ -2175,7 +2292,16 @@ export default function Dashboard() {
         formData.append('title', contentTitle);
         formData.append('description', contentDescription);
         formData.append('location', contentLocation);
-        formData.append('event_date', contentDate || null);
+        // PERBAIKAN: sebelumnya `contentDate || null` - kalau contentDate
+        // kosong (user belum isi tanggal), `null` yang ditambahkan ke
+        // FormData otomatis berubah jadi TEKS "null" (FormData tidak bisa
+        // menyimpan null asli), lalu validator backend ('event_date' =>
+        // 'nullable|date') menolaknya karena teks "null" bukan tanggal yang
+        // valid - makanya selalu muncul "The event date field must be a
+        // valid date." Sekarang field ini hanya dikirim kalau memang diisi.
+        if (contentDate) {
+          formData.append('event_date', contentDate);
+        }
         formData.append('status', contentStatus || "draft");
         formData.append('latitude', mapPosition[0]);
         formData.append('longitude', mapPosition[1]);
@@ -2299,6 +2425,125 @@ export default function Dashboard() {
     }
   };
 
+  // --- ULASAN (REVIEWS) TAB HANDLERS ---
+  const handleReplySubmit = async (reviewId) => {
+    const text = (replyDrafts[reviewId] || "").trim();
+    if (!text) {
+      alert("Balasan tidak boleh kosong.");
+      return;
+    }
+    setReplySubmittingId(reviewId);
+    try {
+      const updated = await api.post(`/reviews/${reviewId}/reply`, { reply: text });
+      setBusinessReviews((prev) => prev.map((r) => (r.id === reviewId ? updated : r)));
+      setReplyDrafts((prev) => ({ ...prev, [reviewId]: undefined }));
+    } catch (err) {
+      alert(err?.data?.message || "Gagal mengirim balasan.");
+    } finally {
+      setReplySubmittingId(null);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!confirm("Hapus ulasan ini? Tindakan ini tidak dapat dibatalkan.")) return;
+    try {
+      await api.delete(`/reviews/${reviewId}`);
+      setBusinessReviews((prev) => prev.filter((r) => r.id !== reviewId));
+    } catch (err) {
+      alert(err?.data?.message || "Gagal menghapus ulasan.");
+    }
+  };
+
+  // Dipakai tombol sidebar "Blog & Event", baik untuk admin maupun user -
+  // diambil ulang tiap diklik supaya datanya selalu terbaru.
+  const handleOpenContentTab = () => {
+    setActiveTab("content");
+    Promise.all([api.get("/blogs"), api.get("/events")])
+      .then(([blogData, eventData]) => {
+        const combined = [
+          ...blogData.map((item) => ({ ...item, type: "blog" })),
+          ...eventData.map((item) => ({ ...item, type: "event" })),
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        setContentItems(combined);
+        setEvents(eventData);
+      })
+      .catch((err) => console.error("Gagal memuat Blog & Event:", err));
+  };
+
+  // --- ADMIN: KUPON DISKON (PLATFORM) HANDLERS ---
+  const handleOpenCouponAdminModal = (coupon = null) => {
+    setSelectedPlatformCoupon(coupon);
+    setPcCode(coupon?.code || "");
+    setPcName(coupon?.name || "");
+    setPcType(coupon?.discount_type || "percentage");
+    setPcValue(coupon?.discount_value || "");
+    setPcAppliesTo(coupon?.applies_to || "semua");
+    setPcMinPurchase(coupon?.min_purchase || "");
+    setPcMaxUses(coupon?.max_uses || "");
+    setPcExpiresAt(coupon?.expires_at ? coupon.expires_at.slice(0, 10) : "");
+    setShowCouponAdminModal(true);
+  };
+
+  const handleSaveCouponAdmin = async (e) => {
+    e.preventDefault();
+    const payload = {
+      code: pcCode.trim().toUpperCase(),
+      name: pcName.trim() || null,
+      discount_type: pcType,
+      discount_value: Number(pcValue),
+      applies_to: pcAppliesTo,
+      min_purchase: pcMinPurchase ? Number(pcMinPurchase) : null,
+      max_uses: pcMaxUses ? Number(pcMaxUses) : null,
+      expires_at: pcExpiresAt || null,
+    };
+    try {
+      if (selectedPlatformCoupon) {
+        const updated = await api.put(`/admin/platform-coupons/${selectedPlatformCoupon.id}`, payload);
+        setPlatformCoupons((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      } else {
+        const created = await api.post("/admin/platform-coupons", payload);
+        setPlatformCoupons((prev) => [created, ...prev]);
+      }
+      setShowCouponAdminModal(false);
+    } catch (err) {
+      alert(err?.data?.errors ? Object.values(err.data.errors).flat().join("\n") : "Gagal menyimpan kupon.");
+    }
+  };
+
+  const handleDeleteCouponAdmin = async (id) => {
+    if (!confirm("Hapus kupon diskon ini?")) return;
+    try {
+      await api.delete(`/admin/platform-coupons/${id}`);
+      setPlatformCoupons((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      alert("Gagal menghapus kupon.");
+    }
+  };
+
+  const handleToggleCouponAdmin = async (coupon) => {
+    try {
+      const updated = await api.put(`/admin/platform-coupons/${coupon.id}`, { is_active: !coupon.is_active });
+      setPlatformCoupons((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    } catch (err) {
+      alert("Gagal mengubah status kupon.");
+    }
+  };
+
+  // --- ADMIN: PENGATURAN (SITE SETTINGS) HANDLERS ---
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      const updated = await api.put("/admin/settings", settingsDraft);
+      setSiteSettings(updated);
+      alert("Pengaturan berhasil disimpan.");
+    } catch (err) {
+      alert("Gagal menyimpan pengaturan.");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   // --- PREMIUM SUBSCRIPTION HANDLERS ---
   const handleOpenSubModal = () => {
     const myBiz = businesses.filter((b) => isAdmin || b.user_id === user?.id);
@@ -2330,6 +2575,15 @@ export default function Dashboard() {
   };
 
   const formatRupiah = (n) => "Rp" + Number(n || 0).toLocaleString("id-ID");
+
+  // Untuk input angka yang perlu tampil dengan pemisah ribuan (mis. "10.000")
+  // sambil tetap menyimpan nilai polos (mis. "10000") di state.
+  const formatRupiahInput = (value) => {
+    const digitsOnly = String(value).replace(/\D/g, "");
+    if (!digitsOnly) return "";
+    return "Rp" + Number(digitsOnly).toLocaleString("id-ID");
+  };
+  const parseRupiahInput = (formatted) => formatted.replace(/\D/g, "");
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-";
   const daysLeft = (d) => {
     if (!d) return null;
@@ -2425,135 +2679,8 @@ export default function Dashboard() {
               <span>Dashboard</span>
             </button>
 
-            <button
-              className={`db-menu-btn ${activeTab === "businesses" ? "active" : ""}`}
-              onClick={() => setActiveTab("businesses")}
-            >
-              <div className="db-menu-icon">
-                <ShoppingBag size={20} />
-              </div>
-              <span>Daftar Bisnis</span>
-            </button>
-            
-            <button
-              className={`db-menu-btn ${activeTab === "saved" ? "active" : ""}`}
-              onClick={() => setActiveTab("saved")}
-            >
-              <div className="db-menu-icon">
-                <Bookmark size={20} />
-              </div>
-              <span>Favorit</span>
-            </button>
-
-            <button
-              className={`db-menu-btn ${activeTab === "ads" ? "active" : ""}`}
-              onClick={() => setActiveTab("ads")}
-            >
-              <div className="db-menu-icon">
-                <Megaphone size={20} />
-              </div>
-              <span>Iklan</span>
-            </button>
-
-            <button
-              className={`db-menu-btn ${activeTab === "premium" ? "active" : ""}`}
-              onClick={() => setActiveTab("premium")}
-            >
-              <div className="db-menu-icon">
-                <Trophy size={20} />
-              </div>
-              <span>Premium</span>
-            </button>
-
-            <button
-              className={`db-menu-btn ${activeTab === "tickets" ? "active" : ""}`}
-              onClick={() => setActiveTab("tickets")}
-            >
-              <div className="db-menu-icon">
-                <CreditCard size={20} />
-              </div>
-              <span>Tiket Pembayaran</span>
-            </button>
-
-            <button
-              className={`db-menu-btn ${activeTab === "menu" ? "active" : ""}`}
-              onClick={() => setActiveTab("menu")}
-            >
-              <div className="db-menu-icon">
-                <Package size={20} />
-              </div>
-              <span>Produk</span>
-            </button>
-
-            <button
-              className={`db-menu-btn ${activeTab === "inbox" ? "active" : ""}`}
-              onClick={() => setActiveTab("inbox")}
-            >
-              <div className="db-menu-icon">
-                <Inbox size={20} />
-              </div>
-              <span>Inbox</span>
-              {unreadInboxCount > 0 && (
-                <span className="db-menu-badge">{unreadInboxCount > 9 ? "9+" : unreadInboxCount}</span>
-              )}
-            </button>
-
-            {/* Menu "Notifikasi" di sidebar sengaja dihapus - semua notifikasi
-                sekarang cukup dibuka lewat ikon lonceng di topbar (lihat
-                db-notification-dropdown di bawah), jadi tidak ada lagi menu
-                terpisah. Ini berlaku sama baik untuk admin maupun user. */}
-
-            <button
-              className={`db-menu-btn ${activeTab === "reseller" ? "active" : ""}`}
-              onClick={() => setActiveTab("reseller")}
-            >
-              <div className="db-menu-icon">
-                <Users2 size={20} />
-              </div>
-              <span>Reseller</span>
-            </button>
-
-            <button
-              className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("content");
-                // PERBAIKAN: sebelumnya data blog/event cuma diambil SEKALI
-                // waktu Dashboard pertama kali dibuka (activeTab sengaja
-                // tidak ada di dependency effect utama, lihat catatan di
-                // atas). Jadi kalau buka Dashboard dari tab lain (mis. dari
-                // "Dasbor") lalu klik "Blog & Event", daftarnya kelihatan
-                // kosong walau sebenarnya ada/baru ditambah - karena tidak
-                // pernah diambil ulang. Sekarang tiap kali menu ini diklik,
-                // data blog & event diambil ulang supaya selalu yang terbaru.
-                Promise.all([api.get("/blogs"), api.get("/events")])
-                  .then(([blogData, eventData]) => {
-                    const combined = [
-                      ...blogData.map((item) => ({ ...item, type: "blog" })),
-                      ...eventData.map((item) => ({ ...item, type: "event" })),
-                    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                    setContentItems(combined);
-                    setEvents(eventData);
-                  })
-                  .catch((err) => console.error("Gagal memuat Blog & Event:", err));
-              }}
-            >
-              <div className="db-menu-icon">
-                <BookOpen size={20} />
-              </div>
-              <span>Blog & Event</span>
-            </button>
-
-            {isAdmin && (
+            {isAdmin ? (
               <>
-                <button
-                  className={`db-menu-btn ${activeTab === "categories" ? "active" : ""}`}
-                  onClick={() => setActiveTab("categories")}
-                >
-                  <div className="db-menu-icon">
-                    <Grid size={20} />
-                  </div>
-                  <span>Kategori</span>
-                </button>
                 <button
                   className={`db-menu-btn ${activeTab === "users" ? "active" : ""}`}
                   onClick={() => setActiveTab("users")}
@@ -2563,6 +2690,37 @@ export default function Dashboard() {
                   </div>
                   <span>Kelola User</span>
                 </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "businesses" ? "active" : ""}`}
+                  onClick={() => setActiveTab("businesses")}
+                >
+                  <div className="db-menu-icon">
+                    <ShoppingBag size={20} />
+                  </div>
+                  <span>Kelola Bisnis</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "categories" ? "active" : ""}`}
+                  onClick={() => setActiveTab("categories")}
+                >
+                  <div className="db-menu-icon">
+                    <Grid size={20} />
+                  </div>
+                  <span>Kelola Kategori</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "ads" ? "active" : ""}`}
+                  onClick={() => setActiveTab("ads")}
+                >
+                  <div className="db-menu-icon">
+                    <Megaphone size={20} />
+                  </div>
+                  <span>Kelola Iklan</span>
+                </button>
+
                 <button
                   className={`db-menu-btn ${activeTab === "riwayat" ? "active" : ""}`}
                   onClick={() => setActiveTab("riwayat")}
@@ -2570,7 +2728,157 @@ export default function Dashboard() {
                   <div className="db-menu-icon">
                     <History size={20} />
                   </div>
-                  <span>Riwayat Premium</span>
+                  <span>Paket Premium</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "coupons" ? "active" : ""}`}
+                  onClick={() => setActiveTab("coupons")}
+                >
+                  <div className="db-menu-icon">
+                    <Ticket size={20} />
+                  </div>
+                  <span>Kupon Diskon</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
+                  onClick={handleOpenContentTab}
+                >
+                  <div className="db-menu-icon">
+                    <BookOpen size={20} />
+                  </div>
+                  <span>Blog & Event</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "reports" ? "active" : ""}`}
+                  onClick={() => setActiveTab("reports")}
+                >
+                  <div className="db-menu-icon">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <span>Laporan Report</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "settings" ? "active" : ""}`}
+                  onClick={() => setActiveTab("settings")}
+                >
+                  <div className="db-menu-icon">
+                    <Settings size={20} />
+                  </div>
+                  <span>Pengaturan</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className={`db-menu-btn ${activeTab === "businesses" ? "active" : ""}`}
+                  onClick={() => setActiveTab("businesses")}
+                >
+                  <div className="db-menu-icon">
+                    <ShoppingBag size={20} />
+                  </div>
+                  <span>Daftar Bisnis</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "saved" ? "active" : ""}`}
+                  onClick={() => setActiveTab("saved")}
+                >
+                  <div className="db-menu-icon">
+                    <Bookmark size={20} />
+                  </div>
+                  <span>Favorit</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "reviews" ? "active" : ""}`}
+                  onClick={() => setActiveTab("reviews")}
+                >
+                  <div className="db-menu-icon">
+                    <Star size={20} />
+                  </div>
+                  <span>Ulasan</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "ads" ? "active" : ""}`}
+                  onClick={() => setActiveTab("ads")}
+                >
+                  <div className="db-menu-icon">
+                    <Megaphone size={20} />
+                  </div>
+                  <span>Iklan</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "premium" ? "active" : ""}`}
+                  onClick={() => setActiveTab("premium")}
+                >
+                  <div className="db-menu-icon">
+                    <Trophy size={20} />
+                  </div>
+                  <span>Premium</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "tickets" ? "active" : ""}`}
+                  onClick={() => setActiveTab("tickets")}
+                >
+                  <div className="db-menu-icon">
+                    <CreditCard size={20} />
+                  </div>
+                  <span>Tiket Pembayaran</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "menu" ? "active" : ""}`}
+                  onClick={() => setActiveTab("menu")}
+                >
+                  <div className="db-menu-icon">
+                    <Package size={20} />
+                  </div>
+                  <span>Produk</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "inbox" ? "active" : ""}`}
+                  onClick={() => setActiveTab("inbox")}
+                >
+                  <div className="db-menu-icon">
+                    <Inbox size={20} />
+                  </div>
+                  <span>Inbox</span>
+                  {unreadInboxCount > 0 && (
+                    <span className="db-menu-badge">{unreadInboxCount > 9 ? "9+" : unreadInboxCount}</span>
+                  )}
+                </button>
+
+                {/* Menu "Notifikasi" di sidebar sengaja dihapus - semua notifikasi
+                    sekarang cukup dibuka lewat ikon lonceng di topbar (lihat
+                    db-notification-dropdown di bawah), jadi tidak ada lagi menu
+                    terpisah. */}
+
+                <button
+                  className={`db-menu-btn ${activeTab === "referral" ? "active" : ""}`}
+                  onClick={() => setActiveTab("referral")}
+                >
+                  <div className="db-menu-icon">
+                    <Users2 size={20} />
+                  </div>
+                  <span>Referral</span>
+                </button>
+
+                <button
+                  className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
+                  onClick={handleOpenContentTab}
+                >
+                  <div className="db-menu-icon">
+                    <BookOpen size={20} />
+                  </div>
+                  <span>Blog & Event</span>
                 </button>
               </>
             )}
@@ -3383,24 +3691,24 @@ export default function Dashboard() {
                         <div className="biz-form-stepper-track"></div>
                         <div className="biz-form-stepper-progress" style={{ width: `${((Math.min(bizFormStep, 5) - 1) / 4) * 80}%` }}></div>
                         <div className={`biz-form-step ${bizFormStep > 1 ? 'done' : ''} ${bizFormStep === 1 ? 'active' : ''}`} data-step="1">
+                          <div className="circle"><Crown size={22} /></div>
+                          <div className="label">Paket</div>
+                        </div>
+                        <div className={`biz-form-step ${bizFormStep > 2 ? 'done' : ''} ${bizFormStep === 2 ? 'active' : ''}`} data-step="2">
                           <div className="circle"><Info size={22} /></div>
                           <div className="label">Info Dasar</div>
                         </div>
-                        <div className={`biz-form-step ${bizFormStep > 2 ? 'done' : ''} ${bizFormStep === 2 ? 'active' : ''}`} data-step="2">
+                        <div className={`biz-form-step ${bizFormStep > 3 ? 'done' : ''} ${bizFormStep === 3 ? 'active' : ''}`} data-step="3">
                           <div className="circle"><Image size={22} /></div>
                           <div className="label">Banner</div>
                         </div>
-                        <div className={`biz-form-step ${bizFormStep > 3 ? 'done' : ''} ${bizFormStep === 3 ? 'active' : ''}`} data-step="3">
+                        <div className={`biz-form-step ${bizFormStep > 4 ? 'done' : ''} ${bizFormStep === 4 ? 'active' : ''}`} data-step="4">
                           <div className="circle"><MapPin size={22} /></div>
                           <div className="label">Lokasi</div>
                         </div>
-                        <div className={`biz-form-step ${bizFormStep > 4 ? 'done' : ''} ${bizFormStep === 4 ? 'active' : ''}`} data-step="4">
+                        <div className={`biz-form-step ${bizFormStep > 5 ? 'done' : ''} ${bizFormStep === 5 ? 'active' : ''}`} data-step="5">
                           <div className="circle"><Gallery size={22} /></div>
                           <div className="label">Galeri</div>
-                        </div>
-                        <div className={`biz-form-step ${bizFormStep > 5 ? 'done' : ''} ${bizFormStep === 5 ? 'active' : ''}`} data-step="5">
-                          <div className="circle"><Crown size={22} /></div>
-                          <div className="label">Paket</div>
                         </div>
                       </div>
                     </div>
@@ -3409,7 +3717,7 @@ export default function Dashboard() {
 
                 <div className="biz-form-content">
                   {/* STEP 1: INFO DASAR */}
-                  <div className={`biz-form-panel ${bizFormStep === 1 ? 'show' : ''}`}>
+                  <div className={`biz-form-panel ${bizFormStep === 2 ? 'show' : ''}`}>
                     <div className="biz-form-card">
                       <div className="biz-form-card-head">
                         <div className="ci"><Info size={18} /></div>
@@ -3632,8 +3940,11 @@ export default function Dashboard() {
                         />
                       </div>
 
-                      <div className="biz-form-actions end">
-                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(2)}>
+                      <div className="biz-form-actions">
+                        <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(1)}>
+                          Kembali
+                        </button>
+                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(3)}>
                           Lanjutkan
                         </button>
                       </div>
@@ -3641,7 +3952,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* STEP 2: BANNER */}
-                  <div className={`biz-form-panel ${bizFormStep === 2 ? 'show' : ''}`}>
+                  <div className={`biz-form-panel ${bizFormStep === 3 ? 'show' : ''}`}>
                     <div className="biz-form-card">
                       <div className="biz-form-card-head">
                         <div className="ci"><Image size={18} /></div>
@@ -3726,10 +4037,10 @@ export default function Dashboard() {
                       </div>
 
                       <div className="biz-form-actions">
-                        <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(1)}>
+                        <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(2)}>
                           Kembali
                         </button>
-                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(3)}>
+                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(4)}>
                           Lanjutkan
                         </button>
                       </div>
@@ -3737,7 +4048,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* STEP 3: LOKASI */}
-                  <div className={`biz-form-panel ${bizFormStep === 3 ? 'show' : ''}`}>
+                  <div className={`biz-form-panel ${bizFormStep === 4 ? 'show' : ''}`}>
                     <div className="biz-form-card">
                       <div className="biz-form-card-head">
                         <div className="ci"><MapPin size={18} /></div>
@@ -3786,7 +4097,7 @@ export default function Dashboard() {
                       </div>
 
                       <div className="biz-form-map-box" style={{ background: '#f8f9fa' }}>
-                        {bizFormStep === 3 && (
+                        {bizFormStep === 4 && (
                           <MapContainer
                             center={bizCoordinates ? bizCoordinates.split(',').map(Number) : [-6.2088, 106.8456]}
                             zoom={bizCoordinates ? 13 : 5}
@@ -3804,65 +4115,6 @@ export default function Dashboard() {
                       </div>
 
                       <div className="biz-form-actions">
-                        <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(2)}>
-                          Kembali
-                        </button>
-                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(4)}>
-                          Lanjutkan
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* STEP 4: GALERI + RINGKASAN */}
-                  <div className={`biz-form-panel ${bizFormStep === 4 ? 'show' : ''}`}>
-                    <div className="biz-form-card">
-                      <div className="biz-form-card-head">
-                        <div className="ci"><Gallery size={18} /></div>
-                        <h2>Galeri Foto & Video</h2>
-                      </div>
-                      <p className="biz-form-card-sub">Upload foto dan video tambahan</p>
-                      <hr className="biz-form-divider" />
-
-                      <div 
-                        className="biz-form-dropzone" 
-                        onClick={() => document.getElementById('galeriInput').click()}
-                      >
-                        <Upload size={28} />
-                        <div className="dt">Klik atau drag & drop foto/video</div>
-                        <div className="dd">Gambar: JPG, PNG | Video: MP4, WEBM, MOV | maks. 20MB</div>
-                      </div>
-                      <input 
-                        type="file" 
-                        id="galeriInput" 
-                        accept="image/*,video/*" 
-                        multiple 
-                        style={{display: 'none'}} 
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files);
-                          setBizGalleryFilesNew([...bizGalleryFilesNew, ...files]);
-                        }}
-                      />
-                      {bizGalleryFilesNew.length === 0 && (
-                        <div className="biz-form-empty-hint">Belum ada file diunggah</div>
-                      )}
-                      <div className="biz-form-file-list">
-                        {bizGalleryFilesNew.map((file, i) => (
-                          <div key={i} className="biz-form-file-row">
-                            {file.type.startsWith('image/') ? (
-                              <img src={URL.createObjectURL(file)} alt={file.name} />
-                            ) : (
-                              <span style={{width: 32, textAlign: 'center'}}>🎬</span>
-                            )}
-                            <span className="fname">{file.name}</span>
-                            <button type="button" onClick={() => {
-                              setBizGalleryFilesNew(bizGalleryFilesNew.filter((_, idx) => idx !== i));
-                            }}>✕</button>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="biz-form-actions">
                         <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(3)}>
                           Kembali
                         </button>
@@ -3873,8 +4125,124 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* STEP 5: PILIH PAKET */}
+                  {/* STEP 4: GALERI + RINGKASAN */}
                   <div className={`biz-form-panel ${bizFormStep === 5 ? 'show' : ''}`}>
+                    <div className="biz-form-card">
+                      <div className="biz-form-card-head">
+                        <div className="ci"><Gallery size={18} /></div>
+                        <h2>Galeri Foto & Video</h2>
+                      </div>
+                      <p className="biz-form-card-sub">Upload foto dan video tambahan</p>
+                      <hr className="biz-form-divider" />
+
+                      {/* ── FOTO ── */}
+                      <div className="biz-form-field">
+                        <label>Foto Tambahan</label>
+                        <p style={{fontSize: '12.5px', color: 'var(--ink-soft)', margin: '-3px 0 12px'}}>Boleh lebih dari satu foto</p>
+                        <div
+                          className="biz-form-dropzone"
+                          onClick={() => document.getElementById('galeriInput').click()}
+                        >
+                          <Upload size={28} />
+                          <div className="dt">Klik atau drag & drop foto</div>
+                          <div className="dd">JPG, PNG, WEBP | maks. 5MB per foto</div>
+                        </div>
+                        <input
+                          type="file"
+                          id="galeriInput"
+                          accept="image/*"
+                          multiple
+                          style={{display: 'none'}}
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files).filter((f) => f.type.startsWith('image/'));
+                            setBizGalleryFilesNew([...bizGalleryFilesNew, ...files]);
+                            e.target.value = '';
+                          }}
+                        />
+                        {bizGalleryFilesNew.length === 0 && (
+                          <div className="biz-form-empty-hint">Belum ada foto diunggah</div>
+                        )}
+                        <div className="biz-form-file-list">
+                          {bizGalleryFilesNew.map((file, i) => (
+                            <div key={i} className="biz-form-file-row">
+                              <img src={URL.createObjectURL(file)} alt={file.name} />
+                              <span className="fname">{file.name}</span>
+                              <button type="button" onClick={() => {
+                                setBizGalleryFilesNew(bizGalleryFilesNew.filter((_, idx) => idx !== i));
+                              }}>✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* ── VIDEO ── */}
+                      <div className="biz-form-field" style={{marginTop: 24}}>
+                        <label>Video (opsional)</label>
+                        <p style={{fontSize: '12.5px', color: 'var(--ink-soft)', margin: '-3px 0 12px'}}>
+                          Pilih salah satu: tempel link video (YouTube/Instagram/dll), atau unggah file video langsung.
+                        </p>
+
+                        <div className="biz-form-field" style={{marginBottom: 14}}>
+                          <label style={{fontWeight: 600, fontSize: '12.5px'}}>Link Video</label>
+                          <input
+                            type="url"
+                            value={bizVideoUrl}
+                            disabled={!!bizVideoFile}
+                            onChange={(e) => setBizVideoUrl(e.target.value)}
+                            placeholder="https://youtube.com/watch?v=..."
+                          />
+                        </div>
+
+                        <div className="biz-form-divider-or">atau</div>
+
+                        {!bizVideoFile ? (
+                          <div
+                            className="biz-form-dropzone small"
+                            onClick={() => { if (!bizVideoUrl) document.getElementById('videoInput').click(); }}
+                            style={bizVideoUrl ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                          >
+                            <div className="circle-ic"><Upload size={22} /></div>
+                            <div className="dt">Klik untuk upload file video</div>
+                            <div className="dd">MP4, WEBM, MOV | maks. 20MB</div>
+                          </div>
+                        ) : (
+                          <div className="biz-form-file-list">
+                            <div className="biz-form-file-row">
+                              <span style={{width: 32, textAlign: 'center'}}>🎬</span>
+                              <span className="fname">{bizVideoFile.name}</span>
+                              <button type="button" onClick={() => setBizVideoFile(null)}>✕</button>
+                            </div>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          id="videoInput"
+                          accept="video/mp4,video/webm,video/quicktime"
+                          style={{display: 'none'}}
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              setBizVideoFile(file);
+                              setBizVideoUrl("");
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+
+                      <div className="biz-form-actions">
+                        <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(4)}>
+                          Kembali
+                        </button>
+                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(6)}>
+                          Lanjutkan
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* STEP 1: PILIH PAKET (dipindah ke urutan pertama) */}
+                  <div className={`biz-form-panel ${bizFormStep === 1 ? 'show' : ''}`}>
                     <div className="biz-form-card">
                       <div className="biz-form-card-head">
                         <div className="ci"><Crown size={18} /></div>
@@ -3943,11 +4311,8 @@ export default function Dashboard() {
                         </label>
                       </div>
 
-                      <div className="biz-form-actions">
-                        <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(4)}>
-                          Kembali
-                        </button>
-                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(6)}>
+                      <div className="biz-form-actions end">
+                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(2)}>
                           Lanjutkan
                         </button>
                       </div>
@@ -5227,7 +5592,402 @@ export default function Dashboard() {
             </div>
           )}
 
-        {/* TAB: TICKETS (TIKET PEMBAYARAN) - For both Admin and Users */}
+        {/* TAB: ULASAN */}
+          {activeTab === "reviews" && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Ulasan Pelanggan</h2>
+                <p style={{ color: "#6b7280", fontSize: "13.5px", margin: "4px 0 0" }}>
+                  Pantau umpan balik konsumen dan ulasan rating bintang
+                </p>
+              </div>
+
+              {loading ? (
+                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat ulasan...</span></div>
+              ) : (
+                <>
+                  <div className="db-kpi-grid">
+                    <div className="db-kpi-card">
+                      <div className="db-kpi-card__icon db-kpi-card__icon--blue"><Star size={16} /></div>
+                      <span className="db-kpi-card__value">{businessReviews.length}</span>
+                      <span className="db-kpi-card__label">Total Ulasan</span>
+                    </div>
+                    <div className="db-kpi-card">
+                      <div className="db-kpi-card__icon db-kpi-card__icon--green"><Star size={16} /></div>
+                      <span className="db-kpi-card__value">
+                        {businessReviews.length > 0
+                          ? (businessReviews.reduce((sum, r) => sum + r.rating, 0) / businessReviews.length).toFixed(1)
+                          : "0.0"}
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: "#94a3b8" }}> / 5</span>
+                      </span>
+                      <span className="db-kpi-card__label">Rata-rata Rating</span>
+                    </div>
+                    <div className="db-kpi-card">
+                      <div className="db-kpi-card__icon db-kpi-card__icon--slate"><Briefcase size={16} /></div>
+                      <span className="db-kpi-card__value">
+                        {new Set(businessReviews.map((r) => r.business_id ?? r.business?.id)).size}
+                      </span>
+                      <span className="db-kpi-card__label">Bisnis Diulas</span>
+                    </div>
+                  </div>
+
+                  {businessReviews.length > 0 ? (
+                    <div className="db-review-list" style={{ marginTop: "20px" }}>
+                      {businessReviews.map((r) => (
+                        <div key={r.id} className="db-card" style={{ padding: "18px 20px", marginBottom: "14px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                            <div style={{ display: "flex", gap: "12px" }}>
+                              <div className="db-review-avatar">
+                                {r.reviewer?.avatar ? (
+                                  <img src={getImageUrl(r.reviewer.avatar)} alt={r.reviewer?.name} />
+                                ) : (
+                                  (r.reviewer?.name || "?").charAt(0).toUpperCase()
+                                )}
+                              </div>
+                              <div>
+                                <strong>{r.business?.title || "-"}</strong>
+                                <div className="db-review-stars">
+                                  <span className="star-filled">{"★".repeat(r.rating)}</span>
+                                  <span className="star-empty">{"☆".repeat(5 - r.rating)}</span>
+                                  <span style={{ marginLeft: "6px", color: "#94a3b8", fontSize: "12.5px" }}>
+                                    oleh {r.reviewer?.name || "Pengguna"} · {new Date(r.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                              <Link to={`/business/${r.business?.id}`} className="db-action-btn" style={{ padding: "6px 12px", fontSize: "12.5px" }}>
+                                <Eye size={14} />
+                                <span>Lihat Bisnis</span>
+                              </Link>
+                              <button
+                                className="db-action-btn"
+                                style={{ padding: "6px 12px", fontSize: "12.5px", background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" }}
+                                onClick={() => handleDeleteReview(r.id)}
+                              >
+                                <Trash2 size={14} />
+                                <span>Hapus</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <p style={{ margin: "12px 0 0", color: "#334155", fontSize: "14.5px", lineHeight: 1.55 }}>
+                            {r.comment}
+                          </p>
+
+                          {r.owner_reply ? (
+                            <div style={{ marginTop: "12px", background: "#f0fdf9", border: "1px solid #ccfbef", borderRadius: "10px", padding: "10px 14px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <strong style={{ fontSize: "12.5px", color: "#0f766e" }}>Balasan Anda</strong>
+                                <button
+                                  type="button"
+                                  className="db-view-all-link"
+                                  onClick={() => setReplyDrafts((prev) => ({ ...prev, [r.id]: r.owner_reply }))}
+                                >
+                                  <Edit2 size={12} /> Edit
+                                </button>
+                              </div>
+                              {replyDrafts[r.id] === undefined ? (
+                                <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: "#0f172a" }}>{r.owner_reply}</p>
+                              ) : (
+                                <div style={{ marginTop: "6px", display: "flex", gap: "8px" }}>
+                                  <textarea
+                                    className="db-textarea"
+                                    rows={2}
+                                    value={replyDrafts[r.id]}
+                                    onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                                    style={{ flex: 1 }}
+                                  />
+                                  <button className="db-action-btn" disabled={replySubmittingId === r.id} onClick={() => handleReplySubmit(r.id)}>
+                                    {replySubmittingId === r.id ? "..." : "Simpan"}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
+                              <textarea
+                                className="db-textarea"
+                                rows={2}
+                                placeholder="Tulis balasan untuk pelanggan ini..."
+                                value={replyDrafts[r.id] || ""}
+                                onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                                style={{ flex: 1 }}
+                              />
+                              <button className="db-action-btn" disabled={replySubmittingId === r.id} onClick={() => handleReplySubmit(r.id)}>
+                                <Send size={14} />
+                                <span>{replySubmittingId === r.id ? "..." : "Balas"}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <DashboardEmptyState
+                      title="Belum Ada Ulasan"
+                      subtitle="Ulasan dari pelanggan untuk bisnis Anda akan muncul di sini."
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* TAB: KUPON DISKON (Admin - kupon diskon Paket Premium/Iklan) */}
+          {activeTab === "coupons" && isAdmin && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Kelola Kupon Diskon</h2>
+                <button className="db-action-btn" onClick={() => handleOpenCouponAdminModal()}>
+                  <Plus size={16} />
+                  <span>Tambah Kupon</span>
+                </button>
+              </div>
+
+              <div className="db-kpi-grid">
+                <div className="db-kpi-card">
+                  <div className="db-kpi-card__icon db-kpi-card__icon--blue"><Ticket size={16} /></div>
+                  <span className="db-kpi-card__value">{platformCoupons.length}</span>
+                  <span className="db-kpi-card__label">Total Kupon</span>
+                </div>
+                <div className="db-kpi-card">
+                  <div className="db-kpi-card__icon db-kpi-card__icon--green"><CheckCircle size={16} /></div>
+                  <span className="db-kpi-card__value">{platformCoupons.filter((c) => c.is_active).length}</span>
+                  <span className="db-kpi-card__label">Kupon Aktif</span>
+                </div>
+                <div className="db-kpi-card">
+                  <div className="db-kpi-card__icon db-kpi-card__icon--slate"><TrendingUp size={16} /></div>
+                  <span className="db-kpi-card__value">{platformCoupons.reduce((sum, c) => sum + (c.used_count || 0), 0)}</span>
+                  <span className="db-kpi-card__label">Total Penggunaan</span>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat kupon...</span></div>
+              ) : platformCoupons.length > 0 ? (
+                <div className="db-table-responsive" style={{ marginTop: "20px" }}>
+                  <table className="db-table">
+                    <thead>
+                      <tr>
+                        <th>Kode Kupon</th>
+                        <th>Nama / Deskripsi</th>
+                        <th>Diskon</th>
+                        <th>Berlaku Untuk</th>
+                        <th>Min Transaksi</th>
+                        <th>Penggunaan</th>
+                        <th>Masa Berlaku</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {platformCoupons.map((c) => (
+                        <tr key={c.id}>
+                          <td><code style={{ background: "#f0fdf9", color: "#0f766e", padding: "3px 8px", borderRadius: "6px", fontWeight: 700 }}>{c.code}</code></td>
+                          <td>{c.name || "-"}</td>
+                          <td>{c.discount_type === "percentage" ? `${c.discount_value}%` : formatRupiah(c.discount_value)}</td>
+                          <td style={{ textTransform: "capitalize" }}>{c.applies_to === "semua" ? "Semua Paket" : c.applies_to === "premium" ? "Paket Premium" : "Paket Iklan"}</td>
+                          <td>{c.min_purchase ? formatRupiah(c.min_purchase) : "-"}</td>
+                          <td>{c.used_count || 0} / {c.max_uses || "∞"}</td>
+                          <td>{c.expires_at ? formatDate(c.expires_at) : "Selamanya"}</td>
+                          <td>
+                            <span
+                              className={`db-badge ${c.is_active ? "db-badge--success" : "db-badge--warning"}`}
+                              onClick={() => handleToggleCouponAdmin(c)}
+                              style={{ cursor: "pointer" }}
+                              title="Klik untuk ubah status"
+                            >
+                              {c.is_active ? "Aktif" : "Nonaktif"}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="db-table-actions">
+                              <button className="db-table-btn db-btn-edit" onClick={() => handleOpenCouponAdminModal(c)} title="Edit"><Edit2 size={14} /></button>
+                              <button className="db-table-btn db-btn-delete" onClick={() => handleDeleteCouponAdmin(c.id)} title="Hapus"><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <DashboardEmptyState
+                  title="Belum Ada Kupon Diskon"
+                  subtitle="Buat kupon diskon untuk Paket Premium atau Paket Iklan."
+                />
+              )}
+            </div>
+          )}
+
+          {/* TAB: PENGATURAN (Admin - pengaturan situs) */}
+          {activeTab === "settings" && isAdmin && (
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Pengaturan Situs</h2>
+              </div>
+              <form onSubmit={handleSaveSettings} style={{ maxWidth: "560px" }}>
+                <div className="db-form-group">
+                  <label>Nama Situs</label>
+                  <input
+                    type="text"
+                    value={settingsDraft.site_name || ""}
+                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, site_name: e.target.value }))}
+                    placeholder="Surade.co.id"
+                  />
+                </div>
+                <div className="db-form-group">
+                  <label>Email Kontak</label>
+                  <input
+                    type="email"
+                    value={settingsDraft.contact_email || ""}
+                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, contact_email: e.target.value }))}
+                    placeholder="admin@surade.co.id"
+                  />
+                </div>
+                <div className="db-form-group">
+                  <label>Nomor Telepon</label>
+                  <input
+                    type="text"
+                    value={settingsDraft.contact_phone || ""}
+                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, contact_phone: e.target.value }))}
+                    placeholder="+62 812 3456 7890"
+                  />
+                </div>
+                <div className="db-form-group">
+                  <label>WhatsApp Admin</label>
+                  <input
+                    type="text"
+                    value={settingsDraft.whatsapp_admin || ""}
+                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, whatsapp_admin: e.target.value }))}
+                    placeholder="6281234567890"
+                  />
+                </div>
+                <div className="db-form-group">
+                  <label>Alamat</label>
+                  <textarea
+                    rows={3}
+                    value={settingsDraft.address || ""}
+                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, address: e.target.value }))}
+                    placeholder="Alamat kantor/perusahaan"
+                  />
+                </div>
+                <div className="db-form-group">
+                  <label>Meta Description (SEO)</label>
+                  <textarea
+                    rows={3}
+                    value={settingsDraft.meta_description || ""}
+                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, meta_description: e.target.value }))}
+                    placeholder="Deskripsi singkat situs untuk mesin pencari"
+                  />
+                </div>
+                <div className="db-modal-footer" style={{ padding: 0, borderTop: "none" }}>
+                  <button type="submit" className="db-btn-submit" disabled={savingSettings}>
+                    {savingSettings ? "Menyimpan..." : "Simpan Pengaturan"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* --- MODAL: TAMBAH/EDIT KUPON DISKON (ADMIN) --- */}
+          {showCouponAdminModal && (
+            <div className="db-modal-overlay" onClick={() => setShowCouponAdminModal(false)}>
+              <div className="db-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="db-modal-header">
+                  <h3>{selectedPlatformCoupon ? "Edit Kupon" : "Tambah Kupon Diskon"}</h3>
+                  <button className="db-modal-close" onClick={() => setShowCouponAdminModal(false)}>&times;</button>
+                </div>
+                <form onSubmit={handleSaveCouponAdmin} className="db-modal-body">
+                  <div className="db-form-group">
+                    <label>Kode Kupon <span className="req">*</span></label>
+                    <div className="db-input-with-btn">
+                      <input
+                        type="text"
+                        required
+                        value={pcCode}
+                        onChange={(e) => setPcCode(e.target.value.toUpperCase())}
+                        placeholder="Contoh: PROMO50"
+                        style={{ textTransform: "uppercase" }}
+                      />
+                      <button
+                        type="button"
+                        className="db-input-btn"
+                        onClick={() => {
+                          const random = Math.random().toString(36).slice(2, 8).toUpperCase();
+                          setPcCode(`SURADE${random}`);
+                        }}
+                      >
+                        Acak Otomatis
+                      </button>
+                    </div>
+                  </div>
+                  <div className="db-form-group">
+                    <label>Nama / Deskripsi</label>
+                    <input type="text" value={pcName} onChange={(e) => setPcName(e.target.value)} placeholder="Contoh: Promo Super Premium 50%" />
+                  </div>
+                  <div className="db-form-row">
+                    <div className="db-form-group">
+                      <label>Tipe Diskon</label>
+                      <select value={pcType} onChange={(e) => setPcType(e.target.value)}>
+                        <option value="percentage">Persentase (%)</option>
+                        <option value="fixed">Nominal (Rp)</option>
+                      </select>
+                    </div>
+                    <div className="db-form-group">
+                      <label>Nilai Diskon <span className="req">*</span></label>
+                      {pcType === "percentage" ? (
+                        <input type="number" required min="1" max="100" value={pcValue} onChange={(e) => setPcValue(e.target.value)} placeholder="Contoh: 30" />
+                      ) : (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          required
+                          value={pcValue ? formatRupiahInput(pcValue) : ""}
+                          onChange={(e) => setPcValue(parseRupiahInput(e.target.value))}
+                          placeholder="Contoh: Rp10.000"
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className="db-form-group">
+                    <label>Berlaku Untuk</label>
+                    <select value={pcAppliesTo} onChange={(e) => setPcAppliesTo(e.target.value)}>
+                      <option value="semua">Semua Paket</option>
+                      <option value="premium">Paket Premium</option>
+                      <option value="iklan">Paket Iklan</option>
+                    </select>
+                  </div>
+                  <div className="db-form-row">
+                    <div className="db-form-group">
+                      <label>Min. Transaksi (Rp)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={pcMinPurchase ? formatRupiahInput(pcMinPurchase) : ""}
+                        onChange={(e) => setPcMinPurchase(parseRupiahInput(e.target.value))}
+                        placeholder="Opsional"
+                      />
+                    </div>
+                    <div className="db-form-group">
+                      <label>Maks. Penggunaan</label>
+                      <input type="number" min="1" value={pcMaxUses} onChange={(e) => setPcMaxUses(e.target.value)} placeholder="Kosongkan = tak terbatas" />
+                    </div>
+                  </div>
+                  <div className="db-form-group">
+                    <label>Masa Berlaku Sampai</label>
+                    <input type="date" value={pcExpiresAt} onChange={(e) => setPcExpiresAt(e.target.value)} />
+                  </div>
+                  <div className="db-modal-footer">
+                    <button type="button" className="db-btn-cancel" onClick={() => setShowCouponAdminModal(false)}>Batal</button>
+                    <button type="submit" className="db-btn-submit">{selectedPlatformCoupon ? "Simpan Perubahan" : "Buat Kupon"}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {activeTab === "tickets" && (
             <div className="db-panel">
               <div className="db-panel-header">
@@ -5777,16 +6537,19 @@ export default function Dashboard() {
                     <BookOpen size={16} />
                     Blog
                   </button>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      className={`db-content-tab ${contentTypeFilter === "event" ? "active" : ""}`}
-                      onClick={() => setContentTypeFilter("event")}
-                    >
-                      <CalendarDays size={16} />
-                      Event
-                    </button>
-                  )}
+                  {/* Tab "Event" sekarang tampil untuk semua role (bukan
+                      cuma admin) supaya tampilannya sama persis dengan
+                      halaman Admin Blog & Event. Aksi tulis (buat/edit/hapus
+                      event) tetap ditolak backend untuk non-admin lewat
+                      pengecekan role di EventController, jadi tetap aman. */}
+                  <button
+                    type="button"
+                    className={`db-content-tab ${contentTypeFilter === "event" ? "active" : ""}`}
+                    onClick={() => setContentTypeFilter("event")}
+                  >
+                    <CalendarDays size={16} />
+                    Event
+                  </button>
                 </div>
 
                 <div className="db-search-input db-content-toolbar__search">
@@ -5898,9 +6661,122 @@ export default function Dashboard() {
             hapus satuan, bersihkan lama) sekarang ada di dropdown lonceng
             topbar, aktif untuk admin maupun user biasa. */}
 
-        {/* TAB: RESELLER */}
-          {activeTab === "reseller" && (
+        {/* TAB: REFERRAL */}
+          {activeTab === "referral" && (
             <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Referral</h2>
+              </div>
+
+              {/* Ringkasan kode referral & komisi milik user sendiri.
+                  Data asli dari API /my-referral-stats, bukan dummy.
+                  Kotak kode referral SELALU tampil (tidak tersembunyi di
+                  belakang loading/error) supaya jelas kelihatan bagian ini aktif. */}
+              <div style={{ marginBottom: '20px', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px' }}>
+                <div className="db-form-group" style={{ maxWidth: 420, marginBottom: 0 }}>
+                  <label>Kode Referral Saya</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={referralStats?.referral_code || user?.referral_code || "Belum ada kode referral"}
+                      disabled
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        color: (referralStats?.referral_code || user?.referral_code) ? '#059669' : '#6b7280',
+                        fontWeight: (referralStats?.referral_code || user?.referral_code) ? '600' : 'normal'
+                      }}
+                    />
+                    {(referralStats?.referral_code || user?.referral_code) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(referralStats?.referral_code || user?.referral_code);
+                          alert('Kode referral berhasil disalin!');
+                        }}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#059669',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          borderRadius: '4px'
+                        }}
+                        title="Copy kode referral"
+                      >
+                        📋
+                      </button>
+                    )}
+                  </div>
+                  <small style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {(referralStats?.referral_code || user?.referral_code)
+                      ? `Bagikan kode ini. Pemakai kode dapat diskon ${referralStats?.discount_percent ?? 5}%, dan Anda mendapat komisi ${referralStats?.commission_percent ?? 15}% dari transaksi setelah disetujui Admin.`
+                      : "Anda belum memiliki kode referral. Kode referral diberikan oleh Admin."}
+                  </small>
+                </div>
+
+                {referralStatsLoading ? (
+                  <div className="db-empty-state">Memuat statistik referral...</div>
+                ) : referralStatsError ? (
+                  <div className="db-empty-state">{referralStatsError}</div>
+                ) : referralStats ? (
+                  <>
+                    <div className="db-stat-grid db-stat-grid--admin" style={{ marginTop: '16px' }}>
+                      <div className="db-stat-card db-stat-card--blue">
+                        <span className="db-stat-card__label">Total Pemakaian</span>
+                        <span className="db-stat-card__value">{referralStats.total_penggunaan}</span>
+                      </div>
+                      <div className="db-stat-card db-stat-card--violet">
+                        <span className="db-stat-card__label">Total Transaksi</span>
+                        <span className="db-stat-card__value">{referralStats.total_transaksi}</span>
+                      </div>
+                      <div className="db-stat-card db-stat-card--green">
+                        <span className="db-stat-card__label">Komisi Disetujui + Dibayar</span>
+                        <span className="db-stat-card__value db-stat-card__value--currency">Rp {Number(referralStats.total_komisi_diterima || 0).toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="db-stat-card db-stat-card--teal">
+                        <span className="db-stat-card__label">Komisi Sudah Dibayar</span>
+                        <span className="db-stat-card__value db-stat-card__value--currency">Rp {Number(referralStats.total_komisi_dibayar || 0).toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+
+                    {referralStats.riwayat_terbaru && referralStats.riwayat_terbaru.length > 0 ? (
+                      <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                        <table className="db-table">
+                          <thead>
+                            <tr>
+                              <th>Transaction ID</th>
+                              <th>User</th>
+                              <th>Diskon</th>
+                              <th>Komisi</th>
+                              <th>Status</th>
+                              <th>Tanggal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {referralStats.riwayat_terbaru.map((r) => (
+                              <tr key={r.id}>
+                                <td>{r.transaction_id || `#${r.id}`}</td>
+                                <td>{r.referred_user || '-'}</td>
+                                <td>Rp {Number(r.discount_amount || 0).toLocaleString('id-ID')}</td>
+                                <td>Rp {Number(r.commission_amount || 0).toLocaleString('id-ID')}</td>
+                                <td>{r.status}</td>
+                                <td>{new Date(r.created_at).toLocaleDateString('id-ID')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="db-empty-state" style={{ marginTop: '16px' }}>Belum ada transaksi referral.</div>
+                    )}
+                  </>
+                ) : null}
+              </div>
+
               <div className="db-panel-header">
                 <h2>Direktori Reseller</h2>
               </div>
@@ -6669,25 +7545,30 @@ export default function Dashboard() {
             </div>
           )}
 
+        {/* TAB: LAPORAN REPORT (Admin Only) */}
+        {activeTab === "reports" && isAdmin && (
+          <AdminReportTab />
+        )}
+
         {/* TAB: RIWAYAT PREMIUM (Admin Only) */}
           {activeTab === "riwayat" && isAdmin && (
             <div className="db-panel">
               <div className="db-panel-header">
                 <h2>Riwayat Premium & Pembayaran</h2>
                 <div className="db-panel-stats">
-                  {subscriptions?.approved_count && (
+                  {premiumHistory.approved_count && (
                     <span className="db-stat-badge db-stat-success">
-                      ✅ {subscriptions.approved_count} Disetujui
+                      ✅ {premiumHistory.approved_count} Disetujui
                     </span>
                   )}
-                  {subscriptions?.active_businesses && (
+                  {premiumHistory.active_businesses && (
                     <span className="db-stat-badge db-stat-primary">
-                      🏆 {subscriptions.active_businesses} Aktif
+                      🏆 {premiumHistory.active_businesses} Aktif
                     </span>
                   )}
-                  {subscriptions?.rejected_count > 0 && (
+                  {premiumHistory.rejected_count > 0 && (
                     <span className="db-stat-badge db-stat-danger">
-                      ❌ {subscriptions.rejected_count} Ditolak
+                      ❌ {premiumHistory.rejected_count} Ditolak
                     </span>
                   )}
                 </div>
@@ -6698,7 +7579,7 @@ export default function Dashboard() {
                   <div className="db-spinner" />
                   <span>Memuat riwayat premium...</span>
                 </div>
-              ) : subscriptions?.history?.length > 0 ? (
+              ) : premiumHistory.history?.length > 0 ? (
                 <>
                   <div className="db-table-responsive">
                     <table className="db-table">
@@ -6715,7 +7596,7 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(showAllHistory ? subscriptions.history : subscriptions.history.slice(0, 5)).map((item) => (
+                        {(showAllHistory ? premiumHistory.history : premiumHistory.history.slice(0, 5)).map((item) => (
                         <tr key={item.id} className={`db-table-row ${
                           item.status === 'approved' ? 'db-row-success' :
                           item.status === 'rejected' ? 'db-row-danger' :
@@ -6804,7 +7685,7 @@ export default function Dashboard() {
                   </table>
                   </div>
                   
-                  {subscriptions.history.length > 5 && (
+                  {premiumHistory.history.length > 5 && (
                     <div className="db-show-all-container">
                       <button 
                         className="db-show-all-btn"
@@ -6818,7 +7699,7 @@ export default function Dashboard() {
                         ) : (
                           <>
                             <ChevronDown size={16} />
-                            Lihat Semua ({subscriptions.history.length - 5} lainnya)
+                            Lihat Semua ({premiumHistory.history.length - 5} lainnya)
                           </>
                         )}
                       </button>
@@ -7051,6 +7932,198 @@ export default function Dashboard() {
               />
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminReportTab() {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetchReports();
+  }, [filterStatus]);
+
+  const fetchReports = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get(`/admin/business-reports?status=${filterStatus}&search=${search}`);
+      setReports(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (id, status) => {
+    try {
+      await api.put(`/admin/business-reports/${id}`, { status });
+      fetchReports();
+    } catch (err) {
+      alert("Gagal update status");
+    }
+  };
+
+  const handleDeleteContent = async (id) => {
+    if (!window.confirm("Yakin hapus konten?")) return;
+    try {
+      await api.post(`/admin/business-reports/${id}/remove-content`);
+      alert("Konten berhasil dihapus.");
+      fetchReports();
+    } catch (err) {
+      alert("Gagal hapus konten");
+    }
+  };
+
+  const totals = {
+    all: reports.length,
+    baru: reports.filter(r => r.status === 'baru').length,
+    diproses: reports.filter(r => r.status === 'diproses').length,
+    selesai: reports.filter(r => r.status === 'selesai').length,
+    usaha: reports.filter(r => r.business?.title).length,
+    blog: 0,
+    event: 0
+  };
+
+  return (
+    <div className="db-panel">
+      <div className="db-panel-header" style={{ marginBottom: "20px" }}>
+        <h2>Laporan Report Pelanggaran</h2>
+        <p className="db-content-header__subtitle">
+          Kelola dan tindak lanjuti laporan pengaduan dari pengguna mengenai pelanggaran konten Usaha, Blog, atau Event.
+        </p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "10px", marginBottom: "24px" }}>
+        <div style={{ padding: "16px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fff", textAlign: "center" }}>
+          <h4 style={{ fontSize: "12px", color: "#64748b", margin: "0 0 8px" }}>TOTAL REPORT</h4>
+          <span style={{ fontSize: "24px", fontWeight: "bold" }}>{totals.all}</span>
+        </div>
+        <div style={{ padding: "16px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fff", textAlign: "center" }}>
+          <h4 style={{ fontSize: "12px", color: "#f59e0b", margin: "0 0 8px" }}>REPORT BARU</h4>
+          <span style={{ fontSize: "24px", fontWeight: "bold" }}>{totals.baru}</span>
+        </div>
+        <div style={{ padding: "16px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fff", textAlign: "center" }}>
+          <h4 style={{ fontSize: "12px", color: "#3b82f6", margin: "0 0 8px" }}>SEDANG DIPROSES</h4>
+          <span style={{ fontSize: "24px", fontWeight: "bold" }}>{totals.diproses}</span>
+        </div>
+        <div style={{ padding: "16px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fff", textAlign: "center" }}>
+          <h4 style={{ fontSize: "12px", color: "#10b981", margin: "0 0 8px" }}>SELESAI</h4>
+          <span style={{ fontSize: "24px", fontWeight: "bold" }}>{totals.selesai}</span>
+        </div>
+        <div style={{ padding: "16px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fff", textAlign: "center" }}>
+          <h4 style={{ fontSize: "12px", color: "#8b5cf6", margin: "0 0 8px" }}>REPORT USAHA</h4>
+          <span style={{ fontSize: "24px", fontWeight: "bold" }}>{totals.usaha}</span>
+        </div>
+        <div style={{ padding: "16px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fff", textAlign: "center" }}>
+          <h4 style={{ fontSize: "12px", color: "#3b82f6", margin: "0 0 8px" }}>REPORT BLOG</h4>
+          <span style={{ fontSize: "24px", fontWeight: "bold" }}>0</span>
+        </div>
+        <div style={{ padding: "16px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fff", textAlign: "center" }}>
+          <h4 style={{ fontSize: "12px", color: "#ec4899", margin: "0 0 8px" }}>REPORT EVENT</h4>
+          <span style={{ fontSize: "24px", fontWeight: "bold" }}>0</span>
+        </div>
+      </div>
+
+      <div className="db-filters" style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
+        <div className="db-search-input" style={{ flex: 1, display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', color: '#64748b' }}>
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="text"
+            placeholder="Cari pelapor, judul konten, alasan..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && fetchReports()}
+            style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%' }}
+          />
+        </div>
+        <select className="db-filter-select" style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0' }} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          <option value="all">Semua Status</option>
+          <option value="baru">Baru</option>
+          <option value="diproses">Sedang Diproses</option>
+          <option value="selesai">Selesai</option>
+          <option value="ditolak">Ditolak</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <div className="db-loader-wrap">
+          <div className="db-spinner" />
+        </div>
+      ) : (
+        <div className="db-table-responsive">
+          <table className="db-table">
+            <thead>
+              <tr>
+                <th>ID & PELAPOR</th>
+                <th>JENIS & KONTEN</th>
+                <th>ALASAN REPORT</th>
+                <th>TANGGAL</th>
+                <th>STATUS</th>
+                <th>AKSI</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <strong>#REP-{String(r.id).padStart(3, '0')}</strong>
+                    <br />
+                    <span style={{ color: "#64748b", fontSize: "12px" }}>{r.reporter_name}</span>
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ padding: "2px 6px", background: "#e0f2fe", color: "#0369a1", fontSize: "10px", borderRadius: "4px", fontWeight: "bold" }}>USAHA</span>
+                      <strong>{r.business?.title || "Bisnis dihapus"}</strong>
+                    </div>
+                  </td>
+                  <td>
+                    <strong style={{ color: "#b91c1c" }}>{r.reason}</strong>
+                    <br />
+                    <span style={{ color: "#64748b", fontSize: "12px" }}>{r.description || "-"}</span>
+                  </td>
+                  <td>
+                    {new Date(r.created_at).toLocaleDateString("id-ID")}
+                  </td>
+                  <td>
+                    <select
+                      value={r.status}
+                      onChange={(e) => handleUpdateStatus(r.id, e.target.value)}
+                      style={{ padding: "4px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", background: r.status === 'ditolak' ? '#fee2e2' : r.status === 'selesai' ? '#dcfce3' : '#fff' }}
+                    >
+                      <option value="baru">Baru</option>
+                      <option value="diproses">Diproses</option>
+                      <option value="selesai">Selesai</option>
+                      <option value="ditolak">Ditolak</option>
+                    </select>
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button className="db-action-btn" style={{ background: "#f1f5f9", color: "#007570", padding: "6px 12px" }}>
+                        Detail
+                      </button>
+                      <button className="db-action-btn" style={{ background: "#fee2e2", color: "#b91c1c", padding: "6px 12px" }} onClick={() => handleDeleteContent(r.id)}>
+                        Hapus Konten
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {reports.length === 0 && (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: "center", padding: "30px", color: "#94a3b8" }}>Tidak ada laporan.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

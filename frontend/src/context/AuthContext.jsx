@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("token");
     const cachedUser = localStorage.getItem("user");
 
     if (token) {
@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
     }
 
     const handleAuthChange = () => {
-      const updatedToken = localStorage.getItem("access_token");
+      const updatedToken = localStorage.getItem("token");
       if (!updatedToken) {
         setUser(null);
       } else {
@@ -62,7 +62,7 @@ export function AuthProvider({ children }) {
         throw new Error("Invalid login response");
       }
       
-      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
       setUser(data.user);
       
@@ -77,16 +77,26 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const setAuth = (authData) => {
+    if (authData.token && authData.user) {
+      localStorage.setItem("token", authData.token);
+      localStorage.setItem("user", JSON.stringify(authData.user));
+      setUser(authData.user);
+      
+      // Dispatch auth change event to notify other components
+      window.dispatchEvent(new Event("auth-change"));
+    }
+  };
+
   const register = async (name, email, password, referral_code = null) => {
     const data = await api.post("/register", { name, email, password, referral_code });
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("user", JSON.stringify(data.user));
-    setUser(data.user);
-    return data.user;
+    
+    // For register with OTP, we don't store auth yet - wait for verification
+    return data;
   };
 
   const logoutLocal = () => {
-    localStorage.removeItem("access_token");
+    localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
   };
@@ -102,7 +112,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser: fetchProfile, isAdmin: user?.role === 'admin' }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, setAuth, refreshUser: fetchProfile, isAdmin: user?.role === 'admin' }}>
       {children}
     </AuthContext.Provider>
   );
