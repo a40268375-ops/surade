@@ -19,6 +19,7 @@ export default function ForgotPassword() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [resetToken, setResetToken] = useState("");
 
   /* ── STEP 1: kirim kode ke email ── */
   const handleSendCode = async (e) => {
@@ -32,7 +33,7 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      await api.post("forgot-password", { email: email.trim() });
+      const response = await api.post("/forgot-password", { email: email.trim() });
       setStep(2);
     } catch (err) {
       setError(
@@ -56,15 +57,24 @@ export default function ForgotPassword() {
       return;
     }
 
+    if (code.length !== 6) {
+      setError("Kode verifikasi harus 6 digit.");
+      return;
+    }
+
     setLoading(true);
     try {
-      await api.post("verify-reset-code", { email: email.trim(), code: code.trim() });
+      const response = await api.post("/verify-reset-otp", { 
+        email: email.trim(), 
+        otp_code: code.trim() 
+      });
+      setResetToken(response.reset_token);
       setStep(3);
     } catch (err) {
       setError(
         err?.data?.message ||
         err?.message ||
-        "Kode verifikasi salah atau sudah kedaluwarsa."
+        "Kode verifikasi salah atau sudah kadaluarsa."
       );
     } finally {
       setLoading(false);
@@ -91,9 +101,8 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      await api.post("reset-password", {
-        email: email.trim(),
-        code: code.trim(),
+      await api.post("/reset-password", {
+        reset_token: resetToken,
         password,
         password_confirmation: passwordConfirm,
       });
@@ -114,7 +123,7 @@ export default function ForgotPassword() {
     setError("");
     setLoading(true);
     try {
-      await api.post("forgot-password", { email: email.trim() });
+      await api.post("/resend-reset-otp", { email: email.trim() });
       setError("");
       alert("Kode verifikasi baru sudah dikirim ke email kamu.");
     } catch (err) {
@@ -188,7 +197,7 @@ export default function ForgotPassword() {
                   Masukkan Kode Verifikasi
                 </h2>
                 <p style={{ margin: "0 0 20px", fontSize: 14, color: "#6b7280" }}>
-                  Kode 6 digit sudah dikirim ke <strong>{email}</strong>. Kode berlaku selama 15 menit.
+                  Kode 6 digit sudah dikirim ke <strong>{email}</strong>. Kode berlaku selama 5 menit.
                 </p>
 
                 {error && (

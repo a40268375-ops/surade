@@ -233,7 +233,7 @@ export default function VisionMission() {
             <div className="footer-col">
               <h4 className="footer-heading">Bantuan</h4>
               <ul className="footer-links">
-                <li><a href="#">FAQ</a></li>
+                <li><Link to="/faq">FAQ</Link></li>
                 <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
                 <li><Link to="/contact">Hubungi Kami</Link></li>
               </ul>

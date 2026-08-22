@@ -86,6 +86,31 @@
   margin-bottom: 6px;
   letter-spacing: -0.02em;
   line-height: 1.15;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Lencana "Terverifikasi" — hijau, hanya tampil kalau bisnisnya
+   memang lagi premium aktif (business.is_premium_active). */
+.bd-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #047857);
+  padding: 6px 14px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.4);
+  vertical-align: middle;
+}
+
+.bd-verified-badge svg {
+  color: #fff;
 }
 
 .bd-hero__category {
@@ -166,8 +191,30 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: visible;
   position: relative;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.bd-quick-actions::-webkit-scrollbar {
+  height: 4px;
+}
+
+.bd-quick-actions::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 4px;
+}
+
+.bd-quick-action {
+  flex: 0 0 auto;
+}
+
+.bd-quick-action--report:hover {
+  border-color: #f97316;
+  color: #f97316;
 }
 
 .bd-quick-action {
@@ -219,18 +266,20 @@
 
 .bd-price-count {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
+  bottom: 2px;
+  right: 2px;
   background: #007570;
   color: #fff;
-  font-size: 0.7rem;
+  font-size: 0.58rem;
   font-weight: 700;
-  width: 18px;
+  min-width: 18px;
   height: 18px;
-  border-radius: 50%;
+  padding: 0 4px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
+  letter-spacing: -0.5px;
 }
 
 .bd-price-dropdown {
@@ -281,6 +330,21 @@
 }
 
 .bd-price-option.active {
+  background: #007570;
+  color: #fff;
+}
+
+/* Read-only: bukan diklik pengunjung, cuma nampilin tier bisnis ini */
+.bd-price-option--readonly {
+  cursor: default;
+}
+
+.bd-price-option--readonly:hover {
+  background: transparent;
+  color: #334155;
+}
+
+.bd-price-option--readonly.active:hover {
   background: #007570;
   color: #fff;
 }
@@ -617,6 +681,16 @@
   .bd-products-section {
     padding: 20px;
   }
+  .bd-products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .bd-products-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 
@@ -658,13 +732,10 @@
 
 .bd-products-grid {
   display: grid;
-  /* Lebar kolom dibatasi maksimal 300px (bukan 1fr/melar bebas) supaya
-     kartu produk nggak jadi raksasa waktu di halaman terakhir cuma
-     tersisa 1-2 produk. Sebelumnya kolom ikut melebar penuh 1 baris,
-     dan karena tinggi foto ngikutin rasio lebar (aspect-ratio), fotonya
-     jadi ekstra besar juga. */
-  grid-template-columns: repeat(auto-fit, minmax(230px, 300px));
-  gap: 22px;
+  /* Tampilkan 3 kolom card yang lebih kecil dan rapi ke samping */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: start;
 }
 
 .bd-product-card {
@@ -690,11 +761,11 @@
 
 .bd-product-card__img-wrap {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 2;
   overflow: hidden;
   background: linear-gradient(135deg, #f0fdfa, #f1f5f9);
   position: relative;
-  padding: 12px;
+  padding: 8px;
 }
 
 .bd-product-card__img-wrap img {
@@ -712,14 +783,14 @@
 }
 
 .bd-product-card__body {
-  padding: 14px 18px 18px;
+  padding: 10px 14px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .bd-product-card__name {
-  font-size: 1.02rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: #0f172a;
   line-height: 1.35;
@@ -727,7 +798,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 2.7em;
+  min-height: 2.4em;
 }
 
 .bd-product-card__price {
@@ -735,11 +806,11 @@
   align-items: center;
   gap: 4px;
   align-self: flex-start;
-  font-size: 0.95rem;
+  font-size: 0.82rem;
   font-weight: 800;
   color: #ee4d2d;
   background: #fff1ee;
-  padding: 6px 13px;
+  padding: 4px 10px;
   border-radius: 999px;
 }
 
@@ -748,10 +819,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  margin-top: 4px;
-  padding-top: 12px;
+  margin-top: 2px;
+  padding-top: 8px;
   border-top: 1px dashed #eef1f4;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #007570;
   transition: gap 0.2s ease;
@@ -1174,20 +1245,32 @@
 }
 
 /* ── Weekly schedule dropdown ── */
+.bd-hours-card__week-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+  overflow: hidden;
+}
+
+.bd-hours-card__week-wrap.open {
+  grid-template-rows: 1fr;
+}
+
 .bd-hours-card__week {
   list-style: none;
-  margin: 16px 0 0;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bd-hours-card__week-wrap.open .bd-hours-card__week {
+  margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid #e8ecf0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  animation: bdHoursExpand 0.2s ease;
-}
-
-@keyframes bdHoursExpand {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .bd-hours-card__week-row {
@@ -1891,6 +1974,12 @@
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+  .bd-verified-badge {
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    gap: 4px;
+  }
+
   .bd-premium-badge {
     font-size: 10px;
     padding: 2px 6px;

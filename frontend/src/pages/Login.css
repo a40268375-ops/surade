@@ -738,3 +738,143 @@
     width: 100%;
   }
 }
+
+/* ─────────────────────────────────────────────
+   OTP VERIFICATION STYLES
+───────────────────────────────────────────── */
+.verify-email-info {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #374151;
+  text-align: center;
+}
+
+.otp-input {
+  font-family: 'Courier New', monospace !important;
+  background: #f9fafb;
+  border: 2px solid #d1d5db;
+  transition: all 0.2s ease;
+}
+
+.otp-input:focus {
+  background: #ffffff;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+}
+
+.otp-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 14px;
+  color: #6b7280;
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.resend-otp {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.resend-otp p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.resend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: #0f766e;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.resend-btn:hover:not(.resend-btn--disabled) {
+  background: #f0fdfa;
+  color: #0d9488;
+}
+
+.resend-btn--disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.login-back-link {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-header__icon {
+  color: #0f766e;
+  margin-bottom: 12px;
+}
+
+.login-header__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.login-header__subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.login-terms {
+  font-size: 13px;
+  color: #6b7280;
+  text-align: center;
+  margin: 16px 0;
+  line-height: 1.5;
+}
+
+.login-terms a {
+  color: #0f766e;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-terms a:hover {
+  text-decoration: underline;
+}
+
+.login-switch {
+  text-align: center;
+  font-size: 14px;
+  color: #6b7280;
+  margin: 16px 0;
+}
+
+.login-switch__link {
+  color: #0f766e;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-switch__link:hover {
+  text-decoration: underline;
+}

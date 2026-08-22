@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
   import { Link, useNavigate } from "react-router-dom";
   import api, { getImageUrl } from "../utils/api";
+  import { useAuth } from "../context/AuthContext";
   import { DEFAULT_CATEGORY_TABS, iconForCategory } from "../utils/categoryIcons.jsx";
   import "./Home.css";
   import Navbar from "../components/Navbar";
@@ -261,11 +262,13 @@ import { useState, useRef, useEffect } from "react";
 
   export default function Home() {
     const navigate = useNavigate();
+    const { user: authUser } = useAuth();
     const [selectedKota, setSelectedKota] = useState(DESA_LIST[0] || "Kelurahan Surade");
     const [kotaSearch, setKotaSearch] = useState("");
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState("all");
-    const [saved, setSaved] = useState({});
+    const [saved, setSaved] = useState({}); // { [businessId]: savedRecordId }
+    const [savingIds, setSavingIds] = useState({});
     const [bounceCounts, setBounceCounts] = useState({});
     const [selectedCity, setSelectedCity] = useState(null);
     const [searchKeyword, setSearchKeyword] = useState("");
@@ -284,6 +287,28 @@ import { useState, useRef, useEffect } from "react";
     const [dbBlogs, setDbBlogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [apiError, setApiError] = useState(false);
+
+    // Muat daftar bisnis yang sudah disimpan user, supaya ikon "Simpan"
+    // langsung kelihatan aktif untuk bisnis yang sebelumnya sudah disimpan.
+    useEffect(() => {
+      if (!authUser) {
+        setSaved({});
+        return;
+      }
+      let cancelled = false;
+      api.get("/my-saved-businesses")
+        .then((rows) => {
+          if (cancelled) return;
+          const map = {};
+          (rows || []).forEach((row) => {
+            const bizId = row.business_id || row.business?.id;
+            if (bizId) map[bizId] = row.id;
+          });
+          setSaved(map);
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
+    }, [authUser]);
 
     useEffect(() => {
       window.scrollTo(0, 0);
@@ -465,6 +490,11 @@ import { useState, useRef, useEffect } from "react";
     const categoriesList = [
       ...DEFAULT_CATEGORY_TABS,
       ...dbCategories
+        // PERBAIKAN: sama seperti di halaman Category - endpoint
+        // "/categories" isinya flat semua (kategori utama + subkategori),
+        // jadi difilter dulu cuma yang tidak punya induk (parent_id kosong)
+        // yang boleh nambah jadi kotak kategori utama.
+        .filter((c) => !c.parent_id)
         .filter((c) => {
           const norm = normalizeLabel(c.name);
           if (DEFAULT_CATEGORY_TABS.some((tab) => tab.id === c.slug)) return false;
@@ -476,7 +506,7 @@ import { useState, useRef, useEffect } from "react";
         .map((c) => ({
           id: c.slug,
           label: c.name,
-          icon: iconForCategory(c.name, { size: 24, strokeWidth: 1.5 }),
+          icon: iconForCategory(c.name, { size: 26, strokeWidth: 1.7 }),
         })),
     ];
 
@@ -490,9 +520,22 @@ import { useState, useRef, useEffect } from "react";
       status: b.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
       img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
       is_premium: b.is_premium_active,
-      open: b.is_premium_active, // Premium businesses are "open", free businesses are "closed"
+      open: !!b.is_open_now,
       categoryColor: "#159c60"
     })) : (apiError ? [...TEMUKAN_DATA, ...BISNIS_DATA] : []);
+
+    // PERBAIKAN: sebelumnya "N bisnis terdaftar" di kartu Smart City &
+    // Smart Village adalah angka STATIS yang ditulis manual di
+    // smartCities.js (mis. selalu "48" untuk Desa Buniwangi, tidak pernah
+    // berubah walau ada bisnis baru daftar/dihapus). Sekarang dihitung
+    // ASLI dari data bisnis yang sudah dimuat, dicocokkan lewat kolom
+    // `village` (bukan menebak-nebak dari teks alamat) - karena pilihan
+    // desa di form Tambah Bisnis memang diambil dari nama SMART_CITIES
+    // yang sama persis, jadi pencocokannya exact match, bukan fuzzy.
+    const villageBusinessCounts = dbBusinesses.reduce((acc, b) => {
+      if (b.village) acc[b.village] = (acc[b.village] || 0) + 1;
+      return acc;
+    }, {});
 
     const filteredKota = KOTA_INDONESIA.filter((k) =>
       k.toLowerCase().includes(kotaSearch.toLowerCase())
@@ -547,7 +590,32 @@ import { useState, useRef, useEffect } from "react";
     });
 
     function toggleSave(id) {
-      setSaved((prev) => ({ ...prev, [id]: !prev[id] }));
+      if (!authUser) {
+        window.location.href = "/login";
+        return;
+      }
+      if (savingIds[id]) return;
+      setSavingIds((prev) => ({ ...prev, [id]: true }));
+      const existingRecordId = saved[id];
+      const request = existingRecordId
+        ? api.delete(`/saved-businesses/${existingRecordId}`).then(() => {
+            setSaved((prev) => {
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
+          })
+        : api.post("/saved-businesses", { business_id: id }).then((result) => {
+            setSaved((prev) => ({ ...prev, [id]: result.id }));
+          });
+
+      request
+        .catch((err) => {
+          alert(err?.data?.message || "Gagal memperbarui daftar favorit. Silakan coba lagi.");
+        })
+        .finally(() => {
+          setSavingIds((prev) => ({ ...prev, [id]: false }));
+        });
     }
 
     const handleSearchSubmit = () => {
@@ -781,12 +849,13 @@ import { useState, useRef, useEffect } from "react";
                       <div className="ad-card__img-overlay">
                         <button
                           type="button"
-                          className={`ad-card__save${saved[ad.id] ? " saved" : ""}`}
-                          onClick={(e) => { e.preventDefault(); toggleSave(ad.id); }}
+                          className={`ad-card__save${saved[ad.businessId] ? " saved" : ""}`}
+                          onClick={(e) => { e.preventDefault(); if (ad.businessId) toggleSave(ad.businessId); }}
+                          disabled={!ad.businessId || !!savingIds[ad.businessId]}
                           aria-label="Simpan"
                         >
-                          <Bookmark size={13} fill={saved[ad.id] ? "currentColor" : "none"} />
-                          <span>Simpan</span>
+                          <Bookmark size={13} fill={saved[ad.businessId] ? "currentColor" : "none"} />
+                          <span>{saved[ad.businessId] ? "Tersimpan" : "Simpan"}</span>
                         </button>
                         <span className="ad-card__views">
                           <Eye size={13} />
@@ -846,7 +915,15 @@ import { useState, useRef, useEffect } from "react";
             <p className="smart-subtitle">Surade.co.id Mendorong Percepatan Program Pemerintah Smart City &amp; Smart Village</p>
 
             <div className="smart-grid">
-              {SMART_CITIES.map((city) => (
+              {SMART_CITIES.map((city) => {
+                // Kalau data bisnis asli sudah dimuat, pakai hitungan asli
+                // (termasuk yang sah bernilai 0 kalau desanya memang belum
+                // punya bisnis terdaftar). Selama masih memuat, tampilkan
+                // dulu angka placeholder dari smartCities.js supaya kartu
+                // tidak "berkedip" ke 0 sesaat sebelum data API selesai.
+                const realCount = villageBusinessCounts[city.name];
+                const displayCount = dbBusinesses.length > 0 ? (realCount || 0) : city.bisnis;
+                return (
                 <Link 
                   key={city.id} 
                   to={`/smart-city/${city.id}`}
@@ -861,58 +938,22 @@ import { useState, useRef, useEffect } from "react";
                     <div className="smart-card__overlay" />
                     <span className="smart-card__name">{city.name}</span>
                     <div className="smart-card__tooltip">
-                      <span className="smart-card__tooltip-count">{city.bisnis.toLocaleString("id-ID")}</span>
+                      <span className="smart-card__tooltip-count">{displayCount.toLocaleString("id-ID")}</span>
                       <span className="smart-card__tooltip-label"> bisnis terdaftar</span>
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
 
-        {/* ── EVENT & PROMO SECTION ──
-             Diisi Admin lewat Dashboard > Event. Tayang otomatis untuk semua
-             pengunjung (beda dengan Iklan, event TIDAK butuh langganan Premium
-             karena ini konten resmi dari admin, bukan promosi bisnis perorangan). */}
-        {dbEvents.length > 0 && (
-          <section className="event-section">
-            <div className="event-inner">
-              <h2 className="event-title">Event &amp; Promo</h2>
-              <p className="event-subtitle">Info acara dan promo terbaru dari Surade.co.id</p>
-
-              <div className="event-grid">
-                {dbEvents.map((ev) => (
-                  <div key={ev.id} className="event-card">
-                    <div className="event-card__img-wrap">
-                      <img
-                        src={ev.image ? getImageUrl(ev.image) : "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=500&h=300&fit=crop"}
-                        alt={ev.title}
-                        className="event-card__img"
-                        loading="lazy"
-                      />
-                      {ev.event_date && (
-                        <span className="event-card__date">
-                          {new Date(ev.event_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-                        </span>
-                      )}
-                    </div>
-                    <div className="event-card__body">
-                      <h3 className="event-card__title">{ev.title}</h3>
-                      {ev.location && (
-                        <p className="event-card__location">
-                          <MapPin size={13} />
-                          {ev.location}
-                        </p>
-                      )}
-                      <p className="event-card__desc">{ev.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
+        {/* PERMINTAAN: "Event & Promo" section yang tadinya berdiri
+            sendiri terpisah dari "Berbagi Pengalaman" (Blog) sekarang
+            digabung jadi SATU section "Blog & Event" di bawah, sesuai
+            menu navbar yang juga sudah "Blog & Event" (satu topik, bukan
+            dua section terpisah). Grid event-nya dipindah ke situ. */}
 
         {/* ── FOTO CURUG CIKASO / KECAMATAN SURADE (animasi gelombang di tepi) ── */}
         <section className="kenapa-section">
@@ -1005,22 +1046,21 @@ import { useState, useRef, useEffect } from "react";
                         type="button"
                         className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
                         onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
+                        disabled={!!savingIds[bisnis.id]}
                         aria-label="Simpan"
                       >
                         <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                        <span>Simpan</span>
+                        <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
                       </button>
                       <span className="biz-card__views">
                         <Eye size={13} />
                         <span>Pratinjau</span>
                       </span>
                     </div>
-                    {/* Premium Badge */}
-                    {bisnis.is_premium && (
-                      <div className="biz-card__premium-badge">
-                        <span>Premium</span>
-                      </div>
-                    )}
+                    {/* Verification Badge */}
+                    <div className="biz-card__premium-badge">
+                      <span>Terverifikasi</span>
+                    </div>
                   </div>
 
                   {/* Body */}
@@ -1100,12 +1140,48 @@ import { useState, useRef, useEffect } from "react";
           </div>
         </section>
 
-        {/* ── BERBAGI PENGALAMAN SECTION ── */}
+        {/* ── BLOG & EVENT SECTION (digabung, satu section saja) ── */}
         <section className="blog-section">
           <div className="blog-inner">
-            <h2 className="blog-title">Berbagi Pengalaman Mereka</h2>
-            <p className="blog-subtitle">Bagikan Pengalaman Dan Info Anda Di Surade.co.id.</p>
+            <h2 className="blog-title">Blog &amp; Event</h2>
+            <p className="blog-subtitle">Info acara, promo, dan cerita pengalaman terbaru dari Surade.co.id</p>
 
+            {dbEvents.length > 0 && (
+              <>
+                <h3 className="blog-subsection-title">📅 Event &amp; Promo</h3>
+                <div className="event-grid">
+                  {dbEvents.map((ev) => (
+                    <div key={ev.id} className="event-card">
+                      <div className="event-card__img-wrap">
+                        <img
+                          src={ev.image ? getImageUrl(ev.image) : "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=500&h=300&fit=crop"}
+                          alt={ev.title}
+                          className="event-card__img"
+                          loading="lazy"
+                        />
+                        {ev.event_date && (
+                          <span className="event-card__date">
+                            {new Date(ev.event_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                      <div className="event-card__body">
+                        <h3 className="event-card__title">{ev.title}</h3>
+                        {ev.location && (
+                          <p className="event-card__location">
+                            <MapPin size={13} />
+                            {ev.location}
+                          </p>
+                        )}
+                        <p className="event-card__desc">{ev.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <h3 className="blog-subsection-title">✍️ Berbagi Pengalaman Mereka</h3>
             <div className="blog-grid">
               {(dbBlogs.length > 0
                 ? dbBlogs.slice(0, 3).map((b) => ({
@@ -1145,9 +1221,9 @@ import { useState, useRef, useEffect } from "react";
                         e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=260&fit=crop";
                       }}
                     />
+                    <span className="blog-card__category">{post.category}</span>
                   </div>
                   <div className="blog-card__body">
-                    <p className="blog-card__category">{post.category}</p>
                     <h3 className="blog-card__title">{post.title}</h3>
                     <div className="blog-card__footer">
                       <span className="blog-card__meta">
@@ -1224,7 +1300,7 @@ import { useState, useRef, useEffect } from "react";
               <div className="footer-col">
                 <h4 className="footer-heading">Bantuan</h4>
                 <ul className="footer-links">
-                  <li><a href="#">FAQ</a></li>
+                  <li><Link to="/faq">FAQ</Link></li>
                   <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
                   <li><Link to="/contact">Hubungi Kami</Link></li>
                 </ul>

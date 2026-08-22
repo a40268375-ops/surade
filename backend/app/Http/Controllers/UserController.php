@@ -90,17 +90,39 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6',
             'role' => 'required|string|in:user,admin,reseller',
-            'referral_code' => 'nullable|string',
+            'referral_code' => 'nullable|string|max:20|unique:users,referral_code',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Auto-generate referral code if not provided
+        // Auto-generate referral code if not provided and user is reseller
         $referralCode = $request->referral_code;
-        if (!$referralCode) {
+        if (!$referralCode && $request->role === 'reseller') {
             $referralCode = $this->generateUniqueReferralCode();
+        } else if ($referralCode) {
+            // Validate custom referral code format
+            if (!preg_match('/^[A-Z0-9]{3,20}$/', $referralCode)) {
+                return response()->json([
+                    'errors' => [
+                        'referral_code' => ['Kode referral harus 3-20 karakter, huruf besar dan angka saja']
+                    ]
+                ], 422);
+            }
+        }
+        $referralCode = $request->referral_code;
+        if (!$referralCode && $request->role === 'reseller') {
+            $referralCode = $this->generateUniqueReferralCode();
+        } else if ($referralCode) {
+            // Validate custom referral code format
+            if (!preg_match('/^[A-Z0-9]{3,20}$/', $referralCode)) {
+                return response()->json([
+                    'errors' => [
+                        'referral_code' => ['Kode referral harus 3-20 karakter, huruf besar dan angka saja']
+                    ]
+                ], 422);
+            }
         }
 
         $user = User::create([
@@ -132,16 +154,38 @@ class UserController extends Controller
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $id,
             'password' => 'nullable|string|min:6',
             'role' => 'sometimes|required|string|in:user,admin,reseller',
-            'referral_code' => 'nullable|string',
+            'referral_code' => 'nullable|string|max:20|unique:users,referral_code,' . $id,
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        // Validate custom referral code format if provided
+        if ($request->filled('referral_code')) {
+            $referralCode = $request->referral_code;
+            if (!preg_match('/^[A-Z0-9]{3,20}$/', $referralCode)) {
+                return response()->json([
+                    'errors' => [
+                        'referral_code' => ['Kode referral harus 3-20 karakter, huruf besar dan angka saja']
+                    ]
+                ], 422);
+            }
+        }
+
         $data = $request->only('name', 'email', 'role', 'referral_code');
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
+        }
+
+        // Auto-generate referral code if user becomes reseller and doesn't have one
+        if ($request->role === 'reseller' && empty($data['referral_code']) && empty($user->referral_code)) {
+            $data['referral_code'] = $this->generateUniqueReferralCode();
+        }
+
+        // Clear referral code if user is no longer reseller and no custom code was provided
+        if ($request->role !== 'reseller' && !$request->filled('referral_code')) {
+            $data['referral_code'] = null;
         }
 
         $user->update($data);

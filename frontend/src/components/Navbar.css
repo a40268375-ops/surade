@@ -163,8 +163,7 @@
   transition: opacity 0.18s, transform 0.2s;
 }
 
-.home-nav__dropdown-wrapper:hover .home-nav__caret,
-.home-nav__dropdown-wrapper:focus-within .home-nav__caret {
+.home-nav__dropdown-wrapper.open .home-nav__caret {
   opacity: 1;
   transform: rotate(180deg);
 }
@@ -272,7 +271,8 @@
 }
 
 .home-nav__dropdown-wrapper:hover .home-nav__dropdown-menu--simple,
-.home-nav__dropdown-wrapper:focus-within .home-nav__dropdown-menu--simple {
+.home-nav__dropdown-wrapper:focus-within .home-nav__dropdown-menu--simple,
+.home-nav__dropdown-wrapper.open .home-nav__dropdown-menu--simple {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -489,4 +489,66 @@
   .home-nav__link--login {
     display: none;
   }
+
+  .home-nav__dropdown-menu--mega {
+    min-width: 280px;
+    flex-direction: column;
+  }
+
+  .home-nav__mega-col--parents {
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    max-height: 200px;
+  }
+}
+
+/* ── MEGA MENU INFORMASI (2 kolom) ── */
+.home-nav__dropdown-menu--mega {
+  display: flex;
+  min-width: 520px;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 0;
+  overflow: hidden;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+
+.home-nav__dropdown-wrapper--mega.open .home-nav__dropdown-menu--mega {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+.home-nav__mega-col {
+  display: flex;
+  flex-direction: column;
+  max-height: min(420px, calc(100vh - 100px));
+  overflow-y: auto;
+}
+
+.home-nav__mega-col--parents {
+  flex: 0 0 220px;
+  border-right: 1px solid #e5e7eb;
+  padding: 8px 0;
+}
+
+.home-nav__mega-col--children {
+  flex: 1;
+  padding: 8px 0;
+  min-width: 240px;
+}
+
+.home-nav__mega-col--children .home-nav__sub-item {
+  white-space: normal;
+}
+
+.home-nav__mega-empty {
+  display: block;
+  padding: 16px 20px;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-style: italic;
 }

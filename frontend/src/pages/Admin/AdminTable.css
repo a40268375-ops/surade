@@ -118,6 +118,30 @@
   border: 2px solid #2563eb !important;
 }
 
+.status-badge.baru {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #d97706 !important;
+}
+
+.status-badge.diproses {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #2563eb !important;
+}
+
+.status-badge.selesai {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #059669 !important;
+}
+
+.status-badge.ditolak {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #6b7280 !important;
+}
+
 /* Action Buttons */
 .action-btn {
   padding: 10px 20px !important;

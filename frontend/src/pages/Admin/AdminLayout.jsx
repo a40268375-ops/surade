@@ -175,6 +175,14 @@ const AdminLayout = ({ children }) => {
                         </svg>
                         Manajemen Reseller
                     </Link>
+                    <Link to="/admin/referrals" style={navItemStyle}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 3v4a1 1 0 0 0 1 1h4"/>
+                            <path d="M17 21h-5a2 2 0 0 1-2-2V7l5-5h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="9,9 9,17 13,13 17,17 17,13"/>
+                        </svg>
+                        Referral
+                    </Link>
                     <Link to="/admin/businesses" style={navItemStyle}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <rect x="3" y="7" width="18" height="13" rx="2"/>
@@ -197,6 +205,14 @@ const AdminLayout = ({ children }) => {
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
                         </svg>
                         Manajemen Blog
+                    </Link>
+                    <Link to="/admin/reports" style={navItemStyle}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        Laporan Report
                     </Link>
                 </nav>
 

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\OtpVerification;
+use App\Mail\OtpMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -15,22 +18,25 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6',
+            'password' => 'required|string|min:6|confirmed',
             'referral_code' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            // Provide more specific error messages
+            $errors = $validator->errors();
+            if ($errors->has('email')) {
+                $emailError = $errors->first('email');
+                if (str_contains($emailError, 'unique')) {
+                    return response()->json([
+                        'message' => 'Email ini sudah terdaftar. Silakan login atau gunakan email lain.',
+                        'errors' => $errors
+                    ], 422);
+                }
+            }
+            return response()->json(['errors' => $errors], 422);
         }
 
-        // SECURITY FIX: `role` used to be accepted straight from the request
-        // body (nullable|in:user,admin,reseller), which meant anyone calling
-        // POST /api/register directly (e.g. via curl/Postman, bypassing the
-        // React form that never exposes a role picker) could send
-        // {"role":"admin"} and instantly get an administrator account. Public
-        // self-registration must always create a plain "user"; only an
-        // existing admin (via UserController::store/update) may grant the
-        // admin or reseller role.
         // Generate unique referral code for new user
         $referralCode = $this->generateUniqueReferralCode();
 
@@ -41,15 +47,269 @@ class AuthController extends Controller
             'role' => 'user',
             'status' => 'active',
             'referral_code' => $referralCode,
+            'is_active' => true,
+            // Don't set email_verified_at yet - wait for OTP verification
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Create OTP for email verification
+        $otpRecord = OtpVerification::createOtp($request->email, 'register', $user->id);
+
+        // Send OTP email
+        $mailResult = $this->sendOtpEmail($user, $otpRecord, 'register');
+
+        $response = [
+            'message' => $mailResult['sent']
+                ? 'Registrasi berhasil. Kode verifikasi telah dikirim ke email Anda.'
+                : 'Registrasi berhasil, tapi kami gagal mengirim email verifikasi. Coba klik "Kirim ulang kode" di halaman berikutnya.',
+            'email' => $user->email,
+            'requires_verification' => true,
+            'email_sent' => $mailResult['sent'],
+        ];
+        if (isset($mailResult['debug_otp_code'])) {
+            $response['debug_otp_code'] = $mailResult['debug_otp_code'];
+        }
+
+        return response()->json($response, 201);
+    }
+
+    public function verifyOtp(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'otp_code' => 'required|string|size:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $otpRecord = OtpVerification::verifyOtp($request->email, $request->otp_code, 'register');
+
+        if (!$otpRecord) {
+            return response()->json([
+                'message' => 'Kode OTP tidak valid atau sudah kadaluarsa.'
+            ], 401);
+        }
+
+        // Mark OTP as verified
+        $otpRecord->markAsVerified();
+
+        // Mark user email as verified
+        $user = User::where('email', $request->email)->first();
+        if ($user) {
+            $user->email_verified_at = now();
+            $user->save();
+
+            // Create token for auto-login after verification
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'message' => 'Email berhasil diverifikasi.',
+                'user' => $user,
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+            ]);
+        }
 
         return response()->json([
-            'user' => $user,
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-        ], 201);
+            'message' => 'User tidak ditemukan.'
+        ], 404);
+    }
+
+    public function resendOtp(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Email tidak ditemukan.'
+            ], 404);
+        }
+
+        if ($user->email_verified_at) {
+            return response()->json([
+                'message' => 'Email sudah terverifikasi.'
+            ], 400);
+        }
+
+        // Create new OTP (this will delete any existing unverified OTPs)
+        $otpRecord = OtpVerification::createOtp($request->email, 'register', $user->id);
+
+        // Send OTP email
+        $mailResult = $this->sendOtpEmail($user, $otpRecord, 'register');
+
+        if (!$mailResult['sent']) {
+            $response = ['message' => 'Gagal mengirim ulang kode OTP. Silakan coba lagi.'];
+            if (isset($mailResult['debug_otp_code'])) {
+                $response['debug_otp_code'] = $mailResult['debug_otp_code'];
+            }
+            return response()->json($response, 500);
+        }
+
+        return response()->json([
+            'message' => 'Kode OTP baru telah dikirim ke email Anda.'
+        ]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Email tidak ditemukan.'
+            ], 404);
+        }
+
+        // Create OTP for password reset
+        $otpRecord = OtpVerification::createOtp($request->email, 'reset_password', $user->id);
+
+        // Send OTP email
+        $mailResult = $this->sendOtpEmail($user, $otpRecord, 'reset_password');
+
+        if (!$mailResult['sent']) {
+            $response = ['message' => 'Gagal mengirim kode reset password. Silakan coba lagi.'];
+            if (isset($mailResult['debug_otp_code'])) {
+                $response['debug_otp_code'] = $mailResult['debug_otp_code'];
+            }
+            return response()->json($response, 500);
+        }
+
+        return response()->json([
+            'message' => 'Kode reset password telah dikirim ke email Anda.',
+            'email' => $user->email,
+        ]);
+    }
+
+    public function verifyResetOtp(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'otp_code' => 'required|string|size:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $otpRecord = OtpVerification::verifyOtp($request->email, $request->otp_code, 'reset_password');
+
+        if (!$otpRecord) {
+            return response()->json([
+                'message' => 'Kode OTP tidak valid atau sudah kadaluarsa.'
+            ], 401);
+        }
+
+        // Mark OTP as verified but don't delete it yet - we need it for password reset
+        $otpRecord->markAsVerified();
+
+        return response()->json([
+            'message' => 'Kode OTP valid. Silakan masukkan password baru.',
+            'reset_token' => $otpRecord->id, // Use OTP record ID as reset token
+        ]);
+    }
+
+    public function resendResetOtp(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Email tidak ditemukan.'
+            ], 404);
+        }
+
+        // Create new OTP for reset password
+        $otpRecord = OtpVerification::createOtp($request->email, 'reset_password', $user->id);
+
+        // Send OTP email
+        $mailResult = $this->sendOtpEmail($user, $otpRecord, 'reset_password');
+
+        if (!$mailResult['sent']) {
+            $response = ['message' => 'Gagal mengirim ulang kode OTP. Silakan coba lagi.'];
+            if (isset($mailResult['debug_otp_code'])) {
+                $response['debug_otp_code'] = $mailResult['debug_otp_code'];
+            }
+            return response()->json($response, 500);
+        }
+
+        return response()->json([
+            'message' => 'Kode OTP baru telah dikirim ke email Anda.'
+        ]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'reset_token' => 'required',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Find the verified OTP record
+        $otpRecord = OtpVerification::where('id', $request->reset_token)
+            ->where('purpose', 'reset_password')
+            ->whereNotNull('verified_at')
+            ->first();
+
+        if (!$otpRecord) {
+            return response()->json([
+                'message' => 'Token reset password tidak valid.'
+            ], 401);
+        }
+
+        // Check if token is still valid (within reasonable time after verification)
+        if ($otpRecord->verified_at < now()->subMinutes(10)) {
+            return response()->json([
+                'message' => 'Token reset password sudah kadaluarsa. Silakan ulangi proses reset.'
+            ], 401);
+        }
+
+        $user = User::where('email', $otpRecord->email)->first();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'User tidak ditemukan.'
+            ], 404);
+        }
+
+        // Update password
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        // Delete the used OTP record
+        $otpRecord->delete();
+
+        return response()->json([
+            'message' => 'Password berhasil diubah. Silakan login dengan password baru.'
+        ]);
     }
 
     public function login(Request $request)
@@ -71,6 +331,29 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Akun ini telah dinonaktifkan. Hubungi admin untuk info lebih lanjut.'
             ], 403);
+        }
+
+        // Check if email is verified
+        if (!$user->email_verified_at) {
+            // Create new OTP for verification
+            $otpRecord = OtpVerification::createOtp($user->email, 'register', $user->id);
+
+            // Send OTP email
+            $mailResult = $this->sendOtpEmail($user, $otpRecord, 'register');
+
+            $response = [
+                'message' => $mailResult['sent']
+                    ? 'Email belum diverifikasi. Kode verifikasi telah dikirim ke email Anda.'
+                    : 'Email belum diverifikasi, dan kami gagal mengirim ulang kodenya. Coba klik "Kirim ulang kode" di halaman berikutnya.',
+                'requires_verification' => true,
+                'email' => $user->email,
+                'email_sent' => $mailResult['sent'],
+            ];
+            if (isset($mailResult['debug_otp_code'])) {
+                $response['debug_otp_code'] = $mailResult['debug_otp_code'];
+            }
+
+            return response()->json($response, 403);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -167,5 +450,26 @@ class AuthController extends Controller
         } while (User::where('referral_code', $code)->exists());
 
         return $code;
+    }
+
+    // Kirim email OTP, dan kembalikan info apakah berhasil terkirim.
+    // Di environment local/debug, kode OTP-nya selalu dikembalikan di response
+    // supaya development/testing tetap bisa jalan tanpa perlu setup SMTP.
+    private function sendOtpEmail($user, $otpRecord, $purpose)
+    {
+        try {
+            Mail::to($user->email)->send(new OtpMail($user->name, $otpRecord->otp_code, $purpose));
+            $result = ['sent' => true];
+        } catch (\Exception $e) {
+            \Log::error("Failed to send OTP email ($purpose): " . $e->getMessage());
+            $result = ['sent' => false, 'error' => $e->getMessage()];
+        }
+        
+        // Always return debug OTP code in local environment
+        if (app()->environment('local') && config('app.debug')) {
+            $result['debug_otp_code'] = $otpRecord->otp_code;
+        }
+        
+        return $result;
     }
 }

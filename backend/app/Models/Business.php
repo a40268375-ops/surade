@@ -20,6 +20,7 @@ class Business extends Model
         'email',
         'operating_hours',
         'closed_days',
+        'price_category',
         'tags',
         'website',
         'image',
@@ -89,22 +90,28 @@ class Business extends Model
      */
     public function getIsOpenNowAttribute(): bool
     {
-        // If no operating hours specified, assume always open
-        if (!$this->operating_hours) {
-            return true;
-        }
-
-        // If marked as 24 hours, always open
-        if (stripos($this->operating_hours, '24') !== false || stripos($this->operating_hours, 'jam') !== false) {
-            return true;
-        }
-
         $now = now()->setTimezone('Asia/Jakarta');
         $currentDay = $this->getCurrentDayInIndonesian($now);
-        
-        // Check if today is a closed day
-        if ($this->closed_days && in_array($currentDay, $this->closed_days)) {
+
+        // PENTING: cek hari libur (closed_days) HARUS dilakukan duluan,
+        // sebelum cek operating_hours kosong. Sebelumnya kalau jam
+        // operasional belum diisi, fungsi ini langsung return true
+        // (dianggap "selalu buka") tanpa pernah sampai mengecek apakah
+        // hari ini termasuk hari libur — jadi status "Tutup" di hari
+        // libur nggak pernah muncul untuk bisnis yang belum isi jam.
+        $closedDays = $this->closed_days;
+        if ($closedDays && is_array($closedDays) && in_array($currentDay, $closedDays)) {
             return false;
+        }
+
+        // Tanpa jam operasional = dianggap tutup (bukan selalu buka)
+        if (!$this->operating_hours) {
+            return false;
+        }
+
+        // Hanya "24 jam" eksplisit yang dianggap buka terus
+        if (preg_match('/24\s*(jam|hours?)/i', $this->operating_hours)) {
+            return true;
         }
 
         // Parse operating hours (format: "08:00 - 20:00", "08:00-20:00",
@@ -143,8 +150,8 @@ class Business extends Model
             }
         }
 
-        // If can't parse, assume open
-        return true;
+        // Kalau format jam tidak bisa diparse, anggap tutup
+        return false;
     }
 
     /**

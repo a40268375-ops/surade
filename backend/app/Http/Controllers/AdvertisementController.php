@@ -20,10 +20,10 @@ class AdvertisementController extends Controller
         } elseif ($request->has('status') && $request->user()) {
             $query->where('status', $request->status)->where('user_id', $request->user()->id);
         } else {
-            // DIUBAH: Di api.php kamu menggunakan status 'verified' untuk iklan tayang
-            $query->where('status', 'verified')
+            // Public listing: only show approved ads that are not expired
+            $query->where('status', 'approved')
                   ->where(function ($q) {
-                      // Tayang kalau belum ada masa berlaku, atau masa berlakunya belum lewat
+                      // Show ads without expiration or with future expiration
                       $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                   });
         }

@@ -144,10 +144,16 @@ export default function SmartCity() {
     );
   }
 
-  const villageKeyword = city.name.replace(/^(desa|kelurahan)\s+/i, "").toLowerCase();
-
+  // PERBAIKAN: sebelumnya bisnis dicocokkan dengan menebak dari teks
+  // alamat (`address.includes(villageKeyword)`) - rawan salah (bisa
+  // ketinggalan bisnis yang alamatnya ditulis beda gaya, atau malah
+  // salah tangkap bisnis dari desa lain yang kebetulan nama desanya
+  // muncul di jalan/patokan). Business sebenarnya sudah punya kolom
+  // `village` sendiri yang diisi dari dropdown yang sumbernya SAMA
+  // PERSIS dengan SMART_CITIES (lihat data/desaList.js) - jadi
+  // pencocokannya sekarang exact match, bukan tebak-tebakan lagi.
   const businessesInThisVillage = dbBusinesses
-    .filter((b) => (b.address || "").toLowerCase().includes(villageKeyword))
+    .filter((b) => b.village === city.name && b.status === "approved")
     .map((b) => ({
       id: b.id,
       name: b.title,
@@ -155,7 +161,7 @@ export default function SmartCity() {
       location: b.address,
       rating: null,
       reviews: 0,
-      status: b.status === "approved" ? "Buka Sekarang" : "Pending",
+      status: b.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
       img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
     }));
 
@@ -192,7 +198,10 @@ export default function SmartCity() {
               <div className="sc-hero__stat">
                 <Building2 size={24} className="sc-hero__stat-icon" />
                 <div className="sc-hero__stat-content">
-                  <span className="sc-hero__stat-value">{city.bisnis.toLocaleString("id-ID")}</span>
+                  {/* PERBAIKAN: sebelumnya city.bisnis (angka statis dari
+                      smartCities.js) - sekarang jumlah bisnis asli yang
+                      approved dan tercatat desanya = {city.name}. */}
+                  <span className="sc-hero__stat-value">{businessesInThisVillage.length.toLocaleString("id-ID")}</span>
                   <span className="sc-hero__stat-label">Bisnis Terdaftar</span>
                 </div>
               </div>
