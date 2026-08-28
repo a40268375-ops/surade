@@ -1,12 +1,18 @@
-import { Link } from "react-router-dom";
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import logoImg from "../assets/logo.png";
+import Footer from "../components/Footer";
 import {
   FileText,
   Shield,
   User,
   AlertCircle,
+  Lock,
+  ShoppingBag,
+  Gavel,
+  BookOpen,
+  Mail,
+  HelpCircle,
 } from "lucide-react";
 import "./Terms.css";
 
@@ -18,332 +24,274 @@ export default function Terms() {
   return (
     <div className="terms-page">
       {/* NAVBAR */}
-      <header className="home-header">
-        <div className="home-header__inner">
-          <Link to="/" className="home-logo">
-            <img src={logoImg} alt="Info.co.id" className="home-logo__img" />
-          </Link>
-          <nav className="home-nav">
-            <Link to="/" className="home-nav__link">Home</Link>
-            <a href="#" className="home-nav__link home-nav__link--dropdown">
-              <span>Informasi</span>
-              <ChevronDown size={15} className="home-nav__caret" />
-            </a>
-            <Link to="/blog" className="home-nav__link">Blog</Link>
-            <Link to="/contact" className="home-nav__link">Hubungi Kami</Link>
-            <Link to="/login" className="home-nav__link home-nav__link--login">Login</Link>
-            <button type="button" className="home-nav__button">
-              <Plus size={15} /><span>Add Bisnis</span>
-            </button>
-          </nav>
-        </div>
-      </header>
+      <Navbar />
 
       {/* HERO SECTION */}
       <section className="terms-hero">
         <div className="terms-hero__bg" />
         <div className="terms-hero__overlay" />
         <div className="terms-hero__content">
-          <h1 className="terms-hero__title">Syarat & Ketentuan</h1>
+          <div className="terms-hero__breadcrumb">
+            <Link to="/">Home</Link>
+            <span className="separator">/</span>
+            <span>Syarat &amp; Ketentuan</span>
+          </div>
+          <h1 className="terms-hero__title">Syarat &amp; Ketentuan</h1>
           <p className="terms-hero__subtitle">
-            Ketentuan penggunaan layanan Info.co.id
+            Panduan dan ketentuan resmi penggunaan seluruh layanan dan platform Info.co.id
           </p>
         </div>
       </section>
 
-      {/* TERMS CONTENT */}
-      <section className="terms-content">
-        <div className="terms-content__inner">
-          {/* Ketentuan Umum */}
-          <div className="terms-section">
-            <h2 className="terms-section__title">Ketentuan Umum</h2>
-            <p className="terms-section__text">
-              Info.co.id sebagai sarana media informasi untuk menginformasikan kegiatan/tempat/bisnis dengan menyediakan berbagai fitur dan layanan untuk menjamin keamanan dan kenyamanan para penggunanya.
-            </p>
-          </div>
+      {/* MAIN CONTENT */}
+      <main className="terms-content">
+        <div className="terms-layout">
+          {/* STICKY SIDEBAR TABLE OF CONTENTS */}
+          <aside className="terms-sidebar">
+            <div className="terms-sidebar__title">
+              <BookOpen size={18} className="text-[#007570]" />
+              <span>Daftar Isi</span>
+            </div>
+            <nav className="terms-nav-list">
+              <a href="#ketentuan-umum" className="terms-nav-link">1. Ketentuan Umum</a>
+              <a href="#media-informasi" className="terms-nav-link">2. Media Informasi</a>
+              <a href="#pengguna" className="terms-nav-link">3. Aturan Pengguna</a>
+              <a href="#jual-barang" className="terms-nav-link">4. Jual Barang / Bisnis</a>
+              <a href="#transaksi" className="terms-nav-link">5. Transaksi</a>
+              <a href="#barang-terlarang" className="terms-nav-link">6. Barang Terlarang</a>
+              <a href="#privasi" className="terms-nav-link">7. Kebijakan Privasi</a>
+              <a href="#sanksi" className="terms-nav-link">8. Sanksi &amp; Pelanggaran</a>
+              <a href="#tanggung-jawab" className="terms-nav-link">9. Batasan Tanggung Jawab</a>
+              <a href="#hukum" className="terms-nav-link">10. Hukum &amp; Sengketa</a>
+              <a href="#kontak" className="terms-nav-link">11. Hubungi Kami</a>
+            </nav>
+          </aside>
 
-          {/* Media Informasi */}
-          <div className="terms-section">
-            <div className="terms-section__header">
-              <div className="terms-section__icon">
-                <FileText size={32} />
+          {/* MAIN TERMS ARTICLE */}
+          <article className="terms-main">
+            {/* 1. Ketentuan Umum */}
+            <section id="ketentuan-umum" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <BookOpen size={24} />
+                </div>
+                <h2 className="terms-section__title">1. Ketentuan Umum</h2>
               </div>
-              <h2 className="terms-section__title">Media Informasi</h2>
-            </div>
-            <div className="terms-section__text">
-              <ol className="terms-list-numbered">
-                <li>Info.co.id merupakan media informasi untuk menyampaikan kegiatan/tempat/bisnis</li>
-                <li>Pada menu Jual-Beli, Info.co.id bukan penjual, melainkan sebagai media informasi bagi penjual</li>
-                <li>Adanya biaya tambahan (Pajak dan lain sebagainya) atas segala transaksi jual-beli menjadi tanggung jawab penjual dan pembeli (disepakati) serta diurus oleh pihak-pihak bersangkutan sesuai ketentuan berlaku di Indonesia.</li>
-                <li>Barang yang dipasang/diperjualbelikan di Info.co.id merupakan barang yang tidak tercantum di daftar "Barang Terlarang".</li>
-                <li>Info.co.id tidak bertanggung jawab atas pelayanan, kualitas barang, kondisi barang, dan/atau segala bentuk perselisihan yang dapat terjadi antar Pengguna.</li>
-                <li>Info.co.id memiliki kewenangan untuk mengambil tindakan yang dianggap perlu terhadap akun yang diduga dan/atau terindikasi melakukan penyalahgunaan, memanipulasi, dan/atau melanggar Aturan Penggunaan, membatasi atau mengakhiri hak setiap Pengguna untuk menggunakan layanan, maupun menutup akun tersebut tanpa memberikan pemberitahuan atau informasi terlebih dahulu kepada pemilik akun yang bersangkutan.</li>
-                <li>Info.co.id memiliki kewenangan untuk mengambil keputusan atas permasalahan yang terjadi pada setiap pemasangan dan transaksi.</li>
-                <li>Jika Pengguna gagal untuk mematuhi setiap ketentuan dalam Aturan Penggunaan ini, maka Info.co.id berhak untuk mengambil tindakan yang dianggap perlu, namun tidak terbatas pada melakukan moderasi, menghentikan layanan "Jual Barang", menutup akun dan/atau mengambil langkah hukum selanjutnya.</li>
-                <li>Info.co.id berhak meminta data-data pribadi Pengguna jika diperlukan.</li>
-                <li>Aturan Penggunaan Info.co.id dapat berubah sewaktu-waktu dan/atau diperbaharui dari waktu ke waktu tanpa pemberitahuan terlebih dahulu. Dengan mengakses Info.co.id, Pengguna dianggap menyetujui perubahan-perubahan dalam Aturan Penggunaan.</li>
-                <li>Aturan Penggunaan pada Situs Info.co.id berlaku mutlak untuk pengguna Info.co.id</li>
-                <li>Hati-hati terhadap penipuan yang mengatasnamakan Info.co.id. Untuk informasi dan pengaduan, silakan hubungi: admin@info.co.id atau +62 811 15 20 900</li>
-              </ol>
-            </div>
-          </div>
-
-          {/* Pengguna */}
-          <div className="terms-section">
-            <div className="terms-section__header">
-              <div className="terms-section__icon">
-                <User size={32} />
+              <div className="terms-section__text">
+                <p>
+                  Selamat datang di <strong>Info.co.id</strong>. Syarat dan Ketentuan Penggunaan ini mengatur akses serta penggunaan Anda terhadap situs web, aplikasi, direktori bisnis, layanan iklan, dan seluruh fitur yang kami sediakan.
+                </p>
+                <div className="terms-callout">
+                  Dengan mendaftar, mengakses, atau menggunakan Info.co.id, Anda menyatakan telah membaca, memahami, dan menyetujui untuk terikat oleh seluruh Syarat dan Ketentuan ini serta Kebijakan Privasi kami.
+                </div>
+                <p>
+                  Info.co.id berfungsi sebagai sarana media direktori informasi untuk mempromosikan kegiatan, tempat, dan bisnis lokal di seluruh Indonesia guna mendukung ekosistem Smart City dan Smart Village yang aman, transparan, dan berdaya saing.
+                </p>
               </div>
-              <h2 className="terms-section__title">Pengguna</h2>
-            </div>
-            <div className="terms-section__text">
-              <ol className="terms-list-numbered">
-                <li>Pengguna wajib mengisi data pribadi secara lengkap dan jujur di form isian</li>
-                <li>Pengguna media informasi dan pengguna jual beli akan ditampilkan alamat, nomor kontak, e-mail, situs, forum, dan media sosial di info.co.id, termasuk di foto profil, foto header, nama akun (username), nama dan deskripsi barang</li>
-                <li>Penggunaan fasilitas apapun yang disediakan oleh info.co.id mengindikasikan bahwa Pengguna telah memahami dan menyetujui segala aturan yang diberlakukan.</li>
-                <li>Selama berada dalam penggunaan info.co.id, Pengguna dilarang keras menyampaikan setiap jenis konten apapun yang menyesatkan, memfitnah, atau mencemarkan nama baik, mengandung atau bersinggungan dengan unsur SARA, diskriminasi, dan/atau menyudutkan pihak lain.</li>
-                <li>Pengguna tidak diperbolehkan menggunakan info.co.id untuk melanggar peraturan yang ditetapkan oleh hukum di Indonesia maupun di negara lainnya.</li>
-                <li>Pengguna bertanggung jawab atas segala risiko yang timbul di kemudian hari atas informasi yang diberikannya ke dalam info.co.id, namun tidak terbatas pada hal-hal yang berkaitan dengan hak cipta, merek, desain industri, desain tata letak industri dan hak paten atas suatu produk.</li>
-                <li>Pengguna diwajibkan menghargai hak-hak Pengguna lainnya dengan tidak memberikan informasi pribadi ke pihak lain tanpa izin pihak yang bersangkutan.</li>
-                <li>Pengguna tidak diperkenankan mengirimkan e-mail spam dengan merujuk ke bagian apapun dari info.co.id.</li>
-                <li>Administrator info.co.id berhak menyesuaikan dan/atau menghapus informasi, dan menonaktifkan Pengguna.</li>
-                <li>Info.co.id memiliki hak untuk memblokir penggunaan sistem terhadap Pengguna yang melanggar peraturan perundang-undangan yang berlaku di wilayah Indonesia.</li>
-                <li>Pengguna dilarang menggunakan kata-kata kasar yang tidak sesuai norma, baik saat berdiskusi di fitur kirim pesan atau chat maupun kolom diskusi. Jika ditemukan pelanggaran, info.co.id berhak memberikan sanksi pelanggaran UU ITE.</li>
-                <li>Pengguna dilarang menggunakan fitur kirim pesan sebagai iklan promosi barang dagangan di info.co.id maupun di platform atau situs lain yang dapat mengganggu Pengguna lainnya. Jika ditemukan pelanggaran, info.co.id berhak memberikan sanksi.</li>
-                <li>Pengguna dilarang menggunakan fitur kirim pesan atau chat sebagai sarana penelitian, kuesioner, atau survey. Jika ditemukan pelanggaran, info.co.id berhak memberikan sanksi untuk menggugurkan hasil riset/surveynya.</li>
-                <li>Pengguna dilarang melakukan transfer atau menjual akun Pengguna ke Pengguna lain atau ke pihak lain tanpa persetujuan dari info.co.id.</li>
-                <li>Pengguna dengan ini menyatakan bahwa Pengguna telah mengetahui seluruh peraturan perundang-undangan yang berlaku di wilayah Republik Indonesia dalam setiap transaksi di info.co.id, dan tidak akan melakukan tindakan apapun yang mungkin melanggar peraturan perundang-undangan yang berlaku di wilayah Republik Indonesia.</li>
-                <li>Pengguna dilarang membuat salinan, modifikasi, turunan atau distribusi konten atau mempublikasikan tampilan yang berasal dari info.co.id yang dapat melanggar Hak Kekayaan Intelektual info.co.id.</li>
-              </ol>
-            </div>
-          </div>
+            </section>
 
-          {/* Jual Barang / Aset */}
-          <div className="terms-section">
-            <div className="terms-section__header">
-              <div className="terms-section__icon">
-                <FileText size={32} />
+            {/* 2. Media Informasi */}
+            <section id="media-informasi" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <FileText size={24} />
+                </div>
+                <h2 className="terms-section__title">2. Media Informasi</h2>
               </div>
-              <h2 className="terms-section__title">Jual Barang / Aset</h2>
-            </div>
-            <div className="terms-section__text">
-              <ol className="terms-list-numbered">
-                <li>Penjual bertanggung jawab secara penuh atas segala risiko yang timbul di kemudian hari terkait dengan informasi yang dibuatnya, termasuk pada hal-hal yang berkaitan dengan hak cipta, merek, desain industri, desain tata letak sirkuit, hak paten dan/atau izin lain yang telah ditetapkan atas suatu produk menurut hukum yang berlaku di Indonesia.</li>
-                <li>Penjual hanya diperbolehkan menjual barang-barang yang tidak tercantum di daftar "Barang Terlarang".</li>
-                <li>Penjual wajib menempatkan barang dagangan sesuai dengan kategori dan subkategorinya.</li>
-                <li>Penjual wajib mengisi nama atau judul barang dengan jelas, singkat dan padat.</li>
-                <li>Penjual wajib mengisi harga yang sesuai dengan harga sebenarnya.</li>
-                <li>Penjual dilarang menjual barang yang identik sama (multiple posting) dengan yang sudah ada di halamannya.</li>
-                <li>Penjual dilarang melakukan duplikasi penjualan barang dengan menyalin atau menggunakan gambar dari pengguna lain.</li>
-                <li>Penjual wajib memperbarui (update) ketersediaan dan status barang yang dijual.</li>
-                <li>Catatan penjual diperuntukkan bagi yang ingin memberikan catatan tambahan yang tidak terkait dengan deskripsi barang kepada calon Pembeli. Catatan penjual tunduk terhadap Aturan Penggunaan info.co.id.</li>
-                <li>Penjual wajib mengisi kolom Deskripsi Barang sesuai dengan Aturan Penggunaan di info.co.id.</li>
-                <li>Penjual dilarang membuat transaksi fiktif atau palsu demi kepentingan personal. info.co.id berhak mengambil tindakan apabila ditemukan tindakan kecurangan.</li>
-              </ol>
-            </div>
-          </div>
-
-          {/* Transaksi */}
-          <div className="terms-section">
-            <div className="terms-section__header">
-              <div className="terms-section__icon">
-                <Shield size={32} />
+              <div className="terms-section__text">
+                <ol className="terms-list-numbered">
+                  <li>Info.co.id merupakan platform media direktori informasi digital untuk menyampaikan info kegiatan, tempat wisata, kuliner, jasa, dan profil bisnis di Indonesia.</li>
+                  <li>Pada direktori produk dan bisnis, Info.co.id bukan merupakan pemilik atau penjual langsung, melainkan media informasi yang memfasilitasi etalase digital bagi pelaku usaha.</li>
+                  <li>Segala bentuk biaya tambahan, pajak, perizinan, dan kesepakatan transaksi jual beli menjadi tanggung jawab pihak penjual dan pembeli sesuai peraturan perundang-undangan di Republik Indonesia.</li>
+                  <li>Barang, jasa, dan info yang dipasang wajib merupakan konten yang legal dan tidak tercantum pada daftar "Barang Terlarang".</li>
+                  <li>Info.co.id memiliki kewenangan penuh untuk memoderasi, menyunting, membatasi, atau menonaktifkan akun dan konten yang terindikasi melanggar Aturan Penggunaan tanpa pemberitahuan sebelumnya.</li>
+                  <li>Aturan Penggunaan Info.co.id dapat diperbarui sewaktu-waktu. Perubahan akan berlaku seketika setelah dipublikasikan pada halaman ini.</li>
+                </ol>
               </div>
-              <h2 className="terms-section__title">Transaksi</h2>
-            </div>
-            <div className="terms-section__text">
-              <ol className="terms-list-numbered">
-                <li>Info.co.id tidak bertanggung jawab terhadap barang/aset yang menjadi konflik antara penjual dan pembeli. Penjual wajib berhati-hati dalam transaksi dan pembeli wajib berhati-hati terhadap barang.</li>
-                <li>Pengecekan dan ketelitian menjadi tanggung jawab penjual dan pembeli masing-masing.</li>
-                <li>Info.co.id atas kebijakannya sendiri dapat melakukan penahanan atau pembekuan terhadap segala risiko dan kerugian yang timbul, jika info.co.id menyimpulkan bahwa tindakan Pengguna, baik Penjual maupun Pembeli terindikasi melakukan kecurangan-kecurangan atau penyalahgunaan dalam bertransaksi dan/atau pelanggaran terhadap Aturan Penggunaan info.co.id maka kami berhak melakukan tindakan.</li>
-              </ol>
-            </div>
-          </div>
+            </section>
 
-          {/* Barang Terlarang */}
-          <div className="terms-section">
-            <div className="terms-section__header">
-              <div className="terms-section__icon">
-                <AlertCircle size={32} />
+            {/* 3. Pengguna */}
+            <section id="pengguna" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <User size={24} />
+                </div>
+                <h2 className="terms-section__title">3. Aturan Pengguna</h2>
               </div>
-              <h2 className="terms-section__title">Barang Terlarang</h2>
-            </div>
-            <div className="terms-section__text">
-              <ol className="terms-list-numbered">
-                <li>info.co.id telah dan akan terus melakukan hal-hal sebagaimana dipersyaratkan oleh peraturan perundang-undangan untuk mencegah terjadinya perdagangan barang-barang yang melanggar ketentuan hukum yang berlaku dan/atau hak pribadi pihak ketiga.</li>
-              </ol>
-            </div>
-          </div>
-
-          {/* Sanksi */}
-          <div className="terms-section">
-            <div className="terms-section__header">
-              <div className="terms-section__icon">
-                <AlertCircle size={32} />
+              <div className="terms-section__text">
+                <ol className="terms-list-numbered">
+                  <li>Pengguna wajib memberikan data yang akurat, lengkap, dan benar saat melakukan pendaftaran akun serta verifikasi OTP.</li>
+                  <li>Pengguna bertanggung jawab penuh atas keamanan akun, kata sandi, dan setiap aktivitas yang terjadi dalam akun miliknya.</li>
+                  <li>Pengguna dilarang keras mempublikasikan konten yang mengandung unsur fitnah, kebencian SARA, pornografi, penipuan, pelanggaran hak cipta, atau merugikan pihak manapun.</li>
+                  <li>Pengguna dilarang mengirimkan pesan spam, melakukan scraping data tanpa izin, atau merusak infrastruktur keamanan sistem Info.co.id.</li>
+                  <li>Pengguna wajib menghormati privasi dan hak-hak pengguna lain serta dilarang menyebarluaskan data pribadi pihak lain tanpa persetujuan resmi.</li>
+                  <li>Pengguna dilarang memperjualbelikan atau memindahtangankan akun Info.co.id kepada pihak lain tanpa persetujuan tertulis dari manajemen Info.co.id.</li>
+                </ol>
               </div>
-              <h2 className="terms-section__title">Sanksi</h2>
-            </div>
-            <div className="terms-section__text">
-              <p>Segala tindakan yang melanggar peraturan di info.co.id akan dikenakan sanksi berupa termasuk dan namun tidak terbatas pada:</p>
-              <ol className="terms-list-numbered">
-                <li>Sanksi sesuai dengan UU ITE</li>
-                <li>Pelaporan ke pihak terkait (Kepolisian, dll).</li>
-              </ol>
-            </div>
-          </div>
+            </section>
 
-          {/* Penanggung Jawab */}
-          <div className="terms-section">
-            <div className="terms-section__header">
-              <div className="terms-section__icon">
-                <Shield size={32} />
+            {/* 4. Jual Barang / Bisnis */}
+            <section id="jual-barang" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <ShoppingBag size={24} />
+                </div>
+                <h2 className="terms-section__title">4. Pemasangan Usaha &amp; Jual Barang</h2>
               </div>
-              <h2 className="terms-section__title">Penanggung Jawab</h2>
-            </div>
-            <div className="terms-section__text">
-              <ol className="terms-list-numbered">
-                <li>info.co.id tidak bertanggung jawab atas segala risiko dan kerugian yang timbul dari dan dalam kaitannya dengan informasi yang dituliskan oleh pengguna.</li>
-                <li>info.co.id tidak bertanggung jawab atas segala pelanggaran hak cipta, merk, desain industri, desain tata letak sirkuit, hak paten atau hak-hak pribadi lain yang melekat atas suatu barang, berkenaan dengan segala informasi yang dibuat oleh Penjual. Untuk melaporkan pelanggaran hak cipta, merek, desain industri, desain tata letak sirkuit, hak paten atau hak-hak pribadi lain dapat menghubungi pihak berwenang.</li>
-                <li>info.co.id tidak bertanggung jawab atas segala risiko dan kerugian yang timbul berkenaan dengan penggunaan barang yang dibeli melalui info.co.id, dalam hal terjadi pelanggaran peraturan perundang-undangan.</li>
-                <li>info.co.id tidak bertanggung jawab atas segala risiko dan kerugian yang timbul berkenaan dengan diaksesnya akun Pengguna oleh pihak lain</li>
-                <li>info.co.id tidak bertanggung jawab atas segala risiko dan kerugian yang timbul akibat transaksi di luar info.co.id.</li>
-                <li>info.co.id tidak bertanggung jawab atas segala risiko dan kerugian yang timbul akibat kesalahan atau perbedaan nominal yang seharusnya ditransfer.</li>
-                <li>info.co.id tidak bertanggung jawab atas segala risiko dan kerugian yang timbul akibat kehilangan barang ketika proses transaksi berjalan dan/atau selesai.</li>
-                <li>info.co.id tidak bertanggung jawab atas segala risiko dan kerugian yang timbul akibat kesalahan Pengguna ataupun pihak lain dalam transaksi</li>
-                <li>Dalam keadaan apapun, Pengguna akan membayar kerugian info.co.id dan/atau menghindarkan info.co.id (termasuk petugas, direktur, karyawan, agen, dan lainnya) dari setiap biaya kerugian apapun, kehilangan, pengeluaran atau kerusakan yang berasal dari tuntutan atau klaim Pihak ketiga yang timbul dari pelanggaran Pengguna terhadap Aturan Penggunaan, dan/atau pelanggaran terhadap hak dari pihak ketiga.</li>
-              </ol>
-            </div>
-          </div>
-
-          {/* Hukum yang Berlaku dan Penyelesaian Sengketa */}
-          <div className="terms-section">
-            <div className="terms-section__header">
-              <div className="terms-section__icon">
-                <Shield size={32} />
+              <div className="terms-section__text">
+                <ol className="terms-list-numbered">
+                  <li>Pemilik bisnis bertanggung jawab penuh atas keabsahan legalitas, hak paten/merek, izin edar (BPOM/SNI bila ada), dan kebenaran deskripsi profil usahanya.</li>
+                  <li>Setiap usaha wajib ditempatkan pada kategori dan lokasi wilayah (kota/kabupaten) yang tepat.</li>
+                  <li>Dilarang membuat postingan duplikat (multiple posting) untuk barang atau bisnis yang sama secara berulang-ulang yang dapat mengganggu kenyamanan direktori.</li>
+                  <li>Pemilik usaha wajib memperbarui informasi jam operasional, ketersediaan produk, dan nomor kontak yang dapat dihubungi.</li>
+                  <li>Dilarang mencantumkan transaksi fiktif atau testimoni manipulatif demi keuntungan pribadi.</li>
+                </ol>
               </div>
-              <h2 className="terms-section__title">Hukum yang Berlaku dan Penyelesaian Sengketa</h2>
-            </div>
-            <div className="terms-section__text">
-              <ol className="terms-list-numbered">
-                <li>Aturan Penggunaan ini dilaksanakan dan tunduk pada Peraturan Perundang-undangan Republik Indonesia.</li>
-                <li>Apabila terjadi perselisihan menjadi tanggung jawab antara penjual dan pembeli.</li>
-                <li>Selama perselisihan dalam proses penyelesaian, Pengguna wajib untuk tetap melaksanakan kewajiban-kewajiban lainnya menurut Aturan yang berlaku.</li>
-              </ol>
-            </div>
-          </div>
+            </section>
 
-          {/* Contact */}
-          <div className="terms-section">
-            <h2 className="terms-section__title">Hubungi Kami</h2>
-            <p className="terms-section__text">
-              Untuk informasi dan pengaduan, silakan hubungi:
-            </p>
-            <div className="terms-contact">
-              <p><strong>Email:</strong> <a href="mailto:admin@info.co.id">admin@info.co.id</a></p>
-              <p><strong>WhatsApp:</strong> +62 811 15 20 900</p>
-              <p><strong>Alamat:</strong> Jalan Mercurius 16680 Dramaga West Java</p>
-            </div>
-          </div>
+            {/* 5. Transaksi */}
+            <section id="transaksi" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <Shield size={24} />
+                </div>
+                <h2 className="terms-section__title">5. Ketentuan Transaksi</h2>
+              </div>
+              <div className="terms-section__text">
+                <ol className="terms-list-numbered">
+                  <li>Transaksi antar pengguna berlangsung secara langsung (direct communication) antara pembeli dan penjual. Pengguna diimbau selalu berhati-hati dan memeriksa keaslian barang sebelum melakukan pembayaran.</li>
+                  <li>Untuk pembayaran paket iklan, banner promosi, atau langganan premium Info.co.id, pembayaran hanya dilakukan melalui metode resmi yang tertera pada sistem Info.co.id.</li>
+                  <li>Info.co.id berhak membekukan layanan dan berkoordinasi dengan pihak berwenang jika ditemukan indikasi tindak penipuan atau pencucian uang.</li>
+                </ol>
+              </div>
+            </section>
 
-          {/* Last Updated */}
-          <div className="terms-footer">
-            <p className="terms-footer__text">
-              Terakhir diperbarui: Juli 2024
-            </p>
-          </div>
+            {/* 6. Barang Terlarang */}
+            <section id="barang-terlarang" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <AlertCircle size={24} />
+                </div>
+                <h2 className="terms-section__title">6. Barang &amp; Konten Terlarang</h2>
+              </div>
+              <div className="terms-section__text">
+                <p>Berikut adalah beberapa jenis barang dan konten yang DILARANG KERAS di Info.co.id:</p>
+                <ol className="terms-list-numbered">
+                  <li>Narkotika, psikotropika, obat-obatan terlarang, dan zat adiktif tanpa izin medis resmi.</li>
+                  <li>Senjata api, bahan peledak, senjata tajam ilegal, dan amunisi.</li>
+                  <li>Konten pornografi, eksploitasi seksual, atau materi yang melanggar norma kesusilaan.</li>
+                  <li>Barang curian, barang selundupan, atau barang bajakan yang melanggar Hak Kekayaan Intelektual (HAKI).</li>
+                  <li>Skema cepat kaya ilegal, investasi bodong, perjudian, atau penipuan daring lainnya.</li>
+                </ol>
+              </div>
+            </section>
+
+            {/* 7. Kebijakan Privasi */}
+            <section id="privasi" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <Lock size={24} />
+                </div>
+                <h2 className="terms-section__title">7. Kebijakan Privasi &amp; Data</h2>
+              </div>
+              <div className="terms-section__text">
+                <p>
+                  Kami berkomitmen melindungi privasi data pribadi Anda sesuai Undang-Undang Perlindungan Data Pribadi (UU PDP) yang berlaku di Indonesia:
+                </p>
+                <ol className="terms-list-numbered">
+                  <li>Informasi yang kami kumpulkan (seperti nama, email, nomor kontak, foto profil) digunakan semata-mata untuk verifikasi akun, operasional platform, dan komunikasi penting.</li>
+                  <li>Data login dilindungi dengan standar enkripsi modern (bcrypt, HTTPS SSL/TLS) guna mencegah akses tidak sah.</li>
+                  <li>Kami tidak akan menjual atau menyewakan data pribadi pengguna kepada pihak ketiga manapun untuk kepentingan komersial tanpa persetujuan Anda.</li>
+                </ol>
+              </div>
+            </section>
+
+            {/* 8. Sanksi */}
+            <section id="sanksi" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <Gavel size={24} />
+                </div>
+                <h2 className="terms-section__title">8. Sanksi &amp; Pelanggaran</h2>
+              </div>
+              <div className="terms-section__text">
+                <p>Pelanggaran terhadap Aturan Penggunaan dapat dikenakan tindakan sebagai berikut:</p>
+                <ol className="terms-list-numbered">
+                  <li>Pemberian peringatan tertulis dan penurunan (take down) konten yang melanggar.</li>
+                  <li>Penangguhan sementara atau penutupan permanen akun pengguna.</li>
+                  <li>Pelaporan kepada pihak berwajib (Kepolisian RI / Kominfo) sesuai UU ITE jika ditemukan tindak pidana siber, pemerasan, fitnah, atau penipuan.</li>
+                </ol>
+              </div>
+            </section>
+
+            {/* 9. Tanggung Jawab */}
+            <section id="tanggung-jawab" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <Shield size={24} />
+                </div>
+                <h2 className="terms-section__title">9. Batasan Tanggung Jawab</h2>
+              </div>
+              <div className="terms-section__text">
+                <ol className="terms-list-numbered">
+                  <li>Info.co.id tidak bertanggung jawab atas segala kerugian materiil maupun immateriil yang timbul akibat transaksi langsung antara pengguna di luar pengawasan sistem resmi.</li>
+                  <li>Info.co.id tidak bertanggung jawab atas isi informasi pihak ketiga, tautan eksternal, atau kegagalan koneksi akibat gangguan jaringan internet pihak penyedia layanan.</li>
+                </ol>
+              </div>
+            </section>
+
+            {/* 10. Hukum */}
+            <section id="hukum" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <Gavel size={24} />
+                </div>
+                <h2 className="terms-section__title">10. Hukum yang Berlaku &amp; Penyelesaian Sengketa</h2>
+              </div>
+              <div className="terms-section__text">
+                <p>
+                  Syarat &amp; Ketentuan ini diatur dan ditafsirkan berdasarkan hukum Negara Kesatuan Republik Indonesia. Setiap perselisihan yang timbul akan diutamakan penyelesaiannya melalui musyawarah untuk mufakat terlebih dahulu sebelum menempuh jalur hukum di Pengadilan Negeri yang berwenang.
+                </p>
+              </div>
+            </section>
+
+            {/* 11. Kontak */}
+            <section id="kontak" className="terms-section">
+              <div className="terms-section__header">
+                <div className="terms-section__icon">
+                  <Mail size={24} />
+                </div>
+                <h2 className="terms-section__title">11. Hubungi Kami &amp; Layanan Pengaduan</h2>
+              </div>
+              <div className="terms-section__text">
+                <p>
+                  Jika Anda memiliki pertanyaan, saran, atau ingin melaporkan indikasi pelanggaran aturan penggunaan di platform Info.co.id, silakan hubungi tim kami:
+                </p>
+                <div className="terms-contact">
+                  <p><strong>Call Center:</strong> <a href="tel:08071001500">0807 - 100 - 1500</a></p>
+                  <p><strong>WhatsApp:</strong> <a href="https://wa.me/628111919711" target="_blank" rel="noopener noreferrer">+62 811-1919-711</a></p>
+                  <p><strong>Email Dukungan:</strong> <a href="mailto:support@info.co.id">support@info.co.id</a></p>
+                  <p><strong>Alamat Kantor:</strong> Jl. Saturnus No.13 Blk. F, RT.2/RW.5, Ciherang, Kec. Dramaga, Kabupaten Bogor, Jawa Barat 16680</p>
+                </div>
+              </div>
+            </section>
+
+            {/* Last updated footer */}
+            <div className="terms-footer">
+              <p className="terms-footer__text">
+                Terakhir diperbarui: 21 Agustus 2026
+              </p>
+              <Link to="/faq" className="text-[#007570] font-semibold text-sm flex items-center gap-1.5 hover:underline">
+                <HelpCircle size={16} />
+                <span>Lihat Pertanyaan Umum (FAQ)</span>
+              </Link>
+            </div>
+          </article>
         </div>
-      </section>
+      </main>
 
       {/* FOOTER */}
-      <footer className="footer">
-        <div className="footer-inner">
-          <div className="footer-cols">
-            {/* Brand/Logo Col */}
-            <div className="footer-col footer-col--brand">
-              <Link to="/" className="footer-logo">
-                <img src={logoImg} alt="Info.co.id" className="footer-logo__img" />
-              </Link>
-              <p className="footer-desc">
-                info.co.id adalah portal informasi yang menyajikan data dan berita terpercaya dari berbagai sumber resmi di Indonesia.
-              </p>
-              <div className="footer-social">
-                <a href="#" className="footer-social__link" aria-label="Instagram">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                  </svg>
-                </a>
-                <a href="#" className="footer-social__link" aria-label="Twitter">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
-                  </svg>
-                </a>
-                <a href="#" className="footer-social__link" aria-label="Facebook">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                  </svg>
-                </a>
-                <a href="#" className="footer-social__link" aria-label="WhatsApp">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-                  </svg>
-                </a>
-                <a href="#" className="footer-social__link" aria-label="YouTube">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
-                    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
-                  </svg>
-                </a>
-              </div>
-            </div>
-
-            {/* Col 1 - Tentang Kami */}
-            <div className="footer-col">
-              <h4 className="footer-heading">Tentang Kami</h4>
-              <ul className="footer-links">
-                <li><Link to="/about">Tentang Info.co.id</Link></li>
-                <li><Link to="/vision-mission">Visi &amp; Misi</Link></li>
-                <li><Link to="/partnership-career">Kerjasama &amp; Karir</Link></li>
-              </ul>
-            </div>
-
-            {/* Col 2 - Bantuan */}
-            <div className="footer-col">
-              <h4 className="footer-heading">Bantuan</h4>
-              <ul className="footer-links">
-                <li><a href="#">FAQ</a></li>
-                <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
-                <li><Link to="/contact">Hubungi Kami</Link></li>
-              </ul>
-            </div>
-
-            {/* Col 3 - Kontak Kami */}
-            <div className="footer-col">
-              <h4 className="footer-heading">Kontak Kami</h4>
-              <ul className="footer-links">
-                <li><a href="mailto:support@info.co.id">support@info.co.id</a></li>
-                <li><span className="footer-text">(021) 1234 5678</span></li>
-                <li><span className="footer-text">Jalan Mercurius 16680 Dramaga West Java</span></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="footer-bottom">
-          <div className="footer-bottom__inner">
-            <p className="footer-copyright">
-              &copy; 2024 Info.co.id. All rights reserved.
-            </p>
-            <div className="footer-bottom-links">
-              <a href="#">Privasi</a>
-              <Link to="/terms">Syarat &amp; Ketentuan</Link>
-              <a href="#">Sitemap</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

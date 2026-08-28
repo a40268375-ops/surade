@@ -124,8 +124,28 @@
 
 .contact-info-card__text {
   font-size: 0.95rem;
-  color: #64748b;
+  color: #334155;
   margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.contact-info-card__link {
+  color: #007570;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.contact-info-card__link:hover {
+  color: #004d4a;
+  text-decoration: underline;
+}
+
+.contact-info-card__subtext {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 /* Contact Main */

@@ -1,5 +1,5 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import { InlineSpinner } from "../components/LoadingScreen";
 import { getStorageUrl } from "../utils/constants";
@@ -28,6 +28,7 @@ import {
   ClipboardList,
   HeartPulse,
   Users,
+  Check,
 } from "lucide-react";
 import heroImg from "../assets/category_hero_illustration.png";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -47,6 +48,23 @@ L.Icon.Default.mergeOptions({
 });
 
 const HERO_IMAGE = heroImg;
+
+/* ── Price Range Options ── */
+const PRICE_RANGES = [
+  { id: "all", label: "Semua Rentang Harga", shortLabel: "Semua Harga", min: null, max: null },
+  { id: "0-50k", label: "Rp 0 - Rp 50.000", shortLabel: "< 50rb", min: 0, max: 50000, desc: "Ekonomis & Terjangkau" },
+  { id: "50k-150k", label: "Rp 50.000 - Rp 150.000", shortLabel: "50rb - 150rb", min: 50000, max: 150000, desc: "Menengah" },
+  { id: "150k-500k", label: "Rp 150.000 - Rp 500.000", shortLabel: "150rb - 500rb", min: 150000, max: 500000, desc: "Standar" },
+  { id: "500k-1m", label: "Rp 500.000 - Rp 1.000.000", shortLabel: "500rb - 1jt", min: 500000, max: 1000000, desc: "Premium" },
+  { id: "1m+", label: "> Rp 1.000.000", shortLabel: "> 1 Juta", min: 1000000, max: Infinity, desc: "1 Juta ke atas" },
+];
+
+const SORT_OPTIONS = [
+  { id: "relevance", label: "Paling Relevan" },
+  { id: "price_asc", label: "Harga Terendah" },
+  { id: "price_desc", label: "Harga Tertinggi" },
+  { id: "views", label: "Paling Populer" },
+];
 
 /* ── Categories loaded dynamically from API ── */
 
@@ -107,19 +125,14 @@ const getCoords = (business) => {
 
 /* ── Cities list ── */
 const CITIES = [
-  "Semua",
-  "Aceh",
-  "Bali",
-  "Bogor",
-  "Depok",
-  "Jakarta",
-  "Jambi",
-  "Kep. Mentawai",
-  "Magelang",
-  "Medan",
-  "Bekasi",
+  "Semua", "Jakarta", "Surabaya", "Bandung", "Medan", "Bekasi", "Tangerang", "Depok",
+  "Semarang", "Palembang", "Makassar", "South Tangerang", "Batam", "Pekanbaru",
+  "Bandar Lampung", "Padang", "Malang", "Bogor", "Denpasar", "Samarinda",
+  "Tasikmalaya", "Pontianak", "Banjarmasin", "Balikpapan", "Jambi", "Surakarta",
+  "Mataram", "Manado", "Yogyakarta", "Ambon", "Kupang", "Jayapura", "Sorong",
+  "Ternate", "Gorontalo", "Kendari", "Palu", "Pekalongan", "Tegal", "Cirebon",
+  "Sukabumi", "Aceh", "Bali", "Kep. Mentawai", "Magelang", "Kabupaten Bogor", "Kabupaten Bekasi", "Kabupaten Tangerang",
 ];
-
 
 export default function Category() {
   const { categoryId } = useParams();
@@ -131,9 +144,23 @@ export default function Category() {
   const [saved, setSaved] = useState({});
   const [searchKeyword, setSearchKeyword] = useState(queryQ);
   const [selectedCity, setSelectedCity] = useState(queryLocation || "Semua");
+  const [kotaSearch, setKotaSearch] = useState("");
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
   const cityDropdownRef = useRef(null);
+
+  const [selectedPriceRange, setSelectedPriceRange] = useState("all");
+  const [priceDropdownOpen, setPriceDropdownOpen] = useState(false);
+  const priceDropdownRef = useRef(null);
+
+  const [sortOption, setSortOption] = useState("relevance");
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const sortDropdownRef = useRef(null);
+
   const tabsRef = useRef(null);
+
+  const filteredCities = CITIES.filter((k) =>
+    k.toLowerCase().includes(kotaSearch.toLowerCase())
+  );
 
   const scrollTabs = (direction) => {
     if (tabsRef.current) {
@@ -198,20 +225,31 @@ export default function Category() {
         .then(bizJson => {
           const bizData = bizJson?.data || bizJson || [];
           if (Array.isArray(bizData)) {
-            const mapped = bizData.map(b => ({
-              id: b.id,
-              name: b.name,
-              category: b.category?.name || "Umum",
-              categorySlug: b.category?.slug || "umum",
-              tags: [b.name],
-              location: b.city || "Indonesia",
-              views: b.views || 0,
-              status: "Buka Sekarang",
-              img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-              lat: b.lat,
-              lng: b.lng,
-              is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
-            }));
+            const mapped = bizData.map(b => {
+              const avgPrice = b.products_avg_price ? Number(b.products_avg_price) : 0;
+              const minPrice = b.products_min_price ? Number(b.products_min_price) : 0;
+              const maxPrice = b.products_max_price ? Number(b.products_max_price) : 0;
+              const productsCount = Number(b.products_count || 0);
+
+              return {
+                id: b.id,
+                name: b.name,
+                category: b.category?.name || "Umum",
+                categorySlug: b.category?.slug || "umum",
+                tags: [b.name],
+                location: b.city || "Indonesia",
+                views: b.views || 0,
+                status: "Buka Sekarang",
+                img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+                lat: b.lat,
+                lng: b.lng,
+                is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
+                avg_price: avgPrice,
+                min_price: minPrice,
+                max_price: maxPrice,
+                products_count: productsCount,
+              };
+            });
             setBisnisData(mapped);
           }
         }).catch(err => console.error("Failed to fetch businesses:", err));
@@ -234,11 +272,17 @@ export default function Category() {
     setSelectedCity(queryLocation || "Semua");
   }, [queryQ, queryLocation]);
 
-  // Outside-click detection for city dropdown
+  // Outside-click detection for dropdowns
   useEffect(() => {
     function handleClickOutside(e) {
       if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target)) {
         setCityDropdownOpen(false);
+      }
+      if (priceDropdownRef.current && !priceDropdownRef.current.contains(e.target)) {
+        setPriceDropdownOpen(false);
+      }
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(e.target)) {
+        setSortDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -276,8 +320,81 @@ export default function Category() {
       b.tags.some(tag => tag.toLowerCase().includes(searchKeyword.toLowerCase())) ||
       b.location.toLowerCase().includes(searchKeyword.toLowerCase());
 
-    return matchesCity && matchesKeyword;
+    // Price range filter based on business's average product price
+    let matchesPrice = true;
+    if (selectedPriceRange && selectedPriceRange !== "all") {
+      const range = PRICE_RANGES.find(r => r.id === selectedPriceRange);
+      if (range) {
+        const price = b.avg_price || 0;
+        if (b.products_count === 0 && price === 0) {
+          matchesPrice = false;
+        } else {
+          const isAboveMin = range.min === null || price >= range.min;
+          const isBelowMax = range.max === null || price <= range.max;
+          matchesPrice = isAboveMin && isBelowMax;
+        }
+      }
+    }
+
+    return matchesCity && matchesKeyword && matchesPrice;
+  }).sort((a, b) => {
+    // 1. PRIMARY: Premium tier first (all Premium businesses come before Free businesses)
+    if (a.is_premium && !b.is_premium) return -1;
+    if (!a.is_premium && b.is_premium) return 1;
+
+    // 2. SECONDARY: Sorting within the same tier
+    if (sortOption === "price_asc") {
+      return (a.avg_price || 0) - (b.avg_price || 0);
+    }
+    if (sortOption === "price_desc") {
+      return (b.avg_price || 0) - (a.avg_price || 0);
+    }
+    if (sortOption === "views") {
+      return (b.views || 0) - (a.views || 0);
+    }
+    // Default / latest
+    return (b.id || 0) - (a.id || 0);
   });
+
+  // ── Pagination Setup (6 items per page) ──
+  const ITEMS_PER_PAGE = 6;
+  const [currentPage, setCurrentPage] = useState(1);
+  const listTopRef = useRef(null);
+
+  // Reset to page 1 whenever search, category, city, price, or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, selectedCity, searchKeyword, selectedPriceRange, sortOption]);
+
+  const totalItems = searchFilteredBisnis.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedBisnis = searchFilteredBisnis.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const pageNumbers = useMemo(() => {
+    const pages = [];
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (safeCurrentPage <= 3) {
+        pages.push(1, 2, 3, 4, "...", totalPages);
+      } else if (safeCurrentPage >= totalPages - 2) {
+        pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, "...", totalPages);
+      }
+    }
+    return pages;
+  }, [totalPages, safeCurrentPage]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages || newPage === safeCurrentPage) return;
+    setCurrentPage(newPage);
+    if (listTopRef.current) {
+      listTopRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   const [searchHistoryCategory, setSearchHistoryCategory] = useState([]);
 
@@ -416,49 +533,105 @@ export default function Category() {
               Temukan bisnis terbaik di kategori {currentCategory?.label?.toLowerCase() || "semua"}
             </p>
 
-            {/* Search Bar with City Filter */}
-            <div className="category-search-container">
-              <div className="category-search">
-                <Search size={18} className="category-search__icon" />
+            {/* Unified Search Bar (Matching Home Page Style) */}
+            <form
+              className="category-unified-search"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearchParams((prev) => {
+                  if (searchKeyword.trim()) {
+                    prev.set("q", searchKeyword.trim());
+                  } else {
+                    prev.delete("q");
+                  }
+                  if (selectedCity && selectedCity !== "Semua") {
+                    prev.set("location", selectedCity);
+                  } else {
+                    prev.delete("location");
+                  }
+                  return prev;
+                });
+              }}
+            >
+              {/* Keyword Group */}
+              <div className="category-search__group category-search__group--keyword">
+                <span className="category-search__label">Kata Kunci :</span>
                 <input
                   type="text"
-                  placeholder="Cari bisnis..."
+                  placeholder="Cari nama bisnis, produk, dll..."
                   value={searchKeyword}
                   onChange={handleSearchChange}
                   className="category-search__input"
                 />
               </div>
-              <div className="category-city-filter" ref={cityDropdownRef}>
+
+              {/* Vertical Divider */}
+              <div className="category-search__divider" />
+
+              {/* Location Dropdown Group */}
+              <div className="category-search__group category-search__group--location" ref={cityDropdownRef}>
+                <span className="category-search__label">Lokasi</span>
                 <button
                   type="button"
-                  className="category-city-btn"
+                  className="category-search__city-btn"
                   onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
                 >
-                  <MapPin size={18} />
-                  <span>{selectedCity}</span>
-                  <ChevronDown size={18} className={`category-city-caret ${cityDropdownOpen ? "open" : ""}`} />
+                  <span className="category-search__city-text">{selectedCity}</span>
+                  <ChevronDown size={16} className={`category-search__caret ${cityDropdownOpen ? "open" : ""}`} />
                 </button>
+
                 {cityDropdownOpen && (
-                  <div className="category-city-dropdown">
-                    <div className="category-city-list">
-                      {CITIES.map((city) => (
-                        <button
-                          key={city}
-                          type="button"
-                          className={`category-city-option ${selectedCity === city ? "selected" : ""}`}
-                          onClick={() => {
-                            setSelectedCity(city);
-                            setCityDropdownOpen(false);
-                          }}
-                        >
-                          {city}
-                        </button>
-                      ))}
+                  <div className="category-city-dropdown" role="listbox">
+                    <div className="category-city-search-box">
+                      <Search size={14} className="category-city-search-icon" />
+                      <input
+                        autoFocus
+                        type="text"
+                        placeholder="Cari kota..."
+                        value={kotaSearch}
+                        onChange={(e) => setKotaSearch(e.target.value)}
+                        className="category-city-search-input"
+                      />
                     </div>
+                    <ul className="category-city-list">
+                      {filteredCities.length > 0 ? (
+                        filteredCities.map((city) => (
+                          <li
+                            key={city}
+                            role="option"
+                            aria-selected={city === selectedCity}
+                            className={`category-city-option ${selectedCity === city ? "selected" : ""}`}
+                            onClick={() => {
+                              setSelectedCity(city);
+                              setCityDropdownOpen(false);
+                              setKotaSearch("");
+                              setSearchParams((prev) => {
+                                if (city && city !== "Semua") {
+                                  prev.set("location", city);
+                                } else {
+                                  prev.delete("location");
+                                }
+                                return prev;
+                              });
+                            }}
+                          >
+                            {city}
+                          </li>
+                        ))
+                      ) : (
+                        <li className="category-city-empty">Kota tidak ditemukan</li>
+                      )}
+                    </ul>
                   </div>
                 )}
               </div>
-            </div>
+
+              {/* Search Submit Button */}
+              <button type="submit" className="category-search__button" title="Cari Bisnis">
+                <Search size={18} />
+                <span>Cari</span>
+              </button>
+            </form>
           </div>
 
           {/* Right Column: 9 Interactive Floating Category Cards */}
@@ -540,80 +713,262 @@ export default function Category() {
       <section className="category-business-section">
         <div className="category-business-inner">
           <div className="category-business__header">
-            <h2 className="category-business__title">
-              {searchFilteredBisnis.length} Bisnis Ditemukan
-            </h2>
+            <div className="category-business__title-wrap">
+              <h2 className="category-business__title">
+                {searchFilteredBisnis.length} Bisnis Ditemukan
+              </h2>
+              {(selectedPriceRange !== "all" || (selectedCity && selectedCity !== "Semua") || searchKeyword) && (
+                <div className="category-active-filters-badges">
+                  {selectedPriceRange !== "all" && (
+                    <span className="filter-badge">
+                      <Tag size={11} /> {PRICE_RANGES.find(r => r.id === selectedPriceRange)?.label}
+                      <button type="button" onClick={() => setSelectedPriceRange("all")} title="Hapus filter harga"><X size={11} /></button>
+                    </span>
+                  )}
+                  {selectedCity && selectedCity !== "Semua" && (
+                    <span className="filter-badge">
+                      <MapPin size={11} /> {selectedCity}
+                      <button type="button" onClick={() => {
+                        setSelectedCity("Semua");
+                        setSearchParams(prev => { prev.delete("location"); return prev; });
+                      }} title="Hapus filter kota"><X size={11} /></button>
+                    </span>
+                  )}
+                  {searchKeyword && (
+                    <span className="filter-badge">
+                      <Search size={11} /> &quot;{searchKeyword}&quot;
+                      <button type="button" onClick={() => {
+                        setSearchKeyword("");
+                        setSearchParams(prev => { prev.delete("q"); return prev; });
+                      }} title="Hapus kata kunci"><X size={11} /></button>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="category-business__filters">
-              <button className="btn-filter-outline" onClick={() => {
-                 setSearchKeyword("");
-                 setSelectedCity("Semua");
-                 setSearchParams((prev) => { prev.delete("q"); prev.delete("location"); return prev; });
-               }}>
+              {/* Reset Filter Button */}
+              <button
+                className="btn-filter-outline"
+                onClick={() => {
+                  setSearchKeyword("");
+                  setSelectedCity("Semua");
+                  setSelectedPriceRange("all");
+                  setSortOption("relevance");
+                  setSearchParams((prev) => { prev.delete("q"); prev.delete("location"); return prev; });
+                }}
+              >
                 <X size={14} /> Reset filter
               </button>
-              <button className="btn-filter-outline">
-                <ListFilter size={14} /> Paling Relevan <ChevronDown size={14} />
-              </button>
+
+              {/* Price Range Filter Dropdown */}
+              <div className="filter-dropdown-wrap" ref={priceDropdownRef}>
+                <button
+                  type="button"
+                  className={`btn-filter-outline ${selectedPriceRange !== "all" ? "active-filter" : ""}`}
+                  onClick={() => setPriceDropdownOpen(!priceDropdownOpen)}
+                >
+                  <Tag size={14} className={selectedPriceRange !== "all" ? "text-[#007570]" : ""} />
+                  <span>
+                    {selectedPriceRange === "all"
+                      ? "Filter Harga"
+                      : PRICE_RANGES.find(r => r.id === selectedPriceRange)?.shortLabel || "Filter Harga"}
+                  </span>
+                  <ChevronDown size={14} className={`dropdown-caret ${priceDropdownOpen ? "open" : ""}`} />
+                </button>
+
+                {priceDropdownOpen && (
+                  <div className="filter-dropdown-menu filter-dropdown-menu--price" role="menu">
+                    <div className="filter-dropdown-header">
+                      <span className="filter-dropdown-title">Rentang Rata-rata Harga Produk</span>
+                    </div>
+                    <ul className="filter-dropdown-list">
+                      {PRICE_RANGES.map((range) => (
+                        <li
+                          key={range.id}
+                          className={`filter-dropdown-item ${selectedPriceRange === range.id ? "selected" : ""}`}
+                          onClick={() => {
+                            setSelectedPriceRange(range.id);
+                            setPriceDropdownOpen(false);
+                          }}
+                        >
+                          <div className="filter-item-info">
+                            <span className="filter-item-label">{range.label}</span>
+                            {range.desc && <span className="filter-item-desc">{range.desc}</span>}
+                          </div>
+                          {selectedPriceRange === range.id && <Check size={15} className="filter-item-check" />}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="filter-dropdown-wrap" ref={sortDropdownRef}>
+                <button
+                  type="button"
+                  className="btn-filter-outline"
+                  onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                >
+                  <ListFilter size={14} />
+                  <span>{SORT_OPTIONS.find(s => s.id === sortOption)?.label || "Paling Relevan"}</span>
+                  <ChevronDown size={14} className={`dropdown-caret ${sortDropdownOpen ? "open" : ""}`} />
+                </button>
+
+                {sortDropdownOpen && (
+                  <div className="filter-dropdown-menu filter-dropdown-menu--sort" role="menu">
+                    <ul className="filter-dropdown-list">
+                      {SORT_OPTIONS.map((opt) => (
+                        <li
+                          key={opt.id}
+                          className={`filter-dropdown-item ${sortOption === opt.id ? "selected" : ""}`}
+                          onClick={() => {
+                            setSortOption(opt.id);
+                            setSortDropdownOpen(false);
+                          }}
+                        >
+                          <span className="filter-item-label">{opt.label}</span>
+                          {sortOption === opt.id && <Check size={15} className="filter-item-check" />}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="category-business-split">
-            <div className="category-business-left">
+            <div className="category-business-left" ref={listTopRef}>
               {loadingData ? (
                 <InlineSpinner text="Memuat data bisnis..." />
               ) : searchFilteredBisnis.length > 0 ? (
-                <div className="reko-grid">
-              {searchFilteredBisnis.map((bisnis) => (
-                <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
-                  {/* Image */}
-                  <div className="biz-card__img-wrap">
-                    <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
-                    {bisnis.is_premium && (
-                      <div className="biz-card__verified-badge" title="Bisnis Terpercaya - Pengguna Premium">
-                        <BadgeCheck size={14} className="biz-card__verified-icon" />
-                        <span>Terpercaya</span>
-                      </div>
-                    )}
-                    <div className="biz-card__img-overlay">
-                      <button
-                        type="button"
-                        className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
-                        onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
-                        aria-label="Simpan"
-                      >
-                        <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                        <span>Simpan</span>
-                      </button>
-                      <span className="biz-card__views">
-                        <Eye size={13} />
-                        <span>{bisnis.views}</span>
-                      </span>
-                    </div>
+                <>
+                  <div className="reko-grid">
+                    {paginatedBisnis.map((bisnis) => (
+                      <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
+                        {/* Image */}
+                        <div className="biz-card__img-wrap">
+                          <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
+                          {bisnis.is_premium && (
+                            <div className="biz-card__verified-badge" title="Bisnis Terverifikasi - Pengguna Premium">
+                              <BadgeCheck size={14} className="biz-card__verified-icon" />
+                              <span>Terverifikasi</span>
+                            </div>
+                          )}
+                          <div className="biz-card__img-overlay">
+                            <button
+                              type="button"
+                              className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
+                              onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
+                              aria-label="Simpan"
+                            >
+                              <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
+                              <span>Simpan</span>
+                            </button>
+                            <span className="biz-card__views">
+                              <Eye size={13} />
+                              <span>{bisnis.views}</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="biz-card__body">
+                          <h3 className="biz-card__name">{bisnis.name}</h3>
+                          <p className="biz-card__category">{bisnis.category}</p>
+                          
+                          {/* Price Range Badge */}
+                          {bisnis.avg_price > 0 && (
+                            <div className="biz-card__price-badge">
+                              <span className="biz-card__price-text">
+                                Rp {Math.round(bisnis.avg_price).toLocaleString("id-ID")}
+                              </span>
+                              <span className="biz-card__price-sub">(rata-rata)</span>
+                            </div>
+                          )}
+
+                          <div className="biz-card__tags">
+                            {bisnis.tags.map((tag) => (
+                              <span key={tag} className="biz-card__tag">
+                                <Tag size={11} />
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="biz-card__footer">
+                            <span className="biz-card__location">
+                              <MapPin size={12} />
+                              {bisnis.location}
+                            </span>
+                            <span className="biz-card__cta">{bisnis.status} →</span>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
                   </div>
 
-                  {/* Body */}
-                  <div className="biz-card__body">
-                    <h3 className="biz-card__name">{bisnis.name}</h3>
-                    <p className="biz-card__category">{bisnis.category}</p>
-                    <div className="biz-card__tags">
-                      {bisnis.tags.map((tag) => (
-                        <span key={tag} className="biz-card__tag">
-                          <Tag size={11} />
-                          {tag}
-                        </span>
-                      ))}
+                  {/* ── Responsive Pagination Controls ── */}
+                  {totalPages > 1 && (
+                    <div className="category-pagination">
+                      <div className="category-pagination__info">
+                        Menampilkan <strong>{startIndex + 1}</strong>–<strong>{Math.min(startIndex + ITEMS_PER_PAGE, totalItems)}</strong> dari <strong>{totalItems}</strong> bisnis
+                      </div>
+
+                      <div className="category-pagination__controls">
+                        {/* Prev Button */}
+                        <button
+                          type="button"
+                          className="category-pagination__nav-btn"
+                          onClick={() => handlePageChange(safeCurrentPage - 1)}
+                          disabled={safeCurrentPage === 1}
+                          aria-label="Halaman Sebelumnya"
+                        >
+                          <ChevronLeft size={16} />
+                          <span className="category-pagination__nav-label">Sebelumnya</span>
+                        </button>
+
+                        {/* Numbered Pages */}
+                        <div className="category-pagination__pages">
+                          {pageNumbers.map((page, idx) =>
+                            page === "..." ? (
+                              <span key={`dots-${idx}`} className="category-pagination__dots">
+                                …
+                              </span>
+                            ) : (
+                              <button
+                                key={`page-${page}`}
+                                type="button"
+                                className={`category-pagination__page-btn ${
+                                  page === safeCurrentPage ? "active" : ""
+                                }`}
+                                onClick={() => handlePageChange(page)}
+                                aria-label={`Ke Halaman ${page}`}
+                                aria-current={page === safeCurrentPage ? "page" : undefined}
+                              >
+                                {page}
+                              </button>
+                            )
+                          )}
+                        </div>
+
+                        {/* Next Button */}
+                        <button
+                          type="button"
+                          className="category-pagination__nav-btn"
+                          onClick={() => handlePageChange(safeCurrentPage + 1)}
+                          disabled={safeCurrentPage === totalPages}
+                          aria-label="Halaman Selanjutnya"
+                        >
+                          <span className="category-pagination__nav-label">Selanjutnya</span>
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="biz-card__footer">
-                      <span className="biz-card__location">
-                        <MapPin size={12} />
-                        {bisnis.location}
-                      </span>
-                      <span className="biz-card__cta">{bisnis.status} →</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-                </div>
+                  )}
+                </>
               ) : (
                 <div className="category-empty">
                   <p>Tidak ada bisnis ditemukan untuk kategori ini.</p>

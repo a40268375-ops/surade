@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\AdPackageController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\AdminReferralController;
+use App\Http\Controllers\Api\PasswordResetController;
 
 // OTP-based registration (3-step flow)
 Route::post('/register/send-otp',     [AuthController::class, 'sendOtp']);
@@ -27,7 +28,15 @@ Route::post('/register/resend-otp',   [AuthController::class, 'resendOtp']);
 
 Route::post('/login', [AuthController::class, 'login']);
 
+// Password reset (4-step flow)
+Route::post('/forgot-password',      [PasswordResetController::class, 'sendResetOtp']);
+Route::post('/verify-reset-code',    [PasswordResetController::class, 'verifyResetCode']);
+Route::post('/resend-reset-code',    [PasswordResetController::class, 'resendResetCode']);
+Route::post('/reset-password',       [PasswordResetController::class, 'resetPassword']);
+
+
 Route::get('/smart-cities', [LocationController::class, 'smartCities']);
+Route::get('/smart-cities/counts', [LocationController::class, 'cityCounts']);
 Route::get('/locations/{slug}', [LocationController::class, 'showLocation']);
 
 Route::get('/businesses', [BusinessController::class, 'index']);
@@ -104,6 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/messages/{message}', [MessageController::class, 'destroy']);
         Route::get('/my-advertisements', [AdvertisementController::class, 'myAdvertisements']);
         Route::post('/advertisements', [AdvertisementController::class, 'store']);
+        Route::get('/advertisements/{id}', [AdvertisementController::class, 'show']);
         Route::put('/advertisements/{id}', [AdvertisementController::class, 'update']);
         Route::delete('/advertisements/{id}', [AdvertisementController::class, 'destroy']);
         Route::match(['put', 'post'], '/advertisements/{id}/pay', [AdvertisementController::class, 'pay']);
@@ -115,6 +125,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware(\App\Http\Middleware\AdminMiddleware::class)->prefix('admin')->group(function () {
         Route::get('/stats', [AdminController::class, 'stats']);
+        Route::get('/activities', [AdminController::class, 'activities']);
         Route::get('/users', [AdminController::class, 'users']);
         Route::post('/users', [AdminController::class, 'createUser']);
         Route::put('/users/{user}', [AdminController::class, 'updateUser']);

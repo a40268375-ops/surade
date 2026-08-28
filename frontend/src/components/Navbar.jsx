@@ -7,34 +7,91 @@ import {
 import logoImg from "../assets/logo.png";
 import { DEFAULT_AVATAR, getStorageUrl } from "../utils/constants";
 
+// In-memory module cache for instant sub-millisecond access across page transitions
+let memoryCategoriesCache = null;
+
+const getCachedCategories = () => {
+  if (memoryCategoriesCache && memoryCategoriesCache.length > 0) {
+    return memoryCategoriesCache;
+  }
+  try {
+    const raw = localStorage.getItem("cached_navbar_categories");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        memoryCategoriesCache = parsed;
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Navbar category cache read error:", e);
+  }
+  return [];
+};
+
 export default function Navbar() {
   const navigate = useNavigate();
 
-  const [categories,       setCategories]       = useState([]);
-  const [activeCategory,   setActiveCategory]   = useState(null);
-  const [loadingCategories,setLoadingCategories]= useState(true);
+  const initialCats = getCachedCategories();
+  const [categories,       setCategories]       = useState(initialCats);
+  const [activeCategory,   setActiveCategory]   = useState(initialCats[0]?.slug || null);
+  const [loadingCategories,setLoadingCategories]= useState(initialCats.length === 0);
   const [user,             setUser]             = useState(null);
   const [showUserMenu,     setShowUserMenu]     = useState(false);
   const [mobileOpen,       setMobileOpen]       = useState(false);
+  const [infoOpen,         setInfoOpen]         = useState(false);
 
-  const userMenuRef = useRef(null);
+  const userMenuRef    = useRef(null);
+  const infoRef        = useRef(null);
+  const infoTimeoutRef = useRef(null);
+
   const activeItem  = categories.find((c) => c.slug === activeCategory) ?? categories[0];
 
-  /* fetch categories */
+  const handleInfoMouseEnter = () => {
+    if (infoTimeoutRef.current) {
+      clearTimeout(infoTimeoutRef.current);
+      infoTimeoutRef.current = null;
+    }
+    setInfoOpen(true);
+  };
+
+  const handleInfoMouseLeave = () => {
+    if (infoTimeoutRef.current) {
+      clearTimeout(infoTimeoutRef.current);
+    }
+    infoTimeoutRef.current = setTimeout(() => {
+      setInfoOpen(false);
+    }, 300); // 300ms buffer so moving cursor never accidentally closes the menu
+  };
+
+  /* SWR background fetch categories - instant 0ms with background revalidation */
   useEffect(() => {
-    const fetch_ = async () => {
-      setLoadingCategories(true);
+    let isMounted = true;
+    const fetchCategories = async () => {
+      if (categories.length === 0) {
+        setLoadingCategories(true);
+      }
       try {
         const res  = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
           setCategories(data);
-          if (data.length > 0 && !activeCategory) setActiveCategory(data[0].slug);
+          memoryCategoriesCache = data;
+          try {
+            localStorage.setItem("cached_navbar_categories", JSON.stringify(data));
+          } catch (_) {}
+          if (!activeCategory) {
+            setActiveCategory(data[0].slug);
+          }
         }
-      } catch (e) { console.error("fetch categories:", e); }
-      finally    { setLoadingCategories(false); }
+      } catch (e) {
+        console.error("fetch categories:", e);
+      } finally {
+        if (isMounted) setLoadingCategories(false);
+      }
     };
-    fetch_();
+    fetchCategories();
+    return () => { isMounted = false; };
   }, []);
 
   /* load user */
@@ -54,14 +111,21 @@ export default function Navbar() {
     };
   }, []);
 
-  /* close user menu on outside click */
+  /* close menus on outside click */
   useEffect(() => {
     const h = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target))
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setShowUserMenu(false);
+      }
+      if (infoRef.current && !infoRef.current.contains(e.target)) {
+        setInfoOpen(false);
+      }
     };
     document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+    return () => {
+      document.removeEventListener("mousedown", h);
+      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
+    };
   }, []);
 
   /* close mobile on resize */
@@ -157,13 +221,20 @@ export default function Navbar() {
 
             <NavLink to="/" end className={navLinkClass}>Home</NavLink>
 
-            {/* ── Informasi dropdown — group hover, original behaviour ── */}
-            <div className="relative group">
+            {/* ── Informasi dropdown — responsive hover stay + click toggle ── */}
+            <div
+              className="relative"
+              ref={infoRef}
+              onMouseEnter={handleInfoMouseEnter}
+              onMouseLeave={handleInfoMouseLeave}
+            >
               <button
                 type="button"
+                onClick={() => setInfoOpen((v) => !v)}
                 className={[
                   "relative inline-flex items-center gap-1.5 py-1.5",
-                  "text-[0.85rem] font-medium whitespace-nowrap text-white/[0.82]",
+                  "text-[0.85rem] font-medium whitespace-nowrap",
+                  infoOpen ? "text-[#00B4A9]" : "text-white/[0.82]",
                   "bg-transparent border-none cursor-pointer font-[inherit]",
                   "transition-colors duration-[250ms] hover:text-[#00B4A9]",
                 ].join(" ")}
@@ -171,81 +242,106 @@ export default function Navbar() {
                 <span>Informasi</span>
                 <ChevronDown
                   size={14}
-                  className="opacity-70 transition-[opacity,transform] duration-[250ms] group-hover:opacity-100 group-hover:text-[#00B4A9] group-hover:rotate-180"
+                  className={`opacity-70 transition-[opacity,transform] duration-[250ms] ${
+                    infoOpen ? "opacity-100 text-[#00B4A9] rotate-180" : "hover:opacity-100"
+                  }`}
                 />
               </button>
 
               {/* mega dropdown panel */}
-              <div className={[
-                "absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 translate-y-[6px]",
-                "before:block before:absolute before:-top-4 before:left-0 before:w-full before:h-4",
-                "bg-white rounded overflow-hidden",
-                "shadow-[0_10px_40px_rgba(0,0,0,0.18)]",
-                "min-w-[480px] z-[1000]",
-                "opacity-0 invisible pointer-events-none",
-                "transition-[opacity,transform,visibility] duration-200",
-                "group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0",
-              ].join(" ")}>
-
+              <div
+                className={[
+                  "absolute top-[calc(100%+10px)] left-1/2 -translate-x-1/2",
+                  "before:block before:absolute before:-top-4 before:left-0 before:w-full before:h-5",
+                  "bg-white rounded-2xl overflow-hidden",
+                  "border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.18),0_4px_12px_rgba(0,0,0,0.06)]",
+                  "min-w-[520px] max-w-[600px] z-[1000]",
+                  "transition-all duration-200 ease-out origin-top",
+                  infoOpen
+                    ? "opacity-100 visible pointer-events-auto translate-y-0 scale-100"
+                    : "opacity-0 invisible pointer-events-none translate-y-2 scale-[0.98]",
+                ].join(" ")}
+              >
                 {/* arrow caret */}
-                <span className="absolute -top-[6px] left-1/2 -translate-x-1/2 rotate-45 w-3 h-3 bg-white shadow-[-2px_-2px_4px_rgba(0,0,0,0.04)]" />
+                <span className="absolute -top-[5px] left-1/2 -translate-x-1/2 rotate-45 w-2.5 h-2.5 bg-white border-t border-l border-slate-200/80" />
 
-                <div className="flex min-h-[320px]">
+                {/* Header bar inside dropdown */}
+                <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100 text-[12px] font-bold text-slate-700">
+                  <span className="flex items-center gap-1.5 text-[#007570]">
+                    <span>Kategori & Direktori Bisnis</span>
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    {categories.length} Kategori
+                  </span>
+                </div>
+
+                <div className="flex min-h-[340px] max-h-[400px]">
                   {loadingCategories ? (
                     <div className="flex items-center justify-center gap-3 p-10 text-slate-500 text-[0.9rem] w-full">
-                      <Loader2 size={20} className="animate-spin" />
+                      <Loader2 size={20} className="animate-spin text-[#007570]" />
                       <span>Memuat kategori...</span>
                     </div>
                   ) : categories.length > 0 ? (
                     <>
-                      {/* main col — min-width:240px, border-right */}
-                      <div className="flex flex-col py-1.5 min-w-[240px] border-r border-slate-200">
-                        {categories.map((item) => (
-                          <Link
-                            key={item.id}
-                            to={`/category/${item.slug}`}
-                            onMouseEnter={() => setActiveCategory(item.slug)}
-                            onFocus={() => setActiveCategory(item.slug)}
-                            className={[
-                              "flex items-center justify-between gap-3 px-[18px] py-[11px]",
-                              "text-[0.875rem] font-medium no-underline",
-                              "transition-[background,color] duration-150",
-                              activeCategory === item.slug
-                                ? "bg-slate-50 text-[#007570]"
-                                : "text-slate-600 hover:bg-slate-50 hover:text-[#007570]",
-                            ].join(" ")}
-                          >
-                            <span>{item.name}</span>
-                            {item.children?.length > 0 && (
-                              <ChevronRight
-                                size={14}
-                                className={[
-                                  "shrink-0 transition-[color,transform] duration-150",
-                                  activeCategory === item.slug
-                                    ? "text-[#007570] translate-x-0.5"
-                                    : "text-slate-400",
-                                ].join(" ")}
-                              />
-                            )}
-                          </Link>
-                        ))}
+                      {/* Main Category Column — scrollable */}
+                      <div className="flex flex-col py-2 min-w-[250px] max-w-[260px] border-r border-slate-100 overflow-y-auto max-h-[350px]">
+                        {categories.map((item) => {
+                          const isSelected = (activeItem?.slug || activeCategory) === item.slug;
+                          return (
+                            <Link
+                              key={item.id}
+                              to={`/category/${item.slug}`}
+                              onClick={() => setInfoOpen(false)}
+                              onMouseEnter={() => setActiveCategory(item.slug)}
+                              onFocus={() => setActiveCategory(item.slug)}
+                              className={[
+                                "flex items-center justify-between gap-2.5 mx-2 px-3.5 py-2.5 rounded-xl",
+                                "text-[13px] font-semibold no-underline",
+                                "transition-all duration-150",
+                                isSelected
+                                  ? "bg-[#007570] text-white shadow-sm"
+                                  : "text-slate-700 hover:bg-slate-100/80 hover:text-[#007570]",
+                              ].join(" ")}
+                            >
+                              <span className="truncate">{item.name}</span>
+                              {item.children?.length > 0 && (
+                                <ChevronRight
+                                  size={14}
+                                  className={[
+                                    "shrink-0 transition-transform duration-150",
+                                    isSelected ? "text-white translate-x-0.5" : "text-slate-400",
+                                  ].join(" ")}
+                                />
+                              )}
+                            </Link>
+                          );
+                        })}
                       </div>
 
-                      {/* sub col */}
-                      <div className="flex flex-col py-1.5 flex-1 min-w-[220px]">
+                      {/* Sub Category Column — scrollable */}
+                      <div className="flex flex-col py-2 flex-1 min-w-[240px] overflow-y-auto max-h-[350px] bg-slate-50/40">
                         {activeItem?.children?.length > 0 ? (
-                          activeItem.children.map((child) => (
-                            <Link
-                              key={child.id}
-                              to={`/category/${child.slug}`}
-                              className="block px-5 py-[10px] text-[0.875rem] font-medium text-slate-600 no-underline transition-[background,color] duration-150 hover:bg-slate-50 hover:text-[#007570]"
-                            >
-                              {child.name}
-                            </Link>
-                          ))
+                          <>
+                            <div className="px-4 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                              Sub Kategori {activeItem.name}
+                            </div>
+                            <div className="flex flex-col gap-0.5 px-2">
+                              {activeItem.children.map((child) => (
+                                <Link
+                                  key={child.id}
+                                  to={`/category/${child.slug}`}
+                                  onClick={() => setInfoOpen(false)}
+                                  className="flex items-center px-3.5 py-2 rounded-lg text-[13px] font-medium text-slate-600 no-underline transition-colors hover:bg-white hover:text-[#007570] hover:shadow-xs"
+                                >
+                                  <span>{child.name}</span>
+                                </Link>
+                              ))}
+                            </div>
+                          </>
                         ) : (
-                          <div className="flex items-center justify-center px-5 py-10 text-slate-400 text-[0.875rem]">
-                            Tidak ada sub kategori
+                          <div className="flex flex-col items-center justify-center p-8 text-slate-400 text-[12.5px] text-center h-full">
+                            <span className="font-semibold text-slate-600 mb-1">{activeItem?.name || "Kategori"}</span>
+                            <span>Tidak ada sub kategori spesifik. Klik kategori utama untuk melihat semua usaha.</span>
                           </div>
                         )}
                       </div>

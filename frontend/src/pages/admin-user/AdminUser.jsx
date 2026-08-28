@@ -54,6 +54,11 @@ import {
   MessageCircle,
   Send,
   AlertCircle,
+  Sparkles,
+  ArrowRight,
+  RefreshCw,
+  Layers,
+  ExternalLink,
 } from "lucide-react";
 
 import logoImg from "../../assets/logo.png";
@@ -204,6 +209,19 @@ export default function AdminUser() {
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [advertisements, setAdvertisements] = useState([]);
   const [loadingAdvertisements, setLoadingAdvertisements] = useState(false);
+  const [adStats, setAdStats] = useState({
+    total_ads: 0,
+    active_ads: 0,
+    pending_payment: 0,
+    waiting_approval: 0,
+    expired_ads: 0,
+    rejected_ads: 0,
+    total_spending: 0,
+  });
+  const [adFilterTab, setAdFilterTab] = useState("all");
+  const [showCreateAdModal, setShowCreateAdModal] = useState(false);
+  const [createAdStep, setCreateAdStep] = useState(1);
+  const [viewingAdDetail, setViewingAdDetail] = useState(null);
   const [selectedBusinessForAd, setSelectedBusinessForAd] = useState(null);
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [adNotes, setAdNotes] = useState('');
@@ -233,13 +251,23 @@ export default function AdminUser() {
     return '8830-1234-5678';
   };
 
+  const getSelectedPackageObj = () => {
+    if (!selectedPackage) return null;
+    return adPackages.find(p => p.name === selectedPackage || p.id === selectedPackage || String(p.id) === String(selectedPackage)) || null;
+  };
+
+  const getSelectedBusinessObj = () => {
+    if (!selectedBusinessForAd) return null;
+    return businesses.find(b => b.id === Number(selectedBusinessForAd) || b.id === selectedBusinessForAd || String(b.id) === String(selectedBusinessForAd)) || null;
+  };
+
   const getSelectedPackagePrice = () => {
     if (!selectedPackage) return 0;
-    const found = adPackages.find(p => p.name === selectedPackage || p.id === selectedPackage);
+    const found = getSelectedPackageObj();
     if (found && found.price) return Number(found.price);
-    if (selectedPackage.toLowerCase().includes('basic')) return 50000;
-    if (selectedPackage.toLowerCase().includes('standard')) return 150000;
-    if (selectedPackage.toLowerCase().includes('premium')) return 350000;
+    if (typeof selectedPackage === 'string' && selectedPackage.toLowerCase().includes('basic')) return 50000;
+    if (typeof selectedPackage === 'string' && selectedPackage.toLowerCase().includes('standard')) return 150000;
+    if (typeof selectedPackage === 'string' && selectedPackage.toLowerCase().includes('premium')) return 350000;
     return 100000;
   };
 
@@ -438,6 +466,9 @@ export default function AdminUser() {
     const convParam = searchParams.get("conversation");
     if (convParam) {
       setActiveConversationId(convParam);
+    } else {
+      setActiveConversationId(null);
+      setActiveChatData(null);
     }
   }, [searchParams]);
 
@@ -468,7 +499,7 @@ export default function AdminUser() {
       (c) => String(c.id) === String(convId) || String(c.conversation_id) === String(convId)
     );
 
-    // Hydrate activeChatData immediately without wiping existing messages
+    // Hydrate activeChatData immediately with zero delay
     if (!isPoll) {
       setActiveChatData((prev) => {
         if (prev && String(prev.id) === String(convId) && prev.messages && prev.messages.length > 0) {
@@ -559,23 +590,17 @@ export default function AdminUser() {
     }
   }, [activeTab, activeConversationId]);
 
-  // Auto select first conversation if activeConversationId is not set
-  useEffect(() => {
-    if (activeTab === "inbox" && !activeConversationId && conversations.length > 0) {
-      setActiveConversationId(conversations[0].id);
-    }
-  }, [activeTab, conversations.length, activeConversationId]);
-
-  // Silent background sync every 8 seconds when Inbox tab is active
+  // Background sync every 10 seconds when Inbox tab is active and document is visible
   useEffect(() => {
     if (activeTab !== "inbox") return;
 
     const interval = setInterval(() => {
+      if (document.hidden) return;
       fetchConversationsList(false);
       if (activeConversationId) {
         fetchActiveChatDetails(activeConversationId, false, true);
       }
-    }, 8000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [activeTab, activeConversationId]);
@@ -1211,6 +1236,8 @@ export default function AdminUser() {
             created_at: b.created_at,
             date: b.created_at ? new Date(b.created_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }) : "-",
             products: b.products || [],
+            opening_hours: b.opening_hours || b.hours || "08:00 - 17:00 WIB",
+            opening_days: b.opening_days || ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"],
             raw: b
           };
         });
@@ -1240,6 +1267,19 @@ export default function AdminUser() {
       const data = res.data?.data || res.data || [];
       const list = Array.isArray(data) ? data : (data?.data || []);
       setAdvertisements(list);
+      if (res.data?.stats) {
+        setAdStats(res.data.stats);
+      } else {
+        setAdStats({
+          total_ads: list.length,
+          active_ads: list.filter(a => (a.computed_status || a.status) === 'active' || (a.computed_status || a.status) === 'approved').length,
+          pending_payment: list.filter(a => (a.computed_status || a.payment_status) === 'pending_payment' || a.payment_status === 'unpaid').length,
+          waiting_approval: list.filter(a => (a.computed_status || a.payment_status) === 'waiting_approval' || (a.payment_status === 'pending' && a.status === 'pending')).length,
+          expired_ads: list.filter(a => (a.computed_status || a.status) === 'expired').length,
+          rejected_ads: list.filter(a => (a.computed_status || a.status) === 'rejected').length,
+          total_spending: list.filter(a => a.payment_status === 'paid' || a.status === 'approved').reduce((acc, curr) => acc + Number(curr.price || 0), 0)
+        });
+      }
     } catch (err) {
       console.error("Failed to fetch advertisements:", err);
       setAdvertisements([]);
@@ -2330,11 +2370,11 @@ export default function AdminUser() {
       </aside>
 
       {/* ── Main Content Area ── */}
-      <main className={`flex-1 min-h-screen flex flex-col transition-all duration-[280ms] ${isCollapsed ? "ml-[68px]" : "ml-[240px]"}`}>
-        <header className="sticky top-0 z-[100] flex items-center justify-between px-[28px] h-[60px] bg-white/85 backdrop-blur-md border-b border-[#e2e8f0] gap-[16px]">
-          <div>
-            <h1 className="text-[17px] font-bold text-[#0f172a] leading-[1.2]">{pageInfo.title}</h1>
-            <p className="text-[12px] text-[#64748b] mt-[1px]">{pageInfo.desc}</p>
+      <main className={`flex-1 min-h-screen min-w-0 max-w-full flex flex-col transition-all duration-[280ms] overflow-x-hidden ${isCollapsed ? "ml-[68px]" : "ml-[240px]"}`}>
+        <header className="sticky top-0 z-[100] flex items-center justify-between px-[28px] max-md:px-[16px] h-[60px] bg-white/85 backdrop-blur-md border-b border-[#e2e8f0] gap-[16px]">
+          <div className="min-w-0">
+            <h1 className="text-[17px] font-bold text-[#0f172a] leading-[1.2] truncate">{pageInfo.title}</h1>
+            <p className="text-[12px] text-[#64748b] mt-[1px] truncate">{pageInfo.desc}</p>
           </div>
           <div className="flex items-center gap-[14px] shrink-0">
             <div className="flex items-center gap-[8px] p-[6px_12px_6px_6px] rounded-full bg-[#f1f5f9] text-[13px] text-[#64748b] cursor-pointer transition-all duration-[280ms] hover:bg-[rgba(0,117,112,0.12)]" onClick={() => setActiveTab("profile")}>
@@ -2343,7 +2383,7 @@ export default function AdminUser() {
                 alt="user avatar"
                 className="w-[24px] h-[24px] rounded-full object-cover"
               />
-              <span>
+              <span className="truncate max-w-[140px]">
                 Halo, <strong>{displayName}</strong>
               </span>
             </div>
@@ -2351,121 +2391,121 @@ export default function AdminUser() {
         </header>
 
         {/* Active Page View Container */}
-        <section className="flex-1 p-[24px_28px] max-md:p-[16px] overflow-y-auto">
+        <section className="flex-1 min-w-0 max-w-full p-[24px_28px] max-md:p-[16px] overflow-y-auto overflow-x-hidden">
           {/* 1. DASHBOARD VIEW */}
           {activeTab === "dashboard" && (
-            <div>
-              {/* Stats Cards */}
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-[16px] mb-[20px]">
-                <div className="bg-white border border-[#e2e8f0] rounded-[12px] p-[20px] flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-[280ms] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] cursor-pointer" onClick={() => setActiveTab("bisnis")}>
-                  <div>
-                    <h3 className="text-[11.5px] font-medium text-[#64748b] uppercase tracking-[0.06em] mb-[6px]">Total Bisnis</h3>
-                    <div className="text-[30px] font-bold text-[#0f172a] leading-none mb-[8px]">{userStats ? userStats.total_businesses : businesses.length}</div>
-                    <div className="flex items-center gap-[4px] text-[12px] font-medium text-[#10b981]">
-                      <TrendingUp size={14} /> <span>{userStats ? `${userStats.total_business_views} views` : "Bisnis Terdaftar"}</span>
+            <div className="w-full max-w-full min-w-0 flex flex-col gap-[20px]">
+              {/* Stats Cards — Compact 4-column row */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-[12px] sm:gap-[14px] w-full min-w-0">
+                <div className="bg-white border border-[#e2e8f0] rounded-[11px] p-[12px_16px] flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all duration-[250ms] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-[1px] cursor-pointer min-w-0" onClick={() => setActiveTab("bisnis")}>
+                  <div className="min-w-0 pr-2">
+                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.05em] mb-[2px] truncate">Total Bisnis</h3>
+                    <div className="text-[20px] sm:text-[22px] font-extrabold text-[#0f172a] leading-tight mb-[3px]">{userStats ? userStats.total_businesses : businesses.length}</div>
+                    <div className="flex items-center gap-[3px] text-[10.5px] font-medium text-[#10b981] truncate">
+                      <TrendingUp size={11} className="shrink-0" /> <span className="truncate">{userStats ? `${userStats.total_business_views} views` : "Bisnis Terdaftar"}</span>
                     </div>
                   </div>
-                  <div className="w-[44px] h-[44px] rounded-[10px] flex items-center justify-center shrink-0 bg-[#eff6ff] text-[#3b82f6]">
-                    <Briefcase size={22} />
+                  <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#eff6ff] text-[#3b82f6]">
+                    <Briefcase size={18} />
                   </div>
                 </div>
 
-                <div className="bg-white border border-[#e2e8f0] rounded-[12px] p-[20px] flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-[280ms] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] cursor-pointer" onClick={() => setActiveTab("blog-event")}>
-                  <div>
-                    <h3 className="text-[11.5px] font-medium text-[#64748b] uppercase tracking-[0.06em] mb-[6px]">Total Event / Blog</h3>
-                    <div className="text-[30px] font-bold text-[#0f172a] leading-none mb-[8px]">{userStats ? (userStats.total_events + userStats.total_blogs) : events.length}</div>
-                    <div className="flex items-center gap-[4px] text-[12px] font-medium text-[#10b981]">
-                      <TrendingUp size={14} /> <span>{userStats ? `${userStats.total_blog_views} views` : "Blog & Event"}</span>
+                <div className="bg-white border border-[#e2e8f0] rounded-[11px] p-[12px_16px] flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all duration-[250ms] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-[1px] cursor-pointer min-w-0" onClick={() => setActiveTab("blog-event")}>
+                  <div className="min-w-0 pr-2">
+                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.05em] mb-[2px] truncate">Total Event / Blog</h3>
+                    <div className="text-[20px] sm:text-[22px] font-extrabold text-[#0f172a] leading-tight mb-[3px]">{userStats ? (userStats.total_events + userStats.total_blogs) : events.length}</div>
+                    <div className="flex items-center gap-[3px] text-[10.5px] font-medium text-[#10b981] truncate">
+                      <TrendingUp size={11} className="shrink-0" /> <span className="truncate">{userStats ? `${userStats.total_blog_views} views` : "Blog & Event"}</span>
                     </div>
                   </div>
-                  <div className="w-[44px] h-[44px] rounded-[10px] flex items-center justify-center shrink-0 bg-[#f0fdf4] text-[#10b981]">
-                    <Calendar size={22} />
+                  <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#f0fdf4] text-[#10b981]">
+                    <Calendar size={18} />
                   </div>
                 </div>
 
-                <div className="bg-white border border-[#e2e8f0] rounded-[12px] p-[20px] flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-[280ms] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] cursor-pointer" onClick={() => setActiveTab("ulasan")}>
-                  <div>
-                    <h3 className="text-[11.5px] font-medium text-[#64748b] uppercase tracking-[0.06em] mb-[6px]">Total Ulasan</h3>
-                    <div className="text-[30px] font-bold text-[#0f172a] leading-none mb-[8px]">{userStats ? userStats.total_reviews : reviews.length}</div>
-                    <div className="flex items-center gap-[4px] text-[12px] font-medium text-[#10b981]">
-                      <TrendingUp size={14} /> <span>Ulasan Usaha</span>
+                <div className="bg-white border border-[#e2e8f0] rounded-[11px] p-[12px_16px] flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all duration-[250ms] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-[1px] cursor-pointer min-w-0" onClick={() => setActiveTab("ulasan")}>
+                  <div className="min-w-0 pr-2">
+                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.05em] mb-[2px] truncate">Total Ulasan</h3>
+                    <div className="text-[20px] sm:text-[22px] font-extrabold text-[#0f172a] leading-tight mb-[3px]">{userStats ? userStats.total_reviews : reviews.length}</div>
+                    <div className="flex items-center gap-[3px] text-[10.5px] font-medium text-[#10b981] truncate">
+                      <TrendingUp size={11} className="shrink-0" /> <span className="truncate">Ulasan Usaha</span>
                     </div>
                   </div>
-                  <div className="w-[44px] h-[44px] rounded-[10px] flex items-center justify-center shrink-0 bg-[#fef9c3] text-[#ca8a04]">
-                    <Star size={22} />
+                  <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#fef9c3] text-[#ca8a04]">
+                    <Star size={18} />
                   </div>
                 </div>
 
-                <div className="bg-white border border-[#e2e8f0] rounded-[12px] p-[20px] flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-[280ms] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] cursor-pointer" onClick={() => setShowChartDetailModal(true)}>
-                  <div>
-                    <h3 className="text-[11.5px] font-medium text-[#64748b] uppercase tracking-[0.06em] mb-[6px]">Total Views Konten</h3>
-                    <div className="text-[30px] font-bold text-[#0f172a] leading-none mb-[8px]">{userStats ? userStats.total_views.toLocaleString("id-ID") : 0}</div>
-                    <div className="flex items-center gap-[4px] text-[12px] font-medium text-[#10b981]">
-                      <TrendingUp size={14} /> <span>Bisnis & Blog</span>
+                <div className="bg-white border border-[#e2e8f0] rounded-[11px] p-[12px_16px] flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all duration-[250ms] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-[1px] cursor-pointer min-w-0" onClick={() => setShowChartDetailModal(true)}>
+                  <div className="min-w-0 pr-2">
+                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.05em] mb-[2px] truncate">Total Views Konten</h3>
+                    <div className="text-[20px] sm:text-[22px] font-extrabold text-[#0f172a] leading-tight mb-[3px] truncate">{userStats ? userStats.total_views.toLocaleString("id-ID") : 0}</div>
+                    <div className="flex items-center gap-[3px] text-[10.5px] font-medium text-[#10b981] truncate">
+                      <TrendingUp size={11} className="shrink-0" /> <span className="truncate">Bisnis & Blog</span>
                     </div>
                   </div>
-                  <div className="w-[44px] h-[44px] rounded-[10px] flex items-center justify-center shrink-0 bg-[#f0fdfa] text-[#007570]">
-                    <Eye size={22} />
+                  <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#f0fdfa] text-[#007570]">
+                    <Eye size={18} />
                   </div>
                 </div>
               </div>
 
-              {/* Graphical & Activity Panels */}
-              <div className="grid grid-cols-[1.6fr_1fr] max-md:grid-cols-1 gap-[16px]">
+              {/* Graphical & Activity Panels — 12-column responsive layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-[16px] w-full min-w-0">
                 {/* 1. KUNJUNGAN PORTAL MINGGUAN CHART PANEL */}
-                <div className="bg-white rounded-[12px] border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.06)] p-[22px] flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-[18px]">
-                    <div>
-                      <h2 className="text-[15px] font-semibold text-[#0f172a]">Kunjungan Portal Mingguan</h2>
-                      <p className="text-[11.5px] text-[#64748b] mt-[2px]">Estimasi statistik kunjungan & interaksi pengunjung minggu ini</p>
+                <div className="lg:col-span-5 bg-white rounded-[14px] border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-[20px] flex flex-col justify-between min-w-0 overflow-hidden">
+                  <div className="flex items-center justify-between mb-[16px] gap-2">
+                    <div className="min-w-0">
+                      <h2 className="text-[15px] font-bold text-[#0f172a] truncate">Kunjungan Portal Mingguan</h2>
+                      <p className="text-[11.5px] text-[#64748b] mt-[2px] truncate">Statistik kunjungan minggu ini</p>
                     </div>
                     <button
                       onClick={() => setShowChartDetailModal(true)}
-                      className="text-[12.5px] font-medium text-[#007570] cursor-pointer px-[10px] py-[4px] rounded-[6px] border border-[rgba(0,117,112,0.25)] transition-all duration-[280ms] hover:bg-[#f0fdfa]"
+                      className="text-[12px] font-semibold text-[#007570] cursor-pointer px-[10px] py-[4px] rounded-[8px] border border-[rgba(0,117,112,0.25)] transition-all duration-[280ms] hover:bg-[#f0fdfa] shrink-0"
                     >
                       Lihat Detail
                     </button>
                   </div>
 
-                  <div className="flex items-end gap-[10px] h-[160px] pt-[10px]">
+                  <div className="flex items-end gap-[8px] sm:gap-[10px] h-[160px] pt-[10px] w-full min-w-0">
                     {weeklyChartStats.chartData.map((d) => (
-                      <div key={d.day} className="flex-1 flex flex-col items-center gap-[6px] h-full justify-end group relative">
+                      <div key={d.day} className="flex-1 min-w-0 flex flex-col items-center gap-[6px] h-full justify-end group relative">
                         {/* Tooltip on hover */}
-                        <div className="absolute bottom-full mb-[6px] bg-[#0f172a] text-white text-[10.5px] font-medium px-[8px] py-[3px] rounded-[4px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-sm">
-                          {d.visits.toLocaleString('id-ID')} kunjungan
+                        <div className="absolute bottom-full mb-[6px] bg-[#0f172a] text-white text-[10px] font-medium px-[7px] py-[3px] rounded-[4px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-sm">
+                          {d.visits.toLocaleString('id-ID')}
                         </div>
                         <div
                           className="w-full bg-gradient-to-b from-[#007570] to-[#00a8a2] rounded-t-[5px] min-h-[6px] transition-all duration-[280ms] group-hover:opacity-85"
                           style={{ height: d.heightPercentage }}
                         ></div>
-                        <span className="text-[11px] text-[#64748b] font-medium group-hover:text-[#007570] transition-colors">{d.day}</span>
+                        <span className="text-[10.5px] text-[#64748b] font-medium group-hover:text-[#007570] transition-colors truncate">{d.day}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* 2. AKTIVITAS TERBARU PANEL */}
-                <div className="bg-white rounded-[12px] border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.06)] p-[22px] flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-[18px]">
-                    <div>
-                      <h2 className="text-[15px] font-semibold text-[#0f172a]">Aktivitas Terbaru</h2>
-                      <p className="text-[11.5px] text-[#64748b] mt-[2px]">Aktivitas konten usaha, blog & event terkini</p>
+                <div className="lg:col-span-7 bg-white rounded-[14px] border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-[20px] flex flex-col justify-between min-w-0 overflow-hidden">
+                  <div className="flex items-center justify-between mb-[16px] gap-2">
+                    <div className="min-w-0">
+                      <h2 className="text-[15px] font-bold text-[#0f172a] truncate">Aktivitas Terbaru</h2>
+                      <p className="text-[11.5px] text-[#64748b] mt-[2px] truncate">Aktivitas konten usaha, blog & event terkini</p>
                     </div>
                     <button
                       onClick={() => setShowAllActivitiesModal(true)}
-                      className="text-[12.5px] font-medium text-[#007570] cursor-pointer px-[10px] py-[4px] rounded-[6px] border border-[rgba(0,117,112,0.25)] transition-all duration-[280ms] hover:bg-[#f0fdfa]"
+                      className="text-[12px] font-semibold text-[#007570] cursor-pointer px-[10px] py-[4px] rounded-[8px] border border-[rgba(0,117,112,0.25)] transition-all duration-[280ms] hover:bg-[#f0fdfa] shrink-0"
                     >
                       Lihat Semua
                     </button>
                   </div>
 
-                  <div className="flex flex-col gap-[14px]">
+                  <div className="flex flex-col gap-[10px] min-w-0">
                     {recentActivitiesList.slice(0, 4).map((act) => {
                       const IconComp = act.icon;
                       return (
                         <div
                           key={act.id}
-                          className="flex gap-[12px] items-start p-[6px_8px] rounded-[8px] transition-colors hover:bg-[#f8fafc] cursor-pointer"
+                          className="flex gap-[12px] items-center p-[8px_10px] rounded-[10px] transition-colors hover:bg-[#f8fafc] cursor-pointer min-w-0 overflow-hidden"
                           onClick={() => {
                             if (act.link) navigate(act.link);
                             else if (act.tab) setActiveTab(act.tab);
@@ -2475,10 +2515,12 @@ export default function AdminUser() {
                             <IconComp size={16} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-[13px] leading-[1.45] text-[#0f172a] truncate">
+                            <div className="text-[12.5px] font-semibold text-[#0f172a] truncate">
                               {act.title}
                             </div>
-                            <div className="text-[11.5px] text-[#64748b] mt-[2px] truncate">{act.subText} • <span className="font-semibold text-[#007570]">{act.dateStr}</span></div>
+                            <div className="text-[11px] text-[#64748b] mt-[1px] truncate">
+                              {act.subText} • <span className="font-semibold text-[#007570]">{act.dateStr}</span>
+                            </div>
                           </div>
                         </div>
                       );
@@ -2700,17 +2742,15 @@ export default function AdminUser() {
                   return totalItems > 0 ? (
                     <div className="flex flex-col gap-[14px]">
                       {/* Table Area */}
-                      <div className="overflow-x-auto border border-[#e2e8f0] rounded-[12px] shadow-sm">
-                        <table className="w-full text-left border-collapse">
+                      <div className="w-full overflow-hidden border border-[#e2e8f0] rounded-[12px] shadow-sm bg-white">
+                        <table className="w-full text-left border-collapse table-fixed">
                           <thead>
                             <tr className="bg-[#f8fafc] border-b border-[#e2e8f0]">
-                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[46px]">Foto</th>
-                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Bisnis & Kategori</th>
-                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Lokasi</th>
-                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center">Produk</th>
-                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center">Status</th>
-                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Tanggal</th>
-                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-right">Aksi</th>
+                              <th className="px-3.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[38%]">Bisnis & Kategori</th>
+                              <th className="px-3 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[26%]">Lokasi & Jam Buka</th>
+                              <th className="px-2 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center w-[10%]">Produk</th>
+                              <th className="px-2.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center w-[12%]">Status</th>
+                              <th className="px-3 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-right w-[14%]">Aksi</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[#f1f5f9]">
@@ -2722,135 +2762,164 @@ export default function AdminUser() {
 
                               return (
                                 <tr key={biz.id} className="hover:bg-[#f8fafc] transition-colors">
-                                  {/* Thumbnail Foto */}
-                                  <td className="px-[14px] py-[12px]">
-                                    <div className="w-[40px] h-[40px] rounded-[10px] overflow-hidden bg-[#f1f5f9] border border-[#e2e8f0] flex items-center justify-center shrink-0">
-                                      {biz.image ? (
-                                        <img
-                                          src={biz.image}
-                                          alt={biz.name}
-                                          className="w-full h-full object-cover"
-                                          onError={(e) => {
-                                            e.currentTarget.style.display = "none";
-                                            if (e.currentTarget.nextElementSibling) {
-                                              e.currentTarget.nextElementSibling.style.display = "flex";
-                                            }
-                                          }}
-                                        />
-                                      ) : null}
-                                      <div
-                                        className="w-full h-full flex items-center justify-center text-[#94a3b8] bg-[#f1f5f9]"
-                                        style={{ display: biz.image ? "none" : "flex" }}
-                                      >
-                                        <Briefcase size={18} />
+                                  {/* Bisnis & Kategori + Thumbnail Foto */}
+                                  <td className="px-3.5 py-2.5">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-[38px] h-[38px] rounded-[10px] overflow-hidden bg-[#f1f5f9] border border-[#e2e8f0] flex items-center justify-center shrink-0">
+                                        {biz.image ? (
+                                          <img
+                                            src={biz.image}
+                                            alt={biz.name}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = "none";
+                                              if (e.currentTarget.nextElementSibling) {
+                                                e.currentTarget.nextElementSibling.style.display = "flex";
+                                              }
+                                            }}
+                                          />
+                                        ) : null}
+                                        <div
+                                          className="w-full h-full flex items-center justify-center text-[#94a3b8] bg-[#f1f5f9]"
+                                          style={{ display: biz.image ? "none" : "flex" }}
+                                        >
+                                          <Briefcase size={17} />
+                                        </div>
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="font-bold text-[13px] text-[#0f172a] truncate max-w-[160px] sm:max-w-[200px]" title={biz.name}>
+                                            {biz.name}
+                                          </span>
+                                          {Boolean(biz.is_premium || biz.raw?.is_premium || biz.raw?.features?.is_premium) ? (
+                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
+                                              ⭐ Premium
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                              Free
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-[#f1f5f9] text-[#475569]">
+                                            {biz.category}
+                                          </span>
+                                          {biz.subCategory && (
+                                            <span className="text-[10.5px] text-[#94a3b8] truncate max-w-[110px]">
+                                              · {biz.subCategory}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {isRejected && (
+                                          <div className="mt-1 p-1.5 bg-[#fef2f2] border border-[#fca5a5] rounded-md text-[10.5px] text-[#b91c1c]">
+                                            <strong>Alasan Ditolak:</strong> {biz.rejection_reason || biz.raw?.rejection_reason || "Periksa data usaha."}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </td>
 
-                                  {/* Nama Bisnis & Kategori */}
-                                  <td className="px-[14px] py-[12px]">
-                                    <div className="font-bold text-[13px] text-[#0f172a] truncate max-w-[240px]" title={biz.name}>
-                                      {biz.name}
-                                    </div>
-                                    <div className="flex items-center gap-[6px] mt-[3px] flex-wrap">
-                                      <span className="inline-flex items-center px-[8px] py-[2px] rounded-[6px] text-[11px] font-semibold bg-[#f1f5f9] text-[#475569]">
-                                        {biz.category}
+                                  {/* Lokasi & Jam Buka */}
+                                  <td className="px-3 py-2.5">
+                                    <div className="flex flex-col gap-1 min-w-0">
+                                      <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-1.5 truncate">
+                                        <MapPin size={13} className="text-[#007570] shrink-0" />
+                                        {biz.city || "Indonesia"}
                                       </span>
-                                      {biz.subCategory && (
-                                        <span className="text-[11px] text-[#94a3b8] truncate max-w-[140px]">
-                                          · {biz.subCategory}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {isRejected && (
-                                      <div className="mt-[6px] p-[8px_10px] bg-[#fef2f2] border border-[#fca5a5] rounded-[8px] text-[11.5px] text-[#b91c1c] max-w-[280px]">
-                                        <div className="font-bold flex items-center gap-[4px]">
-                                          <AlertTriangle size={13} /> Status: Ditolak
-                                        </div>
-                                        <div className="mt-[2px] text-[11px] leading-snug">
-                                          <strong>Alasan:</strong> "{biz.rejection_reason || biz.raw?.rejection_reason || "Silakan periksa dan perbarui data usaha Anda."}"
-                                        </div>
-                                      </div>
-                                    )}
-                                  </td>
+                                      {(() => {
+                                        const hours = biz.opening_hours || biz.raw?.opening_hours || "08:00 - 17:00 WIB";
+                                        const days = biz.opening_days || biz.raw?.opening_days;
+                                        let daysLabel = "Setiap Hari";
+                                        if (Array.isArray(days) && days.length > 0) {
+                                          const first = typeof days[0] === "object" ? days[0].day : days[0];
+                                          const last = typeof days[days.length - 1] === "object" ? days[days.length - 1].day : days[days.length - 1];
+                                          if (days.length === 7) daysLabel = "Setiap Hari";
+                                          else if (days.length === 5 && first === "Senin" && last === "Jumat") daysLabel = "Senin - Jumat";
+                                          else if (days.length === 6 && first === "Senin" && last === "Sabtu") daysLabel = "Senin - Sabtu";
+                                          else daysLabel = `${first} - ${last}`;
+                                        }
+                                        const is24h = hours.includes("24 Jam");
 
-                                  {/* Lokasi */}
-                                  <td className="px-[14px] py-[12px]">
-                                    <span className="text-[12.5px] text-[#475569] flex items-center gap-[4px] truncate max-w-[150px]">
-                                      <MapPin size={13} className="text-[#94a3b8] shrink-0" />
-                                      {biz.city}
-                                    </span>
+                                        return (
+                                          <span className="text-[11px] text-slate-500 flex items-center gap-1 truncate">
+                                            <Clock size={11} className="text-slate-400 shrink-0" />
+                                            <span className="truncate">{hours} ({is24h ? "24 Jam" : daysLabel})</span>
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
                                   </td>
 
                                   {/* Produk */}
-                                  <td className="px-[14px] py-[12px] text-center">
-                                    <span className="inline-flex items-center gap-[4px] px-[9px] py-[3px] rounded-full text-[11.5px] font-bold bg-[#f0fdfa] text-[#007570] border border-[#ccfbf1]">
-                                      <Package size={12} />
+                                  <td className="px-2 py-2.5 text-center">
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold bg-[#f0fdfa] text-[#007570] border border-[#ccfbf1]">
+                                      <Package size={11} />
                                       {biz.products?.length || 0} Item
                                     </span>
                                   </td>
 
-                                  {/* Status */}
-                                  <td className="px-[14px] py-[12px] text-center whitespace-nowrap">
-                                    <span
-                                      className={`inline-flex items-center gap-[5px] px-[9px] py-[3px] rounded-full text-[11px] font-bold ${
-                                        isApproved
-                                          ? "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]"
-                                          : isPending
-                                          ? "bg-[#fefce8] text-[#a16207] border border-[#fef08a]"
-                                          : isRejected
-                                          ? "bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]"
-                                          : "bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]"
-                                      }`}
-                                    >
+                                  {/* Status & Tanggal */}
+                                  <td className="px-2.5 py-2.5 text-center">
+                                    <div className="flex flex-col items-center gap-0.5">
                                       <span
-                                        className={`w-[6px] h-[6px] rounded-full ${
-                                          isApproved ? "bg-[#16a34a]" : isPending ? "bg-[#ca8a04]" : "bg-[#dc2626]"
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
+                                          isApproved
+                                            ? "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]"
+                                            : isPending
+                                            ? "bg-[#fefce8] text-[#a16207] border border-[#fef08a]"
+                                            : isRejected
+                                            ? "bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]"
+                                            : "bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]"
                                         }`}
-                                      />
-                                      {isApproved ? "Disetujui" : isPending ? "Menunggu Persetujuan" : isRejected ? "Ditolak" : "Nonaktif"}
-                                    </span>
-                                  </td>
-
-                                  {/* Tanggal */}
-                                  <td className="px-[14px] py-[12px] text-[12px] text-[#64748b] whitespace-nowrap">
-                                    {biz.date}
+                                      >
+                                        <span
+                                          className={`w-1.5 h-1.5 rounded-full ${
+                                            isApproved ? "bg-[#16a34a]" : isPending ? "bg-[#ca8a04]" : "bg-[#dc2626]"
+                                          }`}
+                                        />
+                                        {isApproved ? "Disetujui" : isPending ? "Menunggu" : isRejected ? "Ditolak" : "Nonaktif"}
+                                      </span>
+                                      <span className="text-[10px] text-[#94a3b8] font-medium">
+                                        {biz.date}
+                                      </span>
+                                    </div>
                                   </td>
 
                                   {/* Action Buttons */}
-                                  <td className="px-[14px] py-[12px] text-right whitespace-nowrap">
-                                    <div className="flex items-center justify-end gap-[6px]">
+                                  <td className="px-3 py-2.5 text-right">
+                                    <div className="flex items-center justify-end gap-1">
                                       {/* View */}
                                       <button
                                         onClick={() => navigate(`/business/${biz.raw?.slug || biz.id}`)}
-                                        className="w-[32px] h-[32px] rounded-[8px] bg-[#eff6ff] text-[#2563eb] hover:bg-[#2563eb] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        className="w-[30px] h-[30px] rounded-lg bg-[#eff6ff] text-[#2563eb] hover:bg-[#2563eb] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                         title="Lihat Halaman Bisnis"
                                       >
-                                        <Eye size={15} />
+                                        <Eye size={14} />
                                       </button>
                                       {/* Edit */}
                                       <button
                                         onClick={() => navigate(`/add-business/${biz.id}`)}
-                                        className="w-[32px] h-[32px] rounded-[8px] bg-[#fefce8] text-[#ca8a04] hover:bg-[#ca8a04] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        className="w-[30px] h-[30px] rounded-lg bg-[#fefce8] text-[#ca8a04] hover:bg-[#ca8a04] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                         title="Edit Profil Bisnis"
                                       >
-                                        <Edit size={15} />
+                                        <Edit size={14} />
                                       </button>
                                       {/* Manage Products */}
                                       <button
                                         onClick={() => navigate(`/add-product/${biz.id}`)}
-                                        className="w-[32px] h-[32px] rounded-[8px] bg-[#f0fdfa] text-[#007570] hover:bg-[#007570] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        className="w-[30px] h-[30px] rounded-lg bg-[#f0fdfa] text-[#007570] hover:bg-[#007570] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                         title="Kelola Produk Bisnis"
                                       >
-                                        <Package size={15} />
+                                        <Package size={14} />
                                       </button>
                                       {/* Delete */}
                                       <button
                                         onClick={() => handleDeleteBusiness(biz.id)}
-                                        className="w-[32px] h-[32px] rounded-[8px] bg-[#fef2f2] text-[#dc2626] hover:bg-[#dc2626] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        className="w-[30px] h-[30px] rounded-lg bg-[#fef2f2] text-[#dc2626] hover:bg-[#dc2626] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                         title="Hapus Bisnis"
                                       >
-                                        <Trash2 size={15} />
+                                        <Trash2 size={14} />
                                       </button>
                                     </div>
                                   </td>
@@ -3082,39 +3151,29 @@ export default function AdminUser() {
 
                   return totalItems > 0 ? (
                     <div className="space-y-4 w-full">
-                      <div className="w-full overflow-hidden rounded-xl border border-slate-200/80 bg-white">
-                        <div className="overflow-x-auto w-full">
-                          <table className="w-full text-left border-collapse min-w-[768px]">
-                            <thead>
-                              <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                <th className="py-3.5 px-4 w-14 text-center font-bold">NO</th>
-                                <th className="py-3.5 px-4 w-28 font-bold">COVER</th>
-                                <th className="py-3.5 px-4 font-bold text-slate-500">JUDUL</th>
-                                <th className="py-3.5 px-4 w-36 font-bold">KATEGORI</th>
-                                <th className="py-3.5 px-4 w-36 font-bold">PENULIS</th>
-                                <th className="py-3.5 px-4 w-32 font-bold">TANGGAL</th>
-                                <th className="py-3.5 px-4 w-28 font-bold">STATUS</th>
-                                <th className="py-3.5 px-4 w-32 text-center font-bold">AKSI</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {currentData.map((item, idx) => {
-                                const rowNumber = startIndex + idx + 1;
-                                const st = (item.status || "").toLowerCase();
-                                const isApproved = st === "approved" || st === "published" || st === "terbit";
-                                const isPending = st === "pending" || st === "menunggu";
-                                const isRejected = st === "rejected" || st === "ditolak";
+                      <div className="w-full overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+                        <table className="w-full text-left border-collapse table-fixed">
+                          <thead>
+                            <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                              <th className="py-2.5 px-3.5 w-[44%] font-semibold">Artikel & Event</th>
+                              <th className="py-2.5 px-3 w-[24%] font-semibold">Kategori & Tanggal</th>
+                              <th className="py-2.5 px-2.5 w-[16%] text-center font-semibold">Status</th>
+                              <th className="py-2.5 px-3 w-[16%] text-right font-semibold">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {currentData.map((item) => {
+                              const st = (item.status || "").toLowerCase();
+                              const isApproved = st === "approved" || st === "published" || st === "terbit";
+                              const isPending = st === "pending" || st === "menunggu";
+                              const isRejected = st === "rejected" || st === "ditolak";
 
-                                return (
-                                  <tr key={`${item.itemType}-${item.id}`} className="hover:bg-slate-50/60 transition-colors">
-                                    {/* NO */}
-                                    <td className="py-4 px-4 text-center text-xs font-bold text-slate-400 align-middle">
-                                      {rowNumber}
-                                    </td>
-
-                                    {/* COVER */}
-                                    <td className="py-4 px-4 align-middle">
-                                      <div className="w-20 h-12 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs flex items-center justify-center shrink-0">
+                              return (
+                                <tr key={`${item.itemType}-${item.id}`} className="hover:bg-slate-50/60 transition-colors">
+                                  {/* Artikel & Event (Cover + Judul + Tipe/Penulis) */}
+                                  <td className="py-2.5 px-3.5 align-middle">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-12 h-9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0 flex items-center justify-center">
                                         {item.thumbnail ? (
                                           <img
                                             src={item.thumbnail}
@@ -3132,111 +3191,111 @@ export default function AdminUser() {
                                           className="w-full h-full items-center justify-center text-slate-400 bg-slate-50"
                                           style={{ display: item.thumbnail ? "none" : "flex" }}
                                         >
-                                          {item.itemType === "event" ? <Calendar size={18} /> : <FileText size={18} />}
+                                          {item.itemType === "event" ? <Calendar size={15} /> : <FileText size={15} />}
                                         </div>
                                       </div>
-                                    </td>
 
-                                    {/* JUDUL */}
-                                    <td className="py-4 px-4 align-middle">
-                                      <span
-                                        className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-2 leading-snug cursor-pointer hover:text-[#007570] transition-colors"
-                                        onClick={() => navigate(`/blog/${item.id}`)}
-                                        title={item.title}
-                                      >
-                                        {item.title}
-                                      </span>
-                                      {isRejected && (
-                                        <div className="mt-1.5 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 max-w-xs">
-                                          <div className="font-bold flex items-center gap-1"><AlertTriangle size={13} /> Status: Ditolak</div>
-                                          <div className="mt-0.5 text-[11px] leading-snug">
-                                            <strong>Alasan:</strong> "{item.rejection_reason || "Silakan periksa dan perbarui artikel/event Anda."}"
-                                          </div>
+                                      <div className="min-w-0 flex-1">
+                                        <span
+                                          className="font-bold text-slate-900 text-[13px] truncate block leading-snug cursor-pointer hover:text-[#007570] transition-colors"
+                                          onClick={() => navigate(`/blog/${item.id}`)}
+                                          title={item.title}
+                                        >
+                                          {item.title}
+                                        </span>
+                                        <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 truncate">
+                                          <span className={`font-semibold ${item.itemType === "event" ? "text-purple-600" : "text-teal-600"}`}>
+                                            {item.itemType === "event" ? "🎪 Event" : "📝 Blog"}
+                                          </span>
+                                          <span>·</span>
+                                          <span className="truncate text-slate-400">oleh {item.author || "User"}</span>
                                         </div>
-                                      )}
-                                    </td>
 
-                                    {/* KATEGORI */}
-                                    <td className="py-4 px-4 align-middle">
+                                        {isRejected && (
+                                          <div className="mt-1 p-1.5 bg-red-50 border border-red-200 rounded-md text-[10.5px] text-red-700">
+                                            <strong>Alasan Ditolak:</strong> {item.rejection_reason || "Periksa kembali artikel/event Anda."}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Kategori & Tanggal */}
+                                  <td className="py-2.5 px-3 align-middle">
+                                    <div className="flex flex-col gap-1 min-w-0">
                                       <span
-                                        className={`px-3 py-1 rounded-md text-xs font-bold inline-block whitespace-nowrap ${getCategoryBadgeClass(
+                                        className={`px-2 py-0.5 rounded text-[10.5px] font-bold inline-block self-start truncate max-w-[140px] ${getCategoryBadgeClass(
                                           item.category
                                         )}`}
                                       >
                                         {item.category}
                                       </span>
-                                    </td>
-
-                                    {/* PENULIS */}
-                                    <td className="py-4 px-4 align-middle">
-                                      <span className="text-xs sm:text-sm font-semibold text-slate-700 whitespace-nowrap">
-                                        {item.author || "satria nice"}
+                                      <span className="text-[11px] text-slate-400 font-medium truncate">
+                                        📅 {item.date}
                                       </span>
-                                    </td>
+                                    </div>
+                                  </td>
 
-                                    {/* TANGGAL */}
-                                    <td className="py-4 px-4 align-middle">
-                                      <span className="text-xs sm:text-sm font-medium text-slate-400 whitespace-nowrap">
-                                        {item.date}
-                                      </span>
-                                    </td>
-
-                                    {/* STATUS */}
-                                    <td className="py-4 px-4 align-middle">
+                                  {/* Status */}
+                                  <td className="py-2.5 px-2.5 text-center align-middle">
+                                    <span
+                                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
+                                        isApproved
+                                          ? "bg-[#e6f4ea] text-[#137333] border border-[#bbf7d0]"
+                                          : isPending
+                                          ? "bg-[#fef7e0] text-[#b06000] border border-[#fef08a]"
+                                          : isRejected
+                                          ? "bg-[#fce8e6] text-[#c5221f] border border-[#fecaca]"
+                                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                                      }`}
+                                    >
                                       <span
-                                        className={`px-3 py-1 rounded-md text-xs font-bold inline-block whitespace-nowrap ${
-                                          isApproved
-                                            ? "bg-[#e6f4ea] text-[#137333]"
-                                            : isPending
-                                            ? "bg-[#fef7e0] text-[#b06000]"
-                                            : isRejected
-                                            ? "bg-[#fce8e6] text-[#c5221f]"
-                                            : "bg-slate-100 text-slate-600"
+                                        className={`w-1.5 h-1.5 rounded-full ${
+                                          isApproved ? "bg-[#16a34a]" : isPending ? "bg-[#ca8a04]" : "bg-[#dc2626]"
                                         }`}
+                                      />
+                                      {isApproved ? "Disetujui" : isPending ? "Menunggu" : isRejected ? "Ditolak" : "Draft"}
+                                    </span>
+                                  </td>
+
+                                  {/* Action Buttons */}
+                                  <td className="py-2.5 px-3 text-right align-middle">
+                                    <div className="flex items-center justify-end gap-1">
+                                      {/* View Button */}
+                                      <button
+                                        onClick={() => navigate(`/blog/${item.id}`)}
+                                        title="Lihat"
+                                        className="w-[30px] h-[30px] rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                       >
-                                        {isApproved ? "Disetujui" : isPending ? "Menunggu Persetujuan" : isRejected ? "Ditolak" : "Draft"}
-                                      </span>
-                                    </td>
+                                        <Eye size={14} />
+                                      </button>
 
-                                    {/* AKSI */}
-                                    <td className="py-4 px-4 align-middle">
-                                      <div className="flex items-center justify-center gap-2">
-                                        {/* View Button */}
-                                        <button
-                                          onClick={() => navigate(`/blog/${item.id}`)}
-                                          title="Lihat"
-                                          className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors cursor-pointer"
-                                        >
-                                          <Eye size={16} />
-                                        </button>
+                                      {/* Edit Button */}
+                                      <button
+                                        onClick={() => navigate(`/add-blog/${item.id}?type=${item.itemType}`)}
+                                        title="Edit"
+                                        className="w-[30px] h-[30px] rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                      >
+                                        <Edit size={14} />
+                                      </button>
 
-                                        {/* Edit Button */}
-                                        <button
-                                          onClick={() => navigate(`/add-blog/${item.id}?type=${item.itemType}`)}
-                                          title="Edit"
-                                          className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center transition-colors cursor-pointer"
-                                        >
-                                          <Edit size={16} />
-                                        </button>
-
-                                        {/* Delete Button */}
-                                        <button
-                                          onClick={() =>
-                                            item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
-                                          }
-                                          title="Hapus"
-                                          className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors cursor-pointer"
-                                        >
-                                          <Trash2 size={16} />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                                      {/* Delete Button */}
+                                      <button
+                                        onClick={() =>
+                                          item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
+                                        }
+                                        title="Hapus"
+                                        className="w-[30px] h-[30px] rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
 
                       {/* PAGINATION FOOTER */}
@@ -3424,11 +3483,13 @@ export default function AdminUser() {
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Mobile Back Button */}
                         <button
+                          type="button"
                           onClick={() => {
                             setActiveConversationId(null);
+                            setActiveChatData(null);
                             navigate(`/dashboard?tab=inbox`, { replace: true });
                           }}
-                          className="md:hidden p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+                          className="md:hidden p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
                           title="Kembali ke Daftar Pesan"
                         >
                           <ChevronLeft size={20} />
@@ -3453,6 +3514,21 @@ export default function AdminUser() {
                           </p>
                         </div>
                       </div>
+
+                      {/* Desktop Close/Exit Chat Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveConversationId(null);
+                          setActiveChatData(null);
+                          navigate(`/dashboard?tab=inbox`, { replace: true });
+                        }}
+                        className="hidden md:flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/70 transition-colors cursor-pointer font-medium"
+                        title="Tutup Percakapan"
+                      >
+                        <X size={15} />
+                        <span>Tutup</span>
+                      </button>
                     </div>
 
                     {/* Body: Messages List */}
@@ -4644,71 +4720,105 @@ export default function AdminUser() {
                               onClick={() => {
                                 if (!isFree) setSelectedUpgradePlan(plan);
                               }}
-                              className={`bg-white rounded-[16px] p-[24px] flex flex-col justify-between shadow-sm relative border-2 transition-all cursor-pointer ${
-                                isSelected
-                                  ? "border-[#007570] shadow-[0_0_0_3px_rgba(0,117,112,0.15)] bg-[#f0fdfa]/40"
-                                  : isPopular
-                                  ? "border-[#007570] hover:shadow-md"
-                                  : "border-[#e2e8f0] hover:border-[#cbd5e1]"
+                              className={`rounded-[20px] p-[24px] flex flex-col justify-between relative border-2 transition-all cursor-pointer overflow-hidden ${
+                                isFree
+                                  ? "bg-slate-50 border-slate-200"
+                                  : isSelected
+                                  ? "bg-gradient-to-b from-[#0c2b27] via-[#053733] to-[#021f1d] text-white border-amber-400 shadow-[0_12px_32px_rgba(0,117,112,0.35),0_0_24px_rgba(251,191,36,0.25)] -translate-y-1 ring-4 ring-amber-400/20"
+                                  : "bg-gradient-to-b from-[#0e3530] via-[#082e29] to-[#041d1a] text-white border-[#009990]/40 hover:border-amber-400/70 hover:shadow-[0_8px_24px_rgba(0,117,112,0.25)]"
                               }`}
                             >
-                              {isPopular && (
-                                <div className="absolute -top-[12px] right-[20px] bg-[#007570] text-white text-[10.5px] font-bold px-[12px] py-[3px] rounded-full uppercase tracking-wider shadow-sm">
-                                  POPULER
-                                </div>
+                              {!isFree && (
+                                <div className="absolute -top-16 -right-16 w-36 h-36 bg-gradient-to-br from-amber-400/20 to-[#00c48c]/30 rounded-full blur-2xl pointer-events-none" />
                               )}
+
                               <div>
-                                <div className="flex items-center justify-between mb-[4px]">
-                                  <h3 className="text-[17px] font-bold text-[#0f172a]">{plan.name}</h3>
+                                <div className="flex items-center justify-between gap-2 mb-3">
+                                  {isFree ? (
+                                    <span className="px-2.5 py-0.5 bg-slate-200 text-slate-700 font-bold text-[10.5px] rounded-full uppercase tracking-wider">
+                                      REGULER
+                                    </span>
+                                  ) : (
+                                    <div className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-sm">
+                                      <span>REKOMENDASI</span>
+                                    </div>
+                                  )}
+
                                   <div
-                                    className={`w-[20px] h-[20px] rounded-full border-2 flex items-center justify-center transition-all ${
+                                    className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all ${
                                       isSelected
-                                        ? "border-[#007570] bg-[#007570] text-white"
-                                        : "border-[#cbd5e1] bg-white"
+                                        ? "border-amber-400 bg-amber-400 text-slate-950 font-bold"
+                                        : isFree
+                                        ? "border-slate-300 bg-white"
+                                        : "border-emerald-400/50 bg-emerald-950/40 text-emerald-300"
                                     }`}
                                   >
-                                    {isSelected && <Check size={12} strokeWidth={3} />}
+                                    {isSelected && <Check size={13} strokeWidth={3} />}
                                   </div>
                                 </div>
-                                <div className="text-[26px] font-extrabold text-[#007570] mt-[8px]">
-                                  {isFree ? "Rp 0" : `Rp ${Number(plan.price).toLocaleString("id-ID")}`}
+
+                                <h3 className={`text-[17px] font-extrabold mb-1 ${isFree ? "text-[#0f172a]" : "text-white"}`}>{plan.name}</h3>
+
+                                <div className="flex items-baseline gap-1 my-2">
+                                  <span className={`text-[24px] font-black ${isFree ? "text-slate-700" : "text-white"}`}>
+                                    {isFree ? "Rp 0" : `Rp ${Number(plan.price).toLocaleString("id-ID")}`}
+                                  </span>
+                                  <span className={`text-[11.5px] font-semibold ${isFree ? "text-slate-400" : "text-emerald-200/80"}`}>
+                                    {isFree ? "selamanya" : `/ ${formattedDuration}`}
+                                  </span>
                                 </div>
-                                <div className="text-[12px] text-[#64748b] font-medium">{isFree ? "selamanya" : `/ ${formattedDuration}`}</div>
+
                                 {plan.description && (
-                                  <p className="text-[12px] text-[#64748b] mt-[6px] italic leading-relaxed">{plan.description}</p>
+                                  <p className={`text-[11.5px] mb-3 leading-relaxed ${isFree ? "text-slate-500" : "text-slate-300"}`}>{plan.description}</p>
                                 )}
 
-                                <ul className="flex flex-col gap-[9px] my-[20px] pt-[16px] border-t border-[#f1f5f9]">
-                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
-                                    {plan.can_add_map ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
-                                    <span className={plan.can_add_map ? "" : "line-through text-[#94a3b8]"}>Integrasi Google Maps</span>
+                                <ul className={`flex flex-col gap-[9px] my-[16px] pt-[14px] border-t ${isFree ? "border-slate-200 text-slate-700" : "border-white/15 text-slate-100"}`}>
+                                  <li className="flex items-center gap-[9px] text-[12px]">
+                                    {plan.can_add_map ? (
+                                      <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
+                                    ) : (
+                                      <X size={14} className="text-slate-400 shrink-0" />
+                                    )}
+                                    <span className={plan.can_add_map ? "font-medium" : "line-through opacity-60"}>Integrasi Google Maps</span>
                                   </li>
-                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
-                                    {plan.can_add_gallery ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
-                                    <span className={plan.can_add_gallery ? "" : "line-through text-[#94a3b8]"}>Galeri Foto Profil</span>
+                                  <li className="flex items-center gap-[9px] text-[12px]">
+                                    {plan.can_add_gallery ? (
+                                      <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
+                                    ) : (
+                                      <X size={14} className="text-slate-400 shrink-0" />
+                                    )}
+                                    <span className={plan.can_add_gallery ? "font-medium" : "line-through opacity-60"}>Galeri Foto &amp; Video</span>
                                   </li>
-                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
-                                    {plan.can_add_video ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
-                                    <span className={plan.can_add_video ? "" : "line-through text-[#94a3b8]"}>Embed Video Profil</span>
+                                  <li className="flex items-center gap-[9px] text-[12px]">
+                                    {plan.can_add_products !== false ? (
+                                      <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
+                                    ) : (
+                                      <X size={14} className="text-slate-400 shrink-0" />
+                                    )}
+                                    <span className={plan.can_add_products !== false ? "font-medium" : "line-through opacity-60"}>Katalog Produk &amp; Harga</span>
                                   </li>
-                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
-                                    {plan.can_add_products !== false ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
-                                    <span className={plan.can_add_products !== false ? "" : "line-through text-[#94a3b8]"}>Katalog Produk Usaha</span>
+                                  <li className="flex items-center gap-[9px] text-[12px]">
+                                    {plan.can_chat !== false ? (
+                                      <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
+                                    ) : (
+                                      <X size={14} className="text-slate-400 shrink-0" />
+                                    )}
+                                    <span className={plan.can_chat !== false ? "font-medium" : "line-through opacity-60"}>Akses Chat Langsung</span>
                                   </li>
-                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
-                                    {plan.can_chat !== false ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
-                                    <span className={plan.can_chat !== false ? "" : "line-through text-[#94a3b8]"}>Akses Chat & Kontak Direct</span>
-                                  </li>
-                                  <li className="flex items-center gap-[10px] text-[12.5px] text-[#0f172a]">
-                                    {plan.priority_listing ? <Check size={15} className="text-[#10b981] shrink-0" /> : <X size={15} className="text-[#ef4444] shrink-0" />}
-                                    <span className={plan.priority_listing ? "" : "line-through text-[#94a3b8]"}>Pencarian Prioritas & Badge</span>
+                                  <li className="flex items-center gap-[9px] text-[12px]">
+                                    {plan.priority_listing ? (
+                                      <Check size={14} className="text-amber-400 shrink-0" />
+                                    ) : (
+                                      <X size={14} className="text-slate-400 shrink-0" />
+                                    )}
+                                    <span className={plan.priority_listing ? "text-amber-300 font-bold" : "line-through opacity-60"}>Badge Bisnis Terverifikasi &amp; Prioritas</span>
                                   </li>
                                 </ul>
                               </div>
 
                               {isFree ? (
-                                <button className="w-full py-[10px] rounded-[10px] bg-[#f1f5f9] text-[#94a3b8] font-semibold text-[13px] cursor-not-allowed border-0" disabled>
-                                  Paket Reguler Saat Ini
+                                <button className="w-full py-[10px] rounded-[12px] bg-slate-200 text-slate-500 font-semibold text-[13px] cursor-not-allowed border-0" disabled>
+                                  Paket Reguler
                                 </button>
                               ) : (
                                 <button
@@ -4717,13 +4827,13 @@ export default function AdminUser() {
                                     e.stopPropagation();
                                     setSelectedUpgradePlan(plan);
                                   }}
-                                  className={`w-full py-[11px] rounded-[10px] font-semibold text-[13.5px] cursor-pointer border-0 transition-all ${
+                                  className={`w-full py-[11px] rounded-[12px] font-bold text-[13.5px] cursor-pointer border-0 transition-all flex items-center justify-center gap-1.5 ${
                                     isSelected
-                                      ? "bg-[#007570] text-white shadow-sm"
-                                      : "bg-[#f0fdfa] text-[#007570] hover:bg-[#007570] hover:text-white"
+                                      ? "bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-md shadow-amber-400/30 font-black"
+                                      : "bg-[#00c48c] text-slate-950 font-extrabold hover:bg-[#00b074] shadow-md"
                                   }`}
                                 >
-                                  {isSelected ? "✓ Paket Terpilih" : "Pilih Paket Ini"}
+                                  <span>{isSelected ? "✓ Paket Terpilih" : "Pilih Paket Premium"}</span>
                                 </button>
                               )}
                             </div>
@@ -5413,563 +5523,1242 @@ export default function AdminUser() {
             </div>
           )}
 
-          {/* 9. IKLAN VIEW */}
+          {/* 9. ADVERTISING / IKLAN SAYA VIEW */}
           {activeTab === "iklan" && (
-            <div className="flex flex-col gap-[24px] max-w-[1000px] mx-auto">
-              <div className="flex items-center gap-[16px] bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm">
-                <Megaphone size={32} className="text-[#007570] shrink-0" />
-                <div>
-                  <h2 className="text-[18px] font-bold text-[#0f172a]">Pasang Iklan</h2>
-                  <p className="text-[13px] text-[#64748b]">Promosikan bisnis Anda ke ribuan pengunjung</p>
+            <div className="space-y-6 w-full max-w-full">
+              {/* Page Header Banner */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 text-white p-6 md:p-7 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="space-y-1.5 z-10">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300 text-xs font-semibold">
+                    <Sparkles size={14} className="text-teal-300" />
+                    <span>Advertising Management Portal</span>
+                  </div>
+                  <h2 className="text-xl md:text-2xl font-extrabold tracking-tight flex items-center gap-2.5">
+                    <Megaphone className="text-[#5eead4]" size={26} />
+                    Advertising / Iklan Saya
+                  </h2>
+                  <p className="text-slate-300 text-xs sm:text-sm max-w-2xl">
+                    Kelola promosi dan paket iklan bisnis Anda. Tampilkan bisnis Anda di posisi strategis dengan paket <strong>Premium Ads (Hero Banner Teratas)</strong> atau <strong>Standard Ads (Running Ticker)</strong>.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 z-10 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchAdvertisements();
+                      fetchAdPackages();
+                    }}
+                    className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5"
+                    title="Segarkan Data"
+                  >
+                    <RefreshCw size={15} className={loadingAdvertisements ? "animate-spin" : ""} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreateAdStep(1);
+                      if (!selectedBusinessForAd && businesses.length > 0) {
+                        setSelectedBusinessForAd(businesses[0].id);
+                      }
+                      if (!selectedPackage && adPackages.length > 0) {
+                        setSelectedPackage(adPackages[0].name || adPackages[0].id);
+                      }
+                      setShowCreateAdModal(true);
+                    }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs sm:text-sm shadow-[0_4px_14px_rgba(0,117,112,0.39)] transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] border-0"
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                    Pasang Iklan Baru
+                  </button>
                 </div>
               </div>
 
-              {/* Advertisement Submission Form */}
-              <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[28px] shadow-sm flex flex-col gap-[20px]">
-                <h3 className="text-[16px] font-bold text-[#0f172a]">Ajukan Iklan Baru</h3>
-                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-[18px]">
-                  <div className="flex flex-col gap-[6px]">
-                    <label className="text-[13px] font-semibold text-[#334155]">Pilih Bisnis</label>
-                    <select 
-                      value={selectedBusinessForAd || ''} 
-                      onChange={(e) => setSelectedBusinessForAd(e.target.value)}
-                      className="w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]"
-                    >
-                      <option value="">-- Pilih Bisnis --</option>
-                      {businesses.map(biz => (
-                        <option key={biz.id} value={biz.id}>{biz.name}</option>
-                      ))}
-                    </select>
+              {/* KPI Summary Cards Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                {/* Total Iklan */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-semibold">Total Iklan</span>
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+                      <Megaphone size={16} />
+                    </div>
                   </div>
-                  
-                  <div className="flex flex-col gap-[6px]">
-                    <label className="text-[13px] font-semibold text-[#334155]">Pilih Paket</label>
-                    <select 
-                      value={selectedPackage || ''} 
-                      onChange={(e) => setSelectedPackage(e.target.value)}
-                      className="w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]"
-                    >
-                      <option value="">-- Pilih Paket --</option>
-                      {adPackages.length > 0 ? (
-                        adPackages.map(pkg => (
-                          <option key={pkg.id} value={pkg.name}>
-                            {pkg.name} - Rp {Number(pkg.price)?.toLocaleString('id-ID')} ({pkg.formatted_duration || `${pkg.duration_value} ${pkg.duration_unit}`})
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="Basic Iklan">Basic Iklan - Rp 50.000 (7 hari)</option>
-                          <option value="Standard Iklan">Standard Iklan - Rp 150.000 (30 hari)</option>
-                          <option value="Premium Iklan">Premium Iklan - Rp 350.000 (90 hari)</option>
-                        </>
-                      )}
-                    </select>
+                  <div className="mt-3">
+                    <span className="text-2xl font-black text-slate-900">{adStats.total_ads ?? advertisements.length}</span>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Semua pengajuan</p>
+                  </div>
+                </div>
+
+                {/* Iklan Aktif */}
+                <div className="bg-white border border-emerald-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-full -mr-6 -mt-6 pointer-events-none" />
+                  <div className="flex items-center justify-between text-emerald-700">
+                    <span className="text-xs font-bold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Iklan Aktif
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100/70 flex items-center justify-center text-emerald-700">
+                      <CheckCircle2 size={16} />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-black text-emerald-700">{adStats.active_ads}</span>
+                    <p className="text-[11px] text-emerald-600 mt-0.5">Sedang tayang di web</p>
+                  </div>
+                </div>
+
+                {/* Menunggu Pembayaran */}
+                <div className="bg-white border border-amber-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-amber-700">
+                    <span className="text-xs font-bold">Menunggu Bayar</span>
+                    <div className="w-8 h-8 rounded-lg bg-amber-100/70 flex items-center justify-center text-amber-700">
+                      <CreditCard size={16} />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-black text-amber-700">{adStats.pending_payment}</span>
+                    <p className="text-[11px] text-amber-600 mt-0.5">Belum dibayar</p>
+                  </div>
+                </div>
+
+                {/* Menunggu Approval */}
+                <div className="bg-white border border-blue-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-blue-700">
+                    <span className="text-xs font-bold">Menunggu Approval</span>
+                    <div className="w-8 h-8 rounded-lg bg-blue-100/70 flex items-center justify-center text-blue-700">
+                      <Clock size={16} />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-black text-blue-700">{adStats.waiting_approval}</span>
+                    <p className="text-[11px] text-blue-600 mt-0.5">Verifikasi admin</p>
+                  </div>
+                </div>
+
+                {/* Iklan Berakhir */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-semibold">Berakhir</span>
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                      <AlertCircle size={16} />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-black text-slate-700">{adStats.expired_ads}</span>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Masa tayang selesai</p>
+                  </div>
+                </div>
+
+                {/* Total Pengeluaran */}
+                <div className="bg-white border border-teal-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-teal-700">
+                    <span className="text-xs font-bold">Total Spending</span>
+                    <div className="w-8 h-8 rounded-lg bg-teal-100/70 flex items-center justify-center text-teal-700">
+                      <Wallet size={16} />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-lg font-black text-[#007570] truncate block">
+                      Rp {Number(adStats.total_spending || 0).toLocaleString('id-ID')}
+                    </span>
+                    <p className="text-[11px] text-teal-600 mt-0.5">Investasi iklan</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Content Section */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {[
+                      { id: "all", label: "Semua", count: adStats.total_ads },
+                      { id: "active", label: "Aktif", count: adStats.active_ads, badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+                      { id: "pending_payment", label: "Menunggu Pembayaran", count: adStats.pending_payment, badgeBg: "bg-amber-50 text-amber-700 border-amber-200" },
+                      { id: "waiting_approval", label: "Menunggu Approval", count: adStats.waiting_approval, badgeBg: "bg-blue-50 text-blue-700 border-blue-200" },
+                      { id: "expired", label: "Berakhir", count: adStats.expired_ads },
+                      { id: "rejected", label: "Ditolak", count: adStats.rejected_ads, badgeBg: "bg-rose-50 text-rose-700 border-rose-200" },
+                    ].map((tab) => {
+                      const isActive = adFilterTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setAdFilterTab(tab.id)}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                            isActive
+                              ? "bg-[#007570] text-white shadow-xs"
+                              : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                          }`}
+                        >
+                          <span>{tab.label}</span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                              isActive
+                                ? "bg-white/25 text-white"
+                                : tab.badgeBg || "bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {tab.count || 0}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <div className="col-span-2 flex flex-col gap-[6px]">
-                    <label className="text-[13px] font-semibold text-[#334155]">Kode Kupon (Opsional)</label>
-                    <div className="flex gap-[8px]">
-                      <input
-                        type="text"
-                        value={couponCodeInput}
-                        onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
-                        placeholder="Contoh: IKLAN20"
-                        className="flex-1 uppercase px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none focus:border-[#007570]"
-                      />
+                  <span className="text-xs text-slate-400 font-medium shrink-0">
+                    Menampilkan iklan yang terdaftar di akun Anda
+                  </span>
+                </div>
+
+                {/* Advertisements List */}
+                {loadingAdvertisements ? (
+                  <div className="flex flex-col items-center justify-center p-12 gap-3 text-slate-500">
+                    <Loader2 size={32} className="animate-spin text-[#007570]" />
+                    <p className="text-xs font-semibold">Memuat daftar iklan Anda...</p>
+                  </div>
+                ) : (() => {
+                  const filtered = advertisements.filter((ad) => {
+                    const status = ad.computed_status || ad.status;
+                    if (adFilterTab === "all") return true;
+                    if (adFilterTab === "active") return status === "active" || status === "approved";
+                    if (adFilterTab === "pending_payment") return status === "pending_payment" || ad.payment_status === "unpaid" || ad.payment_status === "pending_payment";
+                    if (adFilterTab === "waiting_approval") return status === "waiting_approval" || (ad.payment_status === "pending" && status === "pending");
+                    if (adFilterTab === "expired") return status === "expired";
+                    if (adFilterTab === "rejected") return status === "rejected";
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-14 px-4 text-center space-y-3 bg-slate-50/70 border border-slate-200/80 rounded-2xl">
+                        <div className="w-14 h-14 rounded-2xl bg-teal-50 text-[#007570] flex items-center justify-center">
+                          <Megaphone size={28} />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-slate-900">
+                            {adFilterTab === "all"
+                              ? "Belum ada iklan yang diajukan"
+                              : `Tidak ada iklan dengan status "${adFilterTab.replace('_', ' ')}"`}
+                          </h4>
+                          <p className="text-xs text-slate-500 max-w-md">
+                            Tingkatkan eksposur bisnis Anda ke ribuan pengunjung aktif dengan memasang iklan Premium Ads atau Standard Ads.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCreateAdStep(1);
+                            if (!selectedBusinessForAd && businesses.length > 0) {
+                              setSelectedBusinessForAd(businesses[0].id);
+                            }
+                            if (!selectedPackage && adPackages.length > 0) {
+                              setSelectedPackage(adPackages[0].name || adPackages[0].id);
+                            }
+                            setShowCreateAdModal(true);
+                          }}
+                          className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                        >
+                          <Plus size={15} />
+                          Pasang Iklan Sekarang
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-4">
+                      {filtered.map((ad) => {
+                        const status = ad.computed_status || ad.status;
+                        const isPremium = ad.placement_type === "premium" || /premium/i.test(ad.package_name || "");
+                        const biz = ad.business || {};
+                        const bizPhoto = biz.banner || biz.logo || (biz.media && biz.media.length > 0 ? biz.media[0].file_path : null) || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
+
+                        return (
+                          <div
+                            key={`user-ad-${ad.id}`}
+                            className={`group relative bg-white border rounded-2xl p-5 transition-all duration-200 hover:shadow-md ${
+                              isPremium
+                                ? "border-amber-200/90 bg-gradient-to-br from-white via-amber-50/20 to-white"
+                                : "border-slate-200 hover:border-teal-300"
+                            }`}
+                          >
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                              {/* Left info */}
+                              <div className="flex items-start gap-4 min-w-0">
+                                {/* Thumbnail */}
+                                <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                  <img
+                                    src={bizPhoto}
+                                    alt={biz.name || "Bisnis"}
+                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                    onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80"; }}
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                                  <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-black/60 text-white backdrop-blur-xs">
+                                    {isPremium ? "PREMIUM" : "STANDARD"}
+                                  </span>
+                                </div>
+
+                                {/* Texts */}
+                                <div className="min-w-0 space-y-1.5 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-base font-bold text-slate-900 truncate">
+                                      {biz.name || "Nama Bisnis Tidak Ditemukan"}
+                                    </h4>
+
+                                    {/* Placement Pill */}
+                                    {isPremium ? (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-2xs">
+                                        <Sparkles size={11} />
+                                        Premium Hero Placement
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-[#007570] border border-teal-200">
+                                        <Layers size={11} />
+                                        Standard Ticker Placement
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                                    <span className="font-semibold text-slate-700">
+                                      {ad.package_name || "Paket Iklan"}
+                                    </span>
+                                    <span>•</span>
+                                    <span>Durasi: <strong>{ad.duration_days || 7} Hari</strong></span>
+                                    <span>•</span>
+                                    <span className="font-extrabold text-[#007570]">
+                                      Rp {Number(ad.price || 0).toLocaleString("id-ID")}
+                                    </span>
+                                  </div>
+
+                                  {/* Period & Days Remaining Info */}
+                                  <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap pt-0.5">
+                                    {ad.start_date && ad.end_date ? (
+                                      <div className="flex items-center gap-1.5 text-slate-600">
+                                        <Clock size={12} className="text-[#007570]" />
+                                        <span>
+                                          Periode: <strong>{new Date(ad.start_date).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}</strong> s/d <strong>{new Date(ad.end_date).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-400 italic">
+                                        * Periode mulai aktif dihitung otomatis setelah pembayaran disetujui admin.
+                                      </span>
+                                    )}
+
+                                    {status === "active" && ad.days_remaining !== null && (
+                                      <span className="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-emerald-100 text-emerald-800">
+                                        ⏳ Sisa {ad.days_remaining} hari
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Rejection Alert if rejected */}
+                                  {status === "rejected" && (
+                                    <div className="mt-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                                      <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-600" />
+                                      <div>
+                                        <span className="font-bold">Alasan Penolakan Admin: </span>
+                                        <span>{ad.rejection_reason || ad.notes || "Bukti transfer tidak valid atau foto bisnis belum memenuhi syarat."}</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right status & action buttons */}
+                              <div className="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-between gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                                {/* Status badge */}
+                                <div>
+                                  {status === "active" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                      Aktif Tayang
+                                    </span>
+                                  ) : status === "waiting_approval" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      <Clock size={13} className="animate-spin text-blue-600" />
+                                      Menunggu Approval Admin
+                                    </span>
+                                  ) : status === "pending_payment" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                      <AlertCircle size={13} />
+                                      Menunggu Pembayaran
+                                    </span>
+                                  ) : status === "expired" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                      Masa Tayang Berakhir
+                                    </span>
+                                  ) : status === "rejected" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                      Ditolak
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                                      {status}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Action buttons */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingAdDetail(ad)}
+                                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                                    title="Lihat Detail & Live Preview"
+                                  >
+                                    <Eye size={14} />
+                                    Live Preview
+                                  </button>
+
+                                  {(status === "pending_payment" || ad.payment_status === "unpaid") && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setPayModalAd(ad);
+                                        setAdPaymentProofFile(null);
+                                        setAdPaymentProofPreview(null);
+                                      }}
+                                      className="px-3.5 py-1.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                    >
+                                      <CreditCard size={14} />
+                                      Bayar / Upload Bukti
+                                    </button>
+                                  )}
+
+                                  {(status === "pending" || status === "pending_payment") && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAdCancel(ad.id)}
+                                      className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
+                                      title="Batalkan Iklan"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Information Features Banner */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Sparkles size={18} className="text-[#007570]" />
+                  Perbandingan Paket Iklan Info.co.id
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  {/* Premium Ads info card */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-300/80 flex flex-col justify-between space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-2xs">
+                          ⭐ PREMIUM ADS
+                        </span>
+                        <span className="text-xs font-bold text-amber-800">Posisi Paling Atas (Hero)</span>
+                      </div>
+                      <h4 className="text-base font-extrabold text-slate-900">Large Hero Visual Carousel</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Format iklan eksklusif dengan foto bisnis full-width ukuran besar, minimalis tanpa teks berlebih, menampilkan rating bintang ★ dan lokasi 📍. Iklan pertama yang dilihat ribuan pengunjung saat membuka Info.co.id.
+                      </p>
+                    </div>
+                    <ul className="text-xs text-slate-700 space-y-1.5 font-medium pt-2 border-t border-amber-200/60">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle size={14} className="text-amber-600 shrink-0" />
+                        Ukuran visual raksasa di section teratas halaman Home
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle size={14} className="text-amber-600 shrink-0" />
+                        Tampilan carousel otomatis dengan transisi modern
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Standard Ads info card */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-teal-500/10 via-teal-500/5 to-transparent border border-teal-200/90 flex flex-col justify-between space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#007570] text-white">
+                          ⚡ STANDARD ADS
+                        </span>
+                        <span className="text-xs font-bold text-teal-800">Continuous Running Ticker</span>
+                      </div>
+                      <h4 className="text-base font-extrabold text-slate-900">Infinite Horizontal Stream</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Format kartu kecil modern yang bergerak otomatis secara halus dari kanan ke kiri tanpa henti (continuous ticker). Sangat dinamis, eye-catching, dan efisien untuk mempromosikan bisnis Anda.
+                      </p>
+                    </div>
+                    <ul className="text-xs text-slate-700 space-y-1.5 font-medium pt-2 border-t border-teal-200/60">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle size={14} className="text-[#007570] shrink-0" />
+                        Animasi horizontal scroller tanpa jeda (smooth infinite loop)
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle size={14} className="text-[#007570] shrink-0" />
+                        Otomatis pause saat di-hover untuk memudahkan klik pengguna
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* ========================================================================= */}
+              {/* MODAL 1: PASANG IKLAN BARU (3-STEP GUIDED WIZARD) */}
+              {/* ========================================================================= */}
+              {showCreateAdModal && (
+                <div
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto"
+                  onClick={() => setShowCreateAdModal(false)}
+                >
+                  <div
+                    className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-3xl shadow-2xl border border-slate-200 space-y-6 my-8 text-left relative max-h-[90vh] overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-teal-50 text-[#007570] border border-teal-200">
+                            LANGKAH {createAdStep} DARI 3
+                          </span>
+                          <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                            {createAdStep === 1 && "Pilih Bisnis untuk Diiklankan"}
+                            {createAdStep === 2 && "Pilih Paket Iklan (Placement)"}
+                            {createAdStep === 3 && "Live Preview & Checkout Pembayaran"}
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {createAdStep === 1 && "Tentukan salah satu bisnis terdaftar Anda yang ingin dipromosikan."}
+                          {createAdStep === 2 && "Pilih antara Premium Hero Carousel atau Standard Running Ticker."}
+                          {createAdStep === 3 && "Periksa tampilan live iklan Anda, masukkan kupon, dan selesaikan pembayaran."}
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        className="px-[16px] py-[11px] rounded-[10px] bg-transparent text-[#64748b] border border-[#e2e8f0] font-semibold text-[13px] cursor-pointer hover:bg-[#f8fafc] disabled:opacity-50"
-                        onClick={handleValidateUserCoupon}
-                        disabled={validatingCoupon || !couponCodeInput}
-                      >
-                        {validatingCoupon ? 'Memeriksa...' : 'Gunakan'}
-                      </button>
-                    </div>
-                    {couponMsg && (
-                      <p className={`text-[12px] mt-[4px] font-semibold ${appliedCouponInfo ? 'text-[#16a34a]' : 'text-[#dc2626]'}`}>
-                        {couponMsg}
-                      </p>
-                    )}
-                    {appliedCouponInfo && (
-                      <div className="mt-[8px] p-[10px] rounded-[8px] bg-[#f0fdfa] border border-[#5eead4] text-[13px] flex flex-col gap-[4px]">
-                        <div className="flex justify-between text-[#64748b]">
-                          <span>Harga Normal:</span>
-                          <span>Rp {appliedCouponInfo.original_amount?.toLocaleString('id-ID')}</span>
-                        </div>
-                        <div className="flex justify-between text-[#16a34a] font-bold">
-                          <span>Diskon Kupon ({appliedCouponInfo.code}):</span>
-                          <span>-Rp {appliedCouponInfo.discount_amount?.toLocaleString('id-ID')}</span>
-                        </div>
-                        <div className="flex justify-between text-[#0f172a] font-bold border-t border-[#cbd5e1] pt-[4px] mt-[4px]">
-                          <span>Total Pembayaran:</span>
-                          <span>Rp {appliedCouponInfo.final_amount?.toLocaleString('id-ID')}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Rich Payment Methods Cards Selection */}
-                  <div className="col-span-2 flex flex-col gap-[16px] border-t border-[#e2e8f0] pt-[18px] mt-[6px]">
-                    <div>
-                      <h4 className="text-[15px] font-bold text-[#0f172a] flex items-center gap-[8px]">
-                        <CreditCard size={18} className="text-[#007570]" />
-                        Pilihan Metode Pembayaran
-                      </h4>
-                      <p className="text-[12.5px] text-[#64748b] mt-[2px]">Pilih metode pembayaran yang Anda inginkan.</p>
-                    </div>
-
-                    {/* E-WALLET */}
-                    <div className="flex flex-col gap-[8px]">
-                      <span className="text-[11px] font-bold uppercase tracking-[0.5px] text-[#94a3b8]">E-WALLET</span>
-                      <div className="grid grid-cols-3 max-md:grid-cols-1 gap-[12px]">
-                        <div 
-                          className={`p-[12px_14px] rounded-[12px] border transition-all cursor-pointer flex items-center justify-between ${selectedPaymentMethod === 'DANA' ? 'border-[#007570] bg-[#f0fdfa] shadow-[0_2px_8px_rgba(0,117,112,0.1)]' : 'border-[#e2e8f0] bg-white hover:border-[#cbd5e1]'}`}
-                          onClick={() => setSelectedPaymentMethod('DANA')}
-                        >
-                          <div className="flex items-center gap-[10px]">
-                            <span className="px-[8px] py-[3px] bg-[#008ce5] text-white font-extrabold text-[11px] rounded-[6px]">DANA</span>
-                            <span className="text-[13px] font-semibold text-[#0f172a]">DANA</span>
-                          </div>
-                          {selectedPaymentMethod === 'DANA' ? (
-                            <CheckCircle size={18} className="text-[#007570]" />
-                          ) : (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-[#cbd5e1]" />
-                          )}
-                        </div>
-
-                        <div 
-                          className={`p-[12px_14px] rounded-[12px] border transition-all cursor-pointer flex items-center justify-between ${selectedPaymentMethod === 'GoPay' ? 'border-[#007570] bg-[#f0fdfa] shadow-[0_2px_8px_rgba(0,117,112,0.1)]' : 'border-[#e2e8f0] bg-white hover:border-[#cbd5e1]'}`}
-                          onClick={() => setSelectedPaymentMethod('GoPay')}
-                        >
-                          <div className="flex items-center gap-[10px]">
-                            <span className="px-[8px] py-[3px] bg-[#00a5cf] text-white font-extrabold text-[11px] rounded-[6px]">GoPay</span>
-                            <span className="text-[13px] font-semibold text-[#0f172a]">GoPay</span>
-                          </div>
-                          {selectedPaymentMethod === 'GoPay' ? (
-                            <CheckCircle size={18} className="text-[#007570]" />
-                          ) : (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-[#cbd5e1]" />
-                          )}
-                        </div>
-
-                        <div 
-                          className={`p-[12px_14px] rounded-[12px] border transition-all cursor-pointer flex items-center justify-between ${selectedPaymentMethod === 'OVO' ? 'border-[#007570] bg-[#f0fdfa] shadow-[0_2px_8px_rgba(0,117,112,0.1)]' : 'border-[#e2e8f0] bg-white hover:border-[#cbd5e1]'}`}
-                          onClick={() => setSelectedPaymentMethod('OVO')}
-                        >
-                          <div className="flex items-center gap-[10px]">
-                            <span className="px-[8px] py-[3px] bg-[#4c2a86] text-white font-extrabold text-[11px] rounded-[6px]">OVO</span>
-                            <span className="text-[13px] font-semibold text-[#0f172a]">OVO</span>
-                          </div>
-                          {selectedPaymentMethod === 'OVO' ? (
-                            <CheckCircle size={18} className="text-[#007570]" />
-                          ) : (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-[#cbd5e1]" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* VIRTUAL ACCOUNT / TRANSFER BANK */}
-                    <div className="flex flex-col gap-[8px] mt-[4px]">
-                      <span className="text-[11px] font-bold uppercase tracking-[0.5px] text-[#94a3b8]">VIRTUAL ACCOUNT / TRANSFER BANK</span>
-                      <div className="grid grid-cols-3 max-md:grid-cols-1 gap-[12px]">
-                        <div 
-                          className={`p-[12px_14px] rounded-[12px] border transition-all cursor-pointer flex items-center justify-between ${selectedPaymentMethod === 'BCA Virtual Account' || selectedPaymentMethod === 'Transfer Bank BCA' ? 'border-[#007570] bg-[#f0fdfa] shadow-[0_2px_8px_rgba(0,117,112,0.1)]' : 'border-[#e2e8f0] bg-white hover:border-[#cbd5e1]'}`}
-                          onClick={() => setSelectedPaymentMethod('BCA Virtual Account')}
-                        >
-                          <div className="flex items-center gap-[10px]">
-                            <span className="px-[8px] py-[3px] bg-[#005caa] text-white font-extrabold text-[11px] rounded-[6px]">BCA</span>
-                            <span className="text-[12.5px] font-semibold text-[#0f172a]">BCA Virtual Account</span>
-                          </div>
-                          {selectedPaymentMethod === 'BCA Virtual Account' || selectedPaymentMethod === 'Transfer Bank BCA' ? (
-                            <CheckCircle size={18} className="text-[#007570]" />
-                          ) : (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-[#cbd5e1]" />
-                          )}
-                        </div>
-
-                        <div 
-                          className={`p-[12px_14px] rounded-[12px] border transition-all cursor-pointer flex items-center justify-between ${selectedPaymentMethod === 'Mandiri Virtual Account' || selectedPaymentMethod === 'Transfer Bank Mandiri' ? 'border-[#007570] bg-[#f0fdfa] shadow-[0_2px_8px_rgba(0,117,112,0.1)]' : 'border-[#e2e8f0] bg-white hover:border-[#cbd5e1]'}`}
-                          onClick={() => setSelectedPaymentMethod('Mandiri Virtual Account')}
-                        >
-                          <div className="flex items-center gap-[10px]">
-                            <span className="px-[8px] py-[3px] bg-[#003865] text-white font-extrabold text-[11px] rounded-[6px]">Mandiri</span>
-                            <span className="text-[12.5px] font-semibold text-[#0f172a]">Mandiri Virtual Account</span>
-                          </div>
-                          {selectedPaymentMethod === 'Mandiri Virtual Account' || selectedPaymentMethod === 'Transfer Bank Mandiri' ? (
-                            <CheckCircle size={18} className="text-[#007570]" />
-                          ) : (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-[#cbd5e1]" />
-                          )}
-                        </div>
-
-                        <div 
-                          className={`p-[12px_14px] rounded-[12px] border transition-all cursor-pointer flex items-center justify-between ${selectedPaymentMethod === 'BRI Virtual Account' || selectedPaymentMethod === 'Transfer Bank BRI' ? 'border-[#007570] bg-[#f0fdfa] shadow-[0_2px_8px_rgba(0,117,112,0.1)]' : 'border-[#e2e8f0] bg-white hover:border-[#cbd5e1]'}`}
-                          onClick={() => setSelectedPaymentMethod('BRI Virtual Account')}
-                        >
-                          <div className="flex items-center gap-[10px]">
-                            <span className="px-[8px] py-[3px] bg-[#00529c] text-white font-extrabold text-[11px] rounded-[6px]">BRI</span>
-                            <span className="text-[12.5px] font-semibold text-[#0f172a]">BRI Virtual Account</span>
-                          </div>
-                          {selectedPaymentMethod === 'BRI Virtual Account' || selectedPaymentMethod === 'Transfer Bank BRI' ? (
-                            <CheckCircle size={18} className="text-[#007570]" />
-                          ) : (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-[#cbd5e1]" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Instruction Box */}
-                    <div className="mt-[4px] p-[16px] rounded-[14px] bg-[#f8fafc] border border-[#e2e8f0] flex flex-col gap-[10px]">
-                      <div className="flex items-center gap-[8px] text-[#007570]">
-                        <ShieldCheck size={18} />
-                        <h5 className="text-[14px] font-bold text-[#0f172a]">
-                          Instruksi Pembayaran {selectedPaymentMethod}
-                        </h5>
-                      </div>
-                      <p className="text-[12.5px] text-[#64748b] -mt-[4px]">
-                        Silakan lakukan transfer sebesar total tagihan ke rekening / Virtual Account berikut:
-                      </p>
-
-                      <div className="bg-white p-[14px] rounded-[12px] border border-[#cbd5e1] flex justify-between items-center max-md:flex-col max-md:items-start max-md:gap-[10px]">
-                        <div className="flex flex-col gap-[2px]">
-                          <span className="text-[12px] text-[#64748b]">Nomor Rekening / Virtual Account</span>
-                          <span className="text-[18px] font-extrabold text-[#0f172a] tracking-[0.5px]">
-                            {getPaymentNumber(selectedPaymentMethod)}
-                          </span>
-                          <span className="text-[12px] text-[#64748b]">a.n Info.co.id</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="flex items-center gap-[6px] px-[16px] py-[8px] bg-[#f1f5f9] text-[#0f172a] border border-[#cbd5e1] rounded-[8px] text-[12.5px] font-semibold cursor-pointer hover:bg-[#e2e8f0] transition-all"
-                          onClick={() => {
-                            navigator.clipboard.writeText(getPaymentNumber(selectedPaymentMethod));
-                            setCopyToast(true);
-                            setTimeout(() => setCopyToast(false), 2000);
-                          }}
-                        >
-                          <Copy size={14} />
-                          {copyToast ? 'Tersalin!' : 'Salin No'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-[6px]">
-                    <label className="text-[13px] font-semibold text-[#334155]">Upload Bukti Pembayaran (Opsional)</label>
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          setAdPaymentProofFile(file);
-                          setAdPaymentProofPreview(URL.createObjectURL(file));
-                        }
-                      }}
-                      className="w-full text-[13px] text-[#475569] file:mr-[12px] file:py-[8px] file:px-[14px] file:rounded-[8px] file:border-0 file:text-[12.5px] file:font-semibold file:bg-[#f1f5f9] file:text-[#007570] hover:file:bg-[#e2e8f0] cursor-pointer"
-                    />
-                    {adPaymentProofPreview && (
-                      <div className="relative mt-[6px] w-[100px] h-[100px] rounded-[8px] overflow-hidden border border-[#cbd5e1]">
-                        <img src={adPaymentProofPreview} alt="Preview Bukti" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          className="absolute top-[4px] right-[4px] bg-[#dc2626] text-white rounded-full p-[2px] cursor-pointer border-0"
-                          onClick={() => {
-                            setAdPaymentProofFile(null);
-                            setAdPaymentProofPreview(null);
-                          }}
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Rincian Total Keseluruhan Pembayaran */}
-                  <div className="col-span-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-[16px] p-[20px] flex flex-col gap-[12px] shadow-sm mt-[6px]">
-                    <div className="flex justify-between items-center border-b border-[#e2e8f0] pb-[10px]">
-                      <span className="text-[14px] font-bold text-[#0f172a] flex items-center gap-[6px]">
-                        <FileText size={18} className="text-[#007570]" />
-                        Rincian Total Keseluruhan Pembayaran
-                      </span>
-                      {appliedCouponInfo && (
-                        <span className="px-[10px] py-[3px] bg-[#dcfce7] text-[#16a34a] rounded-full text-[11px] font-bold">
-                          KUPON TERPASANG: {appliedCouponInfo.code}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col gap-[6px] text-[13px]">
-                      <div className="flex justify-between text-[#64748b]">
-                        <span>Harga Paket ({selectedPackage || 'Belum Dipilih'}):</span>
-                        <span className="font-semibold text-[#0f172a]">
-                          Rp {getSelectedPackagePrice()?.toLocaleString('id-ID')}
-                        </span>
-                      </div>
-
-                      {appliedCouponInfo && (
-                        <div className="flex justify-between text-[#16a34a] font-semibold">
-                          <span>Diskon Kupon ({appliedCouponInfo.code}):</span>
-                          <span>-Rp {Number(appliedCouponInfo.discount_amount)?.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between items-center text-[15px] font-extrabold text-[#007570] border-t border-[#cbd5e1] pt-[10px] mt-[4px]">
-                        <span>Total Keseluruhan Yang Harus Dibayar:</span>
-                        <span className="text-[20px] text-[#007570]">
-                          Rp {getFinalPrice()?.toLocaleString('id-ID')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <button 
-                  className="inline-flex items-center justify-center gap-[6px] px-[24px] py-[12px] rounded-[10px] bg-[#007570] text-white font-semibold text-[14px] cursor-pointer hover:bg-[#005a58] disabled:opacity-50 border-0 self-start" 
-                  onClick={handleAdSubmit}
-                  disabled={submittingAd}
-                >
-                  {submittingAd ? 'Mengajukan...' : 'Ajukan Iklan'}
-                </button>
-              </div>
-
-              {/* Existing Advertisements */}
-              <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[28px] shadow-sm flex flex-col gap-[20px]">
-                <h3 className="text-[16px] font-bold text-[#0f172a]">Iklan Saya</h3>
-                {loadingAdvertisements ? (
-                  <div className="flex flex-col items-center justify-center p-[40px] gap-[12px] text-[#64748b]">
-                    <Loader2 size={32} className="animate-spin text-[#007570]" />
-                    <p className="text-[13px]">Memuat iklan...</p>
-                  </div>
-                ) : advertisements.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-[40px] gap-[12px] text-[#94a3b8]">
-                    <Megaphone size={48} className="opacity-50" />
-                    <p className="text-[13px]">Belum ada iklan yang diajukan</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-[14px]">
-                    {advertisements.map(ad => (
-                      <div key={ad.id} className="border border-[#e2e8f0] rounded-[12px] p-[20px] flex flex-col gap-[14px] bg-[#fafbff]">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="text-[15px] font-semibold text-[#0f172a]">{ad.business?.name || 'Bisnis'}</h4>
-                            <div className="flex gap-[6px] mt-[4px]">
-                              <span className={`inline-block px-[10px] py-[2px] rounded-full text-[11px] font-semibold ${ad.status === 'active' || ad.status === 'approved' ? 'bg-[#dcfce7] text-[#16a34a]' : ad.status === 'pending' ? 'bg-[#fef9c3] text-[#ca8a04]' : 'bg-[#fee2e2] text-[#dc2626]'}`}>{ad.status}</span>
-                              <span className={`inline-block px-[10px] py-[2px] rounded-full text-[11px] font-semibold ${ad.payment_status === 'paid' ? 'bg-[#dcfce7] text-[#16a34a]' : 'bg-[#fee2e2] text-[#dc2626]'}`}>{ad.payment_status}</span>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className="text-[12px] font-medium text-[#64748b]">{ad.package_name}</span>
-                            <span className="text-[15px] font-bold text-[#007570]">Rp {ad.price?.toLocaleString('id-ID')}</span>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <div className="flex flex-wrap gap-[16px] text-[12.5px] text-[#64748b]">
-                            <div className="flex items-center gap-[4px]">
-                              <span>Durasi:</span>
-                              <span className="font-semibold text-[#0f172a]">{ad.duration_days} hari</span>
-                            </div>
-                            {ad.start_date && (
-                              <div className="flex items-center gap-[4px]">
-                                <span>Mulai:</span>
-                                <span className="font-semibold text-[#0f172a]">{new Date(ad.start_date).toLocaleDateString('id-ID')}</span>
-                              </div>
-                            )}
-                            {ad.end_date && (
-                              <div className="flex items-center gap-[4px]">
-                                <span>Selesai:</span>
-                                <span className="font-semibold text-[#0f172a]">{new Date(ad.end_date).toLocaleDateString('id-ID')}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-[16px] text-[12.5px] text-[#64748b] border-t border-[#f1f5f9] pt-[10px]">
-                          <div className="flex items-center gap-[4px]">
-                            <span>Pembayaran:</span>
-                            <span className="font-semibold text-[#0f172a]">{ad.payment_method || 'Transfer Bank'}</span>
-                          </div>
-                          {ad.discount_amount > 0 && (
-                            <div className="flex items-center gap-[4px] text-[#16a34a]">
-                              <span>Hemat Kupon:</span>
-                              <span className="font-bold">-Rp {Number(ad.discount_amount)?.toLocaleString('id-ID')}</span>
-                            </div>
-                          )}
-                          {ad.payment_proof && (
-                            <div className="flex items-center gap-[6px]">
-                              <span>Bukti Transfer:</span>
-                              <button
-                                type="button"
-                                className="text-[#007570] font-semibold underline bg-transparent border-0 cursor-pointer text-[12.5px]"
-                                onClick={() => window.open(ad.payment_proof, '_blank')}
-                              >
-                                Lihat Bukti
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex gap-[8px] flex-wrap">
-                          {ad.payment_status === 'unpaid' && (
-                            <button 
-                              className="px-[16px] py-[8px] rounded-[8px] bg-[#007570] text-white font-semibold text-[13px] cursor-pointer hover:bg-[#005a58] border-0 flex items-center gap-[4px]"
-                              onClick={() => {
-                                setPayModalAd(ad);
-                                setAdPaymentProofFile(null);
-                                setAdPaymentProofPreview(null);
-                              }}
-                            >
-                              <CheckCircle size={14} />
-                              Bayar / Upload Bukti
-                            </button>
-                          )}
-                          {ad.status === 'pending' && (
-                            <button
-                              className="px-[16px] py-[8px] rounded-[8px] bg-[#f1f5f9] text-[#334155] font-semibold text-[13px] cursor-pointer hover:bg-[#e2e8f0] border-0 flex items-center gap-[4px]"
-                              onClick={() => handleEditAd(ad)}
-                            >
-                              <Edit size={14} />
-                              Edit Iklan
-                            </button>
-                          )}
-                          {ad.status === 'pending' && (
-                            <button 
-                              className="px-[16px] py-[8px] rounded-[8px] bg-[#fee2e2] text-[#dc2626] font-semibold text-[13px] cursor-pointer hover:bg-[#dc2626] hover:text-white border-0 flex items-center gap-[4px]"
-                              onClick={() => handleAdCancel(ad.id)}
-                            >
-                              <Trash2 size={14} />
-                              Batalkan / Hapus
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[28px] shadow-sm">
-                <h3 className="text-[16px] font-bold text-[#0f172a]">Keuntungan Beriklan</h3>
-                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-[20px] mt-[18px]">
-                  <div className="flex items-start gap-[14px]">
-                    <Eye size={24} className="text-[#007570] shrink-0 mt-[2px]" />
-                    <div>
-                      <h4 className="text-[14px] font-semibold text-[#0f172a]">Visibilitas Tinggi</h4>
-                      <p className="text-[12.5px] text-[#64748b]">Bisnis Anda tampil di halaman utama dengan posisi strategis</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-[14px]">
-                    <Target size={24} className="text-[#007570] shrink-0 mt-[2px]" />
-                    <div>
-                      <h4 className="text-[14px] font-semibold text-[#0f172a]">Target Tepat</h4>
-                      <p className="text-[12.5px] text-[#64748b]">Menjangkau audiens yang relevan dengan bisnis Anda</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-[14px]">
-                    <TrendingUp size={24} className="text-[#007570] shrink-0 mt-[2px]" />
-                    <div>
-                      <h4 className="text-[14px] font-semibold text-[#0f172a]">Traffic Meningkat</h4>
-                      <p className="text-[12.5px] text-[#64748b]">Tingkatkan kunjungan dan potensi konversi</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-[14px]">
-                    <BarChart size={24} className="text-[#007570] shrink-0 mt-[2px]" />
-                    <div>
-                      <h4 className="text-[14px] font-semibold text-[#0f172a]">Laporan Detail</h4>
-                      <p className="text-[12.5px] text-[#64748b]">Pantau performa iklan dengan statistik lengkap</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment & Upload Proof Modal */}
-              {payModalAd && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4" onClick={() => { setPayModalAd(null); setAdPaymentProofFile(null); setAdPaymentProofPreview(null); }}>
-                  <div className="bg-white rounded-2xl p-6 sm:p-7 w-full max-w-md shadow-2xl border border-slate-200 space-y-5 my-8 text-left relative" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-between items-center border-b border-[#e2e8f0] pb-[14px]">
-                      <h3 className="text-[16px] font-bold text-[#0f172a]">Pembayaran Iklan</h3>
-                      <button 
-                        onClick={() => { setPayModalAd(null); setAdPaymentProofFile(null); setAdPaymentProofPreview(null); }}
-                        className="bg-transparent border-0 cursor-pointer text-[#64748b] hover:text-[#0f172a]"
+                        onClick={() => setShowCreateAdModal(false)}
+                        className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer border-0"
                       >
                         <X size={20} />
                       </button>
                     </div>
 
-                    <div className="bg-[#f8fafc] rounded-[10px] p-[14px] flex flex-col gap-[6px] border border-[#e2e8f0] text-[13px]">
-                      <div className="flex justify-between">
-                        <span className="text-[#64748b]">Bisnis:</span>
-                        <span className="font-semibold text-[#0f172a]">{payModalAd.business?.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#64748b]">Paket:</span>
-                        <span className="font-semibold text-[#0f172a]">{payModalAd.package_name}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-[14px] text-[#007570] border-t border-[#e2e8f0] pt-[6px] mt-[4px]">
-                        <span>Total Tagihan:</span>
-                        <span>Rp {Number(payModalAd.price)?.toLocaleString('id-ID')}</span>
-                      </div>
+                    {/* Step Progress Pills */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { step: 1, title: "1. Pilih Bisnis" },
+                        { step: 2, title: "2. Pilih Paket" },
+                        { step: 3, title: "3. Preview & Bayar" },
+                      ].map((item) => (
+                        <div
+                          key={item.step}
+                          className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all ${
+                            createAdStep === item.step
+                              ? "bg-teal-50 border-[#007570] text-[#007570]"
+                              : createAdStep > item.step
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                              : "bg-slate-50 border-slate-200 text-slate-400"
+                          }`}
+                        >
+                          {item.title}
+                        </div>
+                      ))}
                     </div>
 
-                    <div className="flex flex-col gap-[10px]">
-                      <label className="text-[13px] font-semibold text-[#334155]">Pilih Metode Pembayaran</label>
-                      <div className="grid grid-cols-2 gap-[8px]">
-                        <div 
-                          className={`p-[10px_12px] rounded-[10px] border cursor-pointer flex items-center justify-between text-[12px] ${selectedPaymentMethod === 'DANA' ? 'border-[#007570] bg-[#f0fdfa]' : 'border-[#e2e8f0]'}`}
-                          onClick={() => setSelectedPaymentMethod('DANA')}
-                        >
-                          <span className="font-semibold text-[#0f172a]">DANA</span>
-                          {selectedPaymentMethod === 'DANA' && <CheckCircle size={14} className="text-[#007570]" />}
-                        </div>
-                        <div 
-                          className={`p-[10px_12px] rounded-[10px] border cursor-pointer flex items-center justify-between text-[12px] ${selectedPaymentMethod === 'GoPay' ? 'border-[#007570] bg-[#f0fdfa]' : 'border-[#e2e8f0]'}`}
-                          onClick={() => setSelectedPaymentMethod('GoPay')}
-                        >
-                          <span className="font-semibold text-[#0f172a]">GoPay</span>
-                          {selectedPaymentMethod === 'GoPay' && <CheckCircle size={14} className="text-[#007570]" />}
-                        </div>
-                        <div 
-                          className={`p-[10px_12px] rounded-[10px] border cursor-pointer flex items-center justify-between text-[12px] ${selectedPaymentMethod === 'BCA Virtual Account' ? 'border-[#007570] bg-[#f0fdfa]' : 'border-[#e2e8f0]'}`}
-                          onClick={() => setSelectedPaymentMethod('BCA Virtual Account')}
-                        >
-                          <span className="font-semibold text-[#0f172a]">BCA Virtual Account</span>
-                          {selectedPaymentMethod === 'BCA Virtual Account' && <CheckCircle size={14} className="text-[#007570]" />}
-                        </div>
-                        <div 
-                          className={`p-[10px_12px] rounded-[10px] border cursor-pointer flex items-center justify-between text-[12px] ${selectedPaymentMethod === 'Mandiri Virtual Account' ? 'border-[#007570] bg-[#f0fdfa]' : 'border-[#e2e8f0]'}`}
-                          onClick={() => setSelectedPaymentMethod('Mandiri Virtual Account')}
-                        >
-                          <span className="font-semibold text-[#0f172a]">Mandiri Virtual Account</span>
-                          {selectedPaymentMethod === 'Mandiri Virtual Account' && <CheckCircle size={14} className="text-[#007570]" />}
-                        </div>
-                      </div>
+                    {/* ── STEP 1: PILIH BISNIS ── */}
+                    {createAdStep === 1 && (
+                      <div className="space-y-4">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Pilih Bisnis Anda ({businesses.length} Bisnis Tersedia)
+                        </label>
 
-                      <div className="p-[12px] rounded-[10px] bg-[#f8fafc] border border-[#e2e8f0] text-[12px] flex flex-col gap-[4px] mt-[4px]">
-                        <span className="text-[#64748b]">Transfer ke {selectedPaymentMethod}:</span>
-                        <div className="flex justify-between items-center font-bold text-[#0f172a]">
-                          <span>{getPaymentNumber(selectedPaymentMethod)} (a.n Info.co.id)</span>
+                        {businesses.length === 0 ? (
+                          <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                            <Briefcase size={36} className="mx-auto text-slate-400" />
+                            <h4 className="text-sm font-bold text-slate-800">Anda belum memiliki bisnis terdaftar</h4>
+                            <p className="text-xs text-slate-500">
+                              Tambahkan bisnis Anda terlebih dahulu di menu "Bisnis" sebelum mengajukan pemasangan iklan.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[360px] overflow-y-auto p-1">
+                            {businesses.map((biz) => {
+                              const isSelected = String(selectedBusinessForAd) === String(biz.id);
+                              const photo = biz.banner || biz.logo || (biz.media && biz.media.length > 0 ? biz.media[0].file_path : null) || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
+
+                              return (
+                                <div
+                                  key={`select-biz-${biz.id}`}
+                                  onClick={() => setSelectedBusinessForAd(biz.id)}
+                                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 relative ${
+                                    isSelected
+                                      ? "border-[#007570] bg-teal-50/40 shadow-xs ring-2 ring-[#007570]/20"
+                                      : "border-slate-200 bg-white hover:border-slate-300"
+                                  }`}
+                                >
+                                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                    <img src={photo} alt={biz.name} className="w-full h-full object-cover" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <h4 className="text-sm font-bold text-slate-900 truncate">{biz.name}</h4>
+                                    <p className="text-xs text-slate-500 truncate">{biz.category?.name || "Kategori Usaha"}</p>
+                                    <p className="text-[11px] text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                                      <MapPin size={11} />
+                                      {biz.city || "Indonesia"}
+                                    </p>
+                                  </div>
+                                  {isSelected && (
+                                    <CheckCircle2 size={20} className="text-[#007570] shrink-0" />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <div className="flex justify-end pt-4 border-t border-slate-100">
                           <button
                             type="button"
-                            className="px-[8px] py-[3px] bg-[#f1f5f9] text-[#007570] border border-[#cbd5e1] rounded text-[11px] cursor-pointer"
-                            onClick={() => {
-                              navigator.clipboard.writeText(getPaymentNumber(selectedPaymentMethod));
-                              setCopyToast(true);
-                              setTimeout(() => setCopyToast(false), 2000);
-                            }}
+                            disabled={!selectedBusinessForAd}
+                            onClick={() => setCreateAdStep(2)}
+                            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs sm:text-sm shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer border-0"
                           >
-                            {copyToast ? 'Tersalin!' : 'Salin'}
+                            Lanjutkan ke Pemilihan Paket
+                            <ArrowRight size={16} />
                           </button>
                         </div>
                       </div>
+                    )}
+
+                    {/* ── STEP 2: PILIH PAKET IKLAN ── */}
+                    {createAdStep === 2 && (
+                      <div className="space-y-4">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Pilih Paket & Placement yang Anda Inginkan
+                        </label>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {adPackages.length > 0 ? (
+                            adPackages.map((pkg) => {
+                              const isSelected = selectedPackage === pkg.name || selectedPackage === pkg.id || String(selectedPackage) === String(pkg.id);
+                              const isPrem = pkg.placement_type === "premium" || /premium/i.test(pkg.name);
+
+                              return (
+                                <div
+                                  key={`ad-pkg-${pkg.id}`}
+                                  onClick={() => setSelectedPackage(pkg.id || pkg.name)}
+                                  className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative ${
+                                    isSelected
+                                      ? isPrem
+                                        ? "border-amber-500 bg-amber-50/40 shadow-md ring-2 ring-amber-500/20"
+                                        : "border-[#007570] bg-teal-50/40 shadow-md ring-2 ring-[#007570]/20"
+                                      : "border-slate-200 bg-white hover:border-slate-300"
+                                  }`}
+                                >
+                                  {isPrem && (
+                                    <div className="absolute -top-3 right-4 px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xs">
+                                      ⭐ TOP HERO CAROUSEL
+                                    </div>
+                                  )}
+
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <span
+                                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase ${
+                                          isPrem
+                                            ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                            : "bg-teal-100 text-teal-900 border border-teal-300"
+                                        }`}
+                                      >
+                                        {isPrem ? "Premium Ads" : "Standard Ads"}
+                                      </span>
+                                      {isSelected && <CheckCircle2 size={20} className={isPrem ? "text-amber-600" : "text-[#007570]"} />}
+                                    </div>
+
+                                    <div>
+                                      <h4 className="text-base font-extrabold text-slate-900">{pkg.name}</h4>
+                                      <div className="flex items-baseline gap-1 mt-1">
+                                        <span className="text-2xl font-black text-slate-900">
+                                          Rp {Number(pkg.price || 0).toLocaleString("id-ID")}
+                                        </span>
+                                        <span className="text-xs text-slate-500">
+                                          / {pkg.formatted_duration || `${pkg.duration_value} ${pkg.duration_unit}`}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <p className="text-xs text-slate-600 leading-relaxed">
+                                      {pkg.description || (isPrem ? "Tampil eksklusif di bagian paling atas Home dengan visual besar, rating, dan lokasi." : "Tampil dalam scroller berjalan continuous ticker yang dinamis dan aktif.")}
+                                    </p>
+
+                                    <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs font-medium text-slate-700">
+                                      <div className="flex items-center gap-2">
+                                        <Check size={14} className={isPrem ? "text-amber-600" : "text-[#007570]"} />
+                                        <span>Placement: <strong>{isPrem ? "Hero Banner Teratas" : "Continuous Running Ticker"}</strong></span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Check size={14} className={isPrem ? "text-amber-600" : "text-[#007570]"} />
+                                        <span>Durasi Tayang: <strong>{pkg.formatted_duration || `${pkg.duration_value} Hari`}</strong></span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <>
+                              {/* Standard fallback */}
+                              <div
+                                onClick={() => setSelectedPackage("Standard Iklan")}
+                                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                                  selectedPackage === "Standard Iklan"
+                                    ? "border-[#007570] bg-teal-50/40 shadow-md"
+                                    : "border-slate-200 bg-white"
+                                }`}
+                              >
+                                <div className="space-y-2">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-900">Standard Ads</span>
+                                  <h4 className="text-base font-extrabold text-slate-900">Standard Ticker (7 Hari)</h4>
+                                  <span className="text-xl font-black text-slate-900">Rp 150.000</span>
+                                  <p className="text-xs text-slate-600">Running ticker continuous scroller.</p>
+                                </div>
+                              </div>
+
+                              {/* Premium fallback */}
+                              <div
+                                onClick={() => setSelectedPackage("Premium Iklan")}
+                                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                                  selectedPackage === "Premium Iklan"
+                                    ? "border-amber-500 bg-amber-50/40 shadow-md"
+                                    : "border-slate-200 bg-white"
+                                }`}
+                              >
+                                <div className="space-y-2">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900">Premium Ads</span>
+                                  <h4 className="text-base font-extrabold text-slate-900">Premium Hero (7 Hari)</h4>
+                                  <span className="text-xl font-black text-slate-900">Rp 75.000</span>
+                                  <p className="text-xs text-slate-600">Large Hero Carousel di posisi paling atas.</p>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="flex justify-between pt-4 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setCreateAdStep(1)}
+                            className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border-0"
+                          >
+                            Kembali
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!selectedPackage}
+                            onClick={() => setCreateAdStep(3)}
+                            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs sm:text-sm shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer border-0"
+                          >
+                            Lanjutkan ke Preview & Pembayaran
+                            <ArrowRight size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── STEP 3: LIVE PREVIEW & CHECKOUT ── */}
+                    {createAdStep === 3 && (() => {
+                      const selBiz = getSelectedBusinessObj();
+                      const selPkg = getSelectedPackageObj();
+                      const isPrem = selPkg?.placement_type === "premium" || (typeof selectedPackage === "string" && /premium/i.test(selectedPackage));
+                      const photo = selBiz?.banner || selBiz?.logo || (selBiz?.media && selBiz?.media.length > 0 ? selBiz?.media[0].file_path : null) || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1000&auto=format&fit=crop&q=80";
+
+                      return (
+                        <div className="space-y-6">
+                          {/* Live Preview Box */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                <Eye size={14} className="text-[#007570]" />
+                                Live Realistic Preview ({isPrem ? "Premium Hero Format" : "Standard Scroller Format"})
+                              </label>
+                              <span className="text-[11px] text-slate-400 font-medium">
+                                * Tampilan actual iklan Anda di halaman Home
+                              </span>
+                            </div>
+
+                            {/* Actual Preview Component Container */}
+                            <div className="rounded-2xl border border-slate-300 overflow-hidden bg-slate-950 p-4 sm:p-5 shadow-inner">
+                              {isPrem ? (
+                                /* Premium Ads Simulation */
+                                <div className="relative w-full h-[220px] sm:h-[260px] rounded-xl overflow-hidden border border-white/10 shadow-xl group">
+                                  <img
+                                    src={photo}
+                                    alt={selBiz?.name}
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
+
+                                  <div className="absolute top-3 left-3">
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-amber-500 text-white shadow-md">
+                                      ⭐ SPONSORED
+                                    </span>
+                                  </div>
+
+                                  <div className="absolute bottom-4 left-4 right-4 text-white space-y-1.5">
+                                    <h4 className="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-md">
+                                      {selBiz?.name || "Nama Bisnis Anda"}
+                                    </h4>
+                                    <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-200">
+                                      <span className="flex items-center gap-1 text-amber-400 font-bold">
+                                        ★ 4.8 <span className="text-slate-300 font-normal">(Ulasan Konsumen)</span>
+                                      </span>
+                                      <span>•</span>
+                                      <span className="flex items-center gap-1">
+                                        <MapPin size={13} className="text-teal-400" />
+                                        {selBiz?.city || "Indonesia"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* Standard Ads Simulation */
+                                <div className="flex items-center justify-center p-4">
+                                  <div className="w-full max-w-[340px] bg-white rounded-2xl border border-slate-200 p-3.5 shadow-md flex items-center gap-3.5">
+                                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                                      <img src={photo} alt={selBiz?.name} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
+                                          SPONSORED
+                                        </span>
+                                        <span className="text-[11px] font-bold text-amber-500">★ 4.8</span>
+                                      </div>
+                                      <h5 className="text-xs font-bold text-slate-900 truncate">
+                                        {selBiz?.name || "Nama Bisnis Anda"}
+                                      </h5>
+                                      <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                                        <MapPin size={10} />
+                                        {selBiz?.city || "Indonesia"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Coupon Code Section */}
+                          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <label className="block text-xs font-bold text-slate-700">Kode Kupon Diskon (Opsional)</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={couponCodeInput}
+                                onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                                placeholder="Contoh: IKLAN20"
+                                className="flex-1 uppercase px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white outline-none focus:border-[#007570]"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleValidateUserCoupon}
+                                disabled={validatingCoupon || !couponCodeInput}
+                                className="px-5 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs cursor-pointer transition-all disabled:opacity-40 border-0"
+                              >
+                                {validatingCoupon ? "Memeriksa..." : "Gunakan Kupon"}
+                              </button>
+                            </div>
+                            {couponMsg && (
+                              <p className={`text-xs font-bold ${appliedCouponInfo ? "text-emerald-600" : "text-rose-600"}`}>
+                                {couponMsg}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Payment Method Selector */}
+                          <div className="space-y-3">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Pilih Metode Pembayaran
+                            </label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                              {[
+                                { id: "BCA Virtual Account", name: "BCA Virtual Account", tag: "BCA", color: "bg-[#005caa]" },
+                                { id: "Mandiri Virtual Account", name: "Mandiri VA", tag: "Mandiri", color: "bg-[#003865]" },
+                                { id: "BRI Virtual Account", name: "BRI Virtual Account", tag: "BRI", color: "bg-[#00529c]" },
+                                { id: "DANA", name: "DANA E-Wallet", tag: "DANA", color: "bg-[#008ce5]" },
+                                { id: "GoPay", name: "GoPay E-Wallet", tag: "GoPay", color: "bg-[#00a5cf]" },
+                                { id: "OVO", name: "OVO E-Wallet", tag: "OVO", color: "bg-[#4c2a86]" },
+                              ].map((pm) => {
+                                const isSelected = selectedPaymentMethod === pm.id;
+                                return (
+                                  <div
+                                    key={pm.id}
+                                    onClick={() => setSelectedPaymentMethod(pm.id)}
+                                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                                      isSelected
+                                        ? "border-[#007570] bg-teal-50/50 shadow-xs ring-1 ring-[#007570]"
+                                        : "border-slate-200 bg-white hover:border-slate-300"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-black text-white ${pm.color}`}>
+                                        {pm.tag}
+                                      </span>
+                                      <span className="text-xs font-bold text-slate-900 truncate">{pm.name}</span>
+                                    </div>
+                                    {isSelected && <CheckCircle2 size={16} className="text-[#007570] shrink-0" />}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Account instruction */}
+                            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                              <div>
+                                <span className="text-slate-500">Nomor Rekening / Virtual Account ({selectedPaymentMethod}):</span>
+                                <div className="text-base font-black text-slate-900 tracking-wider">
+                                  {getPaymentNumber(selectedPaymentMethod)}
+                                </div>
+                                <span className="text-[11px] text-slate-400">a.n PT Info Media Indonesia</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(getPaymentNumber(selectedPaymentMethod));
+                                  setCopyToast(true);
+                                  setTimeout(() => setCopyToast(false), 2000);
+                                }}
+                                className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs"
+                              >
+                                <Copy size={13} />
+                                {copyToast ? "Tersalin!" : "Salin No"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Upload Bukti Transfer (Opsional saat submit awal) */}
+                          <div className="space-y-2">
+                            <label className="block text-xs font-bold text-slate-700">
+                              Upload Bukti Pembayaran (Opsional jika sudah transfer sekarang)
+                            </label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  setAdPaymentProofFile(file);
+                                  setAdPaymentProofPreview(URL.createObjectURL(file));
+                                }
+                              }}
+                              className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-[#007570] hover:file:bg-teal-100 cursor-pointer"
+                            />
+                            {adPaymentProofPreview && (
+                              <div className="relative mt-2 w-24 h-24 rounded-xl overflow-hidden border border-slate-300">
+                                <img src={adPaymentProofPreview} alt="Preview Bukti" className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAdPaymentProofFile(null);
+                                    setAdPaymentProofPreview(null);
+                                  }}
+                                  className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-1 border-0 cursor-pointer"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Price Calculation Card */}
+                          <div className="p-4 rounded-2xl bg-teal-50/60 border border-teal-200 text-xs space-y-2">
+                            <div className="flex justify-between text-slate-600">
+                              <span>Harga Paket ({selPkg?.name || selectedPackage}):</span>
+                              <span className="font-semibold text-slate-900">
+                                Rp {getSelectedPackagePrice().toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                            {appliedCouponInfo && (
+                              <div className="flex justify-between text-emerald-700 font-bold">
+                                <span>Diskon Kupon ({appliedCouponInfo.code}):</span>
+                                <span>-Rp {Number(appliedCouponInfo.discount_amount).toLocaleString("id-ID")}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between items-center text-sm font-black text-[#007570] border-t border-teal-200/80 pt-2 mt-1">
+                              <span>Total Pembayaran:</span>
+                              <span className="text-lg text-[#007570]">
+                                Rp {getFinalPrice().toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Navigation Buttons */}
+                          <div className="flex justify-between pt-4 border-t border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => setCreateAdStep(2)}
+                              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border-0"
+                            >
+                              Kembali
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAdSubmit}
+                              disabled={submittingAd}
+                              className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-extrabold text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer border-0"
+                            >
+                              {submittingAd ? (
+                                <>
+                                  <Loader2 size={16} className="animate-spin" />
+                                  Memproses Pengajuan...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={16} />
+                                  Ajukan Iklan Sekarang
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================================================= */}
+              {/* MODAL 2: DETAIL IKLAN & LIVE PREVIEW (viewingAdDetail) */}
+              {/* ========================================================================= */}
+              {viewingAdDetail && (() => {
+                const ad = viewingAdDetail;
+                const isPremium = ad.placement_type === "premium" || /premium/i.test(ad.package_name || "");
+                const biz = ad.business || {};
+                const photo = biz.banner || biz.logo || (biz.media && biz.media.length > 0 ? biz.media[0].file_path : null) || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1000&auto=format&fit=crop&q=80";
+
+                return (
+                  <div
+                    className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto"
+                    onClick={() => setViewingAdDetail(null)}
+                  >
+                    <div
+                      className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl border border-slate-200 space-y-5 my-8 text-left relative max-h-[90vh] overflow-y-auto"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${isPremium ? "bg-amber-100 text-amber-900" : "bg-teal-100 text-teal-900"}`}>
+                              {isPremium ? "PREMIUM HERO ADS" : "STANDARD SCROLLER ADS"}
+                            </span>
+                            <h3 className="text-lg font-extrabold text-slate-900">
+                              Detail & Live Simulation Iklan #{ad.id}
+                            </h3>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">{biz.name}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setViewingAdDetail(null)}
+                          className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer border-0"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      {/* Live Visual Simulation Preview */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Tampilan Iklan di Website
+                        </label>
+                        <div className="rounded-2xl border border-slate-300 overflow-hidden bg-slate-950 p-4 sm:p-5 shadow-inner">
+                          {isPremium ? (
+                            <div className="relative w-full h-[200px] sm:h-[240px] rounded-xl overflow-hidden border border-white/10 shadow-xl group">
+                              <img src={photo} alt={biz.name} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
+                              <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-amber-500 text-white shadow-md">
+                                ⭐ SPONSORED
+                              </span>
+                              <div className="absolute bottom-4 left-4 right-4 text-white space-y-1">
+                                <h4 className="text-xl font-black text-white tracking-tight drop-shadow-md">{biz.name}</h4>
+                                <div className="flex items-center gap-3 text-xs text-slate-200">
+                                  <span className="text-amber-400 font-bold">★ 4.8 (Ulasan Konsumen)</span>
+                                  <span>•</span>
+                                  <span className="flex items-center gap-1">
+                                    <MapPin size={12} className="text-teal-400" />
+                                    {biz.city || "Indonesia"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center p-3">
+                              <div className="w-full max-w-[320px] bg-white rounded-2xl border border-slate-200 p-3.5 shadow-md flex items-center gap-3.5">
+                                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                                  <img src={photo} alt={biz.name} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
+                                      SPONSORED
+                                    </span>
+                                    <span className="text-[11px] font-bold text-amber-500">★ 4.8</span>
+                                  </div>
+                                  <h5 className="text-xs font-bold text-slate-900 truncate">{biz.name}</h5>
+                                  <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                                    <MapPin size={10} />
+                                    {biz.city || "Indonesia"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Detail Table / Metrics */}
+                      <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <div>
+                          <span className="text-slate-400 block font-medium">Status Iklan:</span>
+                          <span className="font-bold text-slate-900 uppercase">{ad.computed_status || ad.status}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-medium">Paket Iklan:</span>
+                          <span className="font-bold text-slate-900">{ad.package_name}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-medium">Biaya Iklan:</span>
+                          <span className="font-bold text-[#007570] text-sm">Rp {Number(ad.price || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-medium">Durasi Tayang:</span>
+                          <span className="font-bold text-slate-900">{ad.duration_days || 7} Hari</span>
+                        </div>
+                        {ad.start_date && (
+                          <div>
+                            <span className="text-slate-400 block font-medium">Tanggal Mulai:</span>
+                            <span className="font-bold text-slate-900">{new Date(ad.start_date).toLocaleDateString("id-ID")}</span>
+                          </div>
+                        )}
+                        {ad.end_date && (
+                          <div>
+                            <span className="text-slate-400 block font-medium">Tanggal Selesai:</span>
+                            <span className="font-bold text-slate-900">{new Date(ad.end_date).toLocaleDateString("id-ID")}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Payment Proof Viewer */}
+                      {ad.payment_proof && (
+                        <div className="space-y-2">
+                          <span className="text-xs font-bold text-slate-700 block">Bukti Pembayaran Terunggah:</span>
+                          <div className="w-36 h-36 rounded-xl overflow-hidden border border-slate-200 cursor-pointer" onClick={() => window.open(ad.payment_proof, "_blank")}>
+                            <img src={ad.payment_proof} alt="Bukti Transfer" className="w-full h-full object-cover" />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setViewingAdDetail(null)}
+                          className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border-0"
+                        >
+                          Tutup
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ========================================================================= */}
+              {/* MODAL 3: PEMBAYARAN & UPLOAD BUKTI (payModalAd) */}
+              {/* ========================================================================= */}
+              {payModalAd && (
+                <div
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4"
+                  onClick={() => { setPayModalAd(null); setAdPaymentProofFile(null); setAdPaymentProofPreview(null); }}
+                >
+                  <div
+                    className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-md shadow-2xl border border-slate-200 space-y-5 my-8 text-left relative"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+                      <h3 className="text-base font-bold text-slate-900">Pembayaran Iklan</h3>
+                      <button
+                        type="button"
+                        onClick={() => { setPayModalAd(null); setAdPaymentProofFile(null); setAdPaymentProofPreview(null); }}
+                        className="bg-transparent border-0 cursor-pointer text-slate-400 hover:text-slate-800"
+                      >
+                        <X size={20} />
+                      </button>
                     </div>
 
-                    <div className="flex flex-col gap-[6px]">
-                      <label className="text-[13px] font-semibold text-[#334155]">Upload Bukti Pembayaran</label>
-                      <input 
-                        type="file" 
+                    <div className="bg-slate-50 rounded-2xl p-4 flex flex-col gap-1.5 border border-slate-200 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Bisnis:</span>
+                        <span className="font-bold text-slate-900">{payModalAd.business?.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Paket:</span>
+                        <span className="font-bold text-slate-900">{payModalAd.package_name}</span>
+                      </div>
+                      <div className="flex justify-between font-extrabold text-sm text-[#007570] border-t border-slate-200 pt-2 mt-1">
+                        <span>Total Tagihan:</span>
+                        <span>Rp {Number(payModalAd.price || 0).toLocaleString("id-ID")}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-xs font-bold text-slate-700 block">Pilih Rekening / E-Wallet</label>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {["BCA Virtual Account", "Mandiri Virtual Account", "DANA", "GoPay"].map((pm) => (
+                          <div
+                            key={pm}
+                            onClick={() => setSelectedPaymentMethod(pm)}
+                            className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                              selectedPaymentMethod === pm ? "border-[#007570] bg-teal-50 text-[#007570] font-bold" : "border-slate-200 text-slate-700"
+                            }`}
+                          >
+                            <span>{pm}</span>
+                            {selectedPaymentMethod === pm && <CheckCircle size={14} />}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex justify-between items-center">
+                        <div>
+                          <span className="text-slate-400 text-[11px] block">No Rekening / VA:</span>
+                          <span className="font-black text-slate-900 text-sm">{getPaymentNumber(selectedPaymentMethod)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(getPaymentNumber(selectedPaymentMethod));
+                            setCopyToast(true);
+                            setTimeout(() => setCopyToast(false), 2000);
+                          }}
+                          className="px-2.5 py-1 rounded bg-white border border-slate-200 text-slate-700 font-bold text-[11px] cursor-pointer"
+                        >
+                          {copyToast ? "Tersalin!" : "Salin"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 block">Upload Bukti Transfer *</label>
+                      <input
+                        type="file"
                         accept="image/*"
                         onChange={(e) => {
                           const file = e.target.files[0];
@@ -5978,95 +6767,35 @@ export default function AdminUser() {
                             setAdPaymentProofPreview(URL.createObjectURL(file));
                           }
                         }}
-                        className="w-full text-[13px] text-[#475569] file:mr-[12px] file:py-[8px] file:px-[14px] file:rounded-[8px] file:border-0 file:text-[12.5px] file:font-semibold file:bg-[#f1f5f9] file:text-[#007570] hover:file:bg-[#e2e8f0] cursor-pointer"
+                        className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-[#007570] hover:file:bg-teal-100 cursor-pointer"
                       />
                       {adPaymentProofPreview && (
-                        <div className="relative mt-[6px] w-[120px] h-[120px] rounded-[8px] overflow-hidden border border-[#cbd5e1]">
+                        <div className="relative mt-2 w-24 h-24 rounded-xl overflow-hidden border border-slate-300">
                           <img src={adPaymentProofPreview} alt="Preview Bukti" className="w-full h-full object-cover" />
                         </div>
                       )}
                     </div>
 
-                    <div className="flex justify-end gap-[10px] pt-[10px] border-t border-[#e2e8f0]">
+                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                       <button
-                        className="px-[16px] py-[10px] rounded-[10px] bg-[#f1f5f9] text-[#475569] font-semibold text-[13px] border-0 cursor-pointer hover:bg-[#e2e8f0]"
+                        type="button"
                         onClick={() => { setPayModalAd(null); setAdPaymentProofFile(null); setAdPaymentProofPreview(null); }}
+                        className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs border-0 cursor-pointer"
                       >
                         Batal
                       </button>
                       <button
-                        className="px-[20px] py-[10px] rounded-[10px] bg-[#007570] text-white font-semibold text-[13px] border-0 cursor-pointer hover:bg-[#005a58] disabled:opacity-50"
+                        type="button"
                         onClick={handleAdPaymentSubmit}
                         disabled={submittingPayment}
+                        className="px-5 py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs border-0 cursor-pointer disabled:opacity-50"
                       >
-                        {submittingPayment ? 'Mengirim...' : 'Kirim Pembayaran'}
+                        {submittingPayment ? "Mengirim..." : "Kirim Bukti Pembayaran"}
                       </button>
                     </div>
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Edit Advertisement Modal */}
-          {editingAd && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto" onClick={handleCloseEditAdModal}>
-              <div className="bg-white rounded-2xl p-6 sm:p-7 w-full max-w-md shadow-2xl border border-slate-200 space-y-5 my-8 text-left" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Edit size={18} className="text-[#007570]" />
-                    Edit Iklan ({editingAd.business?.name})
-                  </h3>
-                  <button onClick={handleCloseEditAdModal} className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer">
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleUpdateAd} className="space-y-4">
-                  {editingAd.payment_status === 'unpaid' && (
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1.5">Ubah Paket Iklan</label>
-                      <select
-                        value={editAdForm.package_name}
-                        onChange={(e) => setEditAdForm(prev => ({ ...prev, package_name: e.target.value }))}
-                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570]"
-                      >
-                        <option value="basic">Basic - Rp 50.000 (7 hari)</option>
-                        <option value="standard">Standard - Rp 150.000 (30 hari)</option>
-                        <option value="premium">Premium - Rp 350.000 (90 hari)</option>
-                      </select>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1.5">Catatan untuk Admin</label>
-                    <textarea
-                      rows={3}
-                      value={editAdForm.notes}
-                      onChange={(e) => setEditAdForm(prev => ({ ...prev, notes: e.target.value }))}
-                      placeholder="Catatan atau permintaan khusus iklan..."
-                      className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] resize-y"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={handleCloseEditAdModal}
-                      className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold text-xs transition-colors cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={updatingAd}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-                    >
-                      {updatingAd ? 'Menyimpan...' : 'Simpan Perubahan'}
-                    </button>
-                  </div>
-                </form>
-              </div>
             </div>
           )}
 
@@ -6110,27 +6839,65 @@ export default function AdminUser() {
 
                 {selectedBusinessForProducts ? (
                   <>
-                    {/* Controls Bar: Search & Add Product Button */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="relative flex-1 w-full">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                          type="text"
-                          placeholder="Cari nama produk..."
-                          value={productSearch}
-                          onChange={(e) => setProductSearch(e.target.value)}
-                          className="w-full h-11 pl-11 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all shadow-2xs"
-                        />
-                      </div>
-                      <button
-                        className="w-full sm:w-auto h-11 inline-flex items-center justify-center gap-2 bg-[#007570] hover:bg-[#005f5b] active:bg-[#004e4a] text-white px-5 rounded-xl font-bold text-xs md:text-sm transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={() => navigate(`/add-product/${selectedBusinessForProducts}`)}
-                        disabled={!selectedBusinessForProducts}
-                      >
-                        <Plus size={18} strokeWidth={2.5} />
-                        <span>Tambah Produk</span>
-                      </button>
-                    </div>
+                    {(() => {
+                      const activeProdBiz = businesses.find(b => String(b.id) === String(selectedBusinessForProducts));
+                      const isActiveProdBizPrem = Boolean(activeProdBiz?.is_premium || activeProdBiz?.raw?.is_premium || activeProdBiz?.raw?.features?.is_premium);
+                      const isProdLimit3Reached = !isActiveProdBizPrem && products.length >= 3;
+
+                      return (
+                        <>
+                          {isProdLimit3Reached && (
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs">
+                              <div className="flex items-start gap-2.5">
+                                <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+                                <div>
+                                  <p className="font-bold">Batas Maksimal 3 Produk Tercapai (Paket Free)</p>
+                                  <p className="text-amber-700 text-[11.5px] mt-0.5">
+                                    Bisnis <strong>{activeProdBiz?.name}</strong> menggunakan paket Free ({products.length}/3 produk). Upgrade ke Premium untuk produk tanpa batas.
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab("premium")}
+                                className="px-3.5 py-1.5 bg-[#007570] hover:bg-[#005f5b] text-white text-xs font-bold rounded-lg transition-colors shrink-0 cursor-pointer"
+                              >
+                                Upgrade ke Premium
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Controls Bar: Search & Add Product Button */}
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="relative flex-1 w-full">
+                              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                              <input
+                                type="text"
+                                placeholder="Cari nama produk..."
+                                value={productSearch}
+                                onChange={(e) => setProductSearch(e.target.value)}
+                                className="w-full h-11 pl-11 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all shadow-2xs"
+                              />
+                            </div>
+                            <button
+                              className="w-full sm:w-auto h-11 inline-flex items-center justify-center gap-2 bg-[#007570] hover:bg-[#005f5b] active:bg-[#004e4a] text-white px-5 rounded-xl font-bold text-xs md:text-sm transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={() => {
+                                if (isProdLimit3Reached) {
+                                  alert("Bisnis Free dibatasi maksimal 3 produk. Silakan upgrade ke paket Premium untuk menambahkan produk tanpa batas.");
+                                  setActiveTab("premium");
+                                } else {
+                                  navigate(`/add-product/${selectedBusinessForProducts}`);
+                                }
+                              }}
+                              disabled={!selectedBusinessForProducts}
+                            >
+                              <Plus size={18} strokeWidth={2.5} />
+                              <span>Tambah Produk</span>
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
 
                     {/* Loading State */}
                     {loadingProducts ? (

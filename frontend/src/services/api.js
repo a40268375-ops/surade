@@ -18,4 +18,29 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            const token = localStorage.getItem("token");
+            if (token) {
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
+                localStorage.removeItem("displayName");
+                window.dispatchEvent(new Event("userAuthChanged"));
+                
+                // If on protected admin-user, admin-web, or profile routes, redirect to login
+                if (
+                    window.location.pathname.startsWith("/admin-") || 
+                    window.location.pathname.startsWith("/admin") ||
+                    window.location.pathname.startsWith("/profile")
+                ) {
+                    window.location.href = "/login";
+                }
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default api;

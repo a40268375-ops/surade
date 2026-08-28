@@ -343,6 +343,14 @@ export default function Login() {
           {/* ── Right: Login Card ── */}
           <div className="login-card">
             <form className="login-form" onSubmit={handleLogin} noValidate>
+              {/* Password reset success notification */}
+              {searchParams.get("reset") === "success" && !error && (
+                <div className="login-error" style={{ background: "#e6f9f0", borderColor: "#b2f0d1", color: "#007a54" }}>
+                  <CheckCircle size={18} className="login-error__icon" />
+                  Password berhasil diubah. Silakan login dengan password baru.
+                </div>
+              )}
+
               {/* Error */}
               {error && (
                 <div className="login-error">
@@ -397,7 +405,7 @@ export default function Login() {
 
               {/* Forgot Password */}
               <div className="login-forgot">
-                <a href="#">Lupa kata sandi?</a>
+                <Link to="/forgot-password">Lupa kata sandi?</Link>
               </div>
 
               {/* Divider */}
@@ -435,11 +443,9 @@ export default function Login() {
             <Link to="/contact">Hubungi Kami</Link>
             <Link to="/blog">Blog</Link>
             <Link to="/terms">Syarat &amp; Ketentuan</Link>
+            <Link to="/faq">FAQ</Link>
             <Link to="/vision-mission">Visi &amp; Misi</Link>
             <Link to="/partnership-career">Karir</Link>
-            <a href="#">Privasi</a>
-            <a href="#">Cookie</a>
-            <a href="#">Bantuan</a>
           </div>
           <p className="login-footer__copy">
             &copy; 2026 Info.co.id. All rights reserved.

@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import { InlineSpinner } from "../components/LoadingScreen";
 import api from "../services/api";
@@ -20,8 +20,6 @@ import {
   X,
   Building2,
   ArrowRight,
-  Scan,
-  Plus,
   Package,
   Loader2,
   AlertTriangle,
@@ -30,7 +28,13 @@ import {
   ChevronRight,
   Image as ImageIcon,
   Video as VideoIcon,
-  BadgeCheck,
+  Globe,
+  ExternalLink,
+  Compass,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 
@@ -39,8 +43,8 @@ function MapResizeHandler() {
   useEffect(() => {
     if (!map) return;
 
-    const t1 = setTimeout(() => { map.invalidateSize(); }, 100);
-    const t2 = setTimeout(() => { map.invalidateSize(); }, 400);
+    const t1 = setTimeout(() => { map.invalidateSize(); }, 150);
+    const t2 = setTimeout(() => { map.invalidateSize(); }, 450);
 
     const mapDiv = map.getContainer();
     const parent = mapDiv?.parentElement;
@@ -67,6 +71,7 @@ function MapResizeHandler() {
   }, [map]);
   return null;
 }
+
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -82,21 +87,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
-
-function maskPhone() {
-  return "** *** **** ";
-}
-
-// ── Day name mapping (Indonesia -> English) ──
-const DAY_MAP = {
-  Senin: "Monday",
-  Selasa: "Tuesday",
-  Rabu: "Wednesday",
-  Kamis: "Thursday",
-  Jumat: "Friday",
-  Sabtu: "Saturday",
-  Minggu: "Sunday",
-};
 
 function getTodayName() {
   const today = new Date().toLocaleDateString("id-ID", { weekday: "long" });
@@ -129,6 +119,15 @@ function isOpenNow(openingDays) {
   return currentMinutes >= openMin && currentMinutes <= closeMin;
 }
 
+function getYouTubeEmbedUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.trim().match(regExp);
+  return match && match[2].length === 11
+    ? `https://www.youtube.com/embed/${match[2]}`
+    : null;
+}
+
 export default function BusinessDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -136,16 +135,15 @@ export default function BusinessDetail() {
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
-  const [showHours, setShowHours] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [showPriceDropdown, setShowPriceDropdown] = useState(false);
-  const [priceCategory, setPriceCategory] = useState(2); // 1: cheap, 2: medium, 3: expensive
+  const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
+  const [priceCategory, setPriceCategory] = useState(2);
+  const [isAboutExpanded, setIsAboutExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productPage, setProductPage] = useState(1);
-  const productsPerPage = 3;
+  const productsPerPage = 6;
   const [hasActiveAd, setHasActiveAd] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
@@ -158,6 +156,7 @@ export default function BusinessDetail() {
   const [showAllReviewsModal, setShowAllReviewsModal] = useState(false);
   const [allReviewsPage, setAllReviewsPage] = useState(1);
   const reviewsPerPage = 5;
+  const [copiedToast, setCopiedToast] = useState(false);
 
   // Report Modal States
   const [showReportModal, setShowReportModal] = useState(false);
@@ -171,15 +170,17 @@ export default function BusinessDetail() {
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(null);
   const [activeGalleryTab, setActiveGalleryTab] = useState("photo");
+  const [startingChat, setStartingChat] = useState(false);
 
-  const getStorageUrl = (path) => {
+  const getStorageUrlLocal = (path) => {
     if (!path) return "";
     if (path.startsWith("http")) return path;
     const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/i, "");
     return `${baseUrl}/storage/${path}`;
   };
 
-  const imagesList = (() => {
+  // Build hero & gallery images list
+  const allImages = useMemo(() => {
     if (!business) return [];
     const allMedia = Array.isArray(business.media) ? business.media : [];
     const bannerMedia = allMedia.filter((m) => m.title === "Banner");
@@ -187,43 +188,42 @@ export default function BusinessDetail() {
 
     const list = [];
 
+    // 1. Banner
+    bannerMedia.forEach((m) => {
+      const url = getStorageUrlLocal(m.file_path);
+      if (url && !list.includes(url)) list.push(url);
+    });
+
+    // 2. Gallery Media
+    galleryMedia.forEach((m) => {
+      const url = getStorageUrlLocal(m.file_path);
+      if (url && !list.includes(url)) list.push(url);
+    });
+
+    // 3. Logo fallback
     if (business.logo) {
-      list.push(getStorageUrl(business.logo));
+      const url = getStorageUrlLocal(business.logo);
+      if (url && !list.includes(url)) list.push(url);
     }
 
-    bannerMedia.forEach((m) => {
-      const url = getStorageUrl(m.file_path);
-      if (!list.includes(url)) list.push(url);
-    });
-
-    galleryMedia.forEach((m) => {
-      const url = getStorageUrl(m.file_path);
-      if (!list.includes(url)) list.push(url);
-    });
+    if (list.length === 0) {
+      list.push("https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&auto=format&fit=crop&q=80");
+    }
 
     return list;
-  })();
+  }, [business]);
 
-function getYouTubeEmbedUrl(url) {
-  if (!url || typeof url !== "string") return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.trim().match(regExp);
-  return match && match[2].length === 11
-    ? `https://www.youtube.com/embed/${match[2]}`
-    : null;
-}
+  const isPremiumBusiness = Boolean(
+    business?.is_premium ||
+    business?.features?.is_premium ||
+    business?.premium_info?.status === "active"
+  );
 
-  const galleryImages = (() => {
-    if (!business) return [];
-    const allMedia = Array.isArray(business.media) ? business.media : [];
-    const galleryMedia = allMedia.filter((m) => m.title !== "Banner" && m.type === "image");
-    if (galleryMedia.length > 0) {
-      return galleryMedia.map((m) => getStorageUrl(m.file_path));
-    }
-    return imagesList;
-  })();
+  const galleryImages = useMemo(() => {
+    return allImages;
+  }, [allImages]);
 
-  const videoMedia = (() => {
+  const videoMedia = useMemo(() => {
     if (!business) return null;
     const allMedia = Array.isArray(business.media) ? business.media : (Array.isArray(business.gallery) ? business.gallery : []);
     const videoItem = allMedia.find((m) => m.type === "video");
@@ -231,20 +231,20 @@ function getYouTubeEmbedUrl(url) {
       const raw = videoItem.url || videoItem.file_path;
       if (!raw) return null;
       const isUrl = raw.startsWith("http://") || raw.startsWith("https://");
-      const fullUrl = isUrl ? raw : getStorageUrl(raw);
+      const fullUrl = isUrl ? raw : getStorageUrlLocal(raw);
       const embedUrl = getYouTubeEmbedUrl(fullUrl);
       return { url: fullUrl, embedUrl };
     }
     if (business.video) {
       const isUrl = business.video.startsWith("http://") || business.video.startsWith("https://");
-      const fullUrl = isUrl ? business.video : getStorageUrl(business.video);
+      const fullUrl = isUrl ? business.video : getStorageUrlLocal(business.video);
       const embedUrl = getYouTubeEmbedUrl(fullUrl);
       return { url: fullUrl, embedUrl };
     }
     return null;
-  })();
+  }, [business]);
 
-  // Product pagination derived state
+  // Product pagination
   const totalProductPages = Math.ceil(products.length / productsPerPage) || 1;
   const currentProductPage = Math.min(Math.max(1, productPage), totalProductPages);
   const currentProducts = products.slice(
@@ -277,7 +277,7 @@ function getYouTubeEmbedUrl(url) {
 
   const renderUserAvatar = (reviewUser) => {
     const avatarPath = reviewUser?.avatar || reviewUser?.photo;
-    const avatarUrl = avatarPath ? getStorageUrl(avatarPath) : null;
+    const avatarUrl = avatarPath ? getStorageUrlLocal(avatarPath) : null;
     const name = reviewUser?.name || "Pengguna";
     const initials = name
       .split(" ")
@@ -303,12 +303,12 @@ function getYouTubeEmbedUrl(url) {
     }
 
     const bgColors = [
-      "bg-[#dcfce7] text-[#166534] border-[#bbf7d0]",
-      "bg-[#e0f2fe] text-[#0369a1] border-[#bae6fd]",
-      "bg-[#f3e8ff] text-[#6b21a8] border-[#e9d5ff]",
-      "bg-[#fef3c7] text-[#92400e] border-[#fde68a]",
-      "bg-[#ffe4e6] text-[#9f1239] border-[#fecdd3]",
-      "bg-[#ccfbf1] text-[#115e59] border-[#99f6e4]",
+      "bg-teal-100 text-[#007570] border-teal-200",
+      "bg-amber-100 text-amber-800 border-amber-200",
+      "bg-blue-100 text-blue-800 border-blue-200",
+      "bg-purple-100 text-purple-800 border-purple-200",
+      "bg-rose-100 text-rose-800 border-rose-200",
+      "bg-emerald-100 text-emerald-800 border-emerald-200",
     ];
     let charSum = 0;
     for (let i = 0; i < name.length; i++) charSum += name.charCodeAt(i);
@@ -321,11 +321,11 @@ function getYouTubeEmbedUrl(url) {
     );
   };
 
+  // Fetch Business Data
   useEffect(() => {
     window.scrollTo(0, 0);
     setShowPhone(false);
-    setShowHours(false);
-    setCurrentImageIndex(0);
+    setCurrentHeroSlide(0);
 
     const fetchBusiness = async () => {
       setIsLoading(true);
@@ -334,7 +334,6 @@ function getYouTubeEmbedUrl(url) {
         const data = res.data?.data || res.data;
         if (data && data.id) {
           setBusiness(data);
-          // Check if current user has favorited this business
           const userStr = localStorage.getItem("user");
           const user = userStr ? JSON.parse(userStr) : null;
           let localBizIds = [];
@@ -362,44 +361,16 @@ function getYouTubeEmbedUrl(url) {
     fetchBusiness();
   }, [id]);
 
+  // Automatic hero slideshow
   useEffect(() => {
-    if (!business) return;
-
-    // Bangun daftar gambar untuk hero slideshow:
-    // 1. Logo (thumbnail utama) SELALU menjadi slide pertama jika ada
-    // 2. Banner dari business_media menyusul setelah logo
-    // 3. Gallery dari business_media paling akhir
-    const allMedia = Array.isArray(business.media) ? business.media : [];
-    const bannerMedia = allMedia.filter((m) => m.title === "Banner");
-    const galleryMedia = allMedia.filter((m) => m.title !== "Banner" && m.type === "image");
-
-    const imagesList = [];
-
-    // Logo selalu pertama
-    if (business.logo) {
-      imagesList.push(getStorageUrl(business.logo));
-    }
-
-    // Banner setelah logo
-    bannerMedia.forEach((m) => {
-      const url = getStorageUrl(m.file_path);
-      if (!imagesList.includes(url)) imagesList.push(url);
-    });
-
-    // Gallery paling akhir
-    galleryMedia.forEach((m) => {
-      const url = getStorageUrl(m.file_path);
-      if (!imagesList.includes(url)) imagesList.push(url);
-    });
-
-    if (imagesList.length <= 1) return;
+    if (allImages.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % imagesList.length);
-    }, 3000);
+      setCurrentHeroSlide((prev) => (prev + 1) % allImages.length);
+    }, 4500);
     return () => clearInterval(interval);
-  }, [business]);
+  }, [allImages.length]);
 
-  // Fetch products for this business
+  // Fetch products
   useEffect(() => {
     const fetchProducts = async () => {
       if (!business || !business.id) return;
@@ -419,26 +390,25 @@ function getYouTubeEmbedUrl(url) {
     fetchProducts();
   }, [business?.id]);
 
-  // Check if business has active advertisement from loaded business data
+  // Check active advertisement status
   useEffect(() => {
     if (!business) return;
     const hasAd = Boolean(
       business.has_active_ad ||
       business.is_advertised ||
-      (Array.isArray(business.advertisements) && business.advertisements.some(ad => ad.status === 'approved' && ad.payment_status === 'paid'))
+      business.placement_type === 'premium' ||
+      (Array.isArray(business.advertisements) && business.advertisements.some(ad => (ad.status === 'approved' || ad.status === 'active') && ad.payment_status === 'paid'))
     );
     setHasActiveAd(hasAd);
   }, [business]);
 
-  // Fetch reviews (ratings) for this business
+  // Fetch reviews
   useEffect(() => {
     const fetchReviews = async () => {
       if (!business || !business.id) return;
       setLoadingReviews(true);
       try {
-        // Route backend: GET /businesses/{business}/ratings
         const res = await api.get(`/businesses/${business.id}/ratings`);
-        // RatingController.index() returns paginate — data ada di res.data.data
         const raw = res.data?.data || res.data || [];
         const list = Array.isArray(raw) ? raw : (raw?.data || []);
         setReviews(list);
@@ -477,24 +447,24 @@ function getYouTubeEmbedUrl(url) {
   const handleShare = async () => {
     const url = window.location.href;
     if (navigator.share) {
-      await navigator.share({ title: business.name, url });
+      try {
+        await navigator.share({ title: business?.name || "Info.co.id", url });
+      } catch (e) {}
     } else {
       await navigator.clipboard.writeText(url);
-      alert("Link berhasil disalin!");
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 2500);
     }
   };
 
   const handleToggleSave = async () => {
     if (!requireAuth()) return;
-    
     if (isSaving || !business) return;
     setIsSaving(true);
     
     const isCurrentlySaved = saved;
-    // 1. Optimistic UI update (0ms instant response)
     setSaved(!isCurrentlySaved);
 
-    // 2. Sync local cache
     let localBiz = JSON.parse(localStorage.getItem("saved_business_ids") || "[]");
     if (isCurrentlySaved) {
       localBiz = localBiz.filter(id => String(id) !== String(business.id));
@@ -507,23 +477,20 @@ function getYouTubeEmbedUrl(url) {
     try {
       if (isCurrentlySaved) {
         await api.delete(`/favorites/${business.id}`);
-        alert("Bookmark bisnis berhasil dihapus.");
+        toast.success("Bisnis dihapus dari simpanan.");
       } else {
         await api.post(`/favorites/${business.id}`);
-        alert("Bisnis berhasil disimpan ke bookmark!");
+        toast.success("Bisnis berhasil disimpan!");
       }
       window.dispatchEvent(new Event("bookmarkChanged"));
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
-      // Revert on error
       setSaved(isCurrentlySaved);
-      alert("Terjadi kesalahan saat menyimpan bookmark.");
+      toast.error("Terjadi kesalahan saat menyimpan bisnis.");
     } finally {
       setIsSaving(false);
     }
   };
-
-  const [startingChat, setStartingChat] = useState(false);
 
   const handleChatWithSeller = async () => {
     if (!isUserLoggedIn()) {
@@ -542,7 +509,7 @@ function getYouTubeEmbedUrl(url) {
 
     const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
     if (business && business.user_id && currentUser.id === business.user_id) {
-      alert("Anda adalah pemilik bisnis ini.");
+      toast("Anda adalah pemilik bisnis ini.", { icon: "ℹ️" });
       return;
     }
 
@@ -553,24 +520,27 @@ function getYouTubeEmbedUrl(url) {
         const convId = res.data.conversation_id || res.data.id;
         navigate(`/dashboard?tab=inbox&conversation=${convId}`);
       } else {
-        alert(res.data?.message || "Gagal membuka percakapan.");
+        toast.error(res.data?.message || "Gagal membuka percakapan.");
       }
     } catch (err) {
       console.error("Failed to start conversation:", err);
-      alert(err.response?.data?.message || "Terjadi kesalahan saat membuat percakapan.");
+      toast.error(err.response?.data?.message || "Terjadi kesalahan saat membuat percakapan.");
     } finally {
       setStartingChat(false);
     }
   };
 
   const handleWhatsApp = () => {
-    if (!requireAuth()) return;
+    if (!business?.phone) {
+      toast.error("Nomor WhatsApp belum tersedia untuk bisnis ini.");
+      return;
+    }
     const phone = business.phone.replace(/\D/g, "");
     window.open(`https://wa.me/${phone}`, "_blank");
   };
 
   const handleDirections = () => {
-    const query = encodeURIComponent(business.address);
+    const query = encodeURIComponent(business.address || `${business.name}, ${cityName}`);
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
   };
 
@@ -579,11 +549,11 @@ function getYouTubeEmbedUrl(url) {
     if (!requireAuth()) return;
 
     if (!reportReason) {
-      alert("Silakan pilih alasan laporan.");
+      toast.error("Silakan pilih alasan laporan.");
       return;
     }
     if (!reportDescription.trim()) {
-      alert("Silakan isi keterangan detail laporan.");
+      toast.error("Silakan isi keterangan detail laporan.");
       return;
     }
 
@@ -601,13 +571,13 @@ function getYouTubeEmbedUrl(url) {
         reporter_email: user?.email || reporterEmail.trim() || null,
       });
 
-      alert("Laporan Anda berhasil dikirim dan akan diproses oleh admin. Terima kasih!");
+      toast.success("Laporan Anda berhasil dikirim ke tim admin.");
       setShowReportModal(false);
       setReportReason("Informasi Palsu / Penipuan");
       setReportDescription("");
     } catch (err) {
       console.error("Gagal mengirim laporan:", err);
-      alert(err.response?.data?.message || "Gagal mengirim laporan. Silakan coba lagi nanti.");
+      toast.error(err.response?.data?.message || "Gagal mengirim laporan.");
     } finally {
       setSubmittingReport(false);
     }
@@ -640,7 +610,7 @@ function getYouTubeEmbedUrl(url) {
     if (!requireAuth()) return;
 
     if (!userRating || !reviewComment.trim()) {
-      alert("Silakan berikan rating dan tulis ulasan Anda.");
+      toast.error("Silakan berikan bintang dan tulis ulasan Anda.");
       return;
     }
 
@@ -650,20 +620,12 @@ function getYouTubeEmbedUrl(url) {
       const userStr = localStorage.getItem("user");
       const user = userStr ? JSON.parse(userStr) : null;
 
-      if (!user) {
-        alert("Silakan login terlebih dahulu untuk memberikan ulasan.");
+      if (!user || !token) {
+        toast.error("Silakan login terlebih dahulu untuk memberikan ulasan.");
         setSubmittingReview(false);
         return;
       }
 
-      if (!token) {
-        alert("Sesi Anda telah berakhir. Silakan login kembali.");
-        setSubmittingReview(false);
-        return;
-      }
-
-      // Route backend: POST /businesses/{business}/ratings
-      // Field: rating (integer 1-5), review (string)
       const res = await api.post(`/businesses/${business.id}/ratings`, {
         rating: userRating,
         review: reviewComment.trim(),
@@ -671,22 +633,19 @@ function getYouTubeEmbedUrl(url) {
 
       const newReview = res.data?.data || res.data;
 
-      // Refresh ratings dari server agar list dan average akurat
       try {
         const ratingsRes = await api.get(`/businesses/${business.id}/ratings`);
         const raw = ratingsRes.data?.data || ratingsRes.data || [];
         const list = Array.isArray(raw) ? raw : (raw?.data || []);
         setReviews(list);
       } catch {
-        // Jika refresh gagal, tambahkan review baru ke list lokal
         setReviews(prev => [newReview, ...prev]);
       }
 
       setUserRating(0);
       setReviewComment("");
-      alert("Ulasan berhasil dikirim!");
+      toast.success("Ulasan Anda berhasil dipublikasikan!");
 
-      // Refresh business data untuk update average rating
       try {
         const bizRes = await api.get(`/businesses/${id}`);
         const bizData = bizRes.data?.data || bizRes.data;
@@ -698,67 +657,58 @@ function getYouTubeEmbedUrl(url) {
       }
     } catch (err) {
       console.error("Failed to submit review:", err);
-      
-      // Show more specific error message
-      let errorMessage = "Gagal mengirim ulasan. Silakan coba lagi.";
-      if (err.response) {
-        if (err.response.status === 401) {
-          errorMessage = "Sesi Anda telah berakhir. Silakan login kembali.";
-        } else if (err.response.status === 422) {
-          errorMessage = "Data ulasan tidak valid. Silakan periksa kembali.";
-        } else if (err.response.status === 403) {
-          errorMessage = "Anda tidak memiliki izin untuk memberikan ulasan.";
-        } else if (err.response.status === 404) {
-          errorMessage = "Bisnis tidak ditemukan.";
-        } else if (err.response.status === 500) {
-          errorMessage = "Terjadi kesalahan server. Silakan coba lagi nanti.";
-        }
-      } else if (err.request) {
-        errorMessage = "Tidak dapat terhubung ke server. Silakan periksa koneksi internet Anda.";
-      }
-      
-      alert(errorMessage);
+      toast.error(err.response?.data?.message || "Gagal mengirim ulasan.");
     } finally {
       setSubmittingReview(false);
     }
   };
 
-  // ── Tampilkan loading spinner saat data belum siap ──
+  const scrollToReviews = () => {
+    const el = document.getElementById("reviews-section");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  // Loading state
   if (isLoading) {
     return (
       <div className="business-detail-page">
         <Navbar />
-        <div className="bd-content" style={{ paddingTop: "100px" }}>
-          <InlineSpinner text="Memuat data usaha..." />
+        <div className="bd-container" style={{ paddingTop: "140px", paddingBottom: "140px" }}>
+          <InlineSpinner text="Memuat data profil usaha..." />
         </div>
       </div>
     );
   }
 
+  // Not found state
   if (!business) {
     return (
       <div className="business-detail-page">
         <Navbar />
-        <div className="business-detail__not-found">
-          <h2>Bisnis tidak ditemukan</h2>
-          <Link to="/" className="business-detail__back-link">Kembali ke Home</Link>
+        <div className="bd-container flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4 py-20">
+          <Building2 size={56} className="text-slate-300" />
+          <h2 className="text-2xl font-bold text-slate-800">Bisnis Tidak Ditemukan</h2>
+          <p className="text-sm text-slate-500 max-w-md">Profil bisnis yang Anda cari mungkin telah dipindahkan atau dinonaktifkan.</p>
+          <Link to="/" className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#007570] text-white font-bold text-sm shadow-sm hover:bg-[#005a58] transition-all">
+            Kembali ke Beranda
+          </Link>
         </div>
       </div>
     );
   }
 
-
-  // Extract main category and subcategory safely
+  // Extract categories & location
   const rawCat = business.category;
   const isCatObj = rawCat && typeof rawCat === "object";
   const mainCategory = isCatObj ? (rawCat.parent || rawCat) : rawCat;
   const subCategory = isCatObj && rawCat.parent ? rawCat : null;
   const categoryName = typeof mainCategory === "object" ? (mainCategory?.name || "Umum") : (typeof rawCat === "string" ? rawCat : "Umum");
   const subCategoryName = subCategory?.name || null;
-  const cityName = typeof business.city === "object" ? (business.city?.name || "Lokasi") : (business.city || "Lokasi");
+  const cityName = typeof business.city === "object" ? (business.city?.name || "Lokasi") : (business.city || "Indonesia");
 
-  // Hitung rating average dan jumlah dari reviews yang di-load
-  // Fallback ke field business jika reviews belum di-load
+  // Computed Rating
   const computedAvg = reviews.length > 0
     ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
     : null;
@@ -769,254 +719,446 @@ function getYouTubeEmbedUrl(url) {
     ? reviews.length
     : (business.reviews ?? business.total_rating ?? 0);
 
-  // ── Dynamic open/closed status from opening_days ──
+  // Rating Distribution breakdown (1-5 stars)
+  const ratingDistribution = [5, 4, 3, 2, 1].map((starVal) => {
+    const count = reviews.filter((r) => Math.round(r.rating || 0) === starVal).length;
+    const percentage = reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
+    return { starVal, count, percentage };
+  });
+
+  // Dynamic open/closed status
   const openDays = business.opening_days;
   const todayName = getTodayName();
+  const todaySchedule = Array.isArray(openDays) ? openDays.find((d) => d.day === todayName) : null;
   const isOpen = isOpenNow(openDays);
-  const displayStatus = isOpen === true ? "Buka Sekarang" : isOpen === false ? "Tutup" : "Buka Sekarang";
+  const displayStatus = isOpen === true ? "Buka Sekarang" : isOpen === false ? "Tutup" : "Buka";
 
-  // Seller/owner diambil dari business.user (sesuai API response yang sudah eager load 'user')
+  // Seller info
   const seller = business.user
     ? {
         id: business.user.id,
         name: business.user.name,
-        avatar: business.user.avatar
-          ? getStorageUrl(business.user.avatar)
-          : DEFAULT_AVATAR,
-        banner: business.user.banner
-          ? getStorageUrl(business.user.banner)
-          : null,
+        avatar: business.user.avatar ? getStorageUrlLocal(business.user.avatar) : DEFAULT_AVATAR,
+        banner: business.user.banner ? getStorageUrlLocal(business.user.banner) : null,
       }
     : {
         id: null,
-        name: "Pemilik tidak tersedia",
+        name: "Pengelola Bisnis",
         avatar: DEFAULT_AVATAR,
         banner: null,
       };
 
-  // Check if business belongs to premium user or is premium
-  const isPremiumUser = Boolean(
+  const isVerifiedBusiness = Boolean(
+    business.is_verified ||
     business.is_premium ||
     business.premium_info?.status === "active" ||
-    business.user?.role === "premium" ||
-    business.user?.is_premium
+    business.user?.role === "premium"
   );
 
+  const logoUrl = business.logo ? getStorageUrlLocal(business.logo) : null;
+
   return (
-    <div className="business-detail-page">
+    <div className="business-detail-page bg-[#f8fafc] min-h-screen text-slate-800 antialiased">
       <Navbar />
 
-      {/* HERO */}
-      <section className="bd-hero">
-        <div className="bd-hero__bg">
+      {/* ========================================================================= */}
+      {/* 1. HERO BUSINESS HEADER (FULL WIDTH SHOWCASE + STRUCTURED OVERLAY) */}
+      {/* ========================================================================= */}
+      <section className="relative w-full bg-slate-950 overflow-hidden">
+        {/* Visual Showcase (Photo Carousel) */}
+        <div className="relative w-full h-[320px] sm:h-[380px] md:h-[430px] lg:h-[460px]">
+          {/* Multi-slide container */}
           <div
-            className="bd-hero__slides-container"
-            style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
+            className="flex h-full w-full transition-transform duration-700 ease-out"
+            style={{ transform: `translateX(-${currentHeroSlide * 100}%)` }}
           >
-            {imagesList.map((src, i) => (
-              <img key={i} src={src} alt="" className="bd-hero__slide-img" />
+            {allImages.map((src, idx) => (
+              <div key={idx} className="relative w-full h-full shrink-0 overflow-hidden select-none">
+                <img
+                  src={src}
+                  alt={`${business.name} Foto ${idx + 1}`}
+                  className="w-full h-full object-cover object-center"
+                />
+              </div>
             ))}
           </div>
-        </div>
-        <div className="bd-hero__overlay" />
-        <div className="bd-hero__content">
-          <div className="bd-hero__inner">
-            <div className="bd-hero__breadcrumb">
-              <Link to="/">Home</Link>
-              <span>/</span>
-              <span>{categoryName}</span>
-              {subCategoryName && (
-                <>
-                  <span>/</span>
-                  <span>{subCategoryName}</span>
-                </>
-              )}
-              <span>/</span>
-              <span>{business.name}</span>
-            </div>
-            <h1 className="bd-hero__title">
-              {business.name}
-              {hasActiveAd && (
-                <span className="bd-hero__ad-badge">⭐ Iklan Premium</span>
-              )}
-            </h1>
-            <div className="bd-hero__category">
-              <span className="bd-hero__category-main">{categoryName}</span>
-              {subCategoryName && (
-                <>
-                  <span className="bd-hero__category-separator">›</span>
-                  <span className="bd-hero__category-sub">{subCategoryName}</span>
-                </>
-              )}
-              {isPremiumUser && (
-                <div className="bd-hero__verified-badge" title="Bisnis Terpercaya - Pengguna Premium">
-                  <BadgeCheck size={16} className="bd-verified-icon" />
-                  <span>Bisnis Terpercaya</span>
-                </div>
-              )}
-            </div>
-            <div className="bd-hero__meta">
-              <div className="bd-hero__rating">
-                <Star size={18} fill="#fbbf24" stroke="#fbbf24" />
-                <span>{displayRating}</span>
-                <span>({displayReviews} ulasan)</span>
+
+          {/* Dark Gradient Overlay for clean readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/65 to-black/35 pointer-events-none" />
+
+          {/* Slideshow Arrow Navigation */}
+          {allImages.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setCurrentHeroSlide((prev) => (prev > 0 ? prev - 1 : allImages.length - 1))}
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/75 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-xs border border-white/15 z-20 hover:scale-105"
+                title="Foto Sebelumnya"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentHeroSlide((prev) => (prev < allImages.length - 1 ? prev + 1 : 0))}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/75 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-xs border border-white/15 z-20 hover:scale-105"
+                title="Foto Selanjutnya"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </>
+          )}
+
+          {/* Floating Pill: "Lihat Semua X Foto" */}
+          <div className="absolute bottom-5 right-5 sm:bottom-6 sm:right-8 z-20">
+            <button
+              type="button"
+              onClick={() => setShowGalleryModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white text-xs sm:text-sm font-bold shadow-lg backdrop-blur-md border border-white/20 transition-all cursor-pointer hover:scale-105"
+            >
+              <ImageIcon size={15} className="text-teal-400" />
+              <span>Lihat semua {allImages.length} foto</span>
+            </button>
+          </div>
+
+          {/* Hero Content Overlay (Aligned with Container) */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 p-5 sm:p-7 md:p-8">
+            <div className="bd-container">
+              {/* Breadcrumb */}
+              <div className="flex items-center gap-1.5 text-xs text-slate-300 mb-2.5 flex-wrap">
+                <Link to="/" className="hover:text-white transition-colors">Home</Link>
+                <span className="text-slate-500">/</span>
+                <span className="hover:text-white transition-colors">{categoryName}</span>
+                {subCategoryName && (
+                  <>
+                    <span className="text-slate-500">/</span>
+                    <span className="text-slate-200">{subCategoryName}</span>
+                  </>
+                )}
+                <span className="text-slate-500">/</span>
+                <span className="text-teal-300 font-semibold truncate max-w-[240px]">{business.name}</span>
               </div>
-              <div className="bd-hero__status">
-                <span className={`bd-hero__status-dot ${isOpen === true ? "open" : "closed"}`} />
-                <span>{displayStatus}</span>
+
+              {/* Business Identity Row */}
+              <div className="flex items-start gap-4 sm:gap-5">
+                {/* Rounded Avatar/Logo */}
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-white/10 border-2 border-white/80 shadow-2xl shrink-0 backdrop-blur-xs flex items-center justify-center p-0.5">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={business.name}
+                      className="w-full h-full object-cover rounded-xl"
+                    />
+                  ) : (
+                    <Building2 size={28} className="text-teal-300" />
+                  )}
+                </div>
+
+                {/* Title & Metadata */}
+                <div className="space-y-1.5 min-w-0 flex-1">
+                  {/* Title and Badges */}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-md">
+                      {business.name}
+                    </h1>
+
+                    {/* Verified Badge */}
+                    {isVerifiedBusiness && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/25 border border-emerald-400 text-emerald-300 shadow-xs backdrop-blur-xs">
+                        <CheckCircle2 size={13} className="text-emerald-400" />
+                        Terverifikasi
+                      </span>
+                    )}
+
+                    {/* Premium Ads Badge */}
+                    {hasActiveAd && (
+                      <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md">
+                        <Sparkles size={12} />
+                        Iklan Premium
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Rating & Review Counter */}
+                  <div className="flex items-center gap-3 flex-wrap text-white text-xs sm:text-sm">
+                    {/* Star Rating Box */}
+                    <div
+                      onClick={scrollToReviews}
+                      className="flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity bg-black/30 px-3 py-1 rounded-lg backdrop-blur-xs border border-white/10"
+                      title="Lihat ulasan pelanggan"
+                    >
+                      <div className="flex items-center gap-0.5 text-amber-400">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            size={14}
+                            fill={star <= Math.round(displayRating) ? "#fbbf24" : "none"}
+                            color={star <= Math.round(displayRating) ? "#fbbf24" : "#94a3b8"}
+                          />
+                        ))}
+                      </div>
+                      <span className="font-black text-sm text-amber-400 ml-1">{displayRating}</span>
+                      <span className="text-slate-300 font-medium">({displayReviews} ulasan)</span>
+                    </div>
+
+                    <span className="text-slate-400 hidden sm:inline">•</span>
+
+                    {/* Categories */}
+                    <div className="flex items-center gap-2 text-slate-200 text-xs sm:text-sm">
+                      <span className="font-semibold text-teal-300">{categoryName}</span>
+                      {subCategoryName && (
+                        <>
+                          <span>•</span>
+                          <span className="text-slate-300">{subCategoryName}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Open Status & City Location */}
+                  <div className="flex items-center gap-3 flex-wrap text-xs sm:text-sm text-slate-200 pt-0.5">
+                    {/* Live Open / Closed Indicator */}
+                    <div className="flex items-center gap-2 bg-black/40 px-2.5 py-0.5 rounded-md border border-white/10">
+                      <span className={`w-2 h-2 rounded-full ${isOpen ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
+                      <span className={`font-extrabold text-xs ${isOpen ? "text-emerald-400" : "text-rose-400"}`}>
+                        {displayStatus}
+                      </span>
+                      {todaySchedule && (
+                        <span className="text-slate-300 font-medium text-xs hidden sm:inline">
+                          • {todaySchedule.open} - {todaySchedule.close}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Location Pin */}
+                    <div className="flex items-center gap-1.5 text-slate-300 text-xs">
+                      <MapPin size={13} className="text-teal-400 shrink-0" />
+                      <span className="truncate">{business.address ? `${business.address.substring(0, 42)}...` : cityName}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* MAIN CONTENT */}
-      <section className="bd-content">
-        <div className="bd-content__inner">
-          <div className="bd-content__main">
-            {/* Quick Action Icons */}
-            <div className="bd-quick-actions">
-              {/* Price Category Dropdown */}
-              <div className="bd-price-dropdown-wrapper">
-                <button
-                  type="button"
-                  className={`bd-quick-action ${showPriceDropdown ? "active" : ""}`}
-                  title="Kategori Harga"
-                  onClick={() => setShowPriceDropdown(!showPriceDropdown)}
-                >
-                  <DollarSign size={22} strokeWidth={1.8} />
-                  <span className="bd-price-count">{priceCategory}</span>
-                </button>
-                {showPriceDropdown && (
-                  <div className="bd-price-dropdown">
-                    <button
-                      type="button"
-                      className={`bd-price-option ${priceCategory === 1 ? "active" : ""}`}
-                      onClick={() => { setPriceCategory(1); setShowPriceDropdown(false); }}
-                    >
-                      <DollarSign size={16} />
-                      <span>Murah</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`bd-price-option ${priceCategory === 2 ? "active" : ""}`}
-                      onClick={() => { setPriceCategory(2); setShowPriceDropdown(false); }}
-                    >
-                      <div className="bd-price-dollars">
-                        <DollarSign size={16} />
-                        <DollarSign size={16} />
-                      </div>
-                      <span>Sedang</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`bd-price-option ${priceCategory === 3 ? "active" : ""}`}
-                      onClick={() => { setPriceCategory(3); setShowPriceDropdown(false); }}
-                    >
-                      <div className="bd-price-dollars">
-                        <DollarSign size={16} />
-                        <DollarSign size={16} />
-                        <DollarSign size={16} />
-                      </div>
-                      <span>Mahal</span>
-                    </button>
-                  </div>
+      {/* ========================================================================= */}
+      {/* 2. COMPACT ACTION BAR (STICKY, CLEAN, PROPORTIONAL) */}
+      {/* ========================================================================= */}
+      <section className="bg-white border-b border-slate-200 shadow-2xs sticky top-[68px] z-30">
+        <div className="bd-container py-3 flex items-center justify-between gap-3 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {/* Left Action Group */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Tulis Ulasan CTA */}
+            <button
+              type="button"
+              onClick={scrollToReviews}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99] border-0"
+            >
+              <Star size={15} className="fill-amber-300 text-amber-300" />
+              <span>Tulis Ulasan</span>
+            </button>
+
+            {/* Chat Penjual */}
+            <button
+              type="button"
+              onClick={handleChatWithSeller}
+              disabled={startingChat}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-[#007570] border border-teal-200 font-bold text-xs sm:text-sm transition-all cursor-pointer disabled:opacity-50"
+            >
+              {startingChat ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}
+              <span>Chat Penjual</span>
+            </button>
+
+            {/* WhatsApp */}
+            <button
+              type="button"
+              onClick={handleWhatsApp}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs sm:text-sm transition-all cursor-pointer"
+            >
+              <Phone size={15} />
+              <span>WhatsApp</span>
+            </button>
+
+            {/* Petunjuk Arah */}
+            <button
+              type="button"
+              onClick={handleDirections}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-all cursor-pointer"
+            >
+              <Compass size={15} />
+              <span className="hidden sm:inline">Petunjuk Arah</span>
+            </button>
+          </div>
+
+          {/* Right Action Group */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Bookmark / Simpan */}
+            <button
+              type="button"
+              onClick={handleToggleSave}
+              disabled={isSaving}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border ${
+                saved
+                  ? "bg-teal-50 text-[#007570] border-teal-300 ring-1 ring-[#007570]/20"
+                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200"
+              }`}
+              title={saved ? "Tersimpan" : "Simpan Bisnis"}
+            >
+              <Bookmark size={15} fill={saved ? "currentColor" : "none"} />
+              <span>{saved ? "Disimpan" : "Simpan"}</span>
+            </button>
+
+            {/* Share */}
+            <button
+              type="button"
+              onClick={handleShare}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs sm:text-sm font-bold transition-all cursor-pointer relative"
+              title="Bagikan Profil"
+            >
+              <Share2 size={15} />
+              <span className="hidden md:inline">Bagikan</span>
+              {copiedToast && (
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2.5 py-1 bg-slate-900 text-white text-[11px] font-bold rounded-md shadow-md whitespace-nowrap">
+                  Link tersalin!
+                </span>
+              )}
+            </button>
+
+            {/* Report */}
+            <button
+              type="button"
+              onClick={() => {
+                if (requireAuth()) {
+                  setShowReportModal(true);
+                }
+              }}
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all cursor-pointer"
+              title="Laporkan Bisnis"
+            >
+              <Flag size={15} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 3. MAIN DISCOVERY CONTENT (70% MAIN CONTENT + 30% INDEPENDENT SIDEBAR) */}
+      {/* ========================================================================= */}
+      <main className="bd-container py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-8 items-start">
+          
+          {/* ── LEFT COLUMN: MAIN BUSINESS CONTENT (70%) ── */}
+          <div className="space-y-7 min-w-0">
+
+            {/* CARD 1: ABOUT / TENTANG BISNIS (COMPACT, EXPANDABLE) */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Building2 size={18} className="text-[#007570]" />
+                  Tentang {business.name}
+                </h2>
+                {business.year_established && (
+                  <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                    Est. {business.year_established}
+                  </span>
                 )}
               </div>
 
-              <a href={`mailto:${business.email}`} className="bd-quick-action" title="Email">
-                <Mail size={22} strokeWidth={1.8} />
-              </a>
+              {/* Rich text / expandable description */}
+              <div className="relative">
+                {/<[a-z][\s\S]*>/i.test(business.description || "") ? (
+                  <div
+                    className={`prose max-w-none text-slate-600 text-sm leading-relaxed ${
+                      !isAboutExpanded ? "line-clamp-3 max-h-[85px] overflow-hidden" : ""
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: business.description }}
+                  />
+                ) : (
+                  <p className={`text-slate-600 text-sm leading-relaxed ${
+                    !isAboutExpanded ? "line-clamp-3" : ""
+                  }`}>
+                    {business.description || "Belum ada deskripsi detail untuk bisnis ini."}
+                  </p>
+                )}
 
-              {/* Phone - Left blank as requested */}
-              <button type="button" className="bd-quick-action bd-quick-action--disabled" title="Telepon" disabled>
-                <Phone size={22} strokeWidth={1.8} />
-              </button>
-
-              {/* WhatsApp - replacing Telegram */}
-              <button type="button" className="bd-quick-action" title="WhatsApp" onClick={handleWhatsApp}>
-                <MessageCircle size={22} strokeWidth={1.8} />
-              </button>
-
-              {/* Directions - Maps */}
-              <button type="button" className="bd-quick-action" title="Dapatkan Arah" onClick={handleDirections}>
-                <Send size={22} strokeWidth={1.8} />
-              </button>
-
-              <button
-                type="button"
-                className={`bd-quick-action ${saved ? "active" : ""} ${isSaving ? "disabled" : ""}`}
-                title={saved ? "Disimpan" : "Simpan"}
-                onClick={handleToggleSave}
-                disabled={isSaving}
-              >
-                <Bookmark size={22} strokeWidth={1.8} fill={saved ? "currentColor" : "none"} />
-              </button>
-              <button type="button" className="bd-quick-action" title="Bagikan" onClick={handleShare}>
-                <Share2 size={22} strokeWidth={1.8} />
-              </button>
-              <button
-                type="button"
-                className="bd-quick-action text-rose-500 hover:border-rose-500 hover:text-rose-600 hover:bg-rose-50"
-                title="Laporkan Usaha Ini"
-                onClick={() => requireAuth(() => setShowReportModal(true))}
-              >
-                <AlertTriangle size={22} strokeWidth={1.8} />
-              </button>
-            </div>
-
-            {showHours && (
-              <div className="bd-hours-banner">
-                <Clock size={18} />
-                <span>Jam Operasional: <strong>{business.hours}</strong></span>
+                {/* Expand / Collapse Button if text is longer */}
+                {business.description && business.description.length > 180 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAboutExpanded(!isAboutExpanded)}
+                    className="mt-2 text-xs font-bold text-[#007570] hover:text-[#005a58] flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>{isAboutExpanded ? "Tampilkan lebih sedikit" : "Baca selengkapnya..."}</span>
+                    {isAboutExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                )}
               </div>
-            )}
 
-            {/* About */}
-            <div className="bd-about-card">
-              <h2 className="bd-about-card__title">Tentang {business.name}</h2>
-              <p className="bd-about-card__text">{business.description || "Belum ada deskripsi."}</p>
+              {/* Highlights & Tags */}
+              {Array.isArray(business.tags) && business.tags.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-bold text-slate-500 mr-1">Tags:</span>
+                  {business.tags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200"
+                    >
+                      #{typeof tag === "object" ? (tag?.name || tag?.title || String(tag)) : String(tag)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Gallery */}
-            <div className="bd-gallery-section">
-              <h2 className="bd-gallery-section__title">Galeri Usaha</h2>
-              
-              {/* Gallery Tabs */}
-              <div className="bd-gallery-tabs-wrapper">
-                <div className="bd-gallery-tabs">
-                  <button
-                    type="button"
-                    className={`bd-gallery-tab ${activeGalleryTab === "photo" ? "active" : ""}`}
-                    onClick={() => setActiveGalleryTab("photo")}
-                  >
-                    <ImageIcon size={18} />
-                    <span>Foto ({galleryImages.length})</span>
-                  </button>
+            {/* CARD 2: GALLERY MOSAIC (YELP-STYLE GRID) */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <ImageIcon size={18} className="text-[#007570]" />
+                    Galeri Foto &amp; Media
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Dokumentasi suasana, tempat, dan layanan</p>
+                </div>
 
+                {/* Tabs for Photos / Video */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                   <button
                     type="button"
-                    className={`bd-gallery-tab ${activeGalleryTab === "video" ? "active" : ""}`}
-                    onClick={() => setActiveGalleryTab("video")}
+                    onClick={() => setActiveGalleryTab("photo")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeGalleryTab === "photo" ? "bg-white text-[#007570] shadow-xs" : "text-slate-600"
+                    }`}
                   >
-                    <VideoIcon size={18} />
-                    <span>Video ({videoMedia ? 1 : 0})</span>
+                    Foto ({galleryImages.length})
                   </button>
+                  {videoMedia && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveGalleryTab("video")}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                        activeGalleryTab === "video" ? "bg-white text-[#007570] shadow-xs" : "text-slate-600"
+                      }`}
+                    >
+                      <VideoIcon size={13} />
+                      Video
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Gallery Content */}
+              {/* Photo Mosaic Grid (1 Feature Photo + 3 Side Thumbnails) */}
               {activeGalleryTab === "photo" ? (
-                <div className="bd-photo-grid">
-                  {galleryImages.length > 0 ? (
-                    galleryImages.slice(0, 4).map((src, i) => {
+                galleryImages.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {galleryImages.slice(0, 4).map((src, i) => {
                       const isLastItem = i === 3 && galleryImages.length > 4;
-                      const remainingCount = galleryImages.length - 4;
+                      const remaining = galleryImages.length - 4;
 
                       return (
                         <div
                           key={i}
-                          className="bd-photo-item"
                           onClick={() => {
                             if (isLastItem) {
                               setShowGalleryModal(true);
@@ -1024,429 +1166,291 @@ function getYouTubeEmbedUrl(url) {
                               setPreviewImageIndex(i);
                             }
                           }}
+                          className={`group relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                            i === 0 ? "col-span-2 row-span-2 aspect-4/3 sm:aspect-auto min-h-[220px]" : "aspect-4/3"
+                          }`}
                         >
-                          <img src={src} alt={`${business.name} ${i + 1}`} loading="lazy" />
+                          <img
+                            src={src}
+                            alt={`${business.name} Foto ${i + 1}`}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
+
                           {isLastItem && (
-                            <div className="bd-photo-overlay">
-                              <span className="bd-photo-overlay-text">+{remainingCount}</span>
+                            <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center text-white p-2">
+                              <span className="text-lg sm:text-xl font-black">+{remaining}</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-teal-300">Foto Lainnya</span>
                             </div>
                           )}
                         </div>
                       );
-                    })
-                  ) : (
-                    <p className="bd-gallery-empty">Belum ada foto galeri.</p>
-                  )}
-                </div>
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 py-6 text-center">Belum ada foto galeri.</p>
+                )
               ) : (
-                <div className="bd-video-tab-content">
-                  {videoMedia ? (
-                    <div className="bd-video-container">
-                      <div className="bd-video-player-wrapper">
-                        {videoMedia.embedUrl ? (
-                          <iframe
-                            src={videoMedia.embedUrl}
-                            title="Video Profil Usaha"
-                            className="w-full h-full border-0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          />
-                        ) : (
-                          <video controls src={videoMedia.url} poster={business.img} className="bd-video-player">
-                            Your browser does not support the video tag.
-                          </video>
-                        )}
-                      </div>
-                    </div>
+                /* Video Player */
+                <div className="rounded-2xl overflow-hidden bg-black aspect-16/9 flex items-center justify-center">
+                  {videoMedia?.embedUrl ? (
+                    <iframe
+                      src={videoMedia.embedUrl}
+                      title="Video Profil Usaha"
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : videoMedia?.url ? (
+                    <video controls src={videoMedia.url} className="w-full h-full object-cover">
+                      Your browser does not support video.
+                    </video>
                   ) : (
-                    <div className="py-8 text-center text-slate-400 font-medium text-sm">
-                      Belum ada video profil usaha.
-                    </div>
+                    <p className="text-xs text-slate-400">Video tidak dapat dimuat.</p>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Products Section */}
-            <section className="bd-products-section">
-              <div className="bd-products-header">
-                <h3>Produk Kami</h3>
-                <p>Produk dan layanan dari {business.name}</p>
-              </div>
-              {loadingProducts ? (
-                <div className="bd-products-loading">
-                  <Loader2 size={32} className="spin" />
-                  <p>Memuat produk...</p>
-                </div>
-              ) : products.length > 0 ? (
-                <>
-                  <div className="bd-products-grid">
-                    {currentProducts.map((product) => (
-                      <div
-                        key={product.id}
-                        className="bd-product-card"
-                        onClick={() => handleProductClick(product)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <div className="bd-product-card__image">
-                          <img
-                            src={product.image ? getStorageUrl(product.image) : "https://via.placeholder.com/200"}
-                            alt={product.name}
-                            onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/200" }}
-                          />
-                        </div>
-                        <div className="bd-product-card__content">
-                          <h4 className="bd-product-card__name">{product.name}</h4>
-                          <p className="bd-product-card__price">
-                            {product.price != null
-                              ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(product.price))
-                              : "-"}
-                          </p>
-                          <p className="bd-product-card__description">{product.description}</p>
-                        </div>
-                      </div>
-                    ))}
+            {/* CARD 3: PRODUCTS & SERVICES (UNIFORM COMPACT GRID) */}
+            {products.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <Package size={18} className="text-[#007570]" />
+                      Katalog Produk &amp; Layanan ({products.length})
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Pilihan produk unggulan dari {business.name}</p>
                   </div>
+                </div>
 
-                  {/* Pagination Controls (tampil otomatis jika produk > 3) */}
-                  {products.length > productsPerPage && (
-                    <div className="bd-products-pagination">
-                      <button
-                        type="button"
-                        onClick={() => setProductPage((p) => Math.max(1, p - 1))}
-                        disabled={currentProductPage === 1}
-                        className="bd-pagination-btn"
-                      >
-                        Prev
-                      </button>
+                {loadingProducts ? (
+                  <div className="flex items-center justify-center py-10 gap-2 text-slate-400">
+                    <Loader2 size={24} className="animate-spin text-[#007570]" />
+                    <span className="text-xs font-semibold">Memuat produk...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {currentProducts.map((product) => (
+                        <div
+                          key={product.id}
+                          onClick={() => handleProductClick(product)}
+                          className="group p-3 rounded-xl border border-slate-200/80 bg-white hover:border-teal-300 hover:shadow-sm transition-all duration-200 flex flex-col justify-between cursor-pointer"
+                        >
+                          <div className="space-y-2.5">
+                            <div className="w-full aspect-4/3 rounded-lg overflow-hidden bg-slate-100 border border-slate-100">
+                              <img
+                                src={product.image ? getStorageUrlLocal(product.image) : "https://via.placeholder.com/200"}
+                                alt={product.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/200"; }}
+                              />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-[#007570] transition-colors">
+                                {product.name}
+                              </h4>
+                              <p className="text-xs font-black text-[#007570] mt-0.5">
+                                {product.price != null
+                                  ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(product.price))
+                                  : "-"}
+                              </p>
+                              {product.description && (
+                                <p className="text-[11px] text-slate-500 line-clamp-2 mt-1">{product.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
 
-                      <div className="bd-pagination-numbers">
-                        {Array.from({ length: totalProductPages }, (_, i) => i + 1).map((page) => (
+                    {/* Pagination */}
+                    {totalProductPages > 1 && (
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+                        <span className="text-slate-500">
+                          Halaman {currentProductPage} dari {totalProductPages}
+                        </span>
+                        <div className="flex items-center gap-1.5">
                           <button
-                            key={page}
                             type="button"
-                            onClick={() => setProductPage(page)}
-                            className={`bd-pagination-number ${page === currentProductPage ? "active" : ""}`}
+                            onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                            disabled={currentProductPage === 1}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold disabled:opacity-40 cursor-pointer"
                           >
-                            {page}
+                            Prev
                           </button>
-                        ))}
+                          <button
+                            type="button"
+                            onClick={() => setProductPage((p) => Math.min(totalProductPages, p + 1))}
+                            disabled={currentProductPage === totalProductPages}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold disabled:opacity-40 cursor-pointer"
+                          >
+                            Next
+                          </button>
+                        </div>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setProductPage((p) => Math.min(totalProductPages, p + 1))}
-                        disabled={currentProductPage === totalProductPages}
-                        className="bd-pagination-btn"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="bd-products-empty">
-                  <Package size={48} />
-                  <p>Belum ada produk di toko ini</p>
-                </div>
-              )}
-            </section>
-
-            {/* Tags */}
-            <div className="bd-tags">
-              <h3 className="bd-tags__title">Tags</h3>
-              <div className="bd-tags__list">
-                {Array.isArray(business.tags) && business.tags.map((tag, idx) => (
-                  <span key={idx} className="bd-tag">
-                    {typeof tag === "object" ? (tag?.name || tag?.title || String(tag)) : String(tag)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="bd-content__sidebar">
-            {/* Hours */}
-            <div className="bd-hours-card">
-              <h3 className="bd-hours-card__title">
-                <Clock size={18} />
-                <span>Jam Buka</span>
-              </h3>
-              {openDays && Array.isArray(openDays) && openDays.length > 0 ? (
-                <div className="bd-hours-table">
-                  {openDays.map((d) => {
-                    const isToday = d.day === todayName;
-                    return (
-                      <div key={d.day} className={`bd-hours-row ${isToday ? "today" : ""}`}>
-                        <span className="bd-hours-day">{d.day}</span>
-                        <span className="bd-hours-time">{d.open} - {d.close}</span>
-                        {isToday && (
-                          <span className={`bd-hours-badge ${isOpen ? "open" : "closed"}`}>
-                            {isOpen ? "Buka" : "Tutup"}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="bd-hours-card__content">
-                  <Clock size={20} className="bd-hours-card__icon" />
-                  <span className="bd-hours-card__time">{business.opening_hours || business.hours || "-"}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Location & Address Combined Card */}
-            <div className="bd-location-card">
-              <div className="bd-location-card__header">
-                <div>
-                  <h3 className="bd-location-card__title">Lokasi & Alamat</h3>
-                  <p className="bd-location-card__subtitle">Temukan lokasi dan informasi alamat</p>
-                </div>
-                <button type="button" className="bd-location-card__expand" onClick={handleDirections} title="Buka Peta Full">
-                  <Scan size={20} />
-                </button>
-              </div>
-
-              <div className="bd-location-card__map-wrapper">
-                {business.latitude && business.longitude ? (
-                  <div style={{ borderRadius: "14px", overflow: "hidden", height: "200px", position: "relative", zIndex: 0, isolation: "isolate" }}>
-                    <MapContainer
-                      center={[parseFloat(business.latitude), parseFloat(business.longitude)]}
-                      zoom={15}
-                      style={{ height: "200px", width: "100%", position: "relative", zIndex: 0 }}
-                      scrollWheelZoom={false}
-                      zoomControl={true}
-                    >
-                      <MapResizeHandler />
-                      <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      <Marker position={[parseFloat(business.latitude), parseFloat(business.longitude)]}>
-                        <Popup>
-                          <strong>{business.name}</strong><br />
-                          {business.address}
-                        </Popup>
-                      </Marker>
-                    </MapContainer>
-                  </div>
-                ) : (
-                  <button type="button" className="bd-location-card__map" onClick={handleDirections}>
-                    <div className="bd-location-card__map-placeholder">
-                      <MapPin size={32} />
-                      <p>Klik untuk buka di Google Maps</p>
-                    </div>
-                  </button>
-                )}
-              </div>
-
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bd-location-gmaps-btn"
-              >
-                <MapPin size={18} />
-                <span>Buka di Google Maps</span>
-                <ArrowRight size={16} />
-              </a>
-
-              <div className="bd-address-full-section">
-                <h4 className="bd-address-full-title">Alamat Lengkap</h4>
-                <div className="bd-address-full-box">
-                  <div className="bd-address-full-icon">
-                    <Building2 size={20} />
-                  </div>
-                  <p className="bd-address-full-text">{business.address}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bd-seller-card">
-              {/* Banner user */}
-              <div className="bd-seller-card__banner">
-                {seller.banner ? (
-                  <img src={getStorageUrl(seller.banner)} alt="Banner" className="bd-seller-card__banner-img" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                ) : (
-                  <div className="bd-seller-card__banner-placeholder" />
-                )}
-              </div>
-              {seller.id ? (
-                <Link to={`/profile/${seller.id}`} className="bd-seller-card__profile">
-                  <div className="bd-seller-card__avatar-wrapper">
-                    <img
-                      src={getStorageUrl(seller.avatar)}
-                      alt={seller.name}
-                      className="bd-seller-card__avatar"
-                      onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
-                    />
-                  </div>
-                  <span className="bd-seller-card__name">{seller.name}</span>
-                </Link>
-              ) : (
-                <div className="bd-seller-card__profile">
-                  <div className="bd-seller-card__avatar-wrapper">
-                    <img
-                      src={getStorageUrl(seller.avatar)}
-                      alt={seller.name}
-                      className="bd-seller-card__avatar"
-                      onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
-                    />
-                  </div>
-                  <span className="bd-seller-card__name">{seller.name}</span>
-                </div>
-              )}
-              <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: "12px" }}>
-              <button type="button" className="bd-seller-btn" onClick={handleWhatsApp}>
-                <MessageCircle size={18} />
-                <span>WhatsApp</span>
-              </button>
-              <button
-                type="button"
-                className="bd-seller-btn"
-                onClick={handleChatWithSeller}
-                disabled={startingChat}
-              >
-                {startingChat ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <MessageCircle size={18} />
-                )}
-                <span>{startingChat ? "Memproses..." : "Chat Dengan Penjual"}</span>
-              </button>
-              <button
-                type="button"
-                className="bd-seller-phone"
-                onClick={() => setShowPhone(!showPhone)}
-              >
-                <Phone size={16} />
-                <span>{showPhone ? business.phone : `*** *** **** Tampilkan nomor`}</span>
-              </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Full-Width Reviews Section (Spans entire 1240px container width) */}
-        <div className="max-w-[1240px] mx-auto mt-8 pt-2">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 items-stretch">
-            {/* KOLOM KIRI: Form Ulasan & Penilaian */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 md:p-7 space-y-6 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
-                  <h3 className="text-xl font-bold text-slate-900">Ulasan &amp; Penilaian</h3>
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/60 px-4 py-1.5 rounded-full">
-                    <Star size={18} fill="#fbbf24" stroke="#fbbf24" />
-                    <span className="text-base font-black text-slate-900">{displayRating}</span>
-                    <span className="text-xs font-semibold text-slate-500">({displayReviews} ulasan)</span>
-                  </div>
-                </div>
-
-                {/* Review Form Box */}
-                <div className="space-y-4 bg-slate-50/60 p-5 rounded-xl border border-slate-200/60 mt-5">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tulis Ulasan Anda</h4>
-                  
-                  {/* Star Rating Selector */}
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        className="p-1 hover:scale-110 transition-transform cursor-pointer focus:outline-none"
-                        onClick={() => handleStarClick(star)}
-                        onMouseEnter={() => handleStarHover(star)}
-                        onMouseLeave={handleStarLeave}
-                      >
-                        <Star
-                          size={28}
-                          fill={(hoverRating || userRating) >= star ? "#fbbf24" : "none"}
-                          color={(hoverRating || userRating) >= star ? "#fbbf24" : "#cbd5e1"}
-                        />
-                      </button>
-                    ))}
-                    {(hoverRating || userRating) > 0 && (
-                      <span className="text-xs font-semibold text-amber-600 ml-2">
-                        {hoverRating || userRating} dari 5 bintang
-                      </span>
                     )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* CARD 4: REVIEWS & RATINGS (YELP-STYLE UGC) */}
+            <div id="reviews-section" className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-6">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Star size={18} className="fill-amber-400 text-amber-400" />
+                    Ulasan &amp; Penilaian Pelanggan
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Penilaian transparan dari pengunjung terverifikasi</p>
+                </div>
+              </div>
+
+              {/* Yelp Rating Overview Breakdown Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 bg-slate-50/80 p-5 rounded-2xl border border-slate-200/70 items-center">
+                {/* Score badge */}
+                <div className="sm:col-span-5 flex flex-col items-center justify-center text-center p-2 sm:border-r sm:border-slate-200">
+                  <span className="text-4xl font-black text-slate-900 tracking-tight">{displayRating}</span>
+                  <div className="flex items-center gap-1 my-1 text-amber-400">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        size={16}
+                        fill={s <= Math.round(displayRating) ? "#fbbf24" : "none"}
+                        color={s <= Math.round(displayRating) ? "#fbbf24" : "#cbd5e1"}
+                      />
+                    ))}
                   </div>
+                  <span className="text-xs font-semibold text-slate-500">Berdasarkan {displayReviews} ulasan</span>
+                </div>
 
-                  {/* Textarea */}
-                  <textarea
-                    className="w-full p-4 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all resize-y min-h-[120px]"
-                    placeholder="Bagikan pengalaman Anda tentang bisnis ini..."
-                    value={reviewComment}
-                    onChange={(e) => setReviewComment(e.target.value)}
-                    rows={4}
-                  />
+                {/* Rating bars */}
+                <div className="sm:col-span-7 space-y-1.5">
+                  {ratingDistribution.map((dist) => (
+                    <div key={dist.starVal} className="flex items-center gap-2 text-xs">
+                      <span className="w-12 font-bold text-slate-700 shrink-0">{dist.starVal} Bintang</span>
+                      <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full"
+                          style={{ width: `${dist.percentage}%` }}
+                        />
+                      </div>
+                      <span className="w-6 text-right text-slate-400 font-semibold text-[11px] shrink-0">
+                        {dist.count}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-                  {/* Submit Button */}
+              {/* Submit Review Box */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-teal-50/40 border border-teal-200/80 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">Bagikan Pengalaman Anda</h4>
+                  <span className="text-[11px] text-slate-500">Ulasan publik</span>
+                </div>
+
+                {/* Interactive Star Rating Selector */}
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      className="p-1 hover:scale-115 transition-transform cursor-pointer focus:outline-none"
+                      onClick={() => handleStarClick(star)}
+                      onMouseEnter={() => handleStarHover(star)}
+                      onMouseLeave={handleStarLeave}
+                    >
+                      <Star
+                        size={24}
+                        fill={(hoverRating || userRating) >= star ? "#fbbf24" : "none"}
+                        color={(hoverRating || userRating) >= star ? "#fbbf24" : "#cbd5e1"}
+                      />
+                    </button>
+                  ))}
+                  {(hoverRating || userRating) > 0 && (
+                    <span className="text-xs font-bold text-amber-600 ml-2">
+                      {hoverRating || userRating} dari 5 Bintang
+                    </span>
+                  )}
+                </div>
+
+                {/* Textarea */}
+                <textarea
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all resize-y min-h-[90px]"
+                  placeholder="Ceritakan pengalaman Anda mengenai pelayanan, produk, atau suasana di tempat ini..."
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  rows={3}
+                />
+
+                <div className="flex justify-end">
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-[#007570] hover:bg-[#005f5b] active:bg-[#004e4a] text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007570] hover:bg-[#005a58] text-white rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer disabled:opacity-50"
                     onClick={handleSubmitReview}
                     disabled={submittingReview || !userRating || !reviewComment.trim()}
                   >
                     {submittingReview ? (
                       <>
-                        <Loader2 size={18} className="animate-spin" />
-                        <span>Mengirim...</span>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Mengirimkan...</span>
                       </>
                     ) : (
                       <>
-                        <Send size={16} />
+                        <Send size={14} />
                         <span>Kirim Ulasan</span>
                       </>
                     )}
                   </button>
                 </div>
               </div>
-            </div>
 
-            {/* KOLOM KANAN: Card Ulasan Terbaru (Max 5) */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 md:p-7 space-y-5 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-100">
-                  <h3 className="text-xl font-bold text-slate-900">
-                    Ulasan Terbaru <span className="text-xs font-semibold text-slate-500">({reviews.length})</span>
-                  </h3>
-                  {reviews.length > 0 && (
+              {/* Reviews List */}
+              <div className="space-y-4 pt-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Ulasan Pelanggan ({reviews.length})
+                  </h4>
+                  {reviews.length > 5 && (
                     <button
                       onClick={() => {
                         setShowAllReviewsModal(true);
                         setAllReviewsPage(1);
                       }}
-                      className="text-xs font-bold text-[#007570] hover:text-[#005f5b] flex items-center gap-1 cursor-pointer transition-colors"
+                      className="text-xs font-bold text-[#007570] hover:underline cursor-pointer"
                     >
-                      <span>Lihat Semua Ulasan</span>
-                      <ArrowRight size={14} />
+                      Lihat Semua ({reviews.length})
                     </button>
                   )}
                 </div>
 
-                {/* Reviews List */}
                 {loadingReviews ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400">
-                    <Loader2 size={32} className="animate-spin text-[#007570]" />
-                    <p className="text-xs font-semibold text-slate-500">Memuat ulasan...</p>
+                  <div className="flex items-center justify-center py-8 gap-2 text-slate-400">
+                    <Loader2 size={20} className="animate-spin text-[#007570]" />
+                    <span className="text-xs">Memuat ulasan...</span>
                   </div>
                 ) : reviews.length > 0 ? (
-                  <div className="divide-y divide-slate-100 mt-2">
+                  <div className="divide-y divide-slate-100">
                     {reviews.slice(0, 5).map((review) => (
-                      <div key={review.id} className="py-3.5 first:pt-2 last:pb-0 space-y-1.5">
+                      <div key={review.id} className="py-3.5 first:pt-0 space-y-1.5">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3">
                             {renderUserAvatar(review.user)}
                             <div>
-                              <h5 className="text-xs font-bold text-slate-900">{review.user?.name || review.name || "Pengguna"}</h5>
+                              <h5 className="text-xs font-bold text-slate-900">
+                                {review.user?.name || review.name || "Pelanggan Terdaftar"}
+                              </h5>
                               <div className="flex items-center gap-1 mt-0.5">
                                 {[1, 2, 3, 4, 5].map((star) => (
                                   <Star
                                     key={star}
-                                    size={13}
+                                    size={12}
                                     fill={star <= (review.rating || 5) ? "#fbbf24" : "none"}
                                     color={star <= (review.rating || 5) ? "#fbbf24" : "#d1d5db"}
                                   />
@@ -1465,105 +1469,384 @@ function getYouTubeEmbedUrl(url) {
                     ))}
                   </div>
                 ) : (
-                  /* Empty State */
-                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-2">
-                    <MessageCircle size={40} className="text-slate-300" />
-                    <p className="text-xs font-semibold text-slate-500">
-                      Belum ada ulasan untuk bisnis ini. Jadilah yang pertama memberikan ulasan!
-                    </p>
+                  <div className="p-6 text-center bg-slate-50 rounded-xl border border-slate-200/60 space-y-1">
+                    <Star size={28} className="mx-auto text-slate-300" />
+                    <p className="text-xs font-bold text-slate-700">Belum ada ulasan untuk bisnis ini</p>
+                    <p className="text-[11px] text-slate-500">Jadilah yang pertama memberikan review & rating pengalaman Anda!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* ── RIGHT COLUMN: INDEPENDENT SIDEBAR (30% - 360px) ── */}
+          <aside className="flex flex-col gap-6 w-full box-border lg:sticky lg:top-[132px]">
+
+            {/* SIDEBAR CARD 1: JAM BUKA / OPENING HOURS */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Clock size={16} className="text-[#007570]" />
+                  Jam Operasional
+                </h3>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  isOpen ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                }`}>
+                  {isOpen ? "Buka" : "Tutup"}
+                </span>
+              </div>
+
+              {/* Table of Hours */}
+              {openDays && Array.isArray(openDays) && openDays.length > 0 ? (
+                <div className="space-y-1 text-xs">
+                  {openDays.map((d) => {
+                    const isToday = d.day === todayName;
+                    return (
+                      <div
+                        key={d.day}
+                        className={`flex items-center justify-between p-2 rounded-xl transition-colors ${
+                          isToday
+                            ? "bg-teal-50/80 font-bold text-[#007570] border border-teal-200/70"
+                            : "text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {isToday && <span className="w-1.5 h-1.5 rounded-full bg-[#007570]" />}
+                          {d.day}
+                          {isToday && <span className="text-[9px] font-bold bg-[#007570] text-white px-1.5 py-0.2 rounded">HARI INI</span>}
+                        </span>
+                        <span className="font-semibold text-slate-800">
+                          {d.open} - {d.close}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-slate-50 text-xs text-slate-600 flex items-center gap-2">
+                  <Clock size={15} className="text-slate-400" />
+                  <span>{business.opening_hours || business.hours || "Senin - Minggu: 09:00 - 21:00"}</span>
+                </div>
+              )}
+            </div>
+
+            {/* SIDEBAR CARD 2: LOKASI, ALAMAT & MINI MAP */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <MapPin size={16} className="text-[#007570]" />
+                  Lokasi &amp; Peta
+                </h3>
+                <span className="text-xs font-semibold text-slate-500">{cityName}</span>
+              </div>
+
+              {/* Mini Map Container */}
+              <div className="rounded-xl overflow-hidden border border-slate-200 relative h-[160px] bg-slate-100">
+                {business.latitude && business.longitude ? (
+                  <MapContainer
+                    center={[parseFloat(business.latitude), parseFloat(business.longitude)]}
+                    zoom={15}
+                    style={{ height: "160px", width: "100%" }}
+                    scrollWheelZoom={false}
+                    zoomControl={false}
+                  >
+                    <MapResizeHandler />
+                    <TileLayer
+                      attribution='&copy; OpenStreetMap'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[parseFloat(business.latitude), parseFloat(business.longitude)]}>
+                      <Popup>{business.name}</Popup>
+                    </Marker>
+                  </MapContainer>
+                ) : (
+                  <div
+                    onClick={handleDirections}
+                    className="w-full h-full flex flex-col items-center justify-center p-3 text-center cursor-pointer hover:bg-slate-200 transition-colors"
+                  >
+                    <MapPin size={26} className="text-[#007570] mb-1 animate-bounce" />
+                    <span className="text-xs font-bold text-slate-800">Buka Peta Interaktif</span>
+                    <span className="text-[10px] text-slate-500">Klik untuk melihat rute di Google Maps</span>
                   </div>
                 )}
               </div>
 
-              {/* Bottom Button "Lihat Semua Ulasan" */}
-              {reviews.length > 0 && (
-                <div className="pt-4 border-t border-slate-100">
+              {/* Address Text */}
+              <div className="space-y-1 text-xs">
+                <span className="text-slate-400 font-semibold block">Alamat Lengkap:</span>
+                <p className="text-slate-800 font-medium leading-relaxed">
+                  {business.address || `${cityName}, Indonesia`}
+                </p>
+              </div>
+
+              {/* Get Directions Button */}
+              <button
+                type="button"
+                onClick={handleDirections}
+                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border-0"
+              >
+                <Compass size={14} className="text-[#007570]" />
+                <span>Petunjuk Arah (Google Maps)</span>
+                <ExternalLink size={12} className="text-slate-400" />
+              </button>
+            </div>
+
+            {/* SIDEBAR CARD 3: KONTAK & INFORMASI RESMI */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Phone size={16} className="text-[#007570]" />
+                Informasi Kontak
+              </h3>
+
+              <div className="space-y-2 text-xs">
+                {/* Telepon */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                  <div className="flex items-center gap-2 text-slate-700 min-w-0">
+                    <Phone size={14} className="text-[#007570] shrink-0" />
+                    <span className="font-bold truncate">
+                      {showPhone ? business.phone : `${(business.phone || "08123456789").slice(0, 4)} **** ****`}
+                    </span>
+                  </div>
                   <button
-                    onClick={() => {
-                      setShowAllReviewsModal(true);
-                      setAllReviewsPage(1);
-                    }}
-                    className="w-full py-2.5 rounded-full border border-[#007570] text-[#007570] hover:bg-[#007570]/5 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    type="button"
+                    onClick={() => setShowPhone(!showPhone)}
+                    className="text-[#007570] font-bold text-[11px] hover:underline cursor-pointer shrink-0 border-0 bg-transparent"
                   >
-                    <span>Lihat Semua Ulasan ({reviews.length})</span>
-                    <ArrowRight size={14} />
+                    {showPhone ? "Sembunyikan" : "Tampilkan"}
                   </button>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Product Popup */}
+                {/* WhatsApp */}
+                {business.phone && (
+                  <a
+                    href={`https://wa.me/${business.phone.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/70 text-emerald-800 hover:bg-emerald-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageCircle size={14} className="text-emerald-600 shrink-0" />
+                      <span className="font-bold">Hubungi via WhatsApp</span>
+                    </div>
+                    <ExternalLink size={12} className="text-emerald-600" />
+                  </a>
+                )}
+
+                {/* Email */}
+                {business.email && (
+                  <a
+                    href={`mailto:${business.email}`}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 text-slate-700 hover:bg-slate-100 transition-colors truncate"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Mail size={14} className="text-[#007570] shrink-0" />
+                      <span className="font-medium truncate">{business.email}</span>
+                    </div>
+                    <ExternalLink size={12} className="text-slate-400 shrink-0" />
+                  </a>
+                )}
+
+                {/* Website */}
+                {business.website && (
+                  <a
+                    href={business.website.startsWith("http") ? business.website : `https://${business.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 text-slate-700 hover:bg-slate-100 transition-colors truncate"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Globe size={14} className="text-[#007570] shrink-0" />
+                      <span className="font-medium truncate">{business.website}</span>
+                    </div>
+                    <ExternalLink size={12} className="text-slate-400 shrink-0" />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* SIDEBAR CARD 4: PROFIL PENGELOLA */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs">
+              <div className="h-14 bg-gradient-to-r from-slate-800 to-teal-900 relative">
+                {seller.banner && (
+                  <img src={seller.banner} alt="Banner" className="w-full h-full object-cover" />
+                )}
+              </div>
+              <div className="p-4 pt-0 relative space-y-3">
+                <div className="flex items-end justify-between -mt-7 mb-1">
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white shadow-md bg-white">
+                    <img src={seller.avatar} alt={seller.name} className="w-full h-full object-cover" />
+                  </div>
+                  {isVerifiedBusiness && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-teal-50 text-[#007570] border border-teal-200">
+                      Verified Owner
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 truncate">{seller.name}</h4>
+                  <p className="text-[11px] text-slate-500">Pengelola Profil Bisnis</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleChatWithSeller}
+                  disabled={startingChat}
+                  className="w-full py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 border-0"
+                >
+                  {startingChat ? <Loader2 size={13} className="animate-spin" /> : <MessageCircle size={13} />}
+                  <span>Kirim Pesan ke Penjual</span>
+                </button>
+              </div>
+            </div>
+
+          </aside>
+        </div>
+      </main>
+
+      {/* ========================================================================= */}
+      {/* 4. MODALS & POPUPS */}
+      {/* ========================================================================= */}
+
+      {/* MODAL 1: PRODUCT POPUP */}
       {showProductPopup && selectedProduct && (
-        <div
-          className="bd-product-popup-overlay"
-          onClick={closeProductPopup}
-        >
-          <div
-            className="bd-product-popup"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="bd-product-popup__close"
-              onClick={closeProductPopup}
-            >
-              <X size={24} strokeWidth={2} />
-            </button>
-            <div className="bd-product-popup__image">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4" onClick={closeProductPopup}>
+          <div className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-md shadow-2xl border border-slate-200 space-y-4 text-left relative" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 truncate">{selectedProduct.name}</h3>
+              <button type="button" onClick={closeProductPopup} className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer border-0 bg-transparent">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="aspect-4/3 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
               <img
-                src={selectedProduct.image ? getStorageUrl(selectedProduct.image) : "https://via.placeholder.com/400"}
+                src={selectedProduct.image ? getStorageUrlLocal(selectedProduct.image) : "https://via.placeholder.com/400"}
                 alt={selectedProduct.name}
-                onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/400" }}
+                className="w-full h-full object-cover"
               />
             </div>
-            <div className="bd-product-popup__content">
-              <h3 className="bd-product-popup__name">{selectedProduct.name}</h3>
-              <p className="bd-product-popup__price">
+            <div className="space-y-2">
+              <p className="text-xl font-black text-[#007570]">
                 {selectedProduct.price != null
                   ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(selectedProduct.price))
                   : "-"}
               </p>
               {selectedProduct.description && (
-                <p className="bd-product-popup__description">{selectedProduct.description}</p>
+                <p className="text-xs text-slate-600 leading-relaxed">{selectedProduct.description}</p>
               )}
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => { closeProductPopup(); handleWhatsApp(); }}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer border-0 shadow-sm"
+              >
+                <MessageCircle size={16} />
+                Pesan via WhatsApp
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Semua Ulasan */}
-      {showAllReviewsModal && (
-        <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setShowAllReviewsModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl p-6 sm:p-7 w-full max-w-2xl shadow-2xl border border-slate-200 space-y-5 my-8 animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
+      {/* MODAL 2: FULL GALLERY GRID MODAL */}
+      {showGalleryModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setShowGalleryModal(false)}>
+          <div className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-4xl shadow-2xl border border-slate-200 space-y-5 my-8 text-left max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Star className="text-amber-400 fill-amber-400" size={20} />
-                  Semua Ulasan &amp; Penilaian ({reviews.length})
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Daftar lengkap seluruh ulasan dari pelanggan untuk {business?.name || "bisnis ini"}
-                </p>
+                <h3 className="text-lg sm:text-xl font-black text-slate-900">Galeri Foto ({galleryImages.length})</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{business.name}</p>
               </div>
-              <button
-                onClick={() => setShowAllReviewsModal(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-              >
+              <button type="button" onClick={() => setShowGalleryModal(false)} className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer border-0 bg-transparent">
+                <X size={22} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 overflow-y-auto pr-1 flex-1">
+              {galleryImages.map((src, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => setPreviewImageIndex(idx)}
+                  className="group relative aspect-4/3 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 cursor-pointer shadow-2xs hover:shadow-md transition-all"
+                >
+                  <img src={src} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-slate-900 text-xs font-bold px-3 py-1 rounded-full shadow-xs">
+                      Perbesar
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <button type="button" onClick={() => setShowGalleryModal(false)} className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border-0">
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: LARGE LIGHTBOX VIEWER */}
+      {previewImageIndex !== null && galleryImages[previewImageIndex] && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[1100] flex flex-col items-center justify-center p-4" onClick={() => setPreviewImageIndex(null)}>
+          <div className="absolute top-4 right-4 left-4 flex items-center justify-between z-20" onClick={(e) => e.stopPropagation()}>
+            <span className="text-white/90 text-xs sm:text-sm font-bold bg-black/50 px-4 py-1.5 rounded-full border border-white/10 backdrop-blur-xs">
+              {previewImageIndex + 1} / {galleryImages.length}
+            </span>
+            <button type="button" onClick={() => setPreviewImageIndex(null)} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer border border-white/10">
+              <X size={22} />
+            </button>
+          </div>
+
+          {galleryImages.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setPreviewImageIndex((prev) => (prev > 0 ? prev - 1 : galleryImages.length - 1)); }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/30 text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 z-20"
+            >
+              <ChevronLeft size={26} />
+            </button>
+          )}
+
+          <div className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={galleryImages[previewImageIndex]}
+              alt={`Preview ${previewImageIndex + 1}`}
+              className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+            />
+          </div>
+
+          {galleryImages.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setPreviewImageIndex((prev) => (prev < galleryImages.length - 1 ? prev + 1 : 0)); }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/30 text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 z-20"
+            >
+              <ChevronRight size={26} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* MODAL 4: ALL REVIEWS MODAL */}
+      {showAllReviewsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setShowAllReviewsModal(false)}>
+          <div className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-2xl shadow-2xl border border-slate-200 space-y-5 my-8 text-left" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Star className="text-amber-400 fill-amber-400" size={20} />
+                  Semua Ulasan ({reviews.length})
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">{business.name}</p>
+              </div>
+              <button onClick={() => setShowAllReviewsModal(false)} className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer border-0 bg-transparent">
                 <X size={20} />
               </button>
             </div>
 
-            {/* Reviews List Sliced by Page */}
             <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1 divide-y divide-slate-100">
               {(() => {
                 const totalPages = Math.ceil(reviews.length / reviewsPerPage) || 1;
@@ -1590,7 +1873,7 @@ function getYouTubeEmbedUrl(url) {
                           </div>
                         </div>
                       </div>
-                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                      <span className="text-[11px] font-semibold text-slate-400">
                         {formatRelativeDate(review.created_at)}
                       </span>
                     </div>
@@ -1602,63 +1885,8 @@ function getYouTubeEmbedUrl(url) {
               })()}
             </div>
 
-            {/* Pagination Controls */}
-            {reviews.length > reviewsPerPage && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                <p className="text-xs font-semibold text-slate-500">
-                  Menampilkan <span className="font-bold text-slate-900">{((allReviewsPage - 1) * reviewsPerPage) + 1}</span>-
-                  <span className="font-bold text-slate-900">{Math.min(allReviewsPage * reviewsPerPage, reviews.length)}</span> dari{" "}
-                  <span className="font-bold text-[#007570]">{reviews.length}</span> ulasan
-                </p>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setAllReviewsPage((p) => Math.max(1, p - 1))}
-                    disabled={allReviewsPage === 1}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[#007570] hover:bg-slate-50 disabled:opacity-40 text-xs font-bold transition-all cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    Prev
-                  </button>
-
-                  {(() => {
-                    const totalPages = Math.ceil(reviews.length / reviewsPerPage) || 1;
-                    const pages = [];
-                    for (let i = 1; i <= totalPages; i++) {
-                      pages.push(i);
-                    }
-
-                    return pages.map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setAllReviewsPage(page)}
-                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          page === allReviewsPage
-                            ? "bg-[#007570] text-white"
-                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ));
-                  })()}
-
-                  <button
-                    onClick={() => setAllReviewsPage((p) => Math.min(Math.ceil(reviews.length / reviewsPerPage), p + 1))}
-                    disabled={allReviewsPage === Math.ceil(reviews.length / reviewsPerPage)}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[#007570] hover:bg-slate-50 disabled:opacity-40 text-xs font-bold transition-all cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Modal Footer */}
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setShowAllReviewsModal(false)}
-                className="px-5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold text-xs transition-colors cursor-pointer"
-              >
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <button onClick={() => setShowAllReviewsModal(false)} className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border-0">
                 Tutup
               </button>
             </div>
@@ -1666,269 +1894,65 @@ function getYouTubeEmbedUrl(url) {
         </div>
       )}
 
-      {/* Modal Report Usaha */}
+      {/* MODAL 5: REPORT BUSINESS MODAL */}
       {showReportModal && (
-        <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setShowReportModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl p-6 sm:p-7 w-full max-w-lg shadow-2xl border border-slate-200 space-y-5 my-8 animate-fade-in text-left"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setShowReportModal(false)}>
+          <div className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-lg shadow-2xl border border-slate-200 space-y-5 my-8 text-left" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
                   <AlertTriangle size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900">Laporkan Usaha Ini</h3>
-                  <p className="text-xs text-slate-500">Laporkan penyalahgunaan atau informasi tidak valid</p>
+                  <h3 className="text-base font-bold text-slate-900">Laporkan Profil Bisnis</h3>
+                  <p className="text-xs text-slate-500">Bantu kami menjaga akurasi informasi Info.co.id</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-              >
+              <button onClick={() => setShowReportModal(false)} className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer border-0 bg-transparent">
                 <X size={20} />
               </button>
             </div>
 
-            {/* Business Info Banner */}
-            <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
-              <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-200 shrink-0 flex items-center justify-center">
-                {business?.logo ? (
-                  <img src={getStorageUrl(business.logo)} alt={business.name} className="w-full h-full object-cover" />
-                ) : (
-                  <Building2 size={20} className="text-slate-400" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{business?.name}</h4>
-                <p className="text-[11px] text-slate-500 truncate">{categoryName} • {cityName}</p>
-              </div>
-            </div>
-
-            {/* Report Form */}
             <form onSubmit={handleReportSubmit} className="space-y-4">
-              {/* Alasan Laporan */}
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Pilih Alasan Laporan <span className="text-rose-500">*</span>
-                </label>
-                <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                  {[
-                    "Informasi Palsu / Penipuan",
-                    "Konten Tidak Layak / Mengandung SARA",
-                    "Hak Cipta / Logo Tanpa Izin",
-                    "Spam / Promosi Menyesatkan",
-                    "Bisnis Sudah Tutup / Tidak Beroperasi",
-                    "Lainnya",
-                  ].map((reason) => (
-                    <label
-                      key={reason}
-                      className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
-                        reportReason === reason
-                          ? "bg-rose-50/70 border-rose-300 text-rose-900 shadow-2xs"
-                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="reportReason"
-                        value={reason}
-                        checked={reportReason === reason}
-                        onChange={(e) => setReportReason(e.target.value)}
-                        className="w-4 h-4 text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer"
-                      />
-                      <span>{reason}</span>
-                    </label>
-                  ))}
-                </div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">Alasan Pelaporan</label>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:border-[#007570] outline-none"
+                >
+                  <option value="Informasi Palsu / Penipuan">Informasi Palsu / Penipuan</option>
+                  <option value="Konten Tidak Layak / SARA">Konten Tidak Layak / SARA</option>
+                  <option value="Hak Cipta / Logo Tanpa Izin">Hak Cipta / Logo Tanpa Izin</option>
+                  <option value="Bisnis Sudah Tutup">Bisnis Sudah Tutup</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
               </div>
 
-              {/* Detail Laporan */}
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Keterangan Detail <span className="text-rose-500">*</span>
-                </label>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">Detail Keterangan</label>
                 <textarea
                   required
                   rows={3}
                   value={reportDescription}
                   onChange={(e) => setReportDescription(e.target.value)}
-                  placeholder="Jelaskan secara singkat kronologi atau alasan laporan Anda secara jelas..."
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all resize-y"
+                  placeholder="Jelaskan secara singkat alasan laporan Anda..."
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:border-rose-500 outline-none"
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowReportModal(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold text-xs transition-colors cursor-pointer"
-                >
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onClick={() => setShowReportModal(false)} className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer border-0">
                   Batal
                 </button>
-                <button
-                  type="submit"
-                  disabled={submittingReport || !reportReason || !reportDescription.trim()}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submittingReport ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Mengirim...</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle size={15} />
-                      <span>Kirim Laporan</span>
-                    </>
-                  )}
+                <button type="submit" disabled={submittingReport} className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer border-0 disabled:opacity-50">
+                  {submittingReport ? "Mengirim..." : "Kirim Laporan"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Modal Popup Galeri Foto */}
-      {showGalleryModal && (
-        <div
-          className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setShowGalleryModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl p-5 sm:p-7 w-full max-w-4xl shadow-2xl border border-slate-200 space-y-5 my-8 animate-fade-in text-left"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900">
-                  Galeri Usaha ({galleryImages.length})
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Semua foto galeri dari {business?.name || "bisnis ini"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGalleryModal(false)}
-                className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X size={22} />
-              </button>
-            </div>
-
-            {/* Grid Foto Galeri */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 max-h-[65vh] overflow-y-auto pr-1 p-1">
-              {galleryImages.map((src, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setPreviewImageIndex(idx)}
-                  className="group relative aspect-4/3 rounded-xl overflow-hidden bg-slate-100 border border-slate-200/80 cursor-pointer shadow-2xs hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5"
-                >
-                  <img
-                    src={src}
-                    alt={`${business?.name || "Foto"} ${idx + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-200 flex items-center justify-center">
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-full shadow-xs backdrop-blur-xs">
-                      Lihat Foto
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-end pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowGalleryModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold text-xs sm:text-sm transition-colors cursor-pointer"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Large Image Preview Modal */}
-      {previewImageIndex !== null && galleryImages[previewImageIndex] && (
-        <div
-          className="fixed inset-0 bg-black/90 backdrop-blur-md z-[1100] flex flex-col items-center justify-center p-4"
-          onClick={() => setPreviewImageIndex(null)}
-        >
-          {/* Header Bar */}
-          <div
-            className="absolute top-4 right-4 left-4 flex items-center justify-between z-10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="text-white/80 text-xs sm:text-sm font-medium bg-black/40 px-3.5 py-1.5 rounded-full border border-white/10 backdrop-blur-xs">
-              {previewImageIndex + 1} / {galleryImages.length}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPreviewImageIndex(null)}
-              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer backdrop-blur-xs border border-white/10"
-              title="Tutup Preview"
-            >
-              <X size={22} />
-            </button>
-          </div>
-
-          {/* Prev Button */}
-          {galleryImages.length > 1 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPreviewImageIndex((prev) => (prev > 0 ? prev - 1 : galleryImages.length - 1));
-              }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-xs border border-white/10 z-10 hover:scale-110"
-              title="Foto Sebelumnya"
-            >
-              <ChevronLeft size={26} />
-            </button>
-          )}
-
-          {/* Main Large Image */}
-          <div
-            className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={galleryImages[previewImageIndex]}
-              alt={`${business?.name || "Preview"} ${previewImageIndex + 1}`}
-              className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl select-none"
-            />
-          </div>
-
-          {/* Next Button */}
-          {galleryImages.length > 1 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPreviewImageIndex((prev) => (prev < galleryImages.length - 1 ? prev + 1 : 0));
-              }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-xs border border-white/10 z-10 hover:scale-110"
-              title="Foto Selanjutnya"
-            >
-              <ChevronRight size={26} />
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
-

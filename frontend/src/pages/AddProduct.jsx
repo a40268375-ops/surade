@@ -68,6 +68,15 @@ export default function AddProduct() {
     if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
+  const selectedBiz = businesses.find((b) => String(b.id) === String(form.business_id));
+  const isBizPremium = Boolean(
+    selectedBiz?.is_premium ||
+    selectedBiz?.features?.is_premium ||
+    selectedBiz?.premium_info?.status === "active"
+  );
+  const currentProdCount = selectedBiz?.products?.length || 0;
+  const isLimitReached = selectedBiz && !isBizPremium && currentProdCount >= 3;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -75,6 +84,12 @@ export default function AddProduct() {
 
     if (!form.business_id) {
       setError("Pilih bisnis terlebih dahulu");
+      setLoading(false);
+      return;
+    }
+
+    if (isLimitReached) {
+      setError("Bisnis Free dibatasi maksimal 3 produk. Silakan upgrade ke paket Premium untuk menambahkan produk tanpa batas.");
       setLoading(false);
       return;
     }
@@ -159,6 +174,50 @@ export default function AddProduct() {
           </div>
         )}
 
+        {isLimitReached && (
+          <div style={{
+            background: "#fffbeb",
+            border: "1px solid #fde68a",
+            borderRadius: "12px",
+            padding: "16px",
+            marginBottom: "16px",
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap"
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+              <AlertCircle size={22} color="#d97706" style={{ flexShrink: 0, marginTop: "2px" }} />
+              <div>
+                <strong style={{ color: "#92400e", fontSize: "14px", display: "block" }}>
+                  Batas Maksimal 3 Produk Tercapai (Paket Free)
+                </strong>
+                <p style={{ color: "#b45309", fontSize: "12.5px", margin: "4px 0 0 0" }}>
+                  Bisnis <strong>{selectedBiz?.name}</strong> menggunakan paket Free ({currentProdCount}/3 produk). Upgrade ke Premium untuk produk tanpa batas.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/admin-user?tab=premium")}
+              style={{
+                background: "#007570",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 16px",
+                fontWeight: "bold",
+                fontSize: "12.5px",
+                cursor: "pointer"
+              }}
+            >
+              Upgrade Premium
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="add-product-form">
           {/* Business Selection */}
           <div className="form-group">
@@ -176,7 +235,7 @@ export default function AddProduct() {
               <option value="">-- Pilih Bisnis --</option>
               {businesses.map((biz) => (
                 <option key={biz.id} value={biz.id}>
-                  {biz.name}
+                  {biz.name} ({biz.is_premium ? "Premium" : "Free"} - {biz.products?.length || 0} produk)
                 </option>
               ))}
             </select>

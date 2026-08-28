@@ -1,8 +1,13 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Home.css";
+import "./Category.css";
 import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 import HeroSection from "../components/home/HeroSection";
+import PremiumAdsSection from "../components/home/PremiumAdsSection";
+import StandardAdsSection from "../components/home/StandardAdsSection";
+import useScrollReveal from "../hooks/useScrollReveal";
 import logoImg from "../assets/logo.png";
 import { getBusinesses } from "../services/businessService";
 import { InlineSpinner } from "../components/LoadingScreen";
@@ -18,6 +23,8 @@ import {
   MapPin,
   Search,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Bookmark,
   Eye,
   Tag,
@@ -161,22 +168,25 @@ export default function Home() {
   const navigate = useNavigate();
   const [selectedKota, setSelectedKota] = useState("Semua");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [saved, setSaved] = useState({});
+  const [savedBiz, setSavedBiz] = useState({});
+  const [savedBlogs, setSavedBlogs] = useState({});
   const [selectedCity, setSelectedCity] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedSearchCategory, setSelectedSearchCategory] = useState("all");
   const [searchHistory, setSearchHistory] = useState([]);
-  const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const [businesses, setBusinesses] = useState([]);
   const [categories, setCategories] = useState([{ id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> }]);
   const [bisnisData, setBisnisData] = useState([]);
   const [temukanData, setTemukanData] = useState([]);
+  const [premiumAds, setPremiumAds] = useState([]);
+  const [standardAds, setStandardAds] = useState([]);
   const [adsData, setAdsData] = useState([]);
   const [loadingAds, setLoadingAds] = useState(true);
   const [loadingData, setLoadingData] = useState(true);
   const [blogsData, setBlogsData] = useState([]);
   const [testimonialsData, setTestimonialsData] = useState(TESTIMONIALS_DATA);
   const [smartCitiesData, setSmartCitiesData] = useState([]);
+  const categoryScrollRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -250,8 +260,8 @@ export default function Home() {
           }
         }).catch(err => console.error("Failed to fetch smart cities:", err));
 
-      // 3. Featured & Latest Businesses with limit=6
-      const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?limit=6`)
+      // 3. Featured & Latest Businesses for Home (up to 24 businesses for 4 pages)
+      const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?limit=24`)
         .then(res => res.json())
         .then(bizJson => {
           const bizData = bizJson?.data || bizJson || [];
@@ -268,8 +278,11 @@ export default function Home() {
                 category: categoryName,
                 subCategory: subCategoryName,
                 categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
-                tags: [b.name],
-                location: b.city || "Indonesia",
+                tags: Array.isArray(b.tags) && b.tags.length > 0 ? b.tags : [b.name],
+                location: b.city ? (b.province ? `${b.city}, ${b.province}` : b.city) : (b.address || "Indonesia"),
+                address: b.address || b.city || "Indonesia",
+                city: b.city || "Indonesia",
+                province: b.province || "",
                 views: b.views || 0,
                 status: "Buka Sekarang",
                 img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
@@ -287,29 +300,71 @@ export default function Home() {
       const fetchAds = fetch(`${import.meta.env.VITE_API_URL}/advertisements`)
         .then(res => res.json())
         .then(adsJson => {
-          const adsData = adsJson?.data || adsJson || [];
-          if (Array.isArray(adsData)) {
-            const mappedAds = adsData.map(ad => ({
-              id: ad.id,
-              businessId: ad.business?.id,
-              img: getStorageUrl(ad.business?.logo || ad.business?.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-              name: ad.business?.name || "Bisnis",
-              desc: ad.business?.description || "Portal Bisnis Terpercaya",
-              packageName: ad.package_name,
-              price: ad.price
-            }));
+          const rawList = adsJson?.data || adsJson || [];
+          if (Array.isArray(rawList) && rawList.length > 0) {
+            const mappedAds = rawList.map(ad => {
+              const biz = ad.business || {};
+              const pkgType = ad.package_type || (ad.price >= 250000 || (ad.package_name && /premium|utama|slider|unggulan/i.test(ad.package_name)) ? "premium" : "standard");
+              const ratingVal = ad.rating || (biz.ratings_avg_rating ? Number(biz.ratings_avg_rating).toFixed(1) : "4.8");
+              const ratingCount = ad.rating_count || biz.ratings_count || 0;
+              const locationStr = ad.location || (ad.city ? (ad.province ? `${ad.city}, ${ad.province}` : ad.city) : (biz.city ? (biz.province ? `${biz.city}, ${biz.province}` : biz.city) : "Indonesia"));
+
+              return {
+                id: ad.id,
+                businessId: ad.business_id || biz.id,
+                name: ad.name || biz.name || "Bisnis Pilihan",
+                package_type: pkgType,
+                rating: ratingVal,
+                rating_count: ratingCount,
+                city: ad.city || biz.city || "Indonesia",
+                province: ad.province || biz.province || "",
+                location: locationStr,
+                image: ad.image || ad.banner || ad.logo || biz.banner || biz.logo,
+                banner: ad.banner || biz.banner,
+                logo: ad.logo || biz.logo,
+              };
+            });
+
+            const premium = mappedAds.filter(a => a.package_type === "premium");
+            const standard = mappedAds.filter(a => a.package_type === "standard");
+
+            if (premium.length > 0 && standard.length > 0) {
+              setPremiumAds(premium);
+              setStandardAds(standard);
+            } else if (premium.length > 0) {
+              setPremiumAds(premium.slice(0, 4));
+              setStandardAds(premium.length > 4 ? premium.slice(4) : premium);
+            } else {
+              setPremiumAds(standard.slice(0, 3));
+              setStandardAds(standard);
+            }
             setAdsData(mappedAds);
           }
         })
         .catch(err => console.error("Failed to fetch advertisements:", err))
         .finally(() => setLoadingAds(false));
 
-      const fetchBlogs = fetch(`${import.meta.env.VITE_API_URL}/blogs?limit=6`)
+      const fetchBlogs = fetch(`${import.meta.env.VITE_API_URL}/blogs?status=published&all=true`)
         .then(res => res.json())
         .then(blogsJson => {
-          const blogsData = blogsJson?.data || blogsJson || [];
-          if (Array.isArray(blogsData)) {
-            setBlogsData(blogsData);
+          const list = Array.isArray(blogsJson) ? blogsJson : (blogsJson?.data || []);
+          if (Array.isArray(list)) {
+            const mappedBlogs = list.map(b => ({
+              id: b.id,
+              slug: b.slug,
+              title: b.title,
+              category: b.blog_category || b.category?.name || b.category || (b.type === "event" ? "Event" : "Artikel"),
+              author: b.user?.name || "Admin Info.co.id",
+              date: b.published_at
+                ? new Date(b.published_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+                : (b.created_at
+                    ? new Date(b.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+                    : "Terbaru"),
+              thumbnail: b.thumbnail,
+              img: getStorageUrl(b.thumbnail) || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop",
+              type: b.type || "blog",
+            }));
+            setBlogsData(mappedBlogs);
           }
         }).catch(err => console.error("Failed to fetch blogs:", err));
 
@@ -330,13 +385,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (adsData.length > 0) {
-        setCurrentAdIndex((prev) => (prev + 1) % adsData.length);
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [adsData]);
+    if (categoryScrollRef.current) {
+      categoryScrollRef.current.scrollLeft = 0;
+    }
+  }, [categories]);
 
   const filteredBisnis = activeCategory === "all"
     ? bisnisData
@@ -359,7 +411,7 @@ export default function Home() {
       )
     : bisnisData;
 
-  // Combine all filters
+  // Combine all filters and sort Premium first
   const finalFilteredBisnis = bisnisData.filter((b) => {
     const matchesCategory = activeCategory === "all" ||
       b.category.toLowerCase().includes(
@@ -373,9 +425,13 @@ export default function Home() {
       b.location.toLowerCase().includes(searchKeyword.toLowerCase());
     
     return matchesCategory && matchesCity && matchesSearch;
+  }).sort((a, b) => {
+    if (a.is_premium && !b.is_premium) return -1;
+    if (!a.is_premium && b.is_premium) return 1;
+    return (b.id || 0) - (a.id || 0);
   });
 
-  // Filter TEMUKAN_DATA based on search
+  // Filter TEMUKAN_DATA based on search and sort Premium first
   const filteredTemukanData = temukanData.filter((b) => {
     const matchesSearch = !searchKeyword ||
       b.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
@@ -384,6 +440,10 @@ export default function Home() {
       b.location.toLowerCase().includes(searchKeyword.toLowerCase());
     
     return matchesSearch;
+  }).sort((a, b) => {
+    if (a.is_premium && !b.is_premium) return -1;
+    if (!a.is_premium && b.is_premium) return 1;
+    return (b.id || 0) - (a.id || 0);
   });
 
   const fetchUserSavedState = async () => {
@@ -401,29 +461,35 @@ export default function Home() {
 
     if (token) {
       try {
-        const [resBiz, resBlog] = await Promise.all([
+        const [resBiz, resBlog] = await Promise.allSettled([
           api.get("/my-favorites"),
           api.get("/my-blog-favorites")
         ]);
-        const bizData = resBiz.data?.data || resBiz.data || [];
-        const bizArr = Array.isArray(bizData) ? bizData : (bizData?.data || []);
-        bizArr.forEach(fav => {
-          const bId = fav.business_id || fav.business?.id;
-          if (bId) bizSavedMap[bId] = true;
-        });
 
-        const blogData = resBlog.data?.data || resBlog.data || [];
-        const blogArr = Array.isArray(blogData) ? blogData : (blogData?.data || []);
-        blogArr.forEach(fav => {
-          const bId = fav.blog_id || fav.blog?.id;
-          if (bId) blogSavedMap[bId] = true;
-        });
+        if (resBiz.status === "fulfilled" && resBiz.value.data) {
+          const bizData = resBiz.value.data?.data || resBiz.value.data || [];
+          const bizArr = Array.isArray(bizData) ? bizData : (bizData?.data || []);
+          bizArr.forEach(fav => {
+            const bId = fav.business_id || fav.business?.id;
+            if (bId) bizSavedMap[bId] = true;
+          });
+        }
+
+        if (resBlog.status === "fulfilled" && resBlog.value.data) {
+          const blogData = resBlog.value.data?.data || resBlog.value.data || [];
+          const blogArr = Array.isArray(blogData) ? blogData : (blogData?.data || []);
+          blogArr.forEach(fav => {
+            const bId = fav.blog_id || fav.blog?.id;
+            if (bId) blogSavedMap[bId] = true;
+          });
+        }
       } catch (err) {
         console.error("Failed to fetch favorites in Home:", err);
       }
     }
 
-    setSaved({ ...bizSavedMap, ...blogSavedMap });
+    setSavedBiz(bizSavedMap);
+    setSavedBlogs(blogSavedMap);
   };
 
   useEffect(() => {
@@ -436,9 +502,13 @@ export default function Home() {
     if (!id) return;
     if (!requireAuth()) return;
 
-    const isCurrentlySaved = !!saved[id];
+    const isCurrentlySaved = isBlog ? !!savedBlogs[id] : !!savedBiz[id];
 
-    setSaved((prev) => ({ ...prev, [id]: !isCurrentlySaved }));
+    if (isBlog) {
+      setSavedBlogs((prev) => ({ ...prev, [id]: !isCurrentlySaved }));
+    } else {
+      setSavedBiz((prev) => ({ ...prev, [id]: !isCurrentlySaved }));
+    }
 
     const storageKey = isBlog ? "saved_blog_ids" : "saved_business_ids";
     let localItems = JSON.parse(localStorage.getItem(storageKey) || "[]");
@@ -454,9 +524,9 @@ export default function Home() {
     window.dispatchEvent(new Event("bookmarkChanged"));
 
     if (isCurrentlySaved) {
-      alert(`${isBlog ? "Artikel/Event" : "Bisnis"}${itemName ? ` "${itemName}"` : ""} dihapus dari bookmark.`);
+      alert(`${isBlog ? "Blog/Event" : "Bisnis"}${itemName ? ` "${itemName}"` : ""} berhasil dihapus dari bookmark.`);
     } else {
-      alert(`${isBlog ? "Artikel/Event" : "Bisnis"}${itemName ? ` "${itemName}"` : ""} berhasil disimpan ke bookmark!`);
+      alert(`${isBlog ? "Blog/Event" : "Bisnis"}${itemName ? ` "${itemName}"` : ""} berhasil disimpan ke bookmark!`);
     }
 
     try {
@@ -483,7 +553,97 @@ export default function Home() {
     }
     navigate(`/category/${selectedSearchCategory}?q=${encodeURIComponent(searchKeyword)}&location=${encodeURIComponent(selectedKota)}`);
   };
-  
+
+  // ── Temukan Bisnis Pagination & Auto-Slide Setup (6 items per page, max 4 pages) ──
+  const [businessCurrentPage, setBusinessCurrentPage] = useState(1);
+  const [slideAnim, setSlideAnim] = useState({ phase: "active", direction: "next" });
+  const [isBizHovered, setIsBizHovered] = useState(false);
+  const isTransitioningRef = useRef(false);
+  const timerRef = useRef(null);
+
+  const BUSINESSES_PER_PAGE = 6;
+  const MAX_HOME_BUSINESS_PAGES = 4;
+  const totalBusinesses = filteredTemukanData.length;
+  const totalBusinessPages = Math.min(MAX_HOME_BUSINESS_PAGES, Math.ceil(totalBusinesses / BUSINESSES_PER_PAGE)) || 1;
+  const safeBusinessCurrentPage = Math.min(Math.max(1, businessCurrentPage), totalBusinessPages);
+  const businessStartIndex = (safeBusinessCurrentPage - 1) * BUSINESSES_PER_PAGE;
+  const paginatedBusinesses = filteredTemukanData.slice(businessStartIndex, businessStartIndex + BUSINESSES_PER_PAGE);
+
+  // Transition function for ultra-smooth directional sliding
+  const transitionToPage = useCallback((newPage, direction = "next") => {
+    if (isTransitioningRef.current || newPage === safeBusinessCurrentPage) return;
+    isTransitioningRef.current = true;
+
+    // 1. Exit phase (slide out towards direction)
+    setSlideAnim({ phase: "exiting", direction });
+
+    setTimeout(() => {
+      // 2. Change page & position entering offscreen
+      setBusinessCurrentPage(newPage);
+      setSlideAnim({ phase: "entering", direction });
+
+      // 3. Trigger active slide in animation
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          setSlideAnim({ phase: "active", direction });
+          setTimeout(() => {
+            isTransitioningRef.current = false;
+          }, 360);
+        }, 30);
+      });
+    }, 280);
+  }, [safeBusinessCurrentPage]);
+
+  // Robust auto-slide interval (slides every 5 seconds, auto-recovers, never permanently pauses)
+  useEffect(() => {
+    if (totalBusinessPages <= 1) return;
+
+    const startTimer = () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        if (!isBizHovered && !isTransitioningRef.current) {
+          setBusinessCurrentPage((curr) => {
+            const next = curr >= totalBusinessPages ? 1 : curr + 1;
+            transitionToPage(next, "next");
+            return curr;
+          });
+        }
+      }, 5000);
+    };
+
+    startTimer();
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isBizHovered, totalBusinessPages, transitionToPage]);
+
+  const businessPageNumbers = useMemo(() => {
+    const pages = [];
+    if (totalBusinessPages <= 5) {
+      for (let i = 1; i <= totalBusinessPages; i++) pages.push(i);
+    } else {
+      if (safeBusinessCurrentPage <= 3) {
+        pages.push(1, 2, 3, 4, "...", totalBusinessPages);
+      } else if (safeBusinessCurrentPage >= totalBusinessPages - 2) {
+        pages.push(1, "...", totalBusinessPages - 3, totalBusinessPages - 2, totalBusinessPages - 1, totalBusinessPages);
+      } else {
+        pages.push(1, "...", safeBusinessCurrentPage - 1, safeBusinessCurrentPage, safeBusinessCurrentPage + 1, "...", totalBusinessPages);
+      }
+    }
+    return pages;
+  }, [totalBusinessPages, safeBusinessCurrentPage]);
+
+  const handleBusinessPageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalBusinessPages || newPage === safeBusinessCurrentPage) return;
+    const direction = newPage > safeBusinessCurrentPage ? "next" : "prev";
+    transitionToPage(newPage, direction);
+  };
+
+  // ── Home Blogs Display (Latest 6 items) ──
+  const homeBlogs = blogsData.slice(0, 6);
+
+  // ── Subtle Scroll Reveal Animation Hook ──
+  useScrollReveal([categories, smartCitiesData, filteredTemukanData, testimonialsData, homeBlogs]);
 
   return (
     <div className="home-page">
@@ -503,97 +663,17 @@ export default function Home() {
         handleSearchSubmit={handleSearchSubmit}
       />
 
-      {/* ── TERBARU / IKLAN SECTION ── */}
-      <section className="reko-section">
-        <div className="reko-inner min-h-[340px] flex flex-col justify-start">
-          <h2 className="reko-title">Iklan Unggulan &amp; Bisnis Pilihan</h2>
+      {/* ── 1. PREMIUM ADS (HERO VISUAL CAROUSEL) ── */}
+      <PremiumAdsSection ads={premiumAds} loading={loadingAds} />
 
-          {/* Skeleton Loading State */}
-          {loadingAds ? (
-            <div className="w-full px-2 sm:px-12 py-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
-                {[1, 2, 3].map((n) => (
-                  <div
-                    key={`ad-skeleton-${n}`}
-                    className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden animate-pulse flex flex-col h-[260px]"
-                  >
-                    <div className="w-full h-[180px] bg-slate-200/80 relative">
-                      <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-300/80" />
-                    </div>
-                    <div className="p-4 space-y-2 flex-1 bg-white">
-                      <div className="h-4 bg-slate-300/80 rounded-md w-3/4" />
-                      <div className="h-3.5 bg-slate-200/80 rounded-md w-1/2" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : adsData.length > 0 ? (
-            /* Active Ads carousel */
-            <div className="ads-carousel">
-              <button
-                className="ads-carousel__nav ads-carousel__nav--prev"
-                onClick={() => setCurrentAdIndex((prev) => Math.max(0, prev - 1))}
-                aria-label="Previous slide"
-              >
-                ‹
-              </button>
-              <div className="ads-carousel__track" style={{ transform: `translateX(-${currentAdIndex * 33.33}%)` }}>
-                {[...adsData, ...adsData].map((ad, index) => (
-                  <Link key={`${ad.id}-${index}`} to={`/business/${ad.businessId}`} className="ad-card">
-                    <div className="ad-card__img-wrap">
-                      <img src={ad.img} alt={ad.name} className="ad-card__img" loading="lazy" />
-                      <div className="ad-card__img-overlay">
-                        <button
-                          type="button"
-                          className={`ad-card__save${(saved[ad.businessId] || saved[ad.id]) ? " saved" : ""}`}
-                          onClick={(e) => { 
-                            e.preventDefault(); 
-                            e.stopPropagation(); 
-                            const targetBizId = ad.businessId || ad.id;
-                            toggleSave(targetBizId, false, ad.name); 
-                          }}
-                          aria-label="Simpan"
-                        >
-                          <Bookmark size={13} fill={(saved[ad.businessId] || saved[ad.id]) ? "currentColor" : "none"} />
-                          <span>{(saved[ad.businessId] || saved[ad.id]) ? "Tersimpan" : "Simpan"}</span>
-                        </button>
-                        <span className="ad-card__views">
-                          <Eye size={13} />
-                          <span>Pratinjau</span>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="ad-card__body">
-                      <h3 className="ad-card__name">{ad.name}</h3>
-                      <p className="ad-card__category">{ad.desc}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-              <button
-                className="ads-carousel__nav ads-carousel__nav--next"
-                onClick={() => setCurrentAdIndex((prev) => Math.min(adsData.length - 3, prev + 1))}
-                aria-label="Next slide"
-              >
-                ›
-              </button>
-            </div>
-          ) : (
-            /* Empty State */
-            <div className="ads-empty-state min-h-[220px] flex flex-col items-center justify-center">
-              <Megaphone size={48} style={{ opacity: 0.5 }} />
-              <p>Belum ada bisnis yang sedang beriklan</p>
-            </div>
-          )}
-        </div>
-      </section>
+      {/* ── 2. STANDARD ADS (CONTINUOUS INFINITE TICKER) ── */}
+      <StandardAdsSection ads={standardAds} loading={loadingAds} />
 
-      {/* ── KATEGORI SECTION ── */}
-      <section className="category-section">
+      {/* ── 3. KATEGORI SECTION ── */}
+      <section className="category-section reveal-on-scroll">
         <div className="category-inner">
           {/* Category tabs */}
-          <div className="reko-tabs">
+          <div className="reko-tabs" ref={categoryScrollRef}>
             {categories.map((cat) => (
               <Link
                 key={cat.id}
@@ -608,31 +688,57 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── KATEGORI SECTION ── */}
-      <section className="smart-section">
-        <div className="smart-inner">
-          <h2 className="smart-title">Smart City &amp; Smart Village</h2>
-          <p className="smart-subtitle">Info.Co.Id Mendorong Percepatan Program Pemerintah Smart City &amp; Smart Village</p>
+      {/* ── SMART CITY SECTION ── */}
+      <section className="py-16 bg-[#f8fafc] text-slate-800 border-t border-slate-200/80 reveal-on-scroll">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12 reveal-on-scroll">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0f172a] tracking-tight mb-2.5">
+              Smart City &amp; Smart Village
+            </h2>
+            <p className="text-xs sm:text-sm md:text-base text-slate-500 font-normal leading-relaxed">
+              Info.Co.Id Mendorong Percepatan Program Pemerintah Smart City &amp; Smart Village
+            </p>
+          </div>
 
-          <div className="smart-grid">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 reveal-stagger">
             {smartCitiesData.length > 0 ? (
-              smartCitiesData.map((city) => (
-              <Link 
-                key={city.id} 
-                to={`/location/${city.slug}`}
-                className="smart-card-link"
-              >
-                <div className="smart-card">
-                  <img src={city.img} alt={city.name} className="smart-card__img" loading="lazy" />
-                  <div className="smart-card__content">
-                    <h3 className="smart-card__name">{city.name}</h3>
-                    <p className="smart-card__count">{city.bisnis.toLocaleString("id-ID")} bisnis terdaftar</p>
-                  </div>
-                </div>
-              </Link>
-            ))
+              smartCitiesData.map((city) => {
+                const displayName = /^(Kota|Kabupaten|Kab\.|DKI|Provinsi)/i.test(city.name?.trim() || "")
+                  ? city.name?.trim()
+                  : `Kota ${city.name?.trim() || ""}`;
+                const totalBisnis = Number(city.bisnis || 0);
+
+                return (
+                  <Link
+                    key={city.id}
+                    to={`/smart-city/${city.slug || city.id}`}
+                    className="group relative block aspect-[4/3] rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-slate-900 reveal-card"
+                  >
+                    <img
+                      src={city.img || city.image}
+                      alt={city.name}
+                      className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500 ease-out"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent transition-opacity duration-300" />
+                    
+                    <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 text-center z-10 flex flex-col items-center justify-end">
+                      <h3 className="text-base sm:text-lg font-bold text-white tracking-wide transition-all duration-300 transform group-hover:-translate-y-0.5 drop-shadow-md">
+                        {city.name}
+                      </h3>
+                      
+                      {/* Slide up from bottom on hover (Clean text without overlay pill) */}
+                      <div className="max-h-0 opacity-0 overflow-hidden transform translate-y-2 group-hover:max-h-8 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out">
+                        <p className="text-xs text-slate-200 mt-1 font-medium drop-shadow-md whitespace-nowrap">
+                          <span className="text-[#00c48c] font-bold">{totalBisnis}</span> bisnis terdaftar
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })
             ) : (
-              <div className="smart-empty">
+              <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
                 <p>Belum ada data smart city.</p>
               </div>
             )}
@@ -641,9 +747,9 @@ export default function Home() {
       </section>
 
       {/* ── CEPAT PENCARIAN SECTION ── */}
-      <section className="quick-section">
+      <section className="quick-section reveal-on-scroll">
         <div className="quick-inner">
-          <div className="quick-text">
+          <div className="quick-text reveal-from-left">
             <h2 className="quick-title">Cepat dan Memudahkan Pencarian</h2>
             <p className="quick-subtitle">Mudah Menemukan Pelaku Usaha Skala Terkecil</p>
             <div className="quick-steps">
@@ -658,7 +764,7 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="quick-img-wrap">
+          <div className="quick-img-wrap reveal-from-right">
             <img
               src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=700&h=500&fit=crop"
               alt="Ilustrasi pencarian bisnis"
@@ -669,83 +775,160 @@ export default function Home() {
       </section>
 
       {/* ── TEMUKAN TEMPAT BARU SECTION ── */}
-      <section className="temukan-section">
+      <section
+        className="temukan-section reveal-on-scroll"
+        id="temukan-section"
+      >
         <div className="temukan-inner">
-          <h2 className="temukan-title">Temukan Tempat Baru</h2>
-          <p className="temukan-subtitle">
-            Temukan Dihalaman Kami Untuk Dapat Membantu Dalam Menemukan Pelaku Usaha Hingga Skala Terkecil
-          </p>
+          <div className="text-center reveal-on-scroll">
+            <h2 className="temukan-title">Temukan Tempat Baru</h2>
+            <p className="temukan-subtitle">
+              Temukan Dihalaman Kami Untuk Dapat Membantu Dalam Menemukan Pelaku Usaha Hingga Skala Terkecil
+            </p>
+          </div>
 
           {loadingData ? (
             <InlineSpinner text="Memuat data bisnis..." />
           ) : (
             <>
-              <div className="temukan-grid">
-                {filteredTemukanData.slice(0, 6).map((bisnis) => (
-                  <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
-                    {/* Image */}
-                    <div className="biz-card__img-wrap">
-                      <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
-                      {bisnis.is_premium && (
-                        <div className="biz-card__verified-badge" title="Bisnis Terpercaya - Pengguna Premium">
-                          <BadgeCheck size={14} className="biz-card__verified-icon" />
-                          <span>Terpercaya</span>
-                        </div>
-                      )}
-                      <div className="biz-card__img-overlay">
-                        <button
-                          type="button"
-                          className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(bisnis.id, false, bisnis.name); }}
-                          aria-label="Simpan"
-                        >
-                          <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                          <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
-                        </button>
-                        <span className="biz-card__views">
-                          <Eye size={13} />
-                          <span>Pratinjau</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Body */}
-                    <div className="biz-card__body">
-                      <h3 className="biz-card__name">{bisnis.name}</h3>
-                      <div className="biz-card__categories">
-                        <p className="biz-card__category">
-                          <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor }} />
-                          {bisnis.category}
-                        </p>
-                        {bisnis.subCategory && (
-                          <p className="biz-card__category biz-card__category--sub">
-                            <span className="biz-card__cat-separator">›</span>
-                            {bisnis.subCategory}
-                          </p>
+              {/* Carousel Slider Wrapper */}
+              <div 
+                className="temukan-slider-wrapper"
+                onMouseEnter={() => setIsBizHovered(true)}
+                onMouseLeave={() => setIsBizHovered(false)}
+                onTouchStart={() => setIsBizHovered(true)}
+                onTouchEnd={() => { setTimeout(() => setIsBizHovered(false), 2500); }}
+              >
+                <div className={`temukan-grid ${
+                  slideAnim.phase === "active"
+                    ? "temukan-grid--active"
+                    : slideAnim.phase === "exiting"
+                    ? `temukan-grid--exiting-${slideAnim.direction}`
+                    : `temukan-grid--entering-${slideAnim.direction}`
+                }`}>
+                  {paginatedBusinesses.map((bisnis) => (
+                    <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
+                      {/* Image */}
+                      <div className="biz-card__img-wrap">
+                        <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
+                        {bisnis.is_premium && (
+                          <div className="biz-card__verified-badge" title="Bisnis Terverifikasi - Pengguna Premium">
+                            <BadgeCheck size={14} className="biz-card__verified-icon" />
+                            <span>Terverifikasi</span>
+                          </div>
                         )}
-                      </div>
-                      <div className="biz-card__tags">
-                        {bisnis.tags.map((tag) => (
-                          <span key={tag} className="biz-card__tag">
-                            <Tag size={11} />{tag}
+                        <div className="biz-card__img-overlay">
+                          <button
+                            type="button"
+                            className={`biz-card__save${savedBiz[bisnis.id] ? " saved" : ""}`}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(bisnis.id, false, bisnis.name); }}
+                            aria-label="Simpan"
+                          >
+                            <Bookmark size={13} fill={savedBiz[bisnis.id] ? "currentColor" : "none"} />
+                            <span>{savedBiz[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
+                          </button>
+                          <span className="biz-card__views">
+                            <Eye size={13} />
+                            <span>Pratinjau</span>
                           </span>
-                        ))}
+                        </div>
                       </div>
-                      <div className="biz-card__footer">
-                        <span className="biz-card__location">
-                          <MapPin size={12} />{bisnis.location}
-                        </span>
-                        <span className={`biz-card__cta${bisnis.open ? "" : " closed"}`}>
-                          {bisnis.open ? "Buka Sekarang →" : "Tutup Sekarang!"}
-                        </span>
+
+                      {/* Body */}
+                      <div className="biz-card__body">
+                        <h3 className="biz-card__name">{bisnis.name}</h3>
+                        <div className="biz-card__categories">
+                          <p className="biz-card__category">
+                            <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor }} />
+                            {bisnis.category}
+                          </p>
+                          {bisnis.subCategory && (
+                            <p className="biz-card__category biz-card__category--sub">
+                              <span className="biz-card__cat-separator">›</span>
+                              {bisnis.subCategory}
+                            </p>
+                          )}
+                        </div>
+                        <div className="biz-card__tags">
+                          {bisnis.tags.map((tag) => (
+                            <span key={tag} className="biz-card__tag">
+                              <Tag size={11} />{tag}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="biz-card__footer">
+                          <span className="biz-card__location">
+                            <MapPin size={12} />{bisnis.location}
+                          </span>
+                          <span className={`biz-card__cta${bisnis.open ? "" : " closed"}`}>
+                            {bisnis.open ? "Buka Sekarang →" : "Tutup Sekarang!"}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ))}
+                </div>
               </div>
 
+              {/* ── Responsive Business Pagination Controls (Max 6 per page) ── */}
+              {totalBusinessPages > 1 && (
+                <div className="category-pagination temukan-pagination-wrap reveal-on-scroll">
+                  <div className="category-pagination__info">
+                    Menampilkan <strong>{businessStartIndex + 1}</strong>–<strong>{Math.min(businessStartIndex + BUSINESSES_PER_PAGE, totalBusinesses)}</strong> dari <strong>{totalBusinesses}</strong> bisnis
+                  </div>
+
+                  <div className="category-pagination__controls">
+                    {/* Prev Button */}
+                    <button
+                      type="button"
+                      className="category-pagination__nav-btn"
+                      onClick={() => handleBusinessPageChange(safeBusinessCurrentPage - 1)}
+                      disabled={safeBusinessCurrentPage === 1}
+                      aria-label="Halaman Sebelumnya"
+                    >
+                      <ChevronLeft size={16} />
+                      <span className="category-pagination__nav-label">Sebelumnya</span>
+                    </button>
+
+                    {/* Numbered Pages */}
+                    <div className="category-pagination__pages">
+                      {businessPageNumbers.map((page, idx) =>
+                        page === "..." ? (
+                          <span key={`biz-dots-${idx}`} className="category-pagination__dots">
+                            …
+                          </span>
+                        ) : (
+                          <button
+                            key={`biz-page-${page}`}
+                            type="button"
+                            className={`category-pagination__page-btn ${safeBusinessCurrentPage === page ? "active" : ""}`}
+                            onClick={() => handleBusinessPageChange(page)}
+                            aria-label={`Ke halaman ${page}`}
+                            aria-current={safeBusinessCurrentPage === page ? "page" : undefined}
+                          >
+                            {page}
+                          </button>
+                        )
+                      )}
+                    </div>
+
+                    {/* Next Button */}
+                    <button
+                      type="button"
+                      className="category-pagination__nav-btn"
+                      onClick={() => handleBusinessPageChange(safeBusinessCurrentPage + 1)}
+                      disabled={safeBusinessCurrentPage === totalBusinessPages}
+                      aria-label="Halaman Selanjutnya"
+                    >
+                      <span className="category-pagination__nav-label">Selanjutnya</span>
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Lihat Semua Bisnis Button */}
-              <div className="temukan-more-wrap">
+              <div className="temukan-more-wrap reveal-on-scroll">
                 <Link to="/category/all" className="temukan-more-btn">
                   <span>Lihat Semua Bisnis</span>
                   <ArrowRight size={18} />
@@ -757,14 +940,14 @@ export default function Home() {
       </section>
 
       {/* ── TESTIMONIALS SECTION ── */}
-      <section className="testi-section">
+      <section className="testi-section reveal-on-scroll">
         <div className="testi-inner">
-          <h2 className="testi-title">Apa Yang Mereka Katakan</h2>
+          <h2 className="testi-title reveal-on-scroll">Apa Yang Mereka Katakan</h2>
 
-          <div className="testi-grid">
+          <div className="testi-grid reveal-stagger">
             {testimonialsData.length > 0 ? (
               testimonialsData.map((testi) => (
-              <div key={testi.id} className="testi-card">
+              <div key={testi.id} className="testi-card reveal-card">
                 <div className="testi-card__avatar-wrap">
                   <img src={testi.avatar} alt={testi.name} className="testi-card__avatar" loading="lazy" />
                 </div>
@@ -788,11 +971,11 @@ export default function Home() {
       </section>
 
       {/* ── KEY FEATURES SECTION ── */}
-      <section className="features-section">
+      <section className="features-section reveal-on-scroll">
         <div className="features-inner">
-          <div className="features-grid">
+          <div className="features-grid reveal-stagger">
             {FEATURES_DATA.map((feat) => (
-              <div key={feat.id} className="feat-card">
+              <div key={feat.id} className="feat-card reveal-card">
                 <div className="feat-card__icon-wrap">
                   {feat.icon}
                 </div>
@@ -805,143 +988,69 @@ export default function Home() {
       </section>
 
       {/* ── BERBAGI PENGALAMAN SECTION ── */}
-      <section className="blog-section">
+      <section className="blog-section reveal-on-scroll" id="blog-section">
         <div className="blog-inner">
-          <h2 className="blog-title">Berbagi Pengalaman Mereka</h2>
-          <p className="blog-subtitle">Bagikan Pengalaman Dan Info Anda Di Info.co.id.</p>
+          <div className="text-center reveal-on-scroll">
+            <h2 className="blog-title">Berbagi Pengalaman Mereka</h2>
+            <p className="blog-subtitle">Bagikan Pengalaman Dan Info Anda Di Info.co.id.</p>
+          </div>
 
-          <div className="blog-grid">
-            {blogsData.length > 0 ? (
-              blogsData.map((post) => (
-              <Link key={post.id} to={`/blog/${post.id}`} className="blog-card blog-card--link">
-                <div className="blog-card__img-wrap" style={{ position: "relative" }}>
-                  <img src={post.img || getStorageUrl(post.thumbnail)} alt={post.title} className="blog-card__img" loading="lazy" />
-                  <button
-                    type="button"
-                    className={`biz-card__save${saved[post.id] ? " saved" : ""}`}
-                    style={{ position: "absolute", top: "10px", right: "10px", zIndex: 5 }}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(post.id, true); }}
-                    aria-label="Simpan Blog/Event"
-                  >
-                    <Bookmark size={13} fill={saved[post.id] ? "currentColor" : "none"} />
-                    <span>Simpan</span>
-                  </button>
-                </div>
-                <div className="blog-card__body">
-                  <p className="blog-card__category">{post.category}</p>
-                  <h3 className="blog-card__title">{post.title}</h3>
-                  <div className="blog-card__footer">
-                    <span className="blog-card__meta">
-                      <User size={13} />
-                      <span>{post.author}</span>
-                    </span>
-                    <span className="blog-card__meta">
-                      <Calendar size={13} />
-                      <span>{post.date}</span>
-                    </span>
+          <div className="blog-grid reveal-stagger">
+            {homeBlogs.length > 0 ? (
+              homeBlogs.map((post) => (
+                <Link key={post.id} to={`/blog/${post.slug || post.id}`} className="blog-card blog-card--link reveal-card">
+                  <div className="blog-card__img-wrap" style={{ position: "relative" }}>
+                    <img src={post.img || getStorageUrl(post.thumbnail)} alt={post.title} className="blog-card__img" loading="lazy" />
+                    <button
+                      type="button"
+                      className={`biz-card__save${savedBlogs[post.id] ? " saved" : ""}`}
+                      style={{ position: "absolute", top: "10px", right: "10px", zIndex: 5 }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(post.id, true, post.title); }}
+                      aria-label="Simpan Blog/Event"
+                    >
+                      <Bookmark size={13} fill={savedBlogs[post.id] ? "currentColor" : "none"} />
+                      <span>Simpan</span>
+                    </button>
+                    {post.type === "event" ? (
+                      <span className="blog-badge-tag blog-badge-tag--event">Event</span>
+                    ) : (
+                      <span className="blog-badge-tag blog-badge-tag--blog">Blog</span>
+                    )}
                   </div>
-                </div>
-              </Link>
-            ))
+                  <div className="blog-card__body">
+                    <h3 className="blog-card__title">{post.title}</h3>
+                    <div className="blog-card__footer">
+                      <span className="blog-card__meta">
+                        <User size={13} />
+                        <span>{post.author}</span>
+                      </span>
+                      <span className="blog-card__meta">
+                        <Calendar size={13} />
+                        <span>{post.date}</span>
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))
             ) : (
               <div className="blog-empty">
                 <p>Belum ada artikel blog.</p>
               </div>
             )}
           </div>
+
+          {/* ── Bottom See All Button ── */}
+          <div className="blog-bottom-action reveal-on-scroll">
+            <Link to="/blog" className="blog-see-all-cta">
+              <span>Lihat Semua Blog & Event</span>
+              <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="footer">
-        <div className="footer-inner">
-          <div className="footer-cols">
-            {/* Brand/Logo Col */}
-            <div className="footer-col footer-col--brand">
-              <Link to="/" className="footer-logo">
-                <img src={logoImg} alt="Info.co.id" className="footer-logo__img" />
-              </Link>
-              <p className="footer-desc">
-                info.co.id adalah portal informasi yang menyajikan data dan berita terpercaya dari berbagai sumber resmi di Indonesia.
-              </p>
-              <div className="footer-social">
-                <a href="#" className="footer-social__link" aria-label="Instagram">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                  </svg>
-                </a>
-                <a href="#" className="footer-social__link" aria-label="Twitter">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
-                  </svg>
-                </a>
-                <a href="#" className="footer-social__link" aria-label="Facebook">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                  </svg>
-                </a>
-                <a href="#" className="footer-social__link" aria-label="WhatsApp">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-                  </svg>
-                </a>
-                <a href="#" className="footer-social__link" aria-label="YouTube">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
-                    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
-                  </svg>
-                </a>
-              </div>
-            </div>
-
-            {/* Col 1 - Tentang Kami */}
-            <div className="footer-col">
-              <h4 className="footer-heading">Tentang Kami</h4>
-              <ul className="footer-links">
-                <li><Link to="/about">Tentang Info.co.id</Link></li>
-                <li><Link to="/vision-mission">Visi &amp; Misi</Link></li>
-                <li><Link to="/partnership-career">Kerjasama &amp; Karir</Link></li>
-              </ul>
-            </div>
-
-            {/* Col 2 - Bantuan */}
-            <div className="footer-col">
-              <h4 className="footer-heading">Bantuan</h4>
-              <ul className="footer-links">
-                <li><a href="#">FAQ</a></li>
-                <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
-                <li><Link to="/contact">Hubungi Kami</Link></li>
-              </ul>
-            </div>
-
-            {/* Col 3 - Kontak Kami */}
-            <div className="footer-col">
-              <h4 className="footer-heading">Kontak Kami</h4>
-              <ul className="footer-links">
-                <li><a href="mailto:support@info.co.id">support@info.co.id</a></li>
-                <li><span className="footer-text">(021) 1234 5678</span></li>
-                <li><span className="footer-text">Jalan Mercurius 16680 Dramaga West Java</span></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="footer-bottom">
-          <div className="footer-bottom__inner">
-            <p className="footer-copyright">
-              &copy; 2024 Info.co.id. All rights reserved.
-            </p>
-            <div className="footer-bottom-links">
-              <a href="#">Privasi</a>
-              <Link to="/terms">Syarat &amp; Ketentuan</Link>
-              <a href="#">Sitemap</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

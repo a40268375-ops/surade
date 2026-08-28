@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
 import SubCategorySelector from "../components/SubCategorySelector";
+import RichTextEditor, { isYouTubeUrl } from "../components/RichTextEditor";
 import api from "../services/api";
 import { getStorageUrl } from "../utils/constants";
 import {
@@ -249,7 +251,8 @@ export default function AddBusiness() {
     fetch(`${import.meta.env.VITE_API_URL}/plans`)
       .then((r) => r.json())
       .then((d) => {
-        const list = Array.isArray(d) ? d : (d?.data || []);
+        const raw = Array.isArray(d) ? d : (d?.data || []);
+        const list = raw.filter((p) => Number(p.price) > 0 || !p.name?.toLowerCase().includes("free"));
         setPlans(list);
       })
       .catch(console.error)
@@ -470,6 +473,32 @@ export default function AddBusiness() {
   const handlePhotoAdd = (files) => {
     if (!files || files.length === 0) return;
     const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    const isPrem = Boolean(selectedPackage && !selectedPackage.isFree && selectedPackage.id !== "free");
+
+    if (!isPrem) {
+      const remaining = 3 - photos.length;
+      if (remaining <= 0) {
+        setError("Paket Free hanya dapat menambahkan maksimal 3 foto galeri. Silakan upgrade ke paket Premium untuk foto tanpa batas.");
+        setTimeout(() => setError(""), 5000);
+        return;
+      }
+      arr.slice(0, remaining).forEach((file) => {
+        setPhotos((prev) => [
+          ...prev,
+          {
+            file,
+            preview: URL.createObjectURL(file),
+            isExisting: false,
+          },
+        ]);
+      });
+      if (arr.length > remaining) {
+        setError("Hanya 3 foto yang ditambahkan sesuai kuota paket Free. Upgrade ke Premium untuk upload tanpa batas.");
+        setTimeout(() => setError(""), 5000);
+      }
+      return;
+    }
+
     arr.forEach((file) => {
       setPhotos((prev) => [
         ...prev,
@@ -683,6 +712,13 @@ export default function AddBusiness() {
       if (!form.city.trim()) return "Kota wajib diisi.";
       if (!form.province.trim()) return "Provinsi wajib diisi.";
       if (!form.description.trim()) return "Deskripsi wajib diisi.";
+      if (isYouTubeUrl(form.description)) {
+        toast.error("Tidak diperbolehkan memasukkan link video YouTube ke dalam deskripsi usaha. Silakan gunakan fitur Galeri Video.", {
+          duration: 5000,
+          id: "yt-validation-error",
+        });
+        return "Tidak diperbolehkan memasukkan link video YouTube ke dalam deskripsi usaha. Silakan gunakan fitur Galeri Video.";
+      }
       if (!form.phone.trim()) return "Nomor telepon wajib diisi.";
       if (!address.trim()) return "Alamat wajib diisi.";
     }
@@ -1151,66 +1187,67 @@ export default function AddBusiness() {
                 <span className="text-sm font-medium mt-3">Memuat pilihan paket...</span>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
                 {/* ── CARD FREE ── */}
                 <div
                   onClick={() => setSelectedPackage({ id: 'free', name: 'Free', price: 0, isFree: true })}
-                  className={`relative rounded-2xl p-6 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                  className={`relative rounded-3xl p-7 md:p-8 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer bg-gradient-to-b from-[#f0fdfa]/60 via-white to-white ${
                     selectedPackage?.isFree
-                      ? "bg-[#f0fffe] border-[#007570] shadow-[0_8px_24px_rgba(0,117,112,0.15)] -translate-y-1"
-                      : "bg-white border-[#e2e8f0] hover:border-[#007570]/50 hover:shadow-md"
+                      ? "border-[#007570] shadow-[0_8px_30px_rgba(0,117,112,0.18)] -translate-y-1 ring-4 ring-[#007570]/10"
+                      : "border-[#e2e8f0] hover:border-[#007570]/40 hover:shadow-md"
                   }`}
                 >
                   {selectedPackage?.isFree && (
-                    <div className="absolute top-4 right-4 bg-[#007570] text-white p-1 rounded-full">
-                      <Check size={16} />
+                    <div className="absolute top-6 right-6 bg-[#007570] text-white p-1.5 rounded-full shadow-sm">
+                      <Check size={16} strokeWidth={2.5} />
                     </div>
                   )}
 
                   <div>
-                    <div className="inline-block px-3 py-1 bg-slate-100 text-slate-700 font-bold text-[0.75rem] rounded-full mb-3 uppercase tracking-wider">
-                      GRATIS
+                    <div className="inline-block px-3 py-1 bg-[#e6f7f5] text-[#007570] border border-[#ccfbf1] font-bold text-[0.72rem] rounded-full mb-3 uppercase tracking-wider">
+                      PAKET STARTER
                     </div>
-                    <h3 className="text-xl font-extrabold text-[#0f172a] mb-1">FREE</h3>
-                    <div className="flex items-baseline gap-1 my-3">
-                      <span className="text-2xl font-black text-[#0f172a]">Rp0</span>
+                    <h3 className="text-2xl font-black text-[#0f172a] mb-1">Free Basic</h3>
+                    <div className="flex items-baseline gap-1 my-3.5">
+                      <span className="text-3xl font-black text-[#007570]">Rp0</span>
+                      <span className="text-xs font-semibold text-slate-400">/ Selamanya</span>
                     </div>
                     <p className="text-[0.88rem] text-[#64748b] mb-6 leading-relaxed">
-                      Untuk memulai dan mengenalkan usaha kamu.
+                      Cocok untuk memulai dan mengenalkan usaha Anda ke direktori umum.
                     </p>
 
-                    <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[0.88rem]">
+                    <div className="space-y-3 pt-5 border-t border-slate-100 text-[0.88rem]">
                       <div className="flex items-center gap-2.5 text-slate-700 font-medium">
-                        <Check size={16} className="text-emerald-600 shrink-0" />
-                        <span>Profil usaha</span>
+                        <Check size={16} className="text-[#007570] shrink-0" />
+                        <span>Profil &amp; Informasi Usaha</span>
                       </div>
                       <div className="flex items-center gap-2.5 text-slate-700 font-medium">
-                        <Check size={16} className="text-emerald-600 shrink-0" />
-                        <span>Informasi dasar usaha</span>
+                        <Check size={16} className="text-[#007570] shrink-0" />
+                        <span>Alamat &amp; Kontak Manual</span>
                       </div>
                       <div className="flex items-center gap-2.5 text-slate-700 font-medium">
-                        <Check size={16} className="text-emerald-600 shrink-0" />
-                        <span>Alamat manual</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-slate-700 font-medium">
-                        <Check size={16} className="text-emerald-600 shrink-0" />
-                        <span>Fitur dasar</span>
+                        <Check size={16} className="text-[#007570] shrink-0" />
+                        <span>Kategori Usaha Dasar</span>
                       </div>
                       <div className="flex items-center gap-2.5 text-slate-400 line-through">
                         <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Video profil</span>
+                        <span>Peta / Lokasi Interaktif</span>
                       </div>
                       <div className="flex items-center gap-2.5 text-slate-400 line-through">
                         <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Map / lokasi interaktif</span>
+                        <span>Galeri Foto Banner &amp; Video</span>
                       </div>
                       <div className="flex items-center gap-2.5 text-slate-400 line-through">
                         <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Produk katalog</span>
+                        <span>Katalog Produk &amp; Harga</span>
                       </div>
                       <div className="flex items-center gap-2.5 text-slate-400 line-through">
                         <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Fitur Chat</span>
+                        <span>Fitur Chat Pelanggan</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
+                        <X size={16} className="text-slate-300 shrink-0" />
+                        <span>Badge Bisnis Terverifikasi</span>
                       </div>
                     </div>
                   </div>
@@ -1222,64 +1259,79 @@ export default function AddBusiness() {
                       setSelectedPackage({ id: 'free', name: 'Free', price: 0, isFree: true });
                       setStep(2);
                     }}
-                    className={`mt-8 w-full py-3.5 px-4 rounded-xl text-[0.92rem] font-bold transition-all duration-200 border-0 cursor-pointer ${
+                    className={`mt-8 w-full py-3.5 px-4 rounded-2xl text-[0.92rem] font-bold transition-all duration-200 border-0 cursor-pointer ${
                       selectedPackage?.isFree
                         ? "bg-[#007570] text-white shadow-lg shadow-[#007570]/30"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        : "bg-[#eef8f7] text-[#007570] hover:bg-[#007570] hover:text-white"
                     }`}
                   >
                     Gunakan Paket Free
                   </button>
                 </div>
 
-                {/* ── CARD PREMIUM (Dinamis dari API) ── */}
+                {/* ── CARD PREMIUM (Clean Ultra-Premium Design) ── */}
                 {plans.length === 0 ? (
                   <div
                     onClick={() => setSelectedPackage({ id: 1, name: "Premium Business", price: 50000, duration_value: 1, duration_unit: "month", formatted_duration: "1 Bulan", isFree: false })}
-                    className={`relative rounded-2xl p-6 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                    className={`relative rounded-3xl p-7 md:p-8 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer overflow-hidden group ${
                       selectedPackage && !selectedPackage.isFree
-                        ? "bg-[#f0fffe] border-[#007570] shadow-[0_8px_24px_rgba(0,117,112,0.15)] -translate-y-1"
-                        : "bg-white border-[#e2e8f0] hover:border-[#007570]/50 hover:shadow-md"
+                        ? "bg-gradient-to-b from-[#0c2b27] via-[#053733] to-[#021f1d] text-white border-amber-400 shadow-[0_16px_40px_rgba(0,117,112,0.35)] -translate-y-1.5 ring-4 ring-amber-400/20"
+                        : "bg-gradient-to-b from-[#0e3530] via-[#082e29] to-[#041d1a] text-white border-[#009990]/40 hover:border-amber-400/70 hover:shadow-[0_12px_36px_rgba(0,117,112,0.3)] hover:-translate-y-1"
                     }`}
                   >
-                    {selectedPackage && !selectedPackage.isFree && (
-                      <div className="absolute top-4 right-4 bg-[#007570] text-white p-1 rounded-full">
-                        <Check size={16} />
-                      </div>
-                    )}
-                    <div>
-                      <div className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 font-bold text-[0.75rem] rounded-full mb-3 uppercase tracking-wider">
-                        <Sparkles size={12} /> RECOMMENDED
-                      </div>
-                      <h3 className="text-xl font-extrabold text-[#0f172a] mb-1">Premium Business</h3>
-                      <div className="flex items-baseline gap-1.5 my-3">
-                        <span className="text-2xl font-black text-[#007570]">Rp50.000</span>
-                        <span className="text-xs font-semibold text-slate-500">/ 1 Bulan</span>
-                      </div>
-                      <p className="text-[0.88rem] text-[#64748b] mb-6 leading-relaxed">
-                        Tingkatkan jangkauan usaha dengan fitur lokasi interaktif, galeri foto/video, katalog produk, dan fitur chat.
-                      </p>
+                    {/* Ambient Glows */}
+                    <div className="absolute -top-24 -right-24 w-60 h-60 bg-gradient-to-br from-amber-400/20 to-[#00c48c]/30 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-24 -left-24 w-60 h-60 bg-gradient-to-tr from-[#007570]/30 to-teal-400/10 rounded-full blur-3xl pointer-events-none" />
 
-                      <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[0.88rem]">
-                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
-                          <Check size={16} className="text-emerald-600 shrink-0" />
-                          <span>Map / Lokasi Interaktif</span>
+                    <div>
+                      {/* Top Header Badge */}
+                      <div className="flex items-center justify-between gap-2 mb-4 relative z-10">
+                        <div className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full text-[0.72rem] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-sm">
+                          <span>REKOMENDASI TERBAIK</span>
                         </div>
-                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
-                          <Check size={16} className="text-emerald-600 shrink-0" />
-                          <span>Galeri Foto Banner &amp; Video</span>
+
+                        {selectedPackage && !selectedPackage.isFree && (
+                          <div className="bg-amber-400 text-slate-950 p-1.5 rounded-full shadow-md font-bold flex items-center justify-center">
+                            <Check size={16} strokeWidth={3} />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="relative z-10">
+                        <h3 className="text-2xl font-black text-white tracking-tight mb-1">Premium Business</h3>
+
+                        <div className="flex items-baseline gap-2 my-3.5">
+                          <span className="text-3xl sm:text-4xl font-black text-white">
+                            Rp50.000
+                          </span>
+                          <span className="text-xs sm:text-sm font-semibold text-emerald-200/80">/ 1 Bulan</span>
                         </div>
-                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
-                          <Check size={16} className="text-emerald-600 shrink-0" />
-                          <span>Katalog Produk Usaha</span>
-                        </div>
-                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
-                          <Check size={16} className="text-emerald-600 shrink-0" />
-                          <span>Fitur Chat Langsung</span>
-                        </div>
-                        <div className="flex items-center gap-2.5 text-slate-700 font-semibold">
-                          <Check size={16} className="text-emerald-600 shrink-0" />
-                          <span>Prioritas Tampilan Pencarian</span>
+
+                        <p className="text-[0.88rem] text-slate-300 mb-6 leading-relaxed">
+                          Tingkatkan jangkauan usaha dengan badge terverifikasi, peta interaktif, galeri lengkap, dan prioritas pencarian.
+                        </p>
+
+                        <div className="space-y-3 pt-5 border-t border-white/15 text-[0.88rem]">
+                          <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                            <Check size={16} className="text-emerald-400 shrink-0" />
+                            <span>Integrasi Map &amp; Lokasi Interaktif</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                            <Check size={16} className="text-emerald-400 shrink-0" />
+                            <span>Galeri Foto Banner &amp; Video Profil</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                            <Check size={16} className="text-emerald-400 shrink-0" />
+                            <span>Katalog Produk &amp; Rata-rata Harga</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                            <Check size={16} className="text-emerald-400 shrink-0" />
+                            <span>Akses Fitur Chat Langsung</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-amber-300 font-semibold">
+                            <Check size={16} className="text-amber-400 shrink-0" />
+                            <span>Badge Bisnis Terverifikasi &amp; Prioritas</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1291,13 +1343,14 @@ export default function AddBusiness() {
                         setSelectedPackage({ id: 1, name: "Premium Business", price: 50000, duration_value: 1, duration_unit: "month", formatted_duration: "1 Bulan", isFree: false });
                         setStep(2);
                       }}
-                      className={`mt-8 w-full py-3.5 px-4 rounded-xl text-[0.92rem] font-bold transition-all duration-200 border-0 cursor-pointer ${
+                      className={`mt-8 w-full py-3.5 px-5 rounded-2xl text-[0.95rem] font-bold transition-all duration-200 border-0 cursor-pointer relative z-10 flex items-center justify-center gap-2 ${
                         selectedPackage && !selectedPackage.isFree
-                          ? "bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-lg shadow-[#007570]/30"
-                          : "bg-[#007570] text-white hover:bg-[#005a58]"
+                          ? "bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-[0_4px_20px_rgba(251,191,36,0.5)] scale-[1.02]"
+                          : "bg-[#00c48c] hover:bg-[#00b074] text-slate-950 font-extrabold shadow-[0_4px_20px_rgba(0,196,140,0.4)] hover:scale-[1.02] active:scale-[0.98]"
                       }`}
                     >
-                      Pilih Paket Premium
+                      <span>{selectedPackage && !selectedPackage.isFree ? "Paket Premium Terpilih" : "Pilih Paket Premium"}</span>
+                      <ChevronRight size={18} />
                     </button>
                   </div>
                 ) : (
@@ -1309,57 +1362,65 @@ export default function AddBusiness() {
                       <div
                         key={plan.id}
                         onClick={() => setSelectedPackage({ ...plan, isFree: false })}
-                        className={`relative rounded-2xl p-6 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                        className={`relative rounded-3xl p-7 md:p-8 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer overflow-hidden group ${
                           isSelected
-                            ? "bg-[#f0fffe] border-[#007570] shadow-[0_8px_24px_rgba(0,117,112,0.15)] -translate-y-1"
-                            : "bg-white border-[#e2e8f0] hover:border-[#007570]/50 hover:shadow-md"
+                            ? "bg-gradient-to-b from-[#0c2b27] via-[#053733] to-[#021f1d] text-white border-amber-400 shadow-[0_16px_40px_rgba(0,117,112,0.35)] -translate-y-1.5 ring-4 ring-amber-400/20"
+                            : "bg-gradient-to-b from-[#0e3530] via-[#082e29] to-[#041d1a] text-white border-[#009990]/40 hover:border-amber-400/70 hover:shadow-[0_12px_36px_rgba(0,117,112,0.3)] hover:-translate-y-1"
                         }`}
                       >
-                        {isSelected && (
-                          <div className="absolute top-4 right-4 bg-[#007570] text-white p-1 rounded-full">
-                            <Check size={16} />
-                          </div>
-                        )}
+                        {/* Ambient Glows */}
+                        <div className="absolute -top-24 -right-24 w-60 h-60 bg-gradient-to-br from-amber-400/20 to-[#00c48c]/30 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute -bottom-24 -left-24 w-60 h-60 bg-gradient-to-tr from-[#007570]/30 to-teal-400/10 rounded-full blur-3xl pointer-events-none" />
 
                         <div>
-                          <div className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 font-bold text-[0.75rem] rounded-full mb-3 uppercase tracking-wider">
-                            <Sparkles size={12} /> PREMIUM
-                          </div>
-                          <h3 className="text-xl font-extrabold text-[#0f172a] mb-1">{plan.name}</h3>
-                          <div className="flex items-baseline gap-1.5 my-3">
-                            <span className="text-2xl font-black text-[#007570]">
-                              Rp{Number(plan.price || 0).toLocaleString('id-ID')}
-                            </span>
-                            <span className="text-xs font-semibold text-slate-500">/ {durationText}</span>
-                          </div>
-                          <p className="text-[0.88rem] text-[#64748b] mb-6 leading-relaxed">
-                            {plan.description || "Tingkatkan promosi usaha kamu dengan fitur terlengkap."}
-                          </p>
+                          {/* Top Header Badge */}
+                          <div className="flex items-center justify-between gap-2 mb-4 relative z-10">
+                            <div className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full text-[0.72rem] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-sm">
+                              <span>REKOMENDASI TERBAIK</span>
+                            </div>
 
-                          <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[0.88rem]">
-                            <div className={`flex items-center gap-2.5 ${plan.can_add_map !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
-                              {plan.can_add_map !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
-                              <span>Map / Lokasi Interaktif</span>
+                            {isSelected && (
+                              <div className="bg-amber-400 text-slate-950 p-1.5 rounded-full shadow-md font-bold flex items-center justify-center">
+                                <Check size={16} strokeWidth={3} />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="relative z-10">
+                            <h3 className="text-2xl font-black text-white tracking-tight mb-1">{plan.name}</h3>
+
+                            <div className="flex items-baseline gap-2 my-3.5">
+                              <span className="text-3xl sm:text-4xl font-black text-white">
+                                Rp{Number(plan.price || 0).toLocaleString('id-ID')}
+                              </span>
+                              <span className="text-xs sm:text-sm font-semibold text-emerald-200/80">/ {durationText}</span>
                             </div>
-                            <div className={`flex items-center gap-2.5 ${plan.can_add_gallery !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
-                              {plan.can_add_gallery !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
-                              <span>Galeri Foto &amp; Banner</span>
-                            </div>
-                            <div className={`flex items-center gap-2.5 ${plan.can_add_video !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
-                              {plan.can_add_video !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
-                              <span>Video Profil Usaha</span>
-                            </div>
-                            <div className={`flex items-center gap-2.5 ${plan.can_add_products !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
-                              {plan.can_add_products !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
-                              <span>Katalog Produk Usaha</span>
-                            </div>
-                            <div className={`flex items-center gap-2.5 ${plan.can_chat !== false ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
-                              {plan.can_chat !== false ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
-                              <span>Fitur Chat Pelanggan</span>
-                            </div>
-                            <div className={`flex items-center gap-2.5 ${plan.priority_listing ? 'text-slate-700 font-semibold' : 'text-slate-400 line-through'}`}>
-                              {plan.priority_listing ? <Check size={16} className="text-emerald-600 shrink-0" /> : <X size={16} className="text-slate-300 shrink-0" />}
-                              <span>Prioritas Tampilan Hasil Pencarian</span>
+
+                            <p className="text-[0.88rem] text-slate-300 mb-6 leading-relaxed">
+                              {plan.description || "Tingkatkan promosi usaha Anda dengan fitur terlengkap dan badge bisnis terverifikasi."}
+                            </p>
+
+                            <div className="space-y-3 pt-5 border-t border-white/15 text-[0.88rem]">
+                              <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                                <Check size={16} className="text-emerald-400 shrink-0" />
+                                <span>Integrasi Map &amp; Lokasi Interaktif</span>
+                              </div>
+                              <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                                <Check size={16} className="text-emerald-400 shrink-0" />
+                                <span>Galeri Foto Banner &amp; Video Profil</span>
+                              </div>
+                              <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                                <Check size={16} className="text-emerald-400 shrink-0" />
+                                <span>Katalog Produk &amp; Rata-rata Harga</span>
+                              </div>
+                              <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                                <Check size={16} className="text-emerald-400 shrink-0" />
+                                <span>Akses Fitur Chat Langsung</span>
+                              </div>
+                              <div className="flex items-center gap-2.5 text-amber-300 font-semibold">
+                                <Check size={16} className="text-amber-400 shrink-0" />
+                                <span>Badge Bisnis Terverifikasi &amp; Prioritas</span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1371,13 +1432,14 @@ export default function AddBusiness() {
                             setSelectedPackage({ ...plan, isFree: false });
                             setStep(2);
                           }}
-                          className={`mt-8 w-full py-3.5 px-4 rounded-xl text-[0.92rem] font-bold transition-all duration-200 border-0 cursor-pointer ${
+                          className={`mt-8 w-full py-3.5 px-5 rounded-2xl text-[0.95rem] font-bold transition-all duration-200 border-0 cursor-pointer relative z-10 flex items-center justify-center gap-2 ${
                             isSelected
-                              ? "bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-lg shadow-[#007570]/30"
-                              : "bg-[#007570] text-white hover:bg-[#005a58]"
+                              ? "bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-[0_4px_20px_rgba(251,191,36,0.5)] scale-[1.02]"
+                              : "bg-[#00c48c] hover:bg-[#00b074] text-slate-950 font-extrabold shadow-[0_4px_20px_rgba(0,196,140,0.4)] hover:scale-[1.02] active:scale-[0.98]"
                           }`}
                         >
-                          Pilih Paket
+                          <span>{isSelected ? "Paket Premium Terpilih" : "Pilih Paket Premium"}</span>
+                          <ChevronRight size={18} />
                         </button>
                       </div>
                     );
@@ -1431,11 +1493,15 @@ export default function AddBusiness() {
                     <input name="name" type="text" placeholder="Contoh: Warung Makan Sederhana" value={form.name} onChange={handleFormChange} className={inputCls} />
                   </div>
 
-                  {/* Deskripsi Usaha */}
+                  {/* Deskripsi Usaha (TinyMCE WYSIWYG Editor Style) */}
                   <div className="flex flex-col gap-2">
                     <label className={labelCls}>Deskripsi Usaha <span className="text-[#dc2626]">*</span></label>
-                    <textarea name="description" rows={4} placeholder="Ceritakan keunggulan, produk utama, dan informasi usaha kamu secara lengkap..." value={form.description} onChange={handleFormChange}
-                      className="w-full px-4 py-3 border-[1.5px] border-[#e2e8f0] rounded-xl text-[0.95rem] text-[#0f172a] bg-[#fafafa] outline-none transition-all duration-200 leading-[1.6] resize-vertical min-h-[110px] focus:border-[#007570] focus:bg-white"
+                    <RichTextEditor
+                      value={form.description}
+                      onChange={(val) => setForm((prev) => ({ ...prev, description: val }))}
+                      placeholder="Ceritakan keunggulan, produk utama, dan informasi usaha kamu secara lengkap..."
+                      minHeight="180px"
+                      disabled={loading}
                     />
                   </div>
 
@@ -1560,38 +1626,52 @@ export default function AddBusiness() {
                         placeholder="Jl. Contoh No. 123, Kelurahan, Kecamatan, Kota"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && geocodeAddress()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !isFreeSelection) {
+                            e.preventDefault();
+                            geocodeAddress();
+                          }
+                        }}
                         className={inputCls}
                       />
-                      <button
-                        type="button"
-                        onClick={geocodeAddress}
-                        disabled={geocoding}
-                        className="px-5 bg-[#007570] text-white border-0 rounded-xl font-semibold cursor-pointer shrink-0 hover:bg-[#005a58] flex items-center gap-2 transition-colors"
-                      >
-                        {geocoding ? <Loader2 size={16} className={spinCls} /> : <Search size={16} />}
-                        <span className="hidden sm:inline">Cari Peta</span>
-                      </button>
+                      {!isFreeSelection && (
+                        <button
+                          type="button"
+                          onClick={geocodeAddress}
+                          disabled={geocoding}
+                          className="px-5 bg-[#007570] text-white border-0 rounded-xl font-semibold cursor-pointer shrink-0 hover:bg-[#005a58] flex items-center gap-2 transition-colors"
+                        >
+                          {geocoding ? <Loader2 size={16} className={spinCls} /> : <Search size={16} />}
+                          <span className="hidden sm:inline">Cari Peta</span>
+                        </button>
+                      )}
                     </div>
 
-                    <div className="w-full max-w-full rounded-2xl overflow-hidden mt-3 border border-[#e2e8f0] relative isolate z-0 min-w-0">
-                      <MapContainer
-                        key={mapKey}
-                        center={coords ? [coords.lat, coords.lng] : DEFAULT_CENTER}
-                        zoom={coords ? 15 : 6}
-                        style={{ height: "280px", width: "100%", minWidth: 0, position: "relative", zIndex: 0 }}
-                        scrollWheelZoom
-                      >
-                        <MapResizeHandler />
-                        <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        <MapClickHandler onMapClick={(latlng) => setCoords({ lat: latlng.lat, lng: latlng.lng })} />
-                        {coords && <Marker position={[coords.lat, coords.lng]} />}
-                      </MapContainer>
-                      <p className="text-xs text-slate-500 px-4 py-2.5 bg-white border-t border-slate-200 flex items-center gap-1.5">
+                    {!isFreeSelection ? (
+                      <div className="w-full max-w-full rounded-2xl overflow-hidden mt-3 border border-[#e2e8f0] relative isolate z-0 min-w-0">
+                        <MapContainer
+                          key={mapKey}
+                          center={coords ? [coords.lat, coords.lng] : DEFAULT_CENTER}
+                          zoom={coords ? 15 : 6}
+                          style={{ height: "280px", width: "100%", minWidth: 0, position: "relative", zIndex: 0 }}
+                          scrollWheelZoom
+                        >
+                          <MapResizeHandler />
+                          <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          <MapClickHandler onMapClick={(latlng) => setCoords({ lat: latlng.lat, lng: latlng.lng })} />
+                          {coords && <Marker position={[coords.lat, coords.lng]} />}
+                        </MapContainer>
+                        <p className="text-xs text-slate-500 px-4 py-2.5 bg-white border-t border-slate-200 flex items-center gap-1.5">
+                          <MapPin size={14} className="text-[#007570]" />
+                          <span>Klik pada peta untuk menentukan posisi presisi lokasi usaha.</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                         <MapPin size={14} className="text-[#007570]" />
-                        <span>Klik pada peta untuk menentukan posisi presisi lokasi usaha.</span>
+                        <span>Peta lokasi interaktif dan pin presisi Leaflet tersedia pada paket <strong>Premium</strong>.</span>
                       </p>
-                    </div>
+                    )}
                   </div>
 
                   {/* Kota & Provinsi */}
@@ -1728,21 +1808,30 @@ export default function AddBusiness() {
                         </label>
                       </div>
                       <span className="text-xs font-semibold text-slate-500">
-                        {photos.length} foto {video ? " • 1 video" : ""}
+                        {photos.length}{isFreeSelection ? "/3" : ""} foto
                       </span>
                     </div>
 
                     <p className="text-xs text-slate-500">
-                      Tambahkan foto suasana toko, produk unggulan, dan 1 video profil usaha (opsional).
+                      {isFreeSelection
+                        ? "Tambahkan hingga maksimal 3 foto suasana toko atau produk unggulan (Paket Free)."
+                        : "Tambahkan foto galeri foto tanpa batas untuk menarik lebih banyak pelanggan (Paket Premium)."}
                     </p>
 
                     {/* Upload Controls Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="w-full">
                       {/* Photo Upload Area */}
                       <div
-                        className="border border-dashed border-slate-300 rounded-xl p-3.5 text-center cursor-pointer transition-all bg-slate-50 hover:border-[#007570] hover:bg-[#f0fffe] flex flex-col items-center justify-center min-h-[90px]"
+                        className={`border border-dashed rounded-xl p-5 text-center transition-all bg-slate-50 flex flex-col items-center justify-center min-h-[100px] ${
+                          isFreeSelection && photos.length >= 3
+                            ? "border-slate-200 opacity-60 cursor-not-allowed"
+                            : "border-slate-300 cursor-pointer hover:border-[#007570] hover:bg-[#f0fffe]"
+                        }`}
                         {...createDropHandler(handlePhotoAdd)}
-                        onClick={() => photoInputRef.current?.click()}
+                        onClick={() => {
+                          if (isFreeSelection && photos.length >= 3) return;
+                          photoInputRef.current?.click();
+                        }}
                       >
                         <input
                           ref={photoInputRef}
@@ -1750,102 +1839,23 @@ export default function AddBusiness() {
                           accept="image/jpeg,image/png,image/webp,image/gif"
                           multiple
                           hidden
+                          disabled={isFreeSelection && photos.length >= 3}
                           onChange={(e) => handlePhotoAdd(e.target.files)}
                         />
                         <div className="flex items-center gap-2 mb-1 text-[#007570]">
-                          <Upload size={18} />
-                          <span className="text-xs font-bold text-slate-700">Upload Foto Galeri</span>
+                          <Upload size={20} />
+                          <span className="text-sm font-bold text-slate-700">
+                            {isFreeSelection && photos.length >= 3
+                              ? "Batas 3 Foto Paket Free Tercapai"
+                              : "Upload Foto Galeri Usaha"}
+                          </span>
                         </div>
-                        <p className="text-[0.72rem] text-slate-400">JPG, PNG, WEBP (Bisa pilih beberapa foto)</p>
+                        <p className="text-xs text-slate-400">
+                          {isFreeSelection
+                            ? "Maksimal 3 foto untuk paket Free. Upgrade ke Premium untuk foto tanpa batas."
+                            : "JPG, PNG, WEBP (Bisa pilih banyak foto sekaligus)"}
+                        </p>
                       </div>
-
-                      {/* Video Upload Area (Only if no video exists) */}
-                      {!video ? (
-                        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 flex flex-col justify-between min-h-[90px]">
-                          <div className="flex items-center justify-between gap-1 mb-2">
-                            <span className="text-[0.75rem] font-bold text-slate-700 flex items-center gap-1">
-                              <Video size={13} className="text-[#007570]" /> Video Profil (Maks 1)
-                            </span>
-                            <div className="flex rounded-lg p-0.5 bg-slate-200/80 text-[0.68rem] font-bold">
-                              <button
-                                type="button"
-                                onClick={() => { setVideoSourceTab("file"); setYoutubeUrlError(""); }}
-                                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                                  videoSourceTab === "file" ? "bg-white text-[#007570] shadow-2xs" : "text-slate-600"
-                                }`}
-                              >
-                                File
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { setVideoSourceTab("youtube"); setYoutubeUrlError(""); }}
-                                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                                  videoSourceTab === "youtube" ? "bg-white text-[#007570] shadow-2xs" : "text-slate-600"
-                                }`}
-                              >
-                                YouTube
-                              </button>
-                            </div>
-                          </div>
-
-                          {videoSourceTab === "file" ? (
-                            <div
-                              className="border border-dashed border-slate-300 rounded-lg p-2 text-center cursor-pointer transition-all bg-white hover:border-[#007570]"
-                              {...createDropHandler(handleVideoFileAdd)}
-                              onClick={() => videoInputRef.current?.click()}
-                            >
-                              <input
-                                ref={videoInputRef}
-                                type="file"
-                                accept="video/mp4,video/webm,video/quicktime"
-                                hidden
-                                onChange={(e) => handleVideoFileAdd(e.target.files)}
-                              />
-                              <p className="text-xs font-bold text-slate-700 flex items-center justify-center gap-1">
-                                <Upload size={13} className="text-[#007570]" /> Upload File Video
-                              </p>
-                              <p className="text-[0.7rem] text-slate-400">MP4, WebM (Maks 25MB)</p>
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              <div className="flex gap-1.5">
-                                <input
-                                  type="text"
-                                  value={youtubeUrlInput}
-                                  onChange={(e) => {
-                                    setYoutubeUrlInput(e.target.value);
-                                    if (youtubeUrlError) setYoutubeUrlError("");
-                                  }}
-                                  placeholder="Link YouTube (watch?v=...)"
-                                  className="w-full px-2.5 py-1 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:border-[#007570]"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleYouTubeAdd}
-                                  className="px-3 py-1 bg-[#007570] hover:bg-[#005c58] text-white text-xs font-bold rounded-lg transition-colors shrink-0 cursor-pointer"
-                                >
-                                  Tambah
-                                </button>
-                              </div>
-                              {youtubeUrlError && (
-                                <p className="text-[0.7rem] font-medium text-red-600">{youtubeUrlError}</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center justify-between min-h-[90px]">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-[#007570]/10 text-[#007570] flex items-center justify-center font-bold">
-                              <Video size={16} />
-                            </div>
-                            <div>
-                              <span className="text-xs font-bold text-slate-800 block">1 Video Usaha Terpasang</span>
-                              <span className="text-[0.7rem] text-slate-400">Tampilan video ada pada grid galeri</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {/* UNIFIED MEDIA THUMBNAILS GRID (Photos + Video together!) */}
