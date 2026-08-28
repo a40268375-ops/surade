@@ -424,11 +424,14 @@ export default function Category() {
       } else {
         const result = await api.post("/saved-businesses", { business_id: id });
         setSaved((prev) => ({ ...prev, [id]: result.id }));
+<<<<<<< HEAD
         // PERBAIKAN: sama seperti di Home.jsx - begitu berhasil disimpan
         // sebagai favorit, otomatis diarahkan ke Dashboard > Favorit
         // supaya langsung kelihatan sudah masuk daftar, tidak perlu
         // membuka Dashboard sendiri lalu mencari menu Favorit secara manual.
         setTimeout(() => navigate("/dashboard?tab=saved"), 500);
+=======
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
       }
     } catch (err) {
       alert(err?.data?.message || "Gagal memperbarui daftar favorit. Silakan coba lagi.");

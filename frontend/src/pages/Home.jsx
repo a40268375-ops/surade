@@ -526,6 +526,13 @@ import { useState, useRef, useEffect } from "react";
     const categoriesList = [
       ...DEFAULT_CATEGORY_TABS,
       ...dbCategories
+<<<<<<< HEAD
+=======
+        // PERBAIKAN: sama seperti di halaman Category - endpoint
+        // "/categories" isinya flat semua (kategori utama + subkategori),
+        // jadi difilter dulu cuma yang tidak punya induk (parent_id kosong)
+        // yang boleh nambah jadi kotak kategori utama.
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
         .filter((c) => !c.parent_id)
         .filter((c) => {
           const norm = normalizeLabel(c.name);
@@ -538,7 +545,11 @@ import { useState, useRef, useEffect } from "react";
         .map((c) => ({
           id: c.slug,
           label: c.name,
+<<<<<<< HEAD
           icon: iconForCategory(c.name, { size: 26, strokeWidth: 1.7, iconKey: c.icon }),
+=======
+          icon: iconForCategory(c.name, { size: 26, strokeWidth: 1.7 }),
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
         })),
     ];
 
@@ -554,6 +565,7 @@ import { useState, useRef, useEffect } from "react";
       status: b.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
       img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
       is_premium: b.is_premium_active,
+<<<<<<< HEAD
       package: b.package,
       open: !!b.is_open_now,
       categoryColor: "#159c60",
@@ -578,6 +590,24 @@ import { useState, useRef, useEffect } from "react";
 
     // Removed old carousel scroll function
 
+    // Smart Village adalah angka STATIS yang ditulis manual di
+    // smartCities.js (mis. selalu "48" untuk Desa Buniwangi, tidak pernah
+    // berubah walau ada bisnis baru daftar/dihapus). Sekarang dihitung
+    // ASLI dari data bisnis yang sudah dimuat, dicocokkan lewat kolom
+    // `village` (bukan menebak-nebak dari teks alamat) - karena pilihan
+    // desa di form Tambah Bisnis memang diambil dari nama SMART_CITIES
+    // yang sama persis, jadi pencocokannya exact match, bukan fuzzy.
+    const villageBusinessCounts = dbBusinesses.reduce((acc, b) => {
+      if (b.village) acc[b.village] = (acc[b.village] || 0) + 1;
+      return acc;
+    }, {});
+=======
+      open: !!b.is_open_now,
+      categoryColor: "#159c60"
+    })) : (apiError ? [...TEMUKAN_DATA, ...BISNIS_DATA] : []);
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
+    // PERBAIKAN: sebelumnya "N bisnis terdaftar" di kartu Smart City &
     // Smart Village adalah angka STATIS yang ditulis manual di
     // smartCities.js (mis. selalu "48" untuk Desa Buniwangi, tidak pernah
     // berubah walau ada bisnis baru daftar/dihapus). Sekarang dihitung
@@ -660,6 +690,7 @@ import { useState, useRef, useEffect } from "react";
           })
         : api.post("/saved-businesses", { business_id: id }).then((result) => {
             setSaved((prev) => ({ ...prev, [id]: result.id }));
+<<<<<<< HEAD
             // PERBAIKAN: menekan "Simpan" sebelumnya hanya menyimpan data di
             // background tanpa kepastian apa-apa buat penggunanya - dia
             // harus buka Dashboard sendiri lalu klik menu "Favorit" untuk
@@ -667,6 +698,8 @@ import { useState, useRef, useEffect } from "react";
             // disimpan, otomatis diarahkan ke Dashboard > Favorit supaya
             // langsung kelihatan bisnisnya sudah masuk daftar.
             setTimeout(() => navigate("/dashboard?tab=saved"), 500);
+=======
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
           });
 
       request
@@ -773,6 +806,7 @@ import { useState, useRef, useEffect } from "react";
                   }
                 }}
               >
+<<<<<<< HEAD
                 {extendedPremiumAds.map((ad, index) => (
                   <div key={`${ad.businessId || ad.id}-${index}`} className="premium-ad-card">
                     <div className="premium-ad-card__img-wrap">
@@ -799,6 +833,34 @@ import { useState, useRef, useEffect } from "react";
                         <Link to={`/business/${ad.businessId}`} className="premium-ad-card__btn">
                           Lihat Profil Usaha <ArrowUpRight size={18} />
                         </Link>
+=======
+                ‹
+              </button>
+              <div className="ads-carousel__track" style={{ transform: `translateX(-${currentAdIndex * 33.33}%)` }}>
+                {[...displayAds, ...displayAds].map((ad, index) => (
+                  <Link
+                    key={`${ad.id}-${index}`}
+                    to={ad.categorySlug ? `/category/${ad.categorySlug}` : `/business/${ad.businessId}`}
+                    className="ad-card"
+                  >
+                    <div className="ad-card__img-wrap">
+                      <img src={ad.img} alt={ad.name} className="ad-card__img" loading="lazy" />
+                      <div className="ad-card__img-overlay">
+                        <button
+                          type="button"
+                          className={`ad-card__save${saved[ad.businessId] ? " saved" : ""}`}
+                          onClick={(e) => { e.preventDefault(); if (ad.businessId) toggleSave(ad.businessId); }}
+                          disabled={!ad.businessId || !!savingIds[ad.businessId]}
+                          aria-label="Simpan"
+                        >
+                          <Bookmark size={13} fill={saved[ad.businessId] ? "currentColor" : "none"} />
+                          <span>{saved[ad.businessId] ? "Tersimpan" : "Simpan"}</span>
+                        </button>
+                        <span className="ad-card__views">
+                          <Eye size={13} />
+                          <span>Pratinjau</span>
+                        </span>
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
                       </div>
                     </div>
                   </div>
@@ -1048,6 +1110,7 @@ import { useState, useRef, useEffect } from "react";
                         <span>Pratinjau</span>
                       </span>
                     </div>
+<<<<<<< HEAD
                     {/* Verification Badge - HANYA muncul kalau bisnisnya premium,
                         sebelumnya selalu muncul tanpa syarat di semua kartu. */}
                     {bisnis.is_premium && (
@@ -1056,6 +1119,12 @@ import { useState, useRef, useEffect } from "react";
                         <span>Terverifikasi</span>
                       </div>
                     )}
+=======
+                    {/* Verification Badge */}
+                    <div className="biz-card__premium-badge">
+                      <span>Terverifikasi</span>
+                    </div>
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
                   </div>
 
                   {/* Body */}
@@ -1142,14 +1211,54 @@ import { useState, useRef, useEffect } from "react";
         </section>
 
         {/* ── BLOG & EVENT SECTION (digabung, satu section saja) ── */}
+<<<<<<< HEAD
         {/* ── BLOG & EVENT SECTION (satu grid gabungan, badge penanda tipe
              di tiap kartu) ── */}
+=======
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
         <section className="blog-section">
           <div className="blog-inner">
             <h2 className="blog-title">Blog &amp; Event</h2>
             <p className="blog-subtitle">Info acara, promo, dan cerita pengalaman terbaru dari Surade.co.id</p>
 
+            {dbEvents.length > 0 && (
+              <>
+                <h3 className="blog-subsection-title">📅 Event &amp; Promo</h3>
+                <div className="event-grid">
+                  {dbEvents.map((ev) => (
+                    <div key={ev.id} className="event-card">
+                      <div className="event-card__img-wrap">
+                        <img
+                          src={ev.image ? getImageUrl(ev.image) : "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=500&h=300&fit=crop"}
+                          alt={ev.title}
+                          className="event-card__img"
+                          loading="lazy"
+                        />
+                        {ev.event_date && (
+                          <span className="event-card__date">
+                            {new Date(ev.event_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                      <div className="event-card__body">
+                        <h3 className="event-card__title">{ev.title}</h3>
+                        {ev.location && (
+                          <p className="event-card__location">
+                            <MapPin size={13} />
+                            {ev.location}
+                          </p>
+                        )}
+                        <p className="event-card__desc">{ev.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <h3 className="blog-subsection-title">✍️ Berbagi Pengalaman Mereka</h3>
             <div className="blog-grid">
+<<<<<<< HEAD
               {(() => {
                 const mappedEvents = dbEvents.map((ev) => ({
                   type: "event",
@@ -1220,6 +1329,58 @@ import { useState, useRef, useEffect } from "react";
                           yang sudah ada di kiri atas. */}
                       <span className={`home-blog-type-badge home-blog-type-badge--${post.type}`}>
                         {post.type === "blog" ? "Blog" : "Event"}
+=======
+              {(dbBlogs.length > 0
+                ? dbBlogs.slice(0, 3).map((b) => ({
+                    id: b.id,
+                    category: b.category || "Umum",
+                    title: b.title,
+                    author: b.author?.name || "Admin Surade",
+                    date: b.created_at
+                      ? new Date(b.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+                      : "-",
+                    // PERBAIKAN: kalau image-nya kosong ATAU ternyata "blob:..."
+                    // (sisa data lama sebelum upload gambar benar-benar
+                    // diperbaiki - link sementara itu cuma valid di tab
+                    // browser waktu itu, jadi rusak/patah kalau dibuka lagi),
+                    // pakai gambar contoh generik supaya kartunya tetap rapi,
+                    // bukan malah kelihatan pecah/tumpang tindih dengan judul.
+                    img: b.image && !b.image.startsWith("blob:")
+                      ? getImageUrl(b.image)
+                      : "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=260&fit=crop",
+                  }))
+                : BLOG_DATA
+              ).map((post) => (
+                <Link key={post.id} to={`/blog/${post.id}`} className="blog-card blog-card--link">
+                  <div className="blog-card__img-wrap">
+                    <img
+                      src={post.img}
+                      alt={post.title}
+                      className="blog-card__img"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Jaring pengaman terakhir: apa pun sebab gambarnya
+                        // gagal dimuat (link rusak, blob: kadaluarsa, dll),
+                        // otomatis ganti ke gambar generik supaya kartunya
+                        // tidak pernah lagi kelihatan pecah/tumpang tindih
+                        // dengan judul.
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=260&fit=crop";
+                      }}
+                    />
+                    <span className="blog-card__category">{post.category}</span>
+                  </div>
+                  <div className="blog-card__body">
+                    <h3 className="blog-card__title">{post.title}</h3>
+                    <div className="blog-card__footer">
+                      <span className="blog-card__meta">
+                        <User size={13} />
+                        <span>{post.author}</span>
+                      </span>
+                      <span className="blog-card__meta">
+                        <Calendar size={13} />
+                        <span>{post.date}</span>
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
                       </span>
                       <span className="blog-card__category">{post.category}</span>
                     </div>

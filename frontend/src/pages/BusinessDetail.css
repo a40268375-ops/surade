@@ -122,6 +122,7 @@
   gap: 12px;
 }
 
+<<<<<<< HEAD
 @media (max-width: 640px) {
   .bd-hero__top {
     gap: 12px;
@@ -133,6 +134,8 @@
   }
 }
 
+=======
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
 /* Lencana "Terverifikasi" — hijau, hanya tampil kalau bisnisnya
    memang lagi premium aktif (business.is_premium_active). */
 .bd-verified-badge {

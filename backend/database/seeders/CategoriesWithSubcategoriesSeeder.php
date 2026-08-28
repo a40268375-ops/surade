@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Category;
 
+<<<<<<< HEAD
 // PERINGATAN - SEEDER INI SUDAH TIDAK BOLEH DIPAKAI.
 //
 // Seeder ini adalah salah satu penyebab kategori dobel/tidak konsisten di
@@ -23,16 +24,21 @@ use App\Models\Category;
 // pakai `php artisan categories:reconcile` (lihat
 // app/Console/Commands/ReconcileCategoriesCommand.php), yang menggabungkan
 // duplikat tanpa menghapus data bisnis/subkategori yang sudah ada.
+=======
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
 class CategoriesWithSubcategoriesSeeder extends Seeder
 {
     public function run()
     {
+<<<<<<< HEAD
         throw new \RuntimeException(
             'CategoriesWithSubcategoriesSeeder dinonaktifkan permanen karena pernah menyebabkan kategori dobel ' .
             'dan menghapus seluruh data kategori sebelum diisi ulang. Gunakan "php artisan db:seed --class=CategorySeeder" ' .
             'untuk data kategori yang benar, atau "php artisan categories:reconcile" untuk membersihkan duplikat yang sudah terlanjur ada.'
         );
 
+=======
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
         // First, clear existing categories to avoid conflicts
         Category::query()->delete();
 

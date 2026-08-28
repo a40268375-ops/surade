@@ -43,6 +43,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
+<<<<<<< HEAD
         // PERBAIKAN: sebelumnya memanggil CategoriesWithSubcategoriesSeeder,
         // yang isinya kategori LAMA/berbeda ("Makanan & Minuman", "Retail &
         // Belanja", dst) - tidak cocok sama sekali dengan menu Informasi di
@@ -53,6 +54,11 @@ class DatabaseSeeder extends Seeder
         // sekali. Sekarang diganti ke seeder yang benar.
         $this->call([
             CategorySeeder::class,
+=======
+        // Run comprehensive seeders
+        $this->call([
+            CategoriesWithSubcategoriesSeeder::class,
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
             BusinessesSeeder::class,
             AdvertisementsSeeder::class,
         ]);

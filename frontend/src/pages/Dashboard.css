@@ -8704,6 +8704,7 @@
 .db-badge--warning {
   background: #fef3c7;
   color: #b45309;
+<<<<<<< HEAD
 }
 
 .db-badge--danger {
@@ -9238,3 +9239,6 @@
   .referral-header { flex-direction: column; gap: 12px; }
 }
 
+=======
+}
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda

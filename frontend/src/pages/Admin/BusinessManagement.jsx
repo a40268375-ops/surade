@@ -86,13 +86,13 @@ const BusinessManagement = () => {
                                     {((b.images && b.images.length > 0) || b.image) ? (
                                         <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
                                             <img
-                                                src={b.images && b.images.length > 0 ? `http://localhost:8000${b.images[0]}` : `http://localhost:8000${b.image}`}
+                                                src={b.images && b.images.length > 0 ? `http://surade.latihan.co.id${b.images[0]}` : `http://surade.latihan.co.id${b.image}`}
                                                 alt={b.title}
                                                 style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px' }}
                                             />
                                             {b.images && b.images.length > 1 && (
                                                 <img
-                                                    src={`http://localhost:8000${b.images[1]}`}
+                                                    src={`http://surade.latihan.co.id${b.images[1]}`}
                                                     alt={`${b.title} gallery`}
                                                     style={{ width: '34px', height: '34px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e5e7eb' }}
                                                 />

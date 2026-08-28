@@ -584,10 +584,13 @@ export default function BusinessDetail() {
         const result = await api.post("/saved-businesses", { business_id: business.id });
         setSaved(true);
         setSavedRecordId(result.id);
+<<<<<<< HEAD
         // PERBAIKAN: konsisten dengan Home.jsx & Category.jsx - begitu
         // berhasil disimpan sebagai favorit, otomatis diarahkan ke
         // Dashboard > Favorit supaya langsung kelihatan sudah masuk daftar.
         setTimeout(() => navigate("/dashboard?tab=saved"), 500);
+=======
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
       }
     } catch (err) {
       alert(err?.data?.message || "Gagal memperbarui daftar favorit. Silakan coba lagi.");
@@ -791,6 +794,7 @@ export default function BusinessDetail() {
               <span>/</span>
               <span>{business.name}</span>
             </div>
+<<<<<<< HEAD
 
             {/* PERBAIKAN: ditambahkan logo bulat usaha di sebelah nama -
                 sebelumnya di sini kosong sama sekali. Fotonya diambil dari
@@ -825,6 +829,27 @@ export default function BusinessDetail() {
                     <span>{displayStatus}</span>
                   </div>
                 </div>
+=======
+            <h1 className="bd-hero__title">
+              {business.name}
+              {business.is_premium_active && (
+                <span className="bd-verified-badge" title="Bisnis Terverifikasi">
+                  <CheckCircle size={14} strokeWidth={2.5} />
+                  Terverifikasi
+                </span>
+              )}
+            </h1>
+            <p className="bd-hero__category">{business.category}</p>
+            <div className="bd-hero__meta">
+              <div className="bd-hero__rating">
+                <Star size={18} fill="#fbbf24" stroke="#fbbf24" />
+                <span>{business.rating}</span>
+                <span>({business.reviews} ulasan)</span>
+              </div>
+              <div className="bd-hero__status">
+                <span className={`bd-hero__status-dot ${isOpenNow ? "open" : "closed"}`} />
+                <span>{displayStatus}</span>
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
               </div>
             </div>
           </div>

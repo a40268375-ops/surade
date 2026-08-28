@@ -94,7 +94,11 @@ import {
   Image as ImageIcon,
   Package,
   AlertTriangle,
+<<<<<<< HEAD
   Ticket, Wallet, Copy, Target,
+=======
+  Ticket,
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
 } from "lucide-react";
 import emptyStateIcon from "../assets/icon-empty-state.png";
 import logoImg from "../assets/logo.png";
@@ -2021,7 +2025,7 @@ export default function Dashboard() {
     // Create full image URL
     const imageUrl = proofPath.startsWith('http') 
       ? proofPath 
-      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/storage/${proofPath}`;
+      : `${import.meta.env.VITE_API_BASE_URL || 'http://surade.latihan.co.id'}/storage/${proofPath}`;
     
     // Open in new window/tab
     window.open(imageUrl, '_blank');
@@ -2922,6 +2926,19 @@ export default function Dashboard() {
             ) : (
               <>
                 <button
+<<<<<<< HEAD
+=======
+                  className={`db-menu-btn ${activeTab === "businesses" ? "active" : ""}`}
+                  onClick={() => setActiveTab("businesses")}
+                >
+                  <div className="db-menu-icon">
+                    <ShoppingBag size={20} />
+                  </div>
+                  <span>Daftar Bisnis</span>
+                </button>
+
+                <button
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
                   className={`db-menu-btn ${activeTab === "saved" ? "active" : ""}`}
                   onClick={() => setActiveTab("saved")}
                 >
@@ -2994,6 +3011,14 @@ export default function Dashboard() {
                   )}
                 </button>
 
+<<<<<<< HEAD
+=======
+                {/* Menu "Notifikasi" di sidebar sengaja dihapus - semua notifikasi
+                    sekarang cukup dibuka lewat ikon lonceng di topbar (lihat
+                    db-notification-dropdown di bawah), jadi tidak ada lagi menu
+                    terpisah. */}
+
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
                 <button
                   className={`db-menu-btn ${activeTab === "referral" ? "active" : ""}`}
                   onClick={() => setActiveTab("referral")}
@@ -3006,7 +3031,11 @@ export default function Dashboard() {
 
                 <button
                   className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
+<<<<<<< HEAD
                   onClick={() => setActiveTab("content")}
+=======
+                  onClick={handleOpenContentTab}
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
                 >
                   <div className="db-menu-icon">
                     <BookOpen size={20} />
@@ -4077,6 +4106,7 @@ export default function Dashboard() {
                         <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(1)}>
                           Kembali
                         </button>
+<<<<<<< HEAD
                         <button
                           type="button"
                           className="biz-form-btn biz-form-btn-primary"
@@ -4092,6 +4122,9 @@ export default function Dashboard() {
                             setBizFormStep(3);
                           }}
                         >
+=======
+                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(3)}>
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
                           Lanjutkan
                         </button>
                       </div>
@@ -7018,11 +7051,166 @@ export default function Dashboard() {
 
         {/* TAB: REFERRAL */}
           {activeTab === "referral" && (
+<<<<<<< HEAD
             <div className="db-panel referral-dashboard">
               <div className="referral-header">
                 <div className="referral-header-title">
                   <h2>Program Referral</h2>
                   <p>Kelola kode referral Anda, pantau pendapatan komisi, penggunaan kode, dan riwayat transaksi.</p>
+=======
+            <div className="db-panel">
+              <div className="db-panel-header">
+                <h2>Referral</h2>
+              </div>
+
+              {/* Ringkasan kode referral & komisi milik user sendiri.
+                  Data asli dari API /my-referral-stats, bukan dummy.
+                  Kotak kode referral SELALU tampil (tidak tersembunyi di
+                  belakang loading/error) supaya jelas kelihatan bagian ini aktif. */}
+              <div style={{ marginBottom: '20px', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px' }}>
+                <div className="db-form-group" style={{ maxWidth: 420, marginBottom: 0 }}>
+                  <label>Kode Referral Saya</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={referralStats?.referral_code || user?.referral_code || "Belum ada kode referral"}
+                      disabled
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        color: (referralStats?.referral_code || user?.referral_code) ? '#059669' : '#6b7280',
+                        fontWeight: (referralStats?.referral_code || user?.referral_code) ? '600' : 'normal'
+                      }}
+                    />
+                    {(referralStats?.referral_code || user?.referral_code) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(referralStats?.referral_code || user?.referral_code);
+                          alert('Kode referral berhasil disalin!');
+                        }}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#059669',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          borderRadius: '4px'
+                        }}
+                        title="Copy kode referral"
+                      >
+                        📋
+                      </button>
+                    )}
+                  </div>
+                  <small style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {(referralStats?.referral_code || user?.referral_code)
+                      ? `Bagikan kode ini. Pemakai kode dapat diskon ${referralStats?.discount_percent ?? 5}%, dan Anda mendapat komisi ${referralStats?.commission_percent ?? 15}% dari transaksi setelah disetujui Admin.`
+                      : "Anda belum memiliki kode referral. Kode referral diberikan oleh Admin."}
+                  </small>
+                </div>
+
+                {referralStatsLoading ? (
+                  <div className="db-empty-state">Memuat statistik referral...</div>
+                ) : referralStatsError ? (
+                  <div className="db-empty-state">{referralStatsError}</div>
+                ) : referralStats ? (
+                  <>
+                    <div className="db-stat-grid db-stat-grid--admin" style={{ marginTop: '16px' }}>
+                      <div className="db-stat-card db-stat-card--blue">
+                        <span className="db-stat-card__label">Total Pemakaian</span>
+                        <span className="db-stat-card__value">{referralStats.total_penggunaan}</span>
+                      </div>
+                      <div className="db-stat-card db-stat-card--violet">
+                        <span className="db-stat-card__label">Total Transaksi</span>
+                        <span className="db-stat-card__value">{referralStats.total_transaksi}</span>
+                      </div>
+                      <div className="db-stat-card db-stat-card--green">
+                        <span className="db-stat-card__label">Komisi Disetujui + Dibayar</span>
+                        <span className="db-stat-card__value db-stat-card__value--currency">Rp {Number(referralStats.total_komisi_diterima || 0).toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="db-stat-card db-stat-card--teal">
+                        <span className="db-stat-card__label">Komisi Sudah Dibayar</span>
+                        <span className="db-stat-card__value db-stat-card__value--currency">Rp {Number(referralStats.total_komisi_dibayar || 0).toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+
+                    {referralStats.riwayat_terbaru && referralStats.riwayat_terbaru.length > 0 ? (
+                      <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                        <table className="db-table">
+                          <thead>
+                            <tr>
+                              <th>Transaction ID</th>
+                              <th>User</th>
+                              <th>Diskon</th>
+                              <th>Komisi</th>
+                              <th>Status</th>
+                              <th>Tanggal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {referralStats.riwayat_terbaru.map((r) => (
+                              <tr key={r.id}>
+                                <td>{r.transaction_id || `#${r.id}`}</td>
+                                <td>{r.referred_user || '-'}</td>
+                                <td>Rp {Number(r.discount_amount || 0).toLocaleString('id-ID')}</td>
+                                <td>Rp {Number(r.commission_amount || 0).toLocaleString('id-ID')}</td>
+                                <td>{r.status}</td>
+                                <td>{new Date(r.created_at).toLocaleDateString('id-ID')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="db-empty-state" style={{ marginTop: '16px' }}>Belum ada transaksi referral.</div>
+                    )}
+                  </>
+                ) : null}
+              </div>
+
+              <div className="db-panel-header">
+                <h2>Direktori Reseller</h2>
+              </div>
+
+              <div className="db-search-input">
+                <Search size={18} />
+                <input
+                  type="text"
+                  placeholder="Cari nama reseller atau wilayah..."
+                  value={resellerSearch}
+                  onChange={(e) => setResellerSearch(e.target.value)}
+                />
+              </div>
+
+              {filteredResellers.length > 0 ? (
+                <div className="db-reseller-grid">
+                  {filteredResellers.map((r) => (
+                    <div className="db-reseller-card" key={r.id}>
+                      <div className="db-reseller-card__avatar">
+                        <UserIcon size={28} />
+                      </div>
+                      <h3>{r.name}</h3>
+                      <span className="db-reseller-card__region">
+                        <MapPin size={13} /> {r.region}
+                      </span>
+                      <div className="db-reseller-card__stats">
+                        <div>
+                          <strong>{r.sales}</strong>
+                          <span>Penjualan</span>
+                        </div>
+                        <div>
+                          <strong><Star size={13} fill="currentColor" /> {r.rating}</strong>
+                          <span>Rating</span>
+                        </div>
+                      </div>
+                      <button className="db-reseller-card__btn">Hubungi Agen</button>
+                    </div>
+                  ))}
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda
                 </div>
                 <div className="referral-user-badge">
                   <UserIcon size={16} />
@@ -8556,4 +8744,8 @@ function AdminReportTab() {
       )}
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 43511c35c312291308bc3e9f249d166401282bda

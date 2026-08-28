@@ -1,1 +1,5 @@
+<<<<<<<< HEAD:backend/storage/framework/sessions/cPeVevqGfmJBGh7dYXNYqKiWSZVr79Tw5VEnMhY2
 a:3:{s:6:"_token";s:40:"DdYPnfR87tpBTs0MVC0Q2dcFCjf0GtBT30PJEzfT";s:9:"_previous";a:2:{s:3:"url";s:82:"http://127.0.0.1:8000/storage/avatars/ZXzfWwmekH3ya3bcMhIrzQmW2qJMkwHUJ5cbQKbn.png";s:5:"route";N;}s:6:"_flash";a:2:{s:3:"old";a:0:{}s:3:"new";a:0:{}}}
+========
+a:3:{s:6:"_token";s:40:"XwRhcXuovZ27eWdf6jLNapOxKoQoSzXkcwLjoZXO";s:9:"_previous";a:2:{s:3:"url";s:82:"http://127.0.0.1:8000/storage/avatars/ZXzfWwmekH3ya3bcMhIrzQmW2qJMkwHUJ5cbQKbn.png";s:5:"route";N;}s:6:"_flash";a:2:{s:3:"old";a:0:{}s:3:"new";a:0:{}}}
+>>>>>>>> 43511c35c312291308bc3e9f249d166401282bda:backend/storage/framework/sessions/0uqY245Y98YaxnwcRY6EWkCCH8ekM41QwaAd72Li
