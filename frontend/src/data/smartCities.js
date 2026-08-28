@@ -11,25 +11,35 @@
    nama kepala desa bersifat placeholder karena data resmi
    per-desa tidak tersedia publik — silakan sesuaikan sendiri.
 
-   SEMUA LINK FOTO di bawah ini sudah dicek ulang satu-satu
-   (per 16 Juli 2026) dan dipastikan aktif di Unsplash — link
-   lama di versi sebelumnya ada yang sudah dihapus/mati.
-
-   FIX 16 Juli 2026: Desa Buniwangi dan Desa Sukatani sebelumnya
-   memakai foto yang sama persis (photo-1624142482803). Foto
-   Desa Sukatani sekarang diganti dengan foto sawah/ladang udara
-   yang berbeda (photo-1568979810251, oleh Radoslav Bali).
+   PERBAIKAN: sebelumnya semua foto pakai stok foto acak dari
+   Unsplash (bukan foto desa yang sebenarnya). Sekarang diganti
+   pakai foto asli tiap desa yang dikirim langsung - disimpan di
+   src/assets/desa/ dan di-import di bawah supaya ikut ke-bundle
+   Vite (bukan link luar lagi, jadi tidak akan pernah mati/hilang).
 ───────────────────────────────────────────── */
+
+import imgKelurahanSurade from "../assets/desa/kelurahan-surade.jpg";
+import imgPasiripis from "../assets/desa/pasiripis.jpg";
+import imgBuniwangi from "../assets/desa/buniwangi.webp";
+import imgCipeundeuy from "../assets/desa/cipeundeuy.webp";
+import imgGunungsungging from "../assets/desa/gunungsungging.webp";
+import imgCitanglar from "../assets/desa/citanglar.webp";
+import imgJagamukti from "../assets/desa/jagamukti.webp";
+import imgKadaleman from "../assets/desa/kadaleman.webp";
+import imgWanasari from "../assets/desa/wanasari.jpeg";
+import imgSirnasari from "../assets/desa/sirnasari.jpg";
+import imgSukatani from "../assets/desa/sukatani.jpg";
+import imgKademangan from "../assets/desa/kademangan.jpg";
 
 export const SMART_CITIES = [
   {
     id: 1,
     name: "Kelurahan Surade",
     bisnis: 96,
-    population: "9.562 Jiwa",
+    population: "10.141 Jiwa",
     area: "Pusat Kec. Surade",
     governor: "Lurah Surade",
-    img: "https://images.unsplash.com/photo-1760292132737-aab82a97bc9e?w=1200&h=600&fit=crop",
+    img: imgKelurahanSurade,
     description: "Kelurahan Surade adalah pusat pemerintahan Kecamatan Surade sekaligus pusat aktivitas warga, ditandai dengan Bunderan/Tugu Surade. Program Smart Village di sini fokus pada digitalisasi layanan publik dan pusat perdagangan kecamatan.",
     highlights: [
       "Pusat layanan publik kecamatan digital",
@@ -42,10 +52,10 @@ export const SMART_CITIES = [
     id: 2,
     name: "Desa Pasiripis",
     bisnis: 61,
-    population: "13.334 Jiwa",
+    population: "6.782 Jiwa",
     area: "Pesisir Selatan Surade",
     governor: "Kepala Desa Pasiripis",
-    img: "https://images.unsplash.com/photo-1759861680725-914ce086be4e?w=1200&h=600&fit=crop",
+    img: imgPasiripis,
     description: "Desa Pasiripis merupakan desa berpenduduk terbanyak di Kecamatan Surade, dengan garis pantai berpasir putih seperti Pantai Karangtrisna, Minajaya, dan Karanggantungan. Fokus Smart Village di sini adalah pariwisata pantai dan perikanan.",
     highlights: [
       "Smart tourism pantai Karangtrisna & Minajaya",
@@ -58,10 +68,10 @@ export const SMART_CITIES = [
     id: 3,
     name: "Desa Buniwangi",
     bisnis: 48,
-    population: "11.263 Jiwa",
+    population: "5.952 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Buniwangi",
-    img: "https://images.unsplash.com/photo-1624142482803-3bd79c3a6efc?w=1200&h=600&fit=crop",
+    img: imgBuniwangi,
     description: "Desa Buniwangi merupakan salah satu desa dengan penduduk terbesar kedua di Kecamatan Surade, dengan mayoritas warga bermata pencaharian sebagai petani. Smart Village di desa ini mengedepankan digitalisasi pertanian dan koperasi desa.",
     highlights: [
       "Digitalisasi hasil pertanian dan perkebunan",
@@ -74,10 +84,10 @@ export const SMART_CITIES = [
     id: 4,
     name: "Desa Cipeundeuy",
     bisnis: 22,
-    population: "4.646 Jiwa",
+    population: "6.550 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Cipeundeuy",
-    img: "https://images.unsplash.com/photo-1646928998297-5fb2a10aca27?w=1200&h=600&fit=crop",
+    img: imgCipeundeuy,
     description: "Desa Cipeundeuy adalah desa agraris di Kecamatan Surade yang mengandalkan sektor pertanian dan perkebunan sebagai penggerak ekonomi warganya. Smart Village berfokus pada pemberdayaan petani dan digitalisasi UMKM rumahan.",
     highlights: [
       "Pemberdayaan kelompok tani lokal",
@@ -90,10 +100,10 @@ export const SMART_CITIES = [
     id: 5,
     name: "Desa Gunungsungging",
     bisnis: 27,
-    population: "5.735 Jiwa",
+    population: "5.911 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Gunungsungging",
-    img: "https://images.unsplash.com/photo-1759147833377-0345de4fb7eb?w=1200&h=600&fit=crop",
+    img: imgGunungsungging,
     description: "Desa Gunungsungging berada di kawasan perbukitan Kecamatan Surade dengan potensi perkebunan yang cukup besar. Program Smart Village di desa ini menyasar digitalisasi hasil kebun dan konektivitas internet desa.",
     highlights: [
       "Digitalisasi hasil perkebunan",
@@ -106,10 +116,10 @@ export const SMART_CITIES = [
     id: 6,
     name: "Desa Citanglar",
     bisnis: 30,
-    population: "6.614 Jiwa",
+    population: "6.820 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Citanglar",
-    img: "https://images.unsplash.com/photo-1744887079971-29d8f215cc5d?w=1200&h=600&fit=crop",
+    img: imgCitanglar,
     description: "Desa Citanglar mengembangkan Smart Village dengan menitikberatkan pada peningkatan konektivitas dan pemberdayaan ekonomi warga melalui digitalisasi layanan desa.",
     highlights: [
       "Peningkatan konektivitas internet desa",
@@ -122,10 +132,10 @@ export const SMART_CITIES = [
     id: 7,
     name: "Desa Jagamukti",
     bisnis: 26,
-    population: "5.875 Jiwa",
+    population: "6.008 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Jagamukti",
-    img: "https://images.unsplash.com/photo-1519082572439-7ed19908e47e?w=1200&h=600&fit=crop",
+    img: imgJagamukti,
     description: "Desa Jagamukti mengembangkan Smart Village dengan fokus pada digitalisasi pertanian dan penguatan UMKM lokal warga desa.",
     highlights: [
       "Digitalisasi UMKM lokal",
@@ -138,10 +148,10 @@ export const SMART_CITIES = [
     id: 8,
     name: "Desa Kadaleman",
     bisnis: 24,
-    population: "5.319 Jiwa",
+    population: "5.520 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Kadaleman",
-    img: "https://images.unsplash.com/photo-1681414163860-e764ef3a362f?w=1200&h=600&fit=crop",
+    img: imgKadaleman,
     description: "Desa Kadaleman menerapkan konsep Smart Village untuk meningkatkan efisiensi layanan publik desa dan mendorong ekonomi digital warganya.",
     highlights: [
       "Smart Village terintegrasi",
@@ -154,10 +164,10 @@ export const SMART_CITIES = [
     id: 9,
     name: "Desa Wanasari",
     bisnis: 21,
-    population: "5.115 Jiwa",
+    population: "5.256 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Wanasari",
-    img: "https://images.unsplash.com/photo-1667658126089-eeb299129dff?w=1200&h=600&fit=crop",
+    img: imgWanasari,
     description: "Desa Wanasari mengembangkan Smart Village untuk meningkatkan akses layanan publik dan ekonomi masyarakat, dengan sejumlah pondok pesantren sebagai pusat pendidikan agama warganya.",
     highlights: [
       "Digitalisasi layanan pendidikan & pesantren",
@@ -170,10 +180,10 @@ export const SMART_CITIES = [
     id: 10,
     name: "Desa Sirnasari",
     bisnis: 29,
-    population: "6.376 Jiwa",
+    population: "6.393 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Sirnasari",
-    img: "https://images.unsplash.com/photo-1519688091-5b7aad286ad1?w=1200&h=600&fit=crop",
+    img: imgSirnasari,
     description: "Desa Sirnasari mengembangkan Smart Village dengan fokus pada pengelolaan sumber daya alam dan digitalisasi layanan publik bagi warganya.",
     highlights: [
       "Smart environmental monitoring desa",
@@ -186,10 +196,10 @@ export const SMART_CITIES = [
     id: 11,
     name: "Desa Sukatani",
     bisnis: 18,
-    population: "3.980 Jiwa",
+    population: "4.260 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Sukatani",
-    img: "https://images.unsplash.com/photo-1568979810251-6688ca885c1d?w=1200&h=600&fit=crop",
+    img: imgSukatani,
     description: "Desa Sukatani adalah desa dengan jumlah penduduk paling sedikit di Kecamatan Surade, dengan potensi pertanian dan perkebunan sebagai andalan warga. Smart Village di desa ini mendorong digitalisasi UMKM dan pertanian.",
     highlights: [
       "Digitalisasi industri rumahan dan UMKM",
@@ -202,10 +212,10 @@ export const SMART_CITIES = [
     id: 12,
     name: "Desa Kademangan",
     bisnis: 20,
-    population: "4.354 Jiwa",
+    population: "4.588 Jiwa",
     area: "Kec. Surade",
     governor: "Kepala Desa Kademangan",
-    img: "https://images.unsplash.com/photo-1759861680725-914ce086be4e?w=1200&h=600&fit=crop",
+    img: imgKademangan,
     description: "Desa Kademangan mengembangkan Smart Village dengan fokus pada pariwisata berbasis kearifan lokal dan digitalisasi UMKM warga desa.",
     highlights: [
       "Digitalisasi UMKM lokal",

@@ -8,6 +8,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\GeocodeController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\CouponController;
@@ -24,25 +25,83 @@ use App\Http\Controllers\PremiumUpgradeController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PremiumHistoryController;
+use App\Http\Controllers\BusinessReportController;
+use App\Http\Controllers\PlatformCouponController;
+use App\Http\Controllers\SiteSettingController;
 
 /*
 |--------------------------------------------------------------------------
 | Public Routes (Bisa diakses tanpa login)
 |--------------------------------------------------------------------------
 */
+// Route diagnostik: kirim email tes langsung dan tampilkan hasil/error-nya
+// di layar, supaya gampang cari tahu kenapa OTP tidak sampai - TANPA perlu
+// buka file log. HANYA aktif kalau APP_DEBUG=true (otomatis nonaktif di
+// production). Buka di browser: /api/test-mail?email=email_kamu@gmail.com
+Route::get('test-mail', function (\Illuminate\Http\Request $request) {
+    if (!config('app.debug')) {
+        return response()->json(['message' => 'Route ini hanya aktif saat APP_DEBUG=true.'], 403);
+    }
+    $email = $request->query('email');
+    if (!$email) {
+        return response()->json(['message' => 'Tambahkan ?email=alamat@gmail.com di URL-nya.'], 422);
+    }
+    try {
+        \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\OtpMail('Tes', '123456', 'register'));
+        return response()->json([
+            'success' => true,
+            'message' => "Email tes berhasil dikirim ke $email. Cek inbox (dan folder Spam) dalam 1-2 menit.",
+            'mail_config' => [
+                'mailer' => config('mail.default'),
+                'host' => config('mail.mailers.smtp.host'),
+                'port' => config('mail.mailers.smtp.port'),
+                'from' => config('mail.from.address'),
+            ],
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error_message' => $e->getMessage(),
+            'error_class' => get_class($e),
+            'mail_config' => [
+                'mailer' => config('mail.default'),
+                'host' => config('mail.mailers.smtp.host'),
+                'port' => config('mail.mailers.smtp.port'),
+                'username' => config('mail.mailers.smtp.username'),
+                'from' => config('mail.from.address'),
+            ],
+        ], 500);
+    }
+});
+
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
+
+// OTP Verification Routes
+Route::post('verify-otp', [AuthController::class, 'verifyOtp']);
+Route::post('resend-otp', [AuthController::class, 'resendOtp']);
+
+// Password Reset Routes
+Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('verify-reset-otp', [AuthController::class, 'verifyResetOtp']);
+Route::post('resend-reset-otp', [AuthController::class, 'resendResetOtp']);
+Route::post('reset-password', [AuthController::class, 'resetPassword']);
 
 Route::get('businesses', [BusinessController::class, 'index']);
 Route::get('businesses/{id}', [BusinessController::class, 'show']);
 
 Route::get('categories', [CategoryController::class, 'index']);
+Route::get('categories/tree', [CategoryController::class, 'tree']);
 
 Route::get('advertisements', [AdvertisementController::class, 'index']);
 Route::get('advertisements/{id}', [AdvertisementController::class, 'show']);
 
 Route::get('events', [EventController::class, 'index']);
 Route::get('events/{id}', [EventController::class, 'show']);
+
+// Proxy pencarian lokasi (peta) untuk form Buat Event Baru - lihat
+// GeocodeController untuk alasannya (hindari CORS/429 dari Nominatim).
+Route::get('geocode', [GeocodeController::class, 'search']);
 
 Route::get('subscription-plans', [SubscriptionController::class, 'plans']);
 
@@ -188,6 +247,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Referral Code (protected routes)
     Route::post('generate-referral-code', [ReferralController::class, 'generateReferralCodeForUser']);
+    Route::get('my-referral-stats', [ReferralController::class, 'myReferralStats']);
     
     // Payment
     Route::post('create-payment', [PaymentController::class, 'createPayment']);
@@ -218,6 +278,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // 'business' atau 'seller'.
     Route::post('reviews/{type}/{id}/helpful', [ReviewController::class, 'toggleHelpful']);
 
+    // Ulasan yang masuk ke bisnis milik user yang login, dipakai di
+    // Dashboard > Ulasan (balas, hapus, lihat bisnis).
+    Route::get('my-business-reviews', [ReviewController::class, 'myReviews']);
+    Route::post('reviews/{id}/reply', [ReviewController::class, 'reply']);
+    Route::delete('reviews/{id}', [ReviewController::class, 'destroyReview']);
+
+    // Laporkan sebuah bisnis (kesalahan/pelanggaran) dari halaman detail bisnis.
+    Route::post('businesses/{id}/report', [BusinessReportController::class, 'store']);
+
+    // Validasi kode kupon diskon platform saat checkout Premium/Iklan.
+    Route::post('platform-coupons/validate', [PlatformCouponController::class, 'validateCode']);
+
     // -------------------------------------------------------------
     // Fitur Khusus ADMIN (Grouped & Prefixed dengan 'admin/')
     // -------------------------------------------------------------
@@ -247,7 +319,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // 5. CRUD Iklan (Admin Control)
         Route::get('advertisements', [AdvertisementController::class, 'index']);
-        Route::put('advertisements/{id}/verify', [AdvertisementController::class, 'verify']); // Contoh status tayang iklan
+        Route::put('advertisements/{id}/verify', [AdvertisementController::class, 'verify']); // Setujui iklan supaya tayang ke publik
+        Route::put('advertisements/{id}/reject', [AdvertisementController::class, 'reject']); // Tolak iklan
         Route::delete('advertisements/{id}', [AdvertisementController::class, 'destroy']);
 
         // 6. CRUD / Manajemen Reseller oleh Admin
@@ -284,6 +357,61 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // 12. Premium History (Admin Control)
         Route::get('premium-history', [PremiumHistoryController::class, 'adminPremiumHistory']);
+
+        // 13. Laporan Report - laporan pelanggaran/kesalahan pada bisnis (Admin Control)
+        Route::get('business-reports', [BusinessReportController::class, 'adminIndex']);
+        Route::put('business-reports/{id}', [BusinessReportController::class, 'adminUpdateStatus']);
+        Route::delete('business-reports/{id}', [BusinessReportController::class, 'adminDestroy']);
+        Route::post('business-reports/{id}/remove-content', [BusinessReportController::class, 'adminRemoveContent']);
+
+        // 14. Kupon Diskon - kupon diskon tingkat platform untuk Paket Premium/Iklan (Admin Control)
+        Route::get('platform-coupons', [PlatformCouponController::class, 'index']);
+        Route::post('platform-coupons', [PlatformCouponController::class, 'store']);
+        Route::put('platform-coupons/{id}', [PlatformCouponController::class, 'update']);
+        Route::delete('platform-coupons/{id}', [PlatformCouponController::class, 'destroy']);
+
+        // 15. Pengaturan Situs (Admin Control)
+        Route::get('settings', [SiteSettingController::class, 'index']);
+        Route::put('settings', [SiteSettingController::class, 'update']);
+        
+        // 16. Referral Management (Admin Control)
+        Route::prefix('referrals')->group(function () {
+            // Dashboard stats
+            Route::get('dashboard/stats', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getDashboardStats']);
+            
+            // Referral codes management
+            Route::get('/', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getReferralCodes']);
+            Route::get('{id}', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getReferralDetail']);
+            Route::put('{id}', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'updateReferralCode']);
+            Route::post('generate', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'generateReferralCode']);
+            Route::post('{id}/regenerate', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'regenerateReferralCode']);
+            
+            // Helper routes
+            Route::get('helper/referrers', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getReferrers']);
+            Route::get('helper/users', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getAvailableUsers']);
+        });
+        
+        Route::prefix('referral-transactions')->group(function () {
+            // Referral transactions management
+            Route::get('/', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getReferralTransactions']);
+            Route::post('{id}/approve', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'approveReferralTransaction']);
+            Route::post('{id}/reject', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'rejectReferralTransaction']);
+        });
+        
+        Route::prefix('referral-commissions')->group(function () {
+            // Commission management
+            Route::get('/', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getReferralCommissions']);
+            Route::post('{id}/approve', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'approveCommission']);
+            Route::post('{id}/reject', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'rejectCommission']);
+            Route::post('{id}/paid', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'markCommissionPaid']);
+            Route::post('{id}/adjust', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'adjustCommission']);
+        });
+        
+        Route::prefix('referral-settings')->group(function () {
+            // Referral settings
+            Route::get('/', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getReferralSettings']);
+            Route::put('/', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'updateReferralSettings']);
+        });
     });
 
 });

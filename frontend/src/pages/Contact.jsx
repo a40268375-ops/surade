@@ -6,7 +6,6 @@ import Loading from "../components/Loading";
 import api from "../utils/api";
 import { usePageLoading } from "../hooks/usePageLoading";
 import {
-  MapPin,
   Phone,
   Mail,
   Send,
@@ -93,8 +92,8 @@ export default function Contact() {
                 <Phone size={28} />
               </div>
               <h3 className="contact-info-card__title">Telepon</h3>
-              <p className="contact-info-card__text">(021) 1234 5678</p>
-              <p className="contact-info-card__text">0807 100 1500</p>
+              <p className="contact-info-card__text">Call Center: 0807 - 100 - 1500</p>
+              <p className="contact-info-card__text">WhatsApp: +62 811-1919-711</p>
             </div>
 
             <div className="contact-info-card">
@@ -102,21 +101,11 @@ export default function Contact() {
                 <Mail size={28} />
               </div>
               <h3 className="contact-info-card__title">Email</h3>
-              <p className="contact-info-card__text">info@Surade.co.id</p>
-              <p className="contact-info-card__text">support@Surade.co.id</p>
-            </div>
-
-            <div className="contact-info-card">
-              <div className="contact-info-card__icon">
-                <MapPin size={28} />
-              </div>
-              <h3 className="contact-info-card__title">Alamat</h3>
-              <p className="contact-info-card__text">Jl. Contoh No. 123</p>
-              <p className="contact-info-card__text">Jakarta, Indonesia</p>
+              <p className="contact-info-card__text">admin@Surade.co.id</p>
             </div>
           </div>
 
-          {/* Contact Form & Map */}
+          {/* Contact Form */}
           <div className="contact-main">
             {/* Form */}
             <div className="contact-form-section">
@@ -219,22 +208,6 @@ export default function Contact() {
               </form>
             </div>
 
-            {/* Map */}
-            <div className="contact-map-section">
-              <h2 className="contact-map-section__title">Lokasi Kami</h2>
-              <div className="contact-map">
-                <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d126920.24097831853!2d106.759478!3d-6.2297465!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69f3e945e34b9d%3A0x5371bf0fdad786a2!2sJakarta%2C%20Special%20Capital%20Region%20of%20Jakarta!5e0!3m2!1sen!2sid!4v1650000000000!5m2!1sen!2sid"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  allowFullScreen=""
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title="Lokasi Surade.co.id"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -297,7 +270,7 @@ export default function Contact() {
             <div className="footer-col">
               <h4 className="footer-heading">Bantuan</h4>
               <ul className="footer-links">
-                <li><a href="#">FAQ</a></li>
+                <li><Link to="/faq">FAQ</Link></li>
                 <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
                 <li><Link to="/contact">Hubungi Kami</Link></li>
               </ul>
@@ -307,9 +280,10 @@ export default function Contact() {
             <div className="footer-col">
               <h4 className="footer-heading">Kontak Kami</h4>
               <ul className="footer-links">
-                <li><a href="mailto:support@Surade.co.id">support@Surade.co.id</a></li>
-                <li><span className="footer-text">(021) 1234 5678</span></li>
-                <li><span className="footer-text">Jalan Mercurius 16680 Dramaga West Java</span></li>
+                <li><a href="mailto:admin@Surade.co.id">admin@Surade.co.id</a></li>
+                <li><span className="footer-text">Call Center 0807 - 100 - 1500</span></li>
+                  <li><span className="footer-text">WhatsApp: +62 811-1919-711</span></li>
+                
               </ul>
             </div>
           </div>

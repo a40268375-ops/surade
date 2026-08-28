@@ -31,19 +31,38 @@ export const INFO_MENU = [
     label: "Bisnis & Market",
     slug: "bisnis-market",
     children: [
+      "Bakery & Pastry",
       "Cafe & Restaurant",
+      "Catering",
+      "Fast Food",
       "Furniture",
-      "Makanan & Minuman",
+      "Kafe & Coffee Shop",
       "Minimarket",
+      "Minuman Segar",
       "Pasar",
       "Pertokoan",
       "Peternakan",
       "Printing",
       "Produk",
       "Produk Lain",
-      "Properti",
+      "Restoran",
+      "Street Food",
       "Super Market",
       "Warung",
+      "Warung Makan",
+      // PERBAIKAN: "Properti" sebelumnya jadi KATEGORI UTAMA ke-14
+      // tersendiri, padahal spesifikasi eksplisit minta cuma 14 kategori
+      // utama (Semua, Perkantoran, Bisnis & Market, ... Informasi Umum) -
+      // Properti TIDAK termasuk di daftar itu. Jadi sekarang item-item
+      // properti dipindah jadi SUBKATEGORI di sini, bukan kategori utama.
+      "Agen Properti",
+      "Apartemen",
+      "Gedung",
+      "Kos-kosan",
+      "Ruko",
+      "Rumah",
+      "Tanah",
+      "Villa",
     ],
   },
   {

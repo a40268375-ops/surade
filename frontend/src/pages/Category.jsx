@@ -1,8 +1,10 @@
-import { useParams, Link, useSearchParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
 import api, { getImageUrl } from "../utils/api";
+import { useAuth } from "../context/AuthContext";
 import { DEFAULT_CATEGORY_TABS, iconForCategory } from "../utils/categoryIcons.jsx";
 import Navbar from "../components/Navbar";
+import SearchBar from "../components/SearchBar";
 import Loading from "../components/Loading";
 import {
   Search,
@@ -26,6 +28,7 @@ import {
   Info,
   SlidersHorizontal,
   Star,
+  BadgeCheck,
   SearchX,
   X,
   ChevronLeft,
@@ -88,6 +91,7 @@ const BISNIS_DATA = [
 
 export default function Category() {
   const { categoryId } = useParams();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryQ = searchParams.get("q") || "";
   const queryLocation = searchParams.get("location") || "";
@@ -107,7 +111,9 @@ export default function Category() {
   useEffect(() => {
     setActiveCategory(categoryId || "all");
   }, [categoryId]);
-  const [saved, setSaved] = useState({});
+  const [saved, setSaved] = useState({}); // { [businessId]: savedRecordId }
+  const [savingIds, setSavingIds] = useState({}); // { [businessId]: true } while in-flight
+  const { user: authUser } = useAuth();
   const [searchKeyword, setSearchKeyword] = useState(queryQ);
   const [sortBy, setSortBy] = useState("relevan");
   const [priceRange, setPriceRange] = useState("all");
@@ -130,6 +136,28 @@ export default function Category() {
   useEffect(() => {
     setSearchKeyword(queryQ);
   }, [queryQ]);
+
+  // Muat daftar bisnis yang sudah disimpan user, supaya ikon "Simpan"
+  // langsung kelihatan aktif untuk bisnis yang sebelumnya sudah disimpan.
+  useEffect(() => {
+    if (!authUser) {
+      setSaved({});
+      return;
+    }
+    let cancelled = false;
+    api.get("/my-saved-businesses")
+      .then((rows) => {
+        if (cancelled) return;
+        const map = {};
+        (rows || []).forEach((row) => {
+          const bizId = row.business_id || row.business?.id;
+          if (bizId) map[bizId] = row.id;
+        });
+        setSaved(map);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [authUser]);
 
   useEffect(() => {
     async function loadData() {
@@ -192,6 +220,16 @@ export default function Category() {
   const categoriesList = [
     ...DEFAULT_CATEGORY_TABS,
     ...dbCategories
+      // PERBAIKAN: endpoint "/categories" mengembalikan SEMUA baris kategori
+      // secara rata (flat) - termasuk subkategori seperti "Agen Properti",
+      // "Apotek", "Bank", "Bengkel Mobil", dst (yang punya parent_id terisi).
+      // Sebelumnya semua itu ikut ditambahkan sebagai kotak kategori UTAMA
+      // di grid ikon, padahal seharusnya cuma 14 kategori utama saja yang
+      // tampil di sana (subkategori nempel di dalam menu "Informasi" /
+      // halaman kategori masing-masing, bukan jadi kotak sendiri). Sekarang
+      // difilter: cuma kategori yang TIDAK punya induk (parent_id kosong)
+      // yang boleh ikut jadi kotak kategori utama tambahan.
+      .filter((c) => !c.parent_id)
       .filter((c) => {
         const norm = normalizeLabel(c.name);
         if (DEFAULT_CATEGORY_TABS.some((tab) => tab.id === c.slug)) return false;
@@ -203,7 +241,7 @@ export default function Category() {
       .map((c) => ({
         id: c.slug,
         label: c.name,
-        icon: iconForCategory(c.name, { size: 24, strokeWidth: 1.5 }),
+        icon: iconForCategory(c.name, { size: 24, strokeWidth: 1.5, iconKey: c.icon }),
       })),
   ];
 
@@ -218,15 +256,28 @@ export default function Category() {
         categorySlug: b.category?.slug || "",
         tags: [b.title],
         location: b.village || b.address,
+        // Alamat lengkap (beda dari "location" di atas yang lebih suka
+        // pakai nama desa singkat) - dipakai khusus di kartu popup peta
+        // supaya orang bisa langsung lihat alamat sebenarnya tanpa perlu
+        // buka halaman detail dulu.
+        address: b.address || b.village || "",
         views: "Pratinjau",
         status: b.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
         img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
-        images: (b.images || []).map((p) => getImageUrl(p)),
+        images: Array.isArray(b.images) ? b.images.map((p) => getImageUrl(p)) : [],
         hours: b.operating_hours || "",
         rating: b.rating ?? null,
         reviewCount: b.review_count ?? null,
         isPremium: !!b.is_premium_active,
         startingPrice: b.starting_price ?? null,
+        // PERBAIKAN: latitude/longitude asli bisnis (kalau sudah diisi
+        // pemilik usahanya) sebenarnya SUDAH ada di database & sudah
+        // dikirim balik oleh API - cuma sebelumnya nggak ikut diambil di
+        // sini, jadi peta selalu terpaksa pakai perkiraan level
+        // desa/kota saja (lihat BusinessMap.jsx). Sekarang ikut
+        // diteruskan, supaya peta bisa pakai titik lokasi ASLI kalau ada.
+        latitude: b.latitude !== null && b.latitude !== undefined ? Number(b.latitude) : null,
+        longitude: b.longitude !== null && b.longitude !== undefined ? Number(b.longitude) : null,
       }))
     : (apiError ? BISNIS_DATA : []);
 
@@ -354,8 +405,36 @@ export default function Category() {
     });
   };
 
-  function toggleSave(id) {
-    setSaved((prev) => ({ ...prev, [id]: !prev[id] }));
+  async function toggleSave(id) {
+    if (!authUser) {
+      window.location.href = "/login";
+      return;
+    }
+    if (savingIds[id]) return;
+    setSavingIds((prev) => ({ ...prev, [id]: true }));
+    try {
+      const existingRecordId = saved[id];
+      if (existingRecordId) {
+        await api.delete(`/saved-businesses/${existingRecordId}`);
+        setSaved((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      } else {
+        const result = await api.post("/saved-businesses", { business_id: id });
+        setSaved((prev) => ({ ...prev, [id]: result.id }));
+        // PERBAIKAN: sama seperti di Home.jsx - begitu berhasil disimpan
+        // sebagai favorit, otomatis diarahkan ke Dashboard > Favorit
+        // supaya langsung kelihatan sudah masuk daftar, tidak perlu
+        // membuka Dashboard sendiri lalu mencari menu Favorit secara manual.
+        setTimeout(() => navigate("/dashboard?tab=saved"), 500);
+      }
+    } catch (err) {
+      alert(err?.data?.message || "Gagal memperbarui daftar favorit. Silakan coba lagi.");
+    } finally {
+      setSavingIds((prev) => ({ ...prev, [id]: false }));
+    }
   }
 
   const currentCategory = categoriesList.find((c) => c.id === activeCategory);
@@ -397,16 +476,12 @@ export default function Category() {
           </p>
 
           {/* Search Bar */}
-          <div className="category-search">
-            <Search size={18} className="category-search__icon" />
-            <input
-              type="text"
-              placeholder="Cari bisnis..."
-              value={searchKeyword}
-              onChange={handleSearchChange}
-              className="category-search__input"
-            />
-          </div>
+          <SearchBar
+            categoriesList={categoriesList}
+            initialKeyword={searchKeyword}
+            initialLocation={queryLocation || undefined}
+            onKeywordChange={setSearchKeyword}
+          />
         </div>
       </section>
 
@@ -491,8 +566,8 @@ export default function Category() {
                         <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
                         {bisnis.isPremium && (
                           <span className="biz-card__premium">
-                            <Star size={11} fill="#fff" stroke="#fff" />
-                            Premium
+                            <BadgeCheck size={13} fill="#fff" stroke="#059669" />
+                            Terverifikasi
                           </span>
                         )}
                         <div className="biz-card__img-overlay">
@@ -500,10 +575,11 @@ export default function Category() {
                             type="button"
                             className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
                             onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
+                            disabled={!!savingIds[bisnis.id]}
                             aria-label="Simpan"
                           >
                             <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                            <span>Simpan</span>
+                            <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
                           </button>
                           <span className="biz-card__views">
                             <Eye size={13} />
@@ -535,8 +611,8 @@ export default function Category() {
                             <MapPin size={12} />
                             {bisnis.location}
                           </span>
-                          <span className={`biz-card__cta${bisnis.isPremium ? "" : " closed"}`}>
-                            {bisnis.isPremium ? "Buka Sekarang" : "Tutup Sekarang"} →
+                          <span className={`biz-card__cta${bisnis.status === "Buka Sekarang" ? "" : " closed"}`}>
+                            {bisnis.status === "Buka Sekarang" ? "Buka Sekarang" : "Tutup Sekarang"} →
                           </span>
                         </div>
                       </div>
@@ -564,8 +640,11 @@ export default function Category() {
               )}
             </div>
 
-            {/* Peta: nempel di samping daftar, tingginya otomatis ikut
-                tinggi kolom kartu di sebelahnya (lihat Category.css) */}
+            {/* Peta: nempel di samping daftar. Tingginya otomatis mengikuti
+                kolom kartu di sebelahnya lewat "align-items: stretch" di
+                .category-layout (Category.css) - karena jumlah kartu per
+                halaman sudah tetap (4 = 2 baris), CSS murni ini sudah cukup
+                akurat, tanpa perlu diukur manual pakai JavaScript lagi. */}
             {!loading && finalBisnis.length > 0 && (
               <aside className="category-layout__map">
                 <BusinessMap businesses={finalBisnis} />

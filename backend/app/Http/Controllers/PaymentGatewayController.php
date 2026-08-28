@@ -69,6 +69,7 @@ class PaymentGatewayController extends Controller
                 'discount_amount' => $discount,
                 'referral_code' => $request->referral_code,
                 'referrer_id' => $referrerId,
+                'referral_status' => $referrerId ? 'pending' : null,
                 'payment_method' => 'midtrans',
                 'status' => 'pending',
             ]);
@@ -121,7 +122,7 @@ class PaymentGatewayController extends Controller
                     'transaction_id' => $orderId,
                     'gateway' => 'midtrans',
                     'amount' => $finalAmount,
-                    'status' => 'settled',
+                    'status' => 'paid',
                     'gateway_response' => ['mock' => true],
                 ]);
 
@@ -192,6 +193,7 @@ class PaymentGatewayController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Payment creation failed. Please try again.',
+                'debug_error' => app()->environment('production') ? null : $e->getMessage(),
             ], 500);
         }
     }
@@ -245,6 +247,7 @@ class PaymentGatewayController extends Controller
                 'discount_amount' => $discount,
                 'referral_code' => $request->referral_code,
                 'referrer_id' => $referrerId,
+                'referral_status' => $referrerId ? 'pending' : null,
                 'payment_method' => 'xendit',
                 'status' => 'pending',
             ]);
@@ -294,7 +297,7 @@ class PaymentGatewayController extends Controller
                     'transaction_id' => $externalId,
                     'gateway' => 'xendit',
                     'amount' => $finalAmount,
-                    'status' => 'settled',
+                    'status' => 'paid',
                     'gateway_response' => ['mock' => true],
                 ]);
 
@@ -361,6 +364,7 @@ class PaymentGatewayController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Payment creation failed. Please try again.',
+                'debug_error' => app()->environment('production') ? null : $e->getMessage(),
             ], 500);
         }
     }
@@ -534,8 +538,12 @@ class PaymentGatewayController extends Controller
                 return;
             }
 
-            // Calculate commission (e.g., 10% of the discount amount)
-            $commissionAmount = floor($subscription->discount_amount * 0.1);
+            // NEW BUSINESS LOGIC:
+            // Commission = 15% of final price (after 5% discount)
+            // Formula: commission = final_amount * 15%
+            $finalAmount = $subscription->amount; // This is already the final amount after discount
+            $commissionPercent = 15;
+            $commissionAmount = floor($finalAmount * ($commissionPercent / 100));
 
             // Create or update referral commission record
             \App\Models\ReferralCommission::updateOrCreate(
@@ -546,9 +554,12 @@ class PaymentGatewayController extends Controller
                 [
                     'referred_user_id' => $subscription->user_id,
                     'business_id' => $subscription->business_id,
+                    'transaction_id' => $subscription->invoice_number,
                     'discount_amount' => $subscription->discount_amount,
                     'commission_amount' => $commissionAmount,
-                    'commission_percent' => 10,
+                    'commission_percent' => $commissionPercent,
+                    'original_commission_amount' => $commissionAmount,
+                    'final_commission_amount' => $commissionAmount,
                     'status' => 'pending',
                 ]
             );
@@ -556,6 +567,10 @@ class PaymentGatewayController extends Controller
             Log::info('Referral Commission Tracked', [
                 'referrer_id' => $referrer->id,
                 'subscription_id' => $subscription->id,
+                'original_amount' => $subscription->original_amount,
+                'discount_amount' => $subscription->discount_amount,
+                'final_amount' => $finalAmount,
+                'commission_percent' => $commissionPercent,
                 'commission_amount' => $commissionAmount
             ]);
         } catch (\Exception $e) {

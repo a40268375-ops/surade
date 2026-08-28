@@ -143,8 +143,44 @@
   gap: 4px;
   white-space: nowrap;
   transition: color 0.18s;
+
+  /* ── ANIMASI HOVER: garis tumbuh dari tengah di atas & bawah teks ──
+     position:relative + padding atas/bawah supaya ::before (garis atas)
+     dan ::after (garis bawah) punya tempat buat muncul tanpa nabrak teks. */
+  position: relative;
+  padding: 6px 1px;
 }
 
+.home-nav__link::before,
+.home-nav__link::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  height: 2px;
+  width: 0;
+  border-radius: 2px;
+  background: currentColor; /* otomatis ikut warna hover link masing-masing */
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: width 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+  pointer-events: none;
+}
+
+.home-nav__link::before {
+  top: 0;
+}
+
+.home-nav__link::after {
+  bottom: 0;
+}
+
+.home-nav__link:hover::before,
+.home-nav__link:hover::after,
+.home-nav__link:focus-visible::before,
+.home-nav__link:focus-visible::after {
+  width: 100%;
+  opacity: 1;
+}
 
 .home-nav__link:hover {
   color: #a7f3d0;
@@ -155,7 +191,10 @@
   border: none;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
-  padding: 0;
+  /* PENTING: jangan padding:0 - butuh ruang atas/bawah yang sama kayak
+     link biasa supaya garis animasi hover (::before/::after) di atas
+     tetap kebagian tempat, bukan cuma nempel pas di tepi teks. */
+  padding: 6px 1px;
 }
 
 .home-nav__caret {
@@ -163,8 +202,7 @@
   transition: opacity 0.18s, transform 0.2s;
 }
 
-.home-nav__dropdown-wrapper:hover .home-nav__caret,
-.home-nav__dropdown-wrapper:focus-within .home-nav__caret {
+.home-nav__dropdown-wrapper.open .home-nav__caret {
   opacity: 1;
   transform: rotate(180deg);
 }
@@ -272,7 +310,8 @@
 }
 
 .home-nav__dropdown-wrapper:hover .home-nav__dropdown-menu--simple,
-.home-nav__dropdown-wrapper:focus-within .home-nav__dropdown-menu--simple {
+.home-nav__dropdown-wrapper:focus-within .home-nav__dropdown-menu--simple,
+.home-nav__dropdown-wrapper.open .home-nav__dropdown-menu--simple {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -290,6 +329,27 @@
   font-weight: 500;
   text-decoration: none;
   transition: background 0.15s, color 0.15s;
+}
+
+.home-nav__dropdown-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.home-nav__dropdown-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.home-nav__dropdown-item:hover .home-nav__dropdown-icon,
+.home-nav__dropdown-item.active .home-nav__dropdown-icon,
+.home-nav__sub-item:hover .home-nav__dropdown-icon {
+  color: #10b981;
 }
 
 .home-nav__dropdown-item:hover {
@@ -466,7 +526,9 @@
 }
 
 .home-nav__sub-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 20px;
   color: #334155;
   font-size: 0.875rem;
@@ -488,5 +550,102 @@
 
   .home-nav__link--login {
     display: none;
+  }
+
+  .home-nav__dropdown-menu--mega {
+    min-width: 280px;
+    flex-direction: column;
+  }
+
+  .home-nav__mega-col--parents {
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    max-height: 200px;
+  }
+}
+
+/* ── MEGA MENU INFORMASI (2 kolom) ── */
+.home-nav__dropdown-menu--mega {
+  display: flex;
+  min-width: 520px;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 0;
+  overflow: hidden;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+
+.home-nav__dropdown-wrapper--mega.open .home-nav__dropdown-menu--mega {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+.home-nav__mega-col {
+  display: flex;
+  flex-direction: column;
+  max-height: min(420px, calc(100vh - 100px));
+  overflow-y: auto;
+}
+
+.home-nav__mega-col--parents {
+  flex: 0 0 220px;
+  border-right: 1px solid #e5e7eb;
+  padding: 8px 0;
+}
+
+.home-nav__mega-col--children {
+  flex: 1;
+  padding: 8px 0;
+  min-width: 240px;
+}
+
+.home-nav__mega-col--children .home-nav__sub-item {
+  white-space: normal;
+}
+
+.home-nav__mega-empty {
+  display: block;
+  padding: 16px 20px;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* ── Tombol WhatsApp bulat mengambang ── */
+.whatsapp-float-btn {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #25d366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45);
+  z-index: 999;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.whatsapp-float-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 26px rgba(37, 211, 102, 0.55);
+}
+
+@media (max-width: 640px) {
+  .whatsapp-float-btn {
+    right: 16px;
+    bottom: 16px;
+    width: 50px;
+    height: 50px;
+  }
+  .whatsapp-float-btn svg {
+    width: 26px;
+    height: 26px;
   }
 }

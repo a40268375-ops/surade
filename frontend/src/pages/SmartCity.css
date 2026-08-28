@@ -29,6 +29,92 @@
   font-family: "Poppins", sans-serif;
 }
 
+/* ── FILTER KATEGORI (kartu ikon) ──
+   PERMINTAAN: filter kategori diganti dari tombol kotak horizontal jadi
+   kartu ikon (ikon bulat di atas, label, jumlah bisnis di bawahnya),
+   konsisten dengan gaya grid kategori yang dipakai di halaman Home. */
+.sc-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.sc-category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 10px;
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 16px;
+  cursor: pointer;
+  font-family: "Poppins", sans-serif;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.sc-category-card:hover {
+  border-color: #6ee7b7;
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.12);
+  transform: translateY(-2px);
+}
+
+.sc-category-card.active {
+  border-color: #059669;
+  background: #ecfdf5;
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.18);
+}
+
+.sc-category-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #475569;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.sc-category-card.active .sc-category-card__icon {
+  background: #059669;
+  color: #fff;
+}
+
+.sc-category-card__label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1e293b;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.sc-category-card__count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.sc-category-card.active .sc-category-card__count {
+  color: #059669;
+}
+
+@media (max-width: 640px) {
+  .sc-category-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 10px;
+  }
+  .sc-category-card {
+    padding: 14px 6px;
+  }
+  .sc-category-card__icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 
 /* ── HERO SECTION ── */
 .sc-hero {
@@ -462,7 +548,7 @@
 
 .category-content-layout {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 24px;
 }
 
@@ -484,8 +570,22 @@
 }
 
 .category-map-box--sticky {
-  position: sticky;
-  top: 96px;
+  /* PERBAIKAN: "min-height: 420px" sebelumnya bikin peta lebih tinggi
+     dari kolom kartu kalau kartunya cuma sedikit/pendek (sama seperti
+     masalah di Category.css) - minimum diturunkan jauh, dan max-height
+     dihapus supaya height:100% (dari align-items:stretch di
+     .category-content-layout) yang sepenuhnya menentukan tingginya,
+     jadi peta SELALU persis sejajar dengan kolom kartu. */
+  height: 100%;
+  min-height: 220px;
+}
+
+/* BusinessMap.css mematok .biz-map tinggi tetap 560px secara global (dipakai
+   juga di halaman lain). Khusus di sini, kita timpa supaya petanya mengisi
+   penuh tinggi .category-map-box--sticky di atas - jadi otomatis menyamai
+   tinggi kolom daftar kartu di sebelahnya, berapa pun baris kartunya. */
+.category-map-box--sticky .biz-map {
+  height: 100%;
 }
 
 @media (max-width: 992px) {
@@ -498,7 +598,11 @@
     order: -1;
   }
   .category-map-box--sticky {
-    position: static;
+    /* Di layar sempit, tata letak berubah jadi tumpuk vertikal (bukan
+       sejajar lagi), jadi height:100% dari stretch tidak berlaku di sini -
+       kembalikan ke tinggi tetap yang wajar untuk peta berdiri sendiri. */
+    height: 420px;
+    min-height: 0;
   }
 }
 

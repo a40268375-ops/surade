@@ -4,96 +4,35 @@ import Navbar from "../components/Navbar";
 import logoImg from "../assets/logo.png";
 import Loading from "../components/Loading";
 import { usePageLoading } from "../hooks/usePageLoading";
-import { useAuth } from "../context/AuthContext";
 import api, { getImageUrl } from "../utils/api";
 import {
   User,
   Calendar,
   Clock,
+  MapPin,
   ArrowRight,
   Search,
+  BookOpen,
+  CalendarDays,
 } from "lucide-react";
 import "./Blog.css";
 
-/* ── Blog data ── */
-const BLOG_POSTS = [
-  {
-    id: 1,
-    title: "Cucurak Khas Bogor, sambut Bulan Ramadhan",
-    excerpt: "Tradisi cucurak merupakan salah satu budaya lokal yang masih dilestarikan oleh masyarakat Bogor sebagai bentuk syukur menyambut bulan suci Ramadhan.",
-    category: "Budaya",
-    author: "Hikmah Yusila",
-    date: "15 Agustus 2017",
-    readTime: "5 min",
-    img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop",
-  },
-  {
-    id: 2,
-    title: "Tradisi Grebeg Gethuk di Kota Magelang",
-    excerpt: "Grebeg Gethuk adalah tradisi tahunan yang menjadi ikon budaya Kota Magelang, melambangkan kerukunan dan kebersamaan masyarakat.",
-    category: "Budaya",
-    author: "Hikmah Yusila",
-    date: "16 Februari 2017",
-    readTime: "4 min",
-    img: "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=800&h=500&fit=crop",
-  },
-  {
-    id: 3,
-    title: "Pasar Tiban Pahingan Magelang, Destinasi Wisata Kuliner",
-    excerpt: "Pasar Tiban Pahingan menawarkan pengalaman unik berwisata kuliner sambil mendengarkan pengajian, memadukan tradisi dan kuliner lokal.",
-    category: "Kuliner",
-    author: "Hikmah Yusila",
-    date: "16 Februari 2017",
-    readTime: "6 min",
-    img: "https://images.unsplash.com/photo-1572285870954-7b08e56f4c58?w=800&h=500&fit=crop",
-  },
-  {
-    id: 4,
-    title: "Pesona Rumah Gadang Minangkabau",
-    excerpt: "Rumah Gadang adalah ikon arsitektur tradisional Minangkabau dengan atap bergonjong yang khas, merepresentasikan filosofi adat dan budaya.",
-    category: "Budaya",
-    author: "Andi Pratama",
-    date: "20 Maret 2024",
-    readTime: "7 min",
-    img: "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=800&h=500&fit=crop",
-  },
-  {
-    id: 5,
-    title: "Keindahan Pulau Komodo dan Habitatnya",
-    excerpt: "Pulau Komodo adalah rumah bagi komodo, reptil terbesar di dunia, serta menawarkan pemandangan alam yang memukau dan biodiversitas unik.",
-    category: "Wisata",
-    author: "Siti Rahayu",
-    date: "25 April 2024",
-    readTime: "8 min",
-    img: "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=800&h=500&fit=crop",
-  },
-  {
-    id: 6,
-    title: "Tari Kecak: Tradisi Bali yang Mendunia",
-    excerpt: "Tari Kecak adalah seni pertunjukan tradisional Bali yang terkenal dengan gerakan tangan yang kompleks dan nyanyian khas 'cak-cak-cak'.",
-    category: "Budaya",
-    author: "Made Widana",
-    date: "10 Mei 2024",
-    readTime: "5 min",
-    img: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&h=500&fit=crop",
-  },
-];
+const BLOG_FALLBACK_IMG =
+  "https://images.unsplash.com/photo-1536240470700-3e9b6b9b7b7e?w=800&h=500&fit=crop";
+const EVENT_FALLBACK_IMG =
+  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=500&fit=crop";
 
-const CATEGORIES = [
-  { id: "all", label: "Semua" },
-  { id: "budaya", label: "Budaya" },
-  { id: "kuliner", label: "Kuliner" },
-  { id: "wisata", label: "Wisata" },
-  { id: "teknologi", label: "Teknologi" },
-];
-
+// PERMINTAAN: Blog & Event digabung jadi SATU halaman publik (bukan dua
+// halaman terpisah lagi), dengan tab "Semua / Blog / Event" - tiap kartu
+// dikasih badge penanda tipenya biar tetap kelihatan bedanya walau
+// ditampilkan campur di tab "Semua".
 export default function Blog() {
   const pageLoading = usePageLoading();
-  const [activeCategory, setActiveCategory] = useState("all");
+  const [contentTypeFilter, setContentTypeFilter] = useState("all"); // all | blog | event
   const [searchQuery, setSearchQuery] = useState("");
-  const [blogPosts, setBlogPosts] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -101,42 +40,59 @@ export default function Blog() {
     async function loadData() {
       setLoading(true);
       try {
-        // PERBAIKAN: sebelumnya salah ambil dari /announcements (data
-        // pengumuman), makanya blog yang benar-benar dibuat lewat halaman
-        // admin "Blog & Event" / "Buat Blog Baru" tidak pernah muncul di
-        // sini. Sekarang ambil dari /blogs, sumber data yang benar.
-        const data = await api.get("/blogs");
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped = data.map((blog, idx) => ({
-            id: blog.id || 1000 + idx,
-            title: blog.title || `Blog #${blog.id}`,
-            excerpt: blog.excerpt || (blog.content || "").substring(0, 200) + "...",
-            category: blog.category || "Informasi",
-            author: blog.author?.name || "Admin Surade",
-            date: blog.created_at
-              ? new Date(blog.created_at).toLocaleDateString("id-ID", {
-                  day: "numeric", month: "long", year: "numeric",
-                })
-              : "Tidak diketahui",
-            readTime: Math.ceil(((blog.content || "").length / 1000) * 2) + " min",
-            // Kalau belum ada thumbnail yang diupload, tetap pakai foto
-            // generik supaya kartunya tidak kosong/pecah - tapi kalau ADA,
-            // pasti dipakai (lewat getImageUrl supaya path /storage/... dari
-            // server berubah jadi URL yang benar-benar bisa diakses browser).
-            img: blog.image && !blog.image.startsWith("blob:")
-              ? getImageUrl(blog.image)
-              : "https://images.unsplash.com/photo-1536240470700-3e9b6b9b7b7e?w=800&h=500&fit=crop",
-          }));
-          setBlogPosts(mapped);
-          setApiError(false);
-        } else {
-          setBlogPosts(BLOG_POSTS);
-          setApiError(false);
-        }
+        const [blogData, eventData] = await Promise.all([
+          api.get("/blogs").catch(() => []),
+          api.get("/events").catch(() => []),
+        ]);
+
+        const mappedBlogs = (Array.isArray(blogData) ? blogData : []).map((blog) => ({
+          type: "blog",
+          id: blog.id,
+          title: blog.title || "Tanpa judul",
+          excerpt: blog.excerpt || (blog.content || "").substring(0, 200) + "...",
+          category: blog.category || "Informasi",
+          author: blog.author?.name || "Admin Surade",
+          sortDate: blog.created_at ? new Date(blog.created_at) : new Date(0),
+          dateLabel: blog.created_at
+            ? new Date(blog.created_at).toLocaleDateString("id-ID", {
+                day: "numeric", month: "long", year: "numeric",
+              })
+            : "-",
+          readTime: Math.ceil(((blog.content || "").length / 1000) * 2) + " min",
+          img: blog.image && !blog.image.startsWith("blob:")
+            ? getImageUrl(blog.image)
+            : BLOG_FALLBACK_IMG,
+        }));
+
+        const mappedEvents = (Array.isArray(eventData) ? eventData : []).map((ev) => {
+          const dt = ev.event_date ? new Date(ev.event_date) : null;
+          return {
+            type: "event",
+            id: ev.id,
+            title: ev.title || "Tanpa judul",
+            excerpt: ev.description || "",
+            category: ev.category || "Umum",
+            location: ev.location || "-",
+            sortDate: dt || new Date(0),
+            dateLabel: dt
+              ? dt.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+              : "-",
+            timeLabel: dt
+              ? dt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB"
+              : "-",
+            img: ev.image && !ev.image.startsWith("blob:") ? getImageUrl(ev.image) : EVENT_FALLBACK_IMG,
+          };
+        });
+
+        const combined = [...mappedBlogs, ...mappedEvents].sort(
+          (a, b) => b.sortDate - a.sortDate
+        );
+        setItems(combined);
+        setLoadError(false);
       } catch (e) {
-        console.error("Gagal memuat data dari API, pakai data statis:", e);
-        setBlogPosts(BLOG_POSTS);
-        setApiError(true);
+        console.error("Gagal memuat Blog & Event:", e);
+        setItems([]);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -145,11 +101,14 @@ export default function Blog() {
     loadData();
   }, []);
 
-  const filteredPosts = blogPosts.filter((post) => {
-    const matchesCategory = activeCategory === "all" || post.category.toLowerCase() === activeCategory;
-    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+  const filteredItems = items.filter((item) => {
+    const matchesType = contentTypeFilter === "all" || item.type === contentTypeFilter;
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      item.title.toLowerCase().includes(q) ||
+      (item.excerpt || "").toLowerCase().includes(q) ||
+      (item.location || "").toLowerCase().includes(q);
+    return matchesType && matchesSearch;
   });
 
   if (pageLoading || loading) {
@@ -161,7 +120,7 @@ export default function Blog() {
       {/* ── NAVBAR ── */}
       <Navbar />
 
-      {/* ── BLOG HERO ── */}
+      {/* ── HERO ── */}
       <section className="blog-hero">
         <div className="blog-hero__bg" />
         <div className="blog-hero__overlay" />
@@ -169,78 +128,116 @@ export default function Blog() {
           <div className="blog-hero__breadcrumb">
             <Link to="/">Home</Link>
             <span className="separator">/</span>
-            <span>Blog</span>
+            <span>Blog &amp; Event</span>
           </div>
-          <h1 className="blog-hero__title">Blog</h1>
-          <p className="blog-hero__subtitle">Jelajahi Cerita dan Informasi Menarik Seputar Budaya Indonesia</p>
+          <h1 className="blog-hero__title">Blog &amp; Event</h1>
+          <p className="blog-hero__subtitle">Cerita, informasi, dan berbagai event menarik dari Surade.co.id</p>
         </div>
       </section>
 
-      {/* ── BLOG CONTENT ── */}
+      {/* ── CONTENT ── */}
       <section className="blog-content">
         <div className="blog-content__inner">
-          {/* Search & Filter */}
+          {/* Search & Tab tipe konten */}
           <div className="blog-controls">
             <div className="blog-search">
               <Search size={18} className="blog-search__icon" />
               <input
                 type="text"
-                placeholder="Cari artikel..."
+                placeholder="Cari blog atau event..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="blog-search__input"
               />
             </div>
             <div className="blog-categories">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  className={`blog-category-btn${activeCategory === cat.id ? " active" : ""}`}
-                  onClick={() => setActiveCategory(cat.id)}
-                >
-                  {cat.label}
-                </button>
-              ))}
+              <button
+                type="button"
+                className={`blog-category-btn${contentTypeFilter === "all" ? " active" : ""}`}
+                onClick={() => setContentTypeFilter("all")}
+              >
+                Semua
+              </button>
+              <button
+                type="button"
+                className={`blog-category-btn${contentTypeFilter === "blog" ? " active" : ""}`}
+                onClick={() => setContentTypeFilter("blog")}
+              >
+                <BookOpen size={14} style={{ marginRight: 5, verticalAlign: -2 }} />
+                Blog
+              </button>
+              <button
+                type="button"
+                className={`blog-category-btn${contentTypeFilter === "event" ? " active" : ""}`}
+                onClick={() => setContentTypeFilter("event")}
+              >
+                <CalendarDays size={14} style={{ marginRight: 5, verticalAlign: -2 }} />
+                Event
+              </button>
             </div>
           </div>
 
-          {/* Blog Grid */}
+          {/* Grid gabungan */}
           <div className="blog-grid">
-            {filteredPosts.map((post) => (
-              <article key={post.id} className="blog-card">
+            {filteredItems.map((item) => (
+              <article key={`${item.type}-${item.id}`} className="blog-card">
                 <div className="blog-card__img-wrap">
                   <img
-                    src={post.img}
-                    alt={post.title}
+                    src={item.img}
+                    alt={item.title}
                     className="blog-card__img"
                     loading="lazy"
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src = "https://images.unsplash.com/photo-1536240470700-3e9b6b9b7b7e?w=800&h=500&fit=crop";
+                      e.currentTarget.src = item.type === "blog" ? BLOG_FALLBACK_IMG : EVENT_FALLBACK_IMG;
                     }}
                   />
-                  <span className="blog-card__category">{post.category}</span>
+                  {/* Badge penanda tipe konten - ini yang bikin tetap kebeda
+                      Blog vs Event walau lagi nampilin tab "Semua" */}
+                  <span className={`blog-card__type-badge blog-card__type-badge--${item.type}`}>
+                    {item.type === "blog" ? <BookOpen size={12} /> : <CalendarDays size={12} />}
+                    {item.type === "blog" ? "Blog" : "Event"}
+                  </span>
+                  <span className="blog-card__category">{item.category}</span>
                 </div>
                 <div className="blog-card__body">
-                  <h2 className="blog-card__title">{post.title}</h2>
-                  <p className="blog-card__excerpt">{post.excerpt}</p>
+                  <h2 className="blog-card__title">{item.title}</h2>
+                  <p className="blog-card__excerpt">{item.excerpt}</p>
                   <div className="blog-card__meta">
-                    <span className="blog-card__meta-item">
-                      <User size={14} />
-                      {post.author}
-                    </span>
-                    <span className="blog-card__meta-item">
-                      <Calendar size={14} />
-                      {post.date}
-                    </span>
-                    <span className="blog-card__meta-item">
-                      <Clock size={14} />
-                      {post.readTime}
-                    </span>
+                    {item.type === "blog" ? (
+                      <>
+                        <span className="blog-card__meta-item">
+                          <User size={14} />
+                          {item.author}
+                        </span>
+                        <span className="blog-card__meta-item">
+                          <Calendar size={14} />
+                          {item.dateLabel}
+                        </span>
+                        <span className="blog-card__meta-item">
+                          <Clock size={14} />
+                          {item.readTime}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="blog-card__meta-item">
+                          <Calendar size={14} />
+                          {item.dateLabel}
+                        </span>
+                        <span className="blog-card__meta-item">
+                          <Clock size={14} />
+                          {item.timeLabel}
+                        </span>
+                        <span className="blog-card__meta-item">
+                          <MapPin size={14} />
+                          {item.location}
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <Link to={`/blog/${post.id}`} className="blog-card__link">
-                    Baca Selengkapnya
+                  <Link to={item.type === "blog" ? `/blog/${item.id}` : `/events/${item.id}`} className="blog-card__link">
+                    {item.type === "blog" ? "Baca Selengkapnya" : "Lihat Detail"}
                     <ArrowRight size={16} />
                   </Link>
                 </div>
@@ -248,9 +245,13 @@ export default function Blog() {
             ))}
           </div>
 
-          {filteredPosts.length === 0 && (
+          {filteredItems.length === 0 && (
             <div className="blog-empty">
-              <p>Tidak ada artikel yang ditemukan.</p>
+              <p>
+                {loadError
+                  ? "Gagal memuat data dari server."
+                  : "Tidak ada blog atau event yang ditemukan."}
+              </p>
             </div>
           )}
         </div>
@@ -260,7 +261,6 @@ export default function Blog() {
       <footer className="footer">
         <div className="footer-inner">
           <div className="footer-cols">
-            {/* Brand/Logo Col */}
             <div className="footer-col footer-col--brand">
               <Link to="/" className="footer-logo">
                 <img src={logoImg} alt="Surade.co.id" className="footer-logo__img" />
@@ -300,7 +300,6 @@ export default function Blog() {
               </div>
             </div>
 
-            {/* Col 1 - Tentang Kami */}
             <div className="footer-col">
               <h4 className="footer-heading">Tentang Kami</h4>
               <ul className="footer-links">
@@ -310,29 +309,27 @@ export default function Blog() {
               </ul>
             </div>
 
-            {/* Col 2 - Bantuan */}
             <div className="footer-col">
               <h4 className="footer-heading">Bantuan</h4>
               <ul className="footer-links">
-                <li><a href="#">FAQ</a></li>
+                <li><Link to="/faq">FAQ</Link></li>
                 <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
                 <li><Link to="/contact">Hubungi Kami</Link></li>
               </ul>
             </div>
 
-            {/* Col 3 - Kontak Kami */}
             <div className="footer-col">
               <h4 className="footer-heading">Kontak Kami</h4>
               <ul className="footer-links">
-                <li><a href="mailto:support@Surade.co.id">support@Surade.co.id</a></li>
-                <li><span className="footer-text">(021) 1234 5678</span></li>
-                <li><span className="footer-text">Jalan Mercurius 16680 Dramaga West Java</span></li>
+                <li><a href="mailto:admin@Surade.co.id">admin@Surade.co.id</a></li>
+                <li><span className="footer-text">Call Center 0807 - 100 - 1500</span></li>
+                  <li><span className="footer-text">WhatsApp: +62 811-1919-711</span></li>
+                
               </ul>
             </div>
           </div>
         </div>
 
-        {/* Bottom Bar */}
         <div className="footer-bottom">
           <div className="footer-bottom__inner">
             <p className="footer-copyright">

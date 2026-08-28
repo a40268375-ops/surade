@@ -33,7 +33,6 @@ body { background: #f5f6fa; }
   align-items: center;
   justify-content: center;
   padding: 100px 20px 60px;
-  overflow: hidden;
 }
 
 .category-hero__bg {
@@ -467,7 +466,15 @@ body { background: #f5f6fa; }
   display: grid;
   grid-template-columns: 1fr 380px;
   gap: 24px;
-  align-items: start;
+  /* PERBAIKAN: dulu "start" - lalu tinggi peta di-paksa manual lewat
+     JavaScript (lihat riwayat perbaikan sebelumnya di Category.jsx) biar
+     sejajar sama kartu. Sekarang jumlah kartu per halaman sudah TETAP
+     (selalu 4 = 2 baris), jadi dipakai "stretch" bawaan CSS Grid saja -
+     otomatis bikin tinggi kolom peta SELALU sama persis dengan tinggi
+     kolom kartu di sebelahnya, tanpa perlu diukur manual lagi (yang
+     ternyata kadang nilainya salah/nyangkut, bikin peta jadi lebih tinggi
+     dari kartu seperti yang dilaporkan). */
+  align-items: stretch;
 }
 
 .category-layout__main {
@@ -477,13 +484,19 @@ body { background: #f5f6fa; }
 .category-layout__map {
   position: sticky;
   top: 108px; /* di bawah navbar, digeser dikit biar lebih sejajar sama kartu */
+  /* Tingginya sekarang otomatis mengikuti kolom kartu di sebelahnya lewat
+     "align-items: stretch" di .category-layout (lihat komentar di sana) -
+     nggak perlu inline style/JavaScript lagi. max-height tetap dijaga
+     supaya peta nggak pernah lebih tinggi dari layar (biar sticky-nya
+     tetap kelihatan penuh, nggak kepotong, kalau kolom kartu kebetulan
+     sangat panjang). */
+  max-height: calc(100vh - 128px);
+  overflow: hidden;
 }
 
 .category-layout__map .biz-map {
-  /* Tinggi TETAP (bukan ngikutin tinggi kartu lagi), supaya ukurannya
-     selalu sama persis di halaman manapun (halaman 1, 2, 3, dst) -
-     nggak berubah-ubah walau jumlah kartu di halaman itu beda. */
-  height: 671px;
+  height: 100%;
+  min-height: 400px;
 }
 
 @media (max-width: 1080px) {
@@ -671,13 +684,16 @@ body { background: #f5f6fa; }
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  /* PERBAIKAN: sebelumnya merah (kesan "Premium"/promosi), sekarang hijau
+     supaya kesannya "Terverifikasi" (validasi/kepercayaan), senada dengan
+     badge yang sama di halaman Home. */
+  background: linear-gradient(135deg, #10b981, #059669);
   color: #fff;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   border-radius: 20px;
-  box-shadow: 0 2px 8px rgba(220,38,38,0.4);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.4);
 }
 .biz-card__img {
   width: 100%; height: 100%;

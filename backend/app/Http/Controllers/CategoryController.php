@@ -17,8 +17,19 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        // Mengambil kategori sekalian menghitung jumlah bisnis di dalamnya
-        return response()->json(Category::withCount('businesses')->get());
+        return response()->json(Category::withCount('businesses')->orderBy('name')->get());
+    }
+
+    /** Kategori hierarkis (induk + anak) untuk navbar & form daftar bisnis. */
+    public function tree()
+    {
+        $parents = Category::with(['children' => fn ($q) => $q->withCount('businesses')])
+            ->withCount('businesses')
+            ->whereNull('parent_id')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($parents);
     }
 
     public function store(Request $request)
@@ -30,6 +41,9 @@ class CategoryController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255|unique:categories',
             'icon' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'color' => 'nullable|string|max:50',
+            'status' => 'nullable|string|max:20',
         ]);
 
         if ($validator->fails()) {
@@ -40,6 +54,9 @@ class CategoryController extends Controller
             'name' => $request->name,
             'slug' => Str::slug($request->name),
             'icon' => $request->icon,
+            'description' => $request->description,
+            'color' => $request->color ?? '#10b981',
+            'status' => $request->status ?? 'active',
         ]);
 
         return response()->json($category, 201);
@@ -59,6 +76,9 @@ class CategoryController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255|unique:categories,name,' . $id,
             'icon' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'color' => 'nullable|string|max:50',
+            'status' => 'nullable|string|max:20',
         ]);
 
         if ($validator->fails()) {
@@ -69,6 +89,9 @@ class CategoryController extends Controller
             'name' => $request->name,
             'slug' => Str::slug($request->name),
             'icon' => $request->icon,
+            'description' => $request->description,
+            'color' => $request->color ?? $category->color ?? '#10b981',
+            'status' => $request->status ?? $category->status ?? 'active',
         ]);
 
         return response()->json($category);

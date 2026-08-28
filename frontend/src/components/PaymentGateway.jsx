@@ -56,7 +56,7 @@ const PaymentGateway = ({ business, plan, onSuccess, onError, onCancel }) => {
       });
 
       if (response.success) {
-        // Use discount from backend API response (random 10-50% calculated on server)
+        // Use discount from backend API response (fixed 5% discount)
         setDiscount(response.discount || 0);
         setReferralApplied(true);
         setReferralError('');
@@ -264,7 +264,7 @@ const PaymentGateway = ({ business, plan, onSuccess, onError, onCancel }) => {
       )}
 
       <div className="referral-info">
-        <p>💡 Gunakan kode referral dari reseller untuk mendapatkan diskon random 10-50%</p>
+        <p>💡 Gunakan kode referral dari reseller untuk mendapatkan diskon 5%</p>
       </div>
 
       <div className="payment-methods">

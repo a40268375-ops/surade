@@ -12,11 +12,17 @@ class Event extends Model
         'location',
         'event_date',
         'image',
+        'gallery',
         'category',
-        'image_url',
+        'status',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [
         'event_date' => 'datetime',
+        'gallery' => 'array',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 }

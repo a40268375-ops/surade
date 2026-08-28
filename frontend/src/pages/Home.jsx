@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
   import { Link, useNavigate } from "react-router-dom";
   import api, { getImageUrl } from "../utils/api";
+  import { useAuth } from "../context/AuthContext";
   import { DEFAULT_CATEGORY_TABS, iconForCategory } from "../utils/categoryIcons.jsx";
   import "./Home.css";
   import Navbar from "../components/Navbar";
+  import SearchBar from "../components/SearchBar";
   import { SMART_CITIES } from "../data/smartCities";
   import { DESA_LIST } from "../data/desaList";
   import logoImg from "../assets/logo.png";
@@ -29,14 +31,19 @@ import { useState, useRef, useEffect } from "react";
     ChevronDown,
     Bookmark,
     Eye,
+    BadgeCheck,
     Tag,
     Star,
     ChevronDown as ChevronDownIcon,
+    ChevronLeft,
+    ChevronRight,
     Pointer,
     Rocket,
     BookOpen,
     User,
     Calendar,
+    Sparkles,
+    ArrowUpRight,
   } from "lucide-react";
 
   /* ── Daftar Desa/Kelurahan Kecamatan Surade (dropdown Lokasi) ── */
@@ -44,6 +51,10 @@ import { useState, useRef, useEffect } from "react";
 
   /* ── Category tabs ── */
   const CATEGORIES = DEFAULT_CATEGORY_TABS;
+
+  /* ── Jumlah kartu "Temukan Tempat Baru" yang tampil di beranda sebelum
+        tombol "Lihat Semua Usaha" (sisanya ada di halaman /category/all) ── */
+  const TEMUKAN_DISPLAY_LIMIT = 6;
 
   /* ── Mock business data ── */
   const BISNIS_DATA = [
@@ -261,18 +272,43 @@ import { useState, useRef, useEffect } from "react";
 
   export default function Home() {
     const navigate = useNavigate();
+    const { user: authUser } = useAuth();
     const [selectedKota, setSelectedKota] = useState(DESA_LIST[0] || "Kelurahan Surade");
     const [kotaSearch, setKotaSearch] = useState("");
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState("all");
-    const [saved, setSaved] = useState({});
+    const [saved, setSaved] = useState({}); // { [businessId]: savedRecordId }
+    const [savingIds, setSavingIds] = useState({});
     const [bounceCounts, setBounceCounts] = useState({});
     const [selectedCity, setSelectedCity] = useState(null);
     const [searchKeyword, setSearchKeyword] = useState("");
     const [selectedSearchCategory, setSelectedSearchCategory] = useState("all");
     const [keywordDropdownOpen, setKeywordDropdownOpen] = useState(false);
     const [searchHistory, setSearchHistory] = useState([]);
-    const [currentAdIndex, setCurrentAdIndex] = useState(0);
+    // PERBAIKAN: carousel iklan ditulis ulang jadi "peek carousel" satu
+    // slide besar per tampilan (seperti banner KIOSGAMER contoh gambar) -
+    // sebelumnya 3 kartu kecil sekaligus per tampilan, jadi kurang mirip
+    // dengan animasi banner besar yang diminta. currentAdIndex sekarang
+    // adalah index di ARRAY YANG SUDAH DIPERPANJANG (extendedAds, lihat di
+    // bawah): dimulai dari 1 supaya slide pertama yang asli langsung
+    // tampil, dengan 1 kloning di awal & 1 kloning di akhir supaya animasi
+    // geser kiri/kanan terasa "tak berujung" (infinite loop), bukan
+    // berhenti mentok di ujung.
+    const [currentAdIndex, setCurrentAdIndex] = useState(1);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStartX, setDragStartX] = useState(0);
+    const [dragOffset, setDragOffset] = useState(0);
+    // Dipakai untuk mematikan animasi transform SEBENTAR SAJA pas carousel
+    // "melompat diam-diam" dari kloning terakhir/pertama kembali ke slide
+    // asli - kalau tidak, lompatan itu akan kelihatan sebagai slide yang
+    // tiba-tiba geser jauh ke arah berlawanan.
+    const [adTransitionEnabled, setAdTransitionEnabled] = useState(true);
+    const carouselTrackRef = useRef(null);
+    // Carousel Bisnis Premium: lebih sederhana dari carousel iklan di
+    // atas - cuma scroll horizontal biasa yang digeser tombol panah
+    // kiri/kanan (atau digeser jari/kursor langsung di HP/trackpad),
+    // bukan animasi "peek slide" 1-per-1 seperti iklan.
+    const premiumScrollRef = useRef(null);
     const dropdownRef = useRef(null);
     const keywordDropdownRef = useRef(null);
 
@@ -284,6 +320,28 @@ import { useState, useRef, useEffect } from "react";
     const [dbBlogs, setDbBlogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [apiError, setApiError] = useState(false);
+
+    // Muat daftar bisnis yang sudah disimpan user, supaya ikon "Simpan"
+    // langsung kelihatan aktif untuk bisnis yang sebelumnya sudah disimpan.
+    useEffect(() => {
+      if (!authUser) {
+        setSaved({});
+        return;
+      }
+      let cancelled = false;
+      api.get("/my-saved-businesses")
+        .then((rows) => {
+          if (cancelled) return;
+          const map = {};
+          (rows || []).forEach((row) => {
+            const bizId = row.business_id || row.business?.id;
+            if (bizId) map[bizId] = row.id;
+          });
+          setSaved(map);
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
+    }, [authUser]);
 
     useEffect(() => {
       window.scrollTo(0, 0);
@@ -364,10 +422,20 @@ import { useState, useRef, useEffect } from "react";
 
     useEffect(() => {
       const interval = setInterval(() => {
-        setCurrentAdIndex((prev) => (prev + 1) % displayAds.length);
+        setAdTransitionEnabled(true);
+        setCurrentAdIndex((prev) => prev + 1);
       }, 5000);
       return () => clearInterval(interval);
-    }, [dbAds]);
+    }, [dbAds, dbBusinesses]);
+
+    // Kalau transisi baru saja dimatikan (habis "lompat diam-diam" di
+    // onTransitionEnd track), nyalakan lagi di frame render berikutnya
+    // supaya pergerakan slide SESUDAHNYA tetap animasi halus seperti biasa.
+    useEffect(() => {
+      if (adTransitionEnabled) return;
+      const raf = requestAnimationFrame(() => setAdTransitionEnabled(true));
+      return () => cancelAnimationFrame(raf);
+    }, [adTransitionEnabled]);
 
     // Small UI effects: reveal timeline items and video, and typing heading
     // PERBAIKAN: sebelumnya efek ini nyari elemen ".tl-item"/".video-col"
@@ -437,34 +505,28 @@ import { useState, useRef, useEffect } from "react";
     }, [loading]);
 
 
-    // Map real advertisements (Premium-only, auto-hidden on expiry) into the
-    // same shape the carousel already knows how to render. Falls back to the
-    // static demo cards only when there are genuinely no live ads yet.
-    const displayAds = dbAds.length > 0
-      ? dbAds.map((ad) => ({
-          id: ad.id,
-          categorySlug: ad.category?.slug || "all",
-          img: ADS_DATA[ad.id % ADS_DATA.length]?.img || ADS_DATA[0].img,
-          name: ad.company_name,
-          desc: ad.title,
-        }))
-      : ADS_DATA.map((ad) => ({ ...ad, categorySlug: null }));
-
-    // Map API data to view schemas. Keep the full default set and append
-    // any additional categories from the API that are not already included.
-    // PERBAIKAN: sebelumnya cuma dicek berdasarkan ID/slug, jadi kalau ada
-    // kategori di database yang NAMANYA sama persis dengan kategori default
-    // tapi slug-nya beda, dia tetap lolos dan bikin kartu dobel muncul di
-    // grid (mis. "Bisnis & Market" atau "Elektronik & Gadget" muncul 2x).
-    // Sekarang dicek juga berdasarkan nama (huruf kecil semua, tanpa spasi
-    // berlebih) supaya kategori yang namanya sama tidak pernah dobel,
-    // walaupun slug-nya berbeda.
+    // PERBAIKAN: sebelumnya kalau belum ada iklan resmi (/advertisements)
+    // di database, carousel ini langsung jatuh ke ADS_DATA - daftar contoh
+    // yang ditulis manual di kode ("Amel Irwanto cake", "Warung Makan
+    // Sederhana", dst). Data contoh itu TIDAK PERNAH ada di database, jadi
+    // pengunjung melihatnya tampil di beranda tapi Admin/pemilik usaha
+    // tidak akan pernah menemukannya di menu "Iklan" pada Dashboard untuk
+    // dikelola/dihapus - kelihatan seperti bug "iklan di website tidak ada
+    // di dashboard".
+    //
+    // Sekarang urutannya:
+    //   1) Iklan asli yang sudah disetujui Admin (/advertisements) - ini
+    //      persis yang muncul & bisa dikelola di Dashboard > Iklan.
+    //   2) Kalau belum ada iklan resmi, tampilkan bisnis Premium aktif -
+    //      ini juga bisa dilihat/dikelola pemiliknya lewat Dashboard >
+    // ── KATEGORI MAPPING ──
     const normalizeLabel = (s) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
     const defaultLabels = new Set(DEFAULT_CATEGORY_TABS.map((tab) => normalizeLabel(tab.label)));
     const seenExtraLabels = new Set();
     const categoriesList = [
       ...DEFAULT_CATEGORY_TABS,
       ...dbCategories
+        .filter((c) => !c.parent_id)
         .filter((c) => {
           const norm = normalizeLabel(c.name);
           if (DEFAULT_CATEGORY_TABS.some((tab) => tab.id === c.slug)) return false;
@@ -476,23 +538,57 @@ import { useState, useRef, useEffect } from "react";
         .map((c) => ({
           id: c.slug,
           label: c.name,
-          icon: iconForCategory(c.name, { size: 24, strokeWidth: 1.5 }),
+          icon: iconForCategory(c.name, { size: 26, strokeWidth: 1.7, iconKey: c.icon }),
         })),
     ];
 
+    // ── PREMIUM & STANDARD ADS MAPPING ──
+    // Mapping businesses list
     const businessesList = dbBusinesses.length > 0 ? dbBusinesses.map(b => ({
       id: b.id,
       name: b.title,
       category: b.category?.name || "Lainnya",
       tags: [b.title],
-      location: b.village || b.address,
+      location: b.village || b.address || "Surade",
       views: "Pratinjau",
       status: b.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
       img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
       is_premium: b.is_premium_active,
-      open: b.is_premium_active, // Premium businesses are "open", free businesses are "closed"
-      categoryColor: "#159c60"
-    })) : (apiError ? [...TEMUKAN_DATA, ...BISNIS_DATA] : []);
+      package: b.package,
+      open: !!b.is_open_now,
+      categoryColor: "#159c60",
+      rating: "4.8"
+    })) : (apiError ? [...TEMUKAN_DATA, ...BISNIS_DATA].map(b => ({ ...b, is_premium: true, rating: "4.8" })) : []);
+
+    const premiumAds = businessesList.filter(b => b.package === 'premium' && b.is_premium);
+    const standardAds = businessesList.filter(b => b.package === 'standard' && b.is_premium);
+    
+    // Fallback logic if explicit packages are not set
+    const displayPremiumAds = premiumAds.length > 0 ? premiumAds : businessesList.filter(b => b.is_premium).slice(0, 3);
+    const displayStandardAds = standardAds.length > 0 ? standardAds : businessesList.filter(b => b.is_premium).slice(3, 10);
+    
+    // If still empty (e.g. no premium businesses at all), fallback to ADS_DATA for layout testing
+    const finalPremiumAds = displayPremiumAds.length > 0 ? displayPremiumAds : ADS_DATA.map(ad => ({ ...ad, businessId: ad.businessId || ad.id, img: ad.img, name: ad.name, rating: "4.8", location: "Surade" }));
+    const finalStandardAds = displayStandardAds.length > 0 ? displayStandardAds : BISNIS_DATA.map(b => ({ ...b, businessId: b.id, rating: "4.8", location: b.location }));
+
+    // Extended array for infinite carousel
+    const extendedPremiumAds = finalPremiumAds.length > 0
+      ? [finalPremiumAds[finalPremiumAds.length - 1], ...finalPremiumAds, finalPremiumAds[0]]
+      : [];
+
+    // Removed old carousel scroll function
+
+    // Smart Village adalah angka STATIS yang ditulis manual di
+    // smartCities.js (mis. selalu "48" untuk Desa Buniwangi, tidak pernah
+    // berubah walau ada bisnis baru daftar/dihapus). Sekarang dihitung
+    // ASLI dari data bisnis yang sudah dimuat, dicocokkan lewat kolom
+    // `village` (bukan menebak-nebak dari teks alamat) - karena pilihan
+    // desa di form Tambah Bisnis memang diambil dari nama SMART_CITIES
+    // yang sama persis, jadi pencocokannya exact match, bukan fuzzy.
+    const villageBusinessCounts = dbBusinesses.reduce((acc, b) => {
+      if (b.village) acc[b.village] = (acc[b.village] || 0) + 1;
+      return acc;
+    }, {});
 
     const filteredKota = KOTA_INDONESIA.filter((k) =>
       k.toLowerCase().includes(kotaSearch.toLowerCase())
@@ -547,7 +643,39 @@ import { useState, useRef, useEffect } from "react";
     });
 
     function toggleSave(id) {
-      setSaved((prev) => ({ ...prev, [id]: !prev[id] }));
+      if (!authUser) {
+        window.location.href = "/login";
+        return;
+      }
+      if (savingIds[id]) return;
+      setSavingIds((prev) => ({ ...prev, [id]: true }));
+      const existingRecordId = saved[id];
+      const request = existingRecordId
+        ? api.delete(`/saved-businesses/${existingRecordId}`).then(() => {
+            setSaved((prev) => {
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
+          })
+        : api.post("/saved-businesses", { business_id: id }).then((result) => {
+            setSaved((prev) => ({ ...prev, [id]: result.id }));
+            // PERBAIKAN: menekan "Simpan" sebelumnya hanya menyimpan data di
+            // background tanpa kepastian apa-apa buat penggunanya - dia
+            // harus buka Dashboard sendiri lalu klik menu "Favorit" untuk
+            // tahu apakah tersimpan atau tidak. Sekarang begitu berhasil
+            // disimpan, otomatis diarahkan ke Dashboard > Favorit supaya
+            // langsung kelihatan bisnisnya sudah masuk daftar.
+            setTimeout(() => navigate("/dashboard?tab=saved"), 500);
+          });
+
+      request
+        .catch((err) => {
+          alert(err?.data?.message || "Gagal memperbarui daftar favorit. Silakan coba lagi.");
+        })
+        .finally(() => {
+          setSavingIds((prev) => ({ ...prev, [id]: false }));
+        });
     }
 
     const handleSearchSubmit = () => {
@@ -603,211 +731,136 @@ import { useState, useRef, useEffect } from "react";
             <p className="home-hero__subtitle">Semua Ada Disini</p>
 
             {/* Search Bar */}
-            <div className="home-search">
-              <div className="home-search__group home-search__group--keyword" ref={keywordDropdownRef}>
-                <span className="home-search__label">Kata Kunci :</span>
-                <input
-                  className="home-search__input"
-                  type="text"
-                  placeholder="UMKM, Pelaku Usaha, Bisnis, dll"
-                  id="search-keyword"
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  onFocus={() => setKeywordDropdownOpen(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleSearchSubmit();
-                    }
-                  }}
-                />
-
-                {keywordDropdownOpen && (
-                  <div className="home-keyword-dropdown">
-                    {/* Riwayat Pencarian (Top) */}
-                    {searchHistory.length > 0 && (
-                      <div className="home-keyword-dropdown__section">
-                        <span className="home-keyword-dropdown__section-title">Riwayat Pencarian</span>
-                        <ul className="home-keyword-dropdown__list">
-                          {searchHistory.map((item, idx) => (
-                            <li
-                              key={idx}
-                              className="home-keyword-dropdown__item home-keyword-dropdown__item--history"
-                              onClick={() => {
-                                setSearchKeyword(item.keyword);
-                                setSelectedSearchCategory(item.category || "all");
-                                setKeywordDropdownOpen(false);
-                                navigate(`/category/${item.category || "all"}?q=${encodeURIComponent(item.keyword)}&location=${encodeURIComponent(selectedKota)}`);
-                              }}
-                            >
-                              <span className="home-keyword-dropdown__history-text">{item.keyword}</span>
-                              <span className="home-keyword-dropdown__history-cat">
-                                di {categoriesList.find(c => c.id === item.category)?.label || "Semua"}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Kategori Pilihan (otomatis ke-filter sesuai kata kunci yang diketik) */}
-                    <div className="home-keyword-dropdown__section">
-                      <span className="home-keyword-dropdown__section-title">Cari berdasarkan Kategori</span>
-                      <ul className="home-keyword-dropdown__list">
-                        {categoriesList
-                          .filter((cat) =>
-                            searchKeyword.trim() === ""
-                              ? true
-                              : cat.label.toLowerCase().includes(searchKeyword.trim().toLowerCase())
-                          )
-                          .map((cat) => (
-                          <li
-                            key={cat.id}
-                            className="home-keyword-dropdown__item home-keyword-dropdown__item--category"
-                            onClick={() => {
-                              setSelectedSearchCategory(cat.id);
-                              setKeywordDropdownOpen(false);
-
-                              if (cat.id === "all") {
-                                // "Semua" langsung cari: semua kategori + semua desa,
-                                // tanpa kata kunci, biar semua usaha kelihatan.
-                                setSearchKeyword("");
-                                navigate(`/category/all?location=${encodeURIComponent("Semua")}`);
-                                return;
-                              }
-
-                              // Kategori lain: cuma isi kolom "Kata Kunci" dulu,
-                              // biar user masih bisa nambah/ubah kata kunci sebelum
-                              // benar-benar menekan tombol cari (kaca pembesar).
-                              setSearchKeyword(cat.label);
-                              document.getElementById("search-keyword")?.focus();
-                            }}
-                          >
-                            <span className="home-keyword-dropdown__cat-icon">{cat.icon}</span>
-                            <span className="home-keyword-dropdown__cat-label">{cat.label}</span>
-                          </li>
-                        ))}
-                        {categoriesList.filter((cat) =>
-                          searchKeyword.trim() === ""
-                            ? true
-                            : cat.label.toLowerCase().includes(searchKeyword.trim().toLowerCase())
-                        ).length === 0 && (
-                          <li className="home-keyword-dropdown__empty">Kategori tidak ditemukan</li>
-                        )}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="home-search__group home-search__group--lokasi" ref={dropdownRef}>
-                <span className="home-search__label">Lokasi</span>
-                <button
-                  type="button"
-                  className="home-search__kota-btn"
-                  onClick={() => setDropdownOpen((v) => !v)}
-                >
-                  <span>{selectedKota}</span>
-                  <ChevronDown size={14} className={`home-search__kota-caret${dropdownOpen ? " open" : ""}`} />
-                </button>
-
-                {dropdownOpen && (
-                  <div className="home-kota-dropdown" role="listbox">
-                    <div className="home-kota-dropdown__search">
-                      <Search size={13} className="home-kota-dropdown__icon" />
-                      <input
-                        autoFocus
-                        type="text"
-                        placeholder="Cari desa..."
-                        value={kotaSearch}
-                        onChange={(e) => setKotaSearch(e.target.value)}
-                        className="home-kota-dropdown__input"
-                      />
-                    </div>
-                    <ul className="home-kota-dropdown__list">
-                      {filteredKota.length > 0
-                        ? filteredKota.map((kota) => (
-                          <li
-                            key={kota}
-                            role="option"
-                            aria-selected={kota === selectedKota}
-                            className={`home-kota-dropdown__item${kota === selectedKota ? " selected" : ""}`}
-                            onClick={() => { setSelectedKota(kota); setDropdownOpen(false); setKotaSearch(""); }}
-                          >
-                            {kota}
-                          </li>
-                        ))
-                        : <li className="home-kota-dropdown__empty">Desa tidak ditemukan</li>
-                      }
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              <button 
-                className="home-search__button" 
-                type="button" 
-                aria-label="Cari"
-                onClick={handleSearchSubmit}
-              >
-                <Search size={18} strokeWidth={2.5} />
-              </button>
-            </div>
+            <SearchBar
+              categoriesList={categoriesList}
+              initialKeyword={searchKeyword}
+              initialLocation={selectedKota}
+              onKeywordChange={setSearchKeyword}
+              onLocationChange={setSelectedKota}
+            />
           </div>
         </section>
         
-        {/* ── TERBARU / IKLAN SECTION ── */}
-        <section className="reko-section">
-          <div className="reko-inner">
-            <h2 className="reko-title"></h2>
-
-            {/* Ads carousel */}
-            <div className="ads-carousel">
-              <button
-                className="ads-carousel__nav ads-carousel__nav--prev"
-                onClick={() => setCurrentAdIndex((prev) => Math.max(0, prev - 1))}
-                aria-label="Previous slide"
+        {/* ── PREMIUM ADS SECTION ── */}
+        <section className="premium-ads-section">
+          <div className="premium-ads-carousel">
+            <button
+              type="button"
+              className="premium-ads-carousel__nav premium-ads-carousel__nav--prev"
+              onClick={() => { setAdTransitionEnabled(true); setCurrentAdIndex((prev) => prev - 1); }}
+              aria-label="Iklan sebelumnya"
+            >
+              <ChevronLeft size={24} strokeWidth={2.5} />
+            </button>
+            
+            <div className="premium-ads-carousel__viewport">
+              <div
+                ref={carouselTrackRef}
+                className="premium-ads-carousel__track"
+                style={{
+                  transform: `translateX(-${currentAdIndex * 100}%)`,
+                  transition: adTransitionEnabled
+                    ? "transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)"
+                    : "none",
+                }}
+                onTransitionEnd={() => {
+                  if (currentAdIndex >= extendedPremiumAds.length - 1) {
+                    setAdTransitionEnabled(false);
+                    setCurrentAdIndex(1);
+                  } else if (currentAdIndex <= 0) {
+                    setAdTransitionEnabled(false);
+                    setCurrentAdIndex(finalPremiumAds.length);
+                  }
+                }}
               >
-                ‹
-              </button>
-              <div className="ads-carousel__track" style={{ transform: `translateX(-${currentAdIndex * 33.33}%)` }}>
-                {[...displayAds, ...displayAds].map((ad, index) => (
-                  <Link
-                    key={`${ad.id}-${index}`}
-                    to={ad.categorySlug ? `/category/${ad.categorySlug}` : `/business/${ad.businessId}`}
-                    className="ad-card"
-                  >
-                    <div className="ad-card__img-wrap">
-                      <img src={ad.img} alt={ad.name} className="ad-card__img" loading="lazy" />
-                      <div className="ad-card__img-overlay">
-                        <button
-                          type="button"
-                          className={`ad-card__save${saved[ad.id] ? " saved" : ""}`}
-                          onClick={(e) => { e.preventDefault(); toggleSave(ad.id); }}
-                          aria-label="Simpan"
-                        >
-                          <Bookmark size={13} fill={saved[ad.id] ? "currentColor" : "none"} />
-                          <span>Simpan</span>
-                        </button>
-                        <span className="ad-card__views">
-                          <Eye size={13} />
-                          <span>Pratinjau</span>
-                        </span>
+                {extendedPremiumAds.map((ad, index) => (
+                  <div key={`${ad.businessId || ad.id}-${index}`} className="premium-ad-card">
+                    <div className="premium-ad-card__img-wrap">
+                      <img src={ad.img} alt={ad.name} className="premium-ad-card__img" loading="lazy" />
+                      <div className="premium-ad-card__gradient" />
+                      
+                      <div className="premium-ad-card__content">
+                        <div className="premium-ad-card__badge">
+                          <Sparkles size={14} fill="currentColor" />
+                          <span>Sponsored • Premium</span>
+                        </div>
+                        
+                        <h2 className="premium-ad-card__name">{ad.name}</h2>
+                        
+                        <div className="premium-ad-card__meta">
+                          <span className="premium-ad-card__rating">
+                            <Star size={16} fill="#f59e0b" color="#f59e0b" /> {ad.rating} <span className="meta-dim">(2 ulasan)</span>
+                          </span>
+                          <span className="premium-ad-card__location">
+                            <MapPin size={16} /> {ad.location}
+                          </span>
+                        </div>
+                        
+                        <Link to={`/business/${ad.businessId}`} className="premium-ad-card__btn">
+                          Lihat Profil Usaha <ArrowUpRight size={18} />
+                        </Link>
                       </div>
                     </div>
-                    <div className="ad-card__body">
-                      <h3 className="ad-card__name">{ad.name}</h3>
-                      <p className="ad-card__category">{ad.desc}</p>
-                    </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
-              <button
-                className="ads-carousel__nav ads-carousel__nav--next"
-                onClick={() => setCurrentAdIndex((prev) => Math.min(displayAds.length - 3, prev + 1))}
-                aria-label="Next slide"
-              >
-                ›
-              </button>
+            </div>
+            
+            <button
+              type="button"
+              className="premium-ads-carousel__nav premium-ads-carousel__nav--next"
+              onClick={() => { setAdTransitionEnabled(true); setCurrentAdIndex((prev) => prev + 1); }}
+              aria-label="Iklan berikutnya"
+            >
+              <ChevronRight size={24} strokeWidth={2.5} />
+            </button>
+            
+            {/* Minimal Indicators (Lines) */}
+            {finalPremiumAds.length > 1 && (
+              <div className="premium-ads-carousel__dots">
+                {finalPremiumAds.map((ad, i) => (
+                  <button
+                    type="button"
+                    key={`dot-${i}`}
+                    className={`premium-ads-carousel__dot ${((currentAdIndex - 1 + finalPremiumAds.length) % finalPremiumAds.length) === i ? "active" : ""}`}
+                    onClick={() => { setAdTransitionEnabled(true); setCurrentAdIndex(i + 1); }}
+                    aria-label={`Ke iklan ${i + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── STANDARD ADS SECTION ── */}
+        <section className="standard-ads-section">
+          <div className="standard-ads-header">
+            <div className="standard-ads-title">
+              <Sparkles size={16} fill="currentColor" />
+              <span>IKLAN TERVERIFIKASI</span>
+            </div>
+            <div className="standard-ads-subtitle">Mitra Pilihan Info.co.id</div>
+          </div>
+          
+          <div className="standard-ads-marquee">
+            <div className="standard-ads-marquee__track">
+              {/* Duplicated multiple times to ensure seamless infinite scrolling */}
+              {[...finalStandardAds, ...finalStandardAds, ...finalStandardAds, ...finalStandardAds].map((ad, index) => (
+                <Link key={`std-${ad.businessId || ad.id}-${index}`} to={`/business/${ad.businessId}`} className="standard-ad-card">
+                  <div className="standard-ad-card__img-wrap">
+                    <img src={ad.img} alt={ad.name} className="standard-ad-card__img" loading="lazy" />
+                    <div className="standard-ad-card__badge">Iklan</div>
+                  </div>
+                  <div className="standard-ad-card__content">
+                    <h4 className="standard-ad-card__name">{ad.name}</h4>
+                    <div className="standard-ad-card__meta">
+                      <span className="standard-ad-card__rating"><Star size={12} fill="#f59e0b" color="#f59e0b"/> {ad.rating}</span>
+                      <span className="standard-ad-card__dot">•</span>
+                      <span className="standard-ad-card__location"><MapPin size={12}/> {ad.location}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
         </section>
@@ -846,7 +899,15 @@ import { useState, useRef, useEffect } from "react";
             <p className="smart-subtitle">Surade.co.id Mendorong Percepatan Program Pemerintah Smart City &amp; Smart Village</p>
 
             <div className="smart-grid">
-              {SMART_CITIES.map((city) => (
+              {SMART_CITIES.map((city) => {
+                // Kalau data bisnis asli sudah dimuat, pakai hitungan asli
+                // (termasuk yang sah bernilai 0 kalau desanya memang belum
+                // punya bisnis terdaftar). Selama masih memuat, tampilkan
+                // dulu angka placeholder dari smartCities.js supaya kartu
+                // tidak "berkedip" ke 0 sesaat sebelum data API selesai.
+                const realCount = villageBusinessCounts[city.name];
+                const displayCount = dbBusinesses.length > 0 ? (realCount || 0) : city.bisnis;
+                return (
                 <Link 
                   key={city.id} 
                   to={`/smart-city/${city.id}`}
@@ -861,58 +922,22 @@ import { useState, useRef, useEffect } from "react";
                     <div className="smart-card__overlay" />
                     <span className="smart-card__name">{city.name}</span>
                     <div className="smart-card__tooltip">
-                      <span className="smart-card__tooltip-count">{city.bisnis.toLocaleString("id-ID")}</span>
+                      <span className="smart-card__tooltip-count">{displayCount.toLocaleString("id-ID")}</span>
                       <span className="smart-card__tooltip-label"> bisnis terdaftar</span>
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
 
-        {/* ── EVENT & PROMO SECTION ──
-             Diisi Admin lewat Dashboard > Event. Tayang otomatis untuk semua
-             pengunjung (beda dengan Iklan, event TIDAK butuh langganan Premium
-             karena ini konten resmi dari admin, bukan promosi bisnis perorangan). */}
-        {dbEvents.length > 0 && (
-          <section className="event-section">
-            <div className="event-inner">
-              <h2 className="event-title">Event &amp; Promo</h2>
-              <p className="event-subtitle">Info acara dan promo terbaru dari Surade.co.id</p>
-
-              <div className="event-grid">
-                {dbEvents.map((ev) => (
-                  <div key={ev.id} className="event-card">
-                    <div className="event-card__img-wrap">
-                      <img
-                        src={ev.image ? getImageUrl(ev.image) : "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=500&h=300&fit=crop"}
-                        alt={ev.title}
-                        className="event-card__img"
-                        loading="lazy"
-                      />
-                      {ev.event_date && (
-                        <span className="event-card__date">
-                          {new Date(ev.event_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-                        </span>
-                      )}
-                    </div>
-                    <div className="event-card__body">
-                      <h3 className="event-card__title">{ev.title}</h3>
-                      {ev.location && (
-                        <p className="event-card__location">
-                          <MapPin size={13} />
-                          {ev.location}
-                        </p>
-                      )}
-                      <p className="event-card__desc">{ev.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
+        {/* PERMINTAAN: "Event & Promo" section yang tadinya berdiri
+            sendiri terpisah dari "Berbagi Pengalaman" (Blog) sekarang
+            digabung jadi SATU section "Blog & Event" di bawah, sesuai
+            menu navbar yang juga sudah "Blog & Event" (satu topik, bukan
+            dua section terpisah). Grid event-nya dipindah ke situ. */}
 
         {/* ── FOTO CURUG CIKASO / KECAMATAN SURADE (animasi gelombang di tepi) ── */}
         <section className="kenapa-section">
@@ -995,7 +1020,14 @@ import { useState, useRef, useEffect } from "react";
             </p>
 
             <div className="temukan-grid">
-              {filteredTemukanData.map((bisnis) => (
+              {/* PERBAIKAN: section ini sebelumnya menumpahkan SEMUA bisnis
+                  sekaligus tanpa batas dan tanpa tombol "lihat semua" -
+                  sekarang dibatasi TEMUKAN_DISPLAY_LIMIT kartu saja di
+                  beranda (pola sama seperti tombol "Lihat Semua Blog &
+                  Event" di section Blog di bawah), sisanya dilihat lewat
+                  halaman /category/all yang sudah punya pencarian, filter,
+                  & pagination lengkap. */}
+              {filteredTemukanData.slice(0, TEMUKAN_DISPLAY_LIMIT).map((bisnis) => (
                 <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
                   {/* Image */}
                   <div className="biz-card__img-wrap">
@@ -1005,20 +1037,23 @@ import { useState, useRef, useEffect } from "react";
                         type="button"
                         className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
                         onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
+                        disabled={!!savingIds[bisnis.id]}
                         aria-label="Simpan"
                       >
                         <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                        <span>Simpan</span>
+                        <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
                       </button>
                       <span className="biz-card__views">
                         <Eye size={13} />
                         <span>Pratinjau</span>
                       </span>
                     </div>
-                    {/* Premium Badge */}
+                    {/* Verification Badge - HANYA muncul kalau bisnisnya premium,
+                        sebelumnya selalu muncul tanpa syarat di semua kartu. */}
                     {bisnis.is_premium && (
                       <div className="biz-card__premium-badge">
-                        <span>Premium</span>
+                        <BadgeCheck size={13} fill="#fff" stroke="#059669" />
+                        <span>Terverifikasi</span>
                       </div>
                     )}
                   </div>
@@ -1049,6 +1084,12 @@ import { useState, useRef, useEffect } from "react";
                 </Link>
               ))}
             </div>
+
+            {filteredTemukanData.length > TEMUKAN_DISPLAY_LIMIT && (
+              <div className="blog-section__cta">
+                <Link to="/category/all" className="blog-section__cta-btn">Lihat Semua Usaha</Link>
+              </div>
+            )}
           </div>
         </section>
 
@@ -1100,68 +1141,115 @@ import { useState, useRef, useEffect } from "react";
           </div>
         </section>
 
-        {/* ── BERBAGI PENGALAMAN SECTION ── */}
+        {/* ── BLOG & EVENT SECTION (digabung, satu section saja) ── */}
+        {/* ── BLOG & EVENT SECTION (satu grid gabungan, badge penanda tipe
+             di tiap kartu) ── */}
         <section className="blog-section">
           <div className="blog-inner">
-            <h2 className="blog-title">Berbagi Pengalaman Mereka</h2>
-            <p className="blog-subtitle">Bagikan Pengalaman Dan Info Anda Di Surade.co.id.</p>
+            <h2 className="blog-title">Blog &amp; Event</h2>
+            <p className="blog-subtitle">Info acara, promo, dan cerita pengalaman terbaru dari Surade.co.id</p>
 
             <div className="blog-grid">
-              {(dbBlogs.length > 0
-                ? dbBlogs.slice(0, 3).map((b) => ({
-                    id: b.id,
-                    category: b.category || "Umum",
-                    title: b.title,
-                    author: b.author?.name || "Admin Surade",
-                    date: b.created_at
-                      ? new Date(b.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
-                      : "-",
-                    // PERBAIKAN: kalau image-nya kosong ATAU ternyata "blob:..."
-                    // (sisa data lama sebelum upload gambar benar-benar
-                    // diperbaiki - link sementara itu cuma valid di tab
-                    // browser waktu itu, jadi rusak/patah kalau dibuka lagi),
-                    // pakai gambar contoh generik supaya kartunya tetap rapi,
-                    // bukan malah kelihatan pecah/tumpang tindih dengan judul.
-                    img: b.image && !b.image.startsWith("blob:")
-                      ? getImageUrl(b.image)
-                      : "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=260&fit=crop",
-                  }))
-                : BLOG_DATA
-              ).map((post) => (
-                <Link key={post.id} to={`/blog/${post.id}`} className="blog-card blog-card--link">
-                  <div className="blog-card__img-wrap">
-                    <img
-                      src={post.img}
-                      alt={post.title}
-                      className="blog-card__img"
-                      loading="lazy"
-                      onError={(e) => {
-                        // Jaring pengaman terakhir: apa pun sebab gambarnya
-                        // gagal dimuat (link rusak, blob: kadaluarsa, dll),
-                        // otomatis ganti ke gambar generik supaya kartunya
-                        // tidak pernah lagi kelihatan pecah/tumpang tindih
-                        // dengan judul.
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=260&fit=crop";
-                      }}
-                    />
-                  </div>
-                  <div className="blog-card__body">
-                    <p className="blog-card__category">{post.category}</p>
-                    <h3 className="blog-card__title">{post.title}</h3>
-                    <div className="blog-card__footer">
-                      <span className="blog-card__meta">
-                        <User size={13} />
-                        <span>{post.author}</span>
+              {(() => {
+                const mappedEvents = dbEvents.map((ev) => ({
+                  type: "event",
+                  id: ev.id,
+                  category: ev.category || "Event",
+                  title: ev.title,
+                  location: ev.location || "-",
+                  sortDate: ev.event_date ? new Date(ev.event_date) : new Date(0),
+                  date: ev.event_date
+                    ? new Date(ev.event_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+                    : "-",
+                  img: ev.image && !ev.image.startsWith("blob:")
+                    ? getImageUrl(ev.image)
+                    : "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=500&h=300&fit=crop",
+                }));
+
+                const mappedBlogs = dbBlogs.map((b) => ({
+                  type: "blog",
+                  id: b.id,
+                  category: b.category || "Umum",
+                  title: b.title,
+                  author: b.author?.name || "Admin Surade",
+                  sortDate: b.created_at ? new Date(b.created_at) : new Date(0),
+                  date: b.created_at
+                    ? new Date(b.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+                    : "-",
+                  // PERBAIKAN: kalau image-nya kosong ATAU ternyata "blob:..."
+                  // (sisa data lama sebelum upload gambar benar-benar
+                  // diperbaiki - link sementara itu cuma valid di tab
+                  // browser waktu itu, jadi rusak/patah kalau dibuka lagi),
+                  // pakai gambar contoh generik supaya kartunya tetap rapi,
+                  // bukan malah kelihatan pecah/tumpang tindih dengan judul.
+                  img: b.image && !b.image.startsWith("blob:")
+                    ? getImageUrl(b.image)
+                    : "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=260&fit=crop",
+                }));
+
+                const combined = (mappedEvents.length + mappedBlogs.length) > 0
+                  ? [...mappedEvents, ...mappedBlogs].sort((a, b) => b.sortDate - a.sortDate).slice(0, 6)
+                  : BLOG_DATA.map((b) => ({ ...b, type: "blog" }));
+
+                return combined.map((post) => (
+                  <Link
+                    key={`${post.type}-${post.id}`}
+                    to={post.type === "blog" ? `/blog/${post.id}` : `/events/${post.id}`}
+                    className="blog-card blog-card--link"
+                  >
+                    <div className="blog-card__img-wrap">
+                      <img
+                        src={post.img}
+                        alt={post.title}
+                        className="blog-card__img"
+                        loading="lazy"
+                        onError={(e) => {
+                          // Jaring pengaman terakhir: apa pun sebab gambarnya
+                          // gagal dimuat (link rusak, blob: kadaluarsa, dll),
+                          // otomatis ganti ke gambar generik supaya kartunya
+                          // tidak pernah lagi kelihatan pecah/tumpang tindih
+                          // dengan judul.
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = post.type === "blog"
+                            ? "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=260&fit=crop"
+                            : "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=500&h=300&fit=crop";
+                        }}
+                      />
+                      {/* Badge penanda tipe konten (Blog/Event), ditaruh di
+                          kanan atas biar tidak numpuk sama badge kategori
+                          yang sudah ada di kiri atas. */}
+                      <span className={`home-blog-type-badge home-blog-type-badge--${post.type}`}>
+                        {post.type === "blog" ? "Blog" : "Event"}
                       </span>
-                      <span className="blog-card__meta">
-                        <Calendar size={13} />
-                        <span>{post.date}</span>
-                      </span>
+                      <span className="blog-card__category">{post.category}</span>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                    <div className="blog-card__body">
+                      <h3 className="blog-card__title">{post.title}</h3>
+                      <div className="blog-card__footer">
+                        {post.type === "blog" ? (
+                          <span className="blog-card__meta">
+                            <User size={13} />
+                            <span>{post.author}</span>
+                          </span>
+                        ) : (
+                          <span className="blog-card__meta">
+                            <MapPin size={13} />
+                            <span>{post.location}</span>
+                          </span>
+                        )}
+                        <span className="blog-card__meta">
+                          <Calendar size={13} />
+                          <span>{post.date}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ));
+              })()}
+            </div>
+
+            <div className="blog-section__cta">
+              <Link to="/blog" className="blog-section__cta-btn">Lihat Semua Blog &amp; Event</Link>
             </div>
           </div>
         </section>
@@ -1224,7 +1312,7 @@ import { useState, useRef, useEffect } from "react";
               <div className="footer-col">
                 <h4 className="footer-heading">Bantuan</h4>
                 <ul className="footer-links">
-                  <li><a href="#">FAQ</a></li>
+                  <li><Link to="/faq">FAQ</Link></li>
                   <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
                   <li><Link to="/contact">Hubungi Kami</Link></li>
                 </ul>
@@ -1234,9 +1322,9 @@ import { useState, useRef, useEffect } from "react";
               <div className="footer-col">
                 <h4 className="footer-heading">Kontak Kami</h4>
                 <ul className="footer-links">
-                  <li><a href="mailto:support@Surade.co.id">support@Surade.co.id</a></li>
-                  <li><span className="footer-text">(021) 1234 5678</span></li>
-                  <li><span className="footer-text">Jalan Mercurius 16680 Dramaga West Java</span></li>
+                  <li><a href="mailto:admin@Surade.co.id">admin@Surade.co.id</a></li>
+                  <li><span className="footer-text">Call Center 0807 - 100 - 1500</span></li>
+                  <li><span className="footer-text">WhatsApp: +62 811-1919-711</span></li>
                 </ul>
               </div>
             </div>

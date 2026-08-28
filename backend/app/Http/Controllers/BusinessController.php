@@ -144,10 +144,12 @@ class BusinessController extends Controller
             'operating_hours' => 'nullable|string',
             'closed_days' => 'nullable|array',
             'closed_days.*' => 'string',
+            'price_category' => 'nullable|integer|in:1,2,3',
             'tags' => 'nullable|array',
             'tags.*' => 'string',
             'website' => 'nullable|string',
             'video_url' => 'nullable|string',
+            'video' => 'nullable|file|mimetypes:video/mp4,video/webm,video/quicktime|max:20480',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'referred_by' => 'nullable|string',
@@ -179,7 +181,7 @@ class BusinessController extends Controller
             }
         }
 
-        $data = $request->except(['image', 'images']);
+        $data = $request->except(['image', 'images', 'video']);
         $data['user_id'] = $request->user()->id;
         $data['status'] = $request->user()->role === 'admin' ? 'approved' : 'pending';
         $data['package'] = $request->input('package');
@@ -202,6 +204,14 @@ class BusinessController extends Controller
                 $galleryPaths[] = '/storage/' . $file->store('businesses', 'public');
             }
             $data['images'] = $galleryPaths;
+        }
+
+        // Video: kalau ada file video yang diunggah langsung, itu yang dipakai
+        // (path storage-nya disimpan di kolom video_url yang sama), timpa link
+        // video_url dari teks kalau ada dua-duanya.
+        if ($request->hasFile('video')) {
+            $videoPath = $request->file('video')->store('businesses/videos', 'public');
+            $data['video_url'] = '/storage/' . $videoPath;
         }
 
         $business = Business::create($data);
@@ -262,10 +272,12 @@ class BusinessController extends Controller
             'operating_hours' => 'nullable|string',
             'closed_days' => 'nullable|array',
             'closed_days.*' => 'string',
+            'price_category' => 'nullable|integer|in:1,2,3',
             'tags' => 'nullable|array',
             'tags.*' => 'string',
             'website' => 'nullable|string',
             'video_url' => 'nullable|string',
+            'video' => 'nullable|file|mimetypes:video/mp4,video/webm,video/quicktime|max:20480',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // could be a new uploaded file
             'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'remove_gallery' => 'nullable|array',
@@ -278,7 +290,7 @@ class BusinessController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $data = $request->except(['image', 'images', 'remove_gallery']);
+        $data = $request->except(['image', 'images', 'remove_gallery', 'video']);
 
         if ($request->hasFile('image')) {
             // Delete old image if exists
@@ -288,6 +300,17 @@ class BusinessController extends Controller
             }
             $path = $request->file('image')->store('businesses', 'public');
             $data['image'] = '/storage/' . $path;
+        }
+
+        // Video: file yang diunggah langsung menang atas link teks, dan
+        // video lama (kalau berupa file storage, bukan link eksternal)
+        // dihapus supaya tidak menumpuk sampah di server.
+        if ($request->hasFile('video')) {
+            if ($business->video_url && str_starts_with($business->video_url, '/storage/')) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $business->video_url));
+            }
+            $videoPath = $request->file('video')->store('businesses/videos', 'public');
+            $data['video_url'] = '/storage/' . $videoPath;
         }
 
         // Start from the existing gallery, drop any paths the user asked to

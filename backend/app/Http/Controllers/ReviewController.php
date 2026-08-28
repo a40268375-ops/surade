@@ -62,4 +62,73 @@ class ReviewController extends Controller
             'helpful_by_me' => true,
         ]);
     }
+
+    /**
+     * Auth required: semua ulasan yang masuk ke bisnis-bisnis milik user
+     * yang sedang login (admin melihat semua ulasan). Dipakai di
+     * Dashboard > Ulasan.
+     */
+    public function myReviews(Request $request)
+    {
+        $user = $request->user();
+
+        $query = BusinessReview::with(['business:id,title,image,user_id', 'reviewer:id,name,avatar'])
+            ->latest();
+
+        if ($user->role !== 'admin') {
+            $businessIds = $user->businesses()->pluck('id');
+            $query->whereIn('business_id', $businessIds);
+        }
+
+        return response()->json($query->get());
+    }
+
+    /**
+     * Auth required: pemilik bisnis (atau admin) membalas/mengedit balasan
+     * atas sebuah ulasan pelanggan.
+     */
+    public function reply(Request $request, $id)
+    {
+        $review = BusinessReview::with('business')->find($id);
+        if (!$review) {
+            return response()->json(['message' => 'Ulasan tidak ditemukan'], 404);
+        }
+
+        $user = $request->user();
+        if ($user->role !== 'admin' && $review->business->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $request->validate([
+            'reply' => 'required|string|max:1000',
+        ]);
+
+        $review->update([
+            'owner_reply' => $request->reply,
+            'owner_reply_at' => now(),
+        ]);
+
+        return response()->json($review->load(['business:id,title,image,user_id', 'reviewer:id,name,avatar']));
+    }
+
+    /**
+     * Auth required: pemilik bisnis (atau admin) menghapus ulasan, mis.
+     * karena melanggar atau spam.
+     */
+    public function destroyReview(Request $request, $id)
+    {
+        $review = BusinessReview::with('business')->find($id);
+        if (!$review) {
+            return response()->json(['message' => 'Ulasan tidak ditemukan'], 404);
+        }
+
+        $user = $request->user();
+        if ($user->role !== 'admin' && $review->business->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $review->delete();
+
+        return response()->json(['message' => 'Ulasan berhasil dihapus']);
+    }
 }

@@ -16,6 +16,7 @@ class Advertisement extends Model
         'location',
         'phone',
         'website',
+        'image',
         'status',
         'expires_at',
     ];

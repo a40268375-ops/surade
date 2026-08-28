@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Advertisement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class AdvertisementController extends Controller
@@ -20,10 +21,10 @@ class AdvertisementController extends Controller
         } elseif ($request->has('status') && $request->user()) {
             $query->where('status', $request->status)->where('user_id', $request->user()->id);
         } else {
-            // DIUBAH: Di api.php kamu menggunakan status 'verified' untuk iklan tayang
-            $query->where('status', 'verified')
+            // Public listing: only show approved ads that are not expired
+            $query->where('status', 'approved')
                   ->where(function ($q) {
-                      // Tayang kalau belum ada masa berlaku, atau masa berlakunya belum lewat
+                      // Show ads without expiration or with future expiration
                       $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                   });
         }
@@ -47,6 +48,10 @@ class AdvertisementController extends Controller
             'location' => 'required|string|max:255',
             'phone' => 'nullable|string',
             'website' => 'nullable|string',
+            // PERBAIKAN: sebelumnya tidak ada validasi/handling untuk
+            // gambar sama sekali - form "Pasang Iklan Baru" tidak bisa
+            // upload foto apa pun.
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ]);
 
         if ($validator->fails()) {
@@ -59,9 +64,20 @@ class AdvertisementController extends Controller
             ], 403);
         }
 
-        $data = $request->all();
+        // PERBAIKAN: sebelumnya `$data = $request->all()` dipakai apa
+        // adanya untuk Advertisement::create() - kalau ada file gambar di
+        // request, field 'image' akan berisi objek UploadedFile mentah
+        // (bukan path string), yang bakal gagal disimpan ke kolom varchar
+        // di database. Sekarang file gambar dikeluarkan dulu dari $data,
+        // lalu ditangani terpisah persis seperti BusinessController.
+        $data = $request->except(['image']);
         $data['user_id'] = $request->user()->id;
         $data['status'] = 'pending';
+
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('advertisements', 'public');
+            $data['image'] = '/storage/' . $path;
+        }
 
         $advertisement = Advertisement::create($data);
 
@@ -79,7 +95,7 @@ class AdvertisementController extends Controller
         return response()->json($advertisement);
     }
 
-    // DITAMBAHKAN: Fungsi verify untuk memenuhi Route::put('advertisements/{id}/verify') di api.php kamu
+    // Admin menyetujui iklan yang masih pending, supaya tayang ke publik.
     public function verify(Request $request, $id)
     {
         if ($request->user()->role !== 'admin') {
@@ -92,8 +108,36 @@ class AdvertisementController extends Controller
             return response()->json(['message' => 'Advertisement not found'], 404);
         }
 
-        $advertisement->status = 'verified'; // Status disetujui admin agar tayang ke publik
+        // PERBAIKAN: sebelumnya status di-set ke 'verified' - nilai ini
+        // BUKAN salah satu pilihan enum kolom `status` di database (yang
+        // hanya mengizinkan pending/approved/rejected), dan method
+        // index() di atas mem-filter tampilan publik dengan
+        // `where('status', 'approved')`. Akibatnya iklan yang "disetujui"
+        // justru gagal disimpan (melanggar enum) ATAU tetap tidak akan
+        // PERNAH muncul di beranda - persis keluhan "iklan yang di
+        // website itu bukan iklan kita". Sekarang disamakan jadi
+        // 'approved' supaya konsisten dari ujung ke ujung.
+        $advertisement->status = 'approved';
         $advertisement->expires_at = now()->addDays(30); // Masa tayang 30 hari sejak disetujui
+        $advertisement->save();
+
+        return response()->json($advertisement->load('category'));
+    }
+
+    // Admin menolak iklan yang masih pending.
+    public function reject(Request $request, $id)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $advertisement = Advertisement::find($id);
+
+        if (!$advertisement) {
+            return response()->json(['message' => 'Advertisement not found'], 404);
+        }
+
+        $advertisement->status = 'rejected';
         $advertisement->save();
 
         return response()->json($advertisement->load('category'));
@@ -119,17 +163,32 @@ class AdvertisementController extends Controller
             'location' => 'sometimes|required|string|max:255',
             'phone' => 'nullable|string',
             'website' => 'nullable|string',
-            'status' => 'nullable|string|in:pending,verified,rejected', // Diubah dari approved ke verified sesuai sistem api.php
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            // PERBAIKAN: sebelumnya `in:pending,verified,rejected` - nilai
+            // 'verified' tidak pernah valid (lihat penjelasan di verify()
+            // di atas) dan 'approved' (nilai yang SEHARUSNYA dipakai)
+            // malah tidak diizinkan sama sekali oleh validator ini.
+            'status' => 'nullable|string|in:pending,approved,rejected',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $data = $request->all();
+        $data = $request->except(['image']);
 
         if ($request->user()->role !== 'admin') {
             unset($data['status']);
+        }
+
+        if ($request->hasFile('image')) {
+            // Hapus foto lama supaya file di server tidak menumpuk.
+            if ($advertisement->image) {
+                $oldPath = str_replace('/storage/', '', $advertisement->image);
+                Storage::disk('public')->delete($oldPath);
+            }
+            $path = $request->file('image')->store('advertisements', 'public');
+            $data['image'] = '/storage/' . $path;
         }
 
         $advertisement->update($data);
@@ -147,6 +206,10 @@ class AdvertisementController extends Controller
 
         if ($request->user()->id !== $advertisement->user_id && $request->user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($advertisement->image) {
+            Storage::disk('public')->delete(str_replace('/storage/', '', $advertisement->image));
         }
 
         $advertisement->delete();

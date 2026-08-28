@@ -4,9 +4,80 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\ReferralCommission;
 
 class ReferralController extends Controller
 {
+    /**
+     * Statistik referral milik user yang sedang login, untuk ditampilkan
+     * di tab "Referral" pada Dashboard user (menggantikan tab Reseller lama).
+     *
+     * Semua angka diambil langsung dari database (referral_commissions),
+     * tidak ada dummy data.
+     */
+    public function myReferralStats(Request $request)
+    {
+        $user = $request->user();
+
+        $baseQuery = ReferralCommission::where('referrer_id', $user->id);
+
+        $totalUsage = (clone $baseQuery)->distinct()->count('referred_user_id');
+        $totalTransaksi = (clone $baseQuery)->count();
+
+        $commissionByStatus = (clone $baseQuery)
+            ->selectRaw('status, COUNT(*) as total, SUM(COALESCE(final_commission_amount, commission_amount)) as amount')
+            ->groupBy('status')
+            ->get()
+            ->keyBy('status');
+
+        $statuses = ['pending', 'approved', 'paid', 'rejected', 'cancelled'];
+        $commissionSummary = [];
+        foreach ($statuses as $status) {
+            $row = $commissionByStatus->get($status);
+            $commissionSummary[$status] = [
+                'total_transaksi' => $row ? (int) $row->total : 0,
+                'total_komisi' => $row ? (float) $row->amount : 0,
+            ];
+        }
+
+        $totalKomisiDiterima = $commissionSummary['approved']['total_komisi'] + $commissionSummary['paid']['total_komisi'];
+        $totalKomisiDibayar = $commissionSummary['paid']['total_komisi'];
+
+        $riwayatTerbaru = (clone $baseQuery)
+            ->with(['referredUser:id,name,email', 'business:id,name'])
+            ->latest()
+            ->take(10)
+            ->get()
+            ->map(function ($c) {
+                return [
+                    'id' => $c->id,
+                    'transaction_id' => $c->transaction_id,
+                    'referred_user' => $c->referredUser?->name,
+                    'business' => $c->business?->name,
+                    'discount_amount' => (float) $c->discount_amount,
+                    'commission_amount' => (float) ($c->final_commission_amount ?? $c->commission_amount),
+                    'status' => $c->status,
+                    'created_at' => $c->created_at,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'referral_code' => $user->referral_code,
+                'has_referral_code' => (bool) $user->referral_code,
+                'discount_percent' => 5,
+                'commission_percent' => 15,
+                'total_penggunaan' => $totalUsage,
+                'total_transaksi' => $totalTransaksi,
+                'total_komisi_diterima' => $totalKomisiDiterima,
+                'total_komisi_dibayar' => $totalKomisiDibayar,
+                'komisi_per_status' => $commissionSummary,
+                'riwayat_terbaru' => $riwayatTerbaru,
+            ],
+        ]);
+    }
+
     public function checkReferralCode(Request $request)
     {
         $request->validate([
@@ -21,32 +92,26 @@ class ReferralController extends Controller
                 'valid' => false,
                 'discount_percent' => 0,
                 'message' => 'Kode referral tidak valid'
-            ], 200); // Return 200, not 404
+            ], 200);
         }
 
         // Check if referrer is active and has referral privileges
-        if ($referrer->status !== 'active') {
+        if ($referrer->status !== 'active' || !$referrer->is_active) {
             return response()->json([
                 'valid' => false,
                 'discount_percent' => 0,
                 'message' => 'Kode referral tidak aktif'
-            ], 200); // Return 200, not 400
+            ], 200);
         }
 
-        // Return discount percentage (you can customize this logic)
-        $discountPercent = 10; // Default 10% discount
-        
-        // Admin or reseller might have higher discount
-        if ($referrer->role === 'admin') {
-            $discountPercent = 15;
-        } elseif ($referrer->role === 'reseller') {
-            $discountPercent = 12;
-        }
+        // Fixed 5% discount for all referrals (no role-based differences)
+        $discountPercent = 5;
 
         return response()->json([
             'valid' => true,
             'discount_percent' => $discountPercent,
             'referrer_name' => $referrer->name,
+            'referrer_id' => $referrer->id,
             'message' => "Kode referral valid! Anda mendapat diskon {$discountPercent}%"
         ], 200);
     }
@@ -80,7 +145,7 @@ class ReferralController extends Controller
                 ], 200);
             }
 
-            // Get plan amount
+            // Get plan amount - DO NOT trust frontend values, get from backend config
             $planAmounts = [
                 'monthly' => 49000,
                 'quarterly' => 129000,
@@ -89,8 +154,8 @@ class ReferralController extends Controller
 
             $planAmount = $planAmounts[$request->plan] ?? 49000;
 
-            // Calculate random discount between 10-50%
-            $discountPercent = rand(10, 50);
+            // Fixed 5% discount for all referrals (not random)
+            $discountPercent = 5;
             $discountAmount = floor($planAmount * ($discountPercent / 100));
 
             return response()->json([
@@ -99,7 +164,9 @@ class ReferralController extends Controller
                 'discount_percent' => $discountPercent,
                 'referrer_id' => $referrer->id,
                 'referrer_name' => $referrer->name,
-                'message' => "Kode referral valid! Anda mendapat diskon {$discountPercent}% (Rp {$discountAmount})"
+                'original_amount' => $planAmount,
+                'final_amount' => $planAmount - $discountAmount,
+                'message' => "Kode referral valid! Anda mendapat diskon {$discountPercent}% (Rp " . number_format($discountAmount, 0, ',', '.') . ")"
             ], 200);
         } catch (\Exception $e) {
             \Log::error('Referral validation error: ' . $e->getMessage(), [

@@ -8,10 +8,7 @@ const BULAN = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
-// Widget kalender kecil buat halaman Dasbor - murni dekoratif (menampilkan
-// bulan berjalan & menyorot hari ini), tidak baca/tulis data booking apa
-// pun, jadi aman dipakai di halaman mana saja tanpa butuh API tambahan.
-export default function MiniCalendar() {
+export default function MiniCalendar({ events = [], onDateClick }) {
   const today = new Date();
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [collapsed, setCollapsed] = useState(false);
@@ -30,6 +27,20 @@ export default function MiniCalendar() {
 
   const isToday = (d) =>
     d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+
+  // Check if a specific date has any events
+  const hasEvent = (d) => {
+    if (!d) return false;
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return events.some(e => e.date === dateStr || (e.created_at && e.created_at.startsWith(dateStr)));
+  };
+
+  const handleDateClick = (d) => {
+    if (d && onDateClick) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      onDateClick(dateStr);
+    }
+  };
 
   const goPrevMonth = () => setViewDate(new Date(year, month - 1, 1));
   const goNextMonth = () => setViewDate(new Date(year, month + 1, 1));
@@ -65,9 +76,11 @@ export default function MiniCalendar() {
             {cells.map((d, idx) => (
               <span
                 key={idx}
-                className={`mini-cal__cell ${d === null ? "mini-cal__cell--empty" : ""} ${d && isToday(d) ? "mini-cal__cell--today" : ""}`}
+                onClick={() => handleDateClick(d)}
+                className={`mini-cal__cell ${d === null ? "mini-cal__cell--empty" : ""} ${d && isToday(d) ? "mini-cal__cell--today" : ""} ${d && hasEvent(d) ? "mini-cal__cell--has-event" : ""} ${d ? "clickable" : ""}`}
               >
                 {d || ""}
+                {d && hasEvent(d) && <span className="mini-cal__event-dot"></span>}
               </span>
             ))}
           </div>

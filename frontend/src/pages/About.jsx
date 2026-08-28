@@ -202,7 +202,7 @@ export default function About() {
             <div className="footer-col">
               <h4 className="footer-heading">Bantuan</h4>
               <ul className="footer-links">
-                <li><a href="#">FAQ</a></li>
+                <li><Link to="/faq">FAQ</Link></li>
                 <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
                 <li><Link to="/contact">Hubungi Kami</Link></li>
               </ul>
@@ -212,9 +212,10 @@ export default function About() {
             <div className="footer-col">
               <h4 className="footer-heading">Kontak Kami</h4>
               <ul className="footer-links">
-                <li><a href="mailto:support@Surade.co.id">support@Surade.co.id</a></li>
-                <li><span className="footer-text">(021) 1234 5678</span></li>
-                <li><span className="footer-text">Jalan Mercurius 16680 Dramaga West Java</span></li>
+                <li><a href="mailto:admin@Surade.co.id">admin@Surade.co.id</a></li>
+                <li><span className="footer-text">Call Center 0807 - 100 - 1500</span></li>
+                  <li><span className="footer-text">WhatsApp: +62 811-1919-711</span></li>
+                
               </ul>
             </div>
           </div>

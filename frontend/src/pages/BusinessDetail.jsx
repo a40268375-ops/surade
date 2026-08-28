@@ -1,6 +1,7 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api, { getImageUrl } from "../utils/api";
+import { computeOpenStatus, buildWeeklySchedule, getPriceTier } from "../utils/businessHours";
 import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
 import { usePageLoading } from "../hooks/usePageLoading";
@@ -23,8 +24,10 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-  CalendarCheck,
   ThumbsUp,
+  Flag,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import "./Home.css";
 import "./Login.css";
@@ -70,63 +73,7 @@ const DEFAULT_SELLER = {
   rating: 4.8
 };
 
-/* ── Weekly opening-hours schedule ── */
-const DAY_NAMES = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
-
-function buildWeeklySchedule(business) {
-  const closedDays = business.closedDays || business.closed_days || [];
-  const jsToday = new Date().getDay();
-  const todayIndex = jsToday === 0 ? 6 : jsToday - 1;
-  return DAY_NAMES.map((day, idx) => {
-    const closed = closedDays.includes(day);
-    return {
-      day,
-      hours: closed ? "Tutup" : (business.operating_hours || business.hours),
-      closed,
-      isToday: idx === todayIndex,
-    };
-  });
-}
-
-/* ── Hitung status buka/tutup SEKARANG ── */
-function computeOpenStatus(business) {
-  // Use the backend's computed is_open_now attribute if available
-  if (business.hasOwnProperty('is_open_now')) {
-    return { 
-      isOpen: business.is_open_now, 
-      label: business.is_open_now ? "Buka Sekarang" : "Tutup Sekarang" 
-    };
-  }
-
-  // Fallback to frontend logic using operating_hours (not hours)
-  const hours = business.operating_hours;
-  if (!hours) return null;
-  
-  const jsToday = new Date().getDay();
-  const todayName = DAY_NAMES[jsToday === 0 ? 6 : jsToday - 1];
-  if ((business.closedDays || business.closed_days || []).includes(todayName)) {
-    return { isOpen: false, label: "Tutup Hari Ini" };
-  }
-  
-  const match = hours.match(/(\d{1,2})[.:](\d{2})\s*-\s*(\d{1,2})[.:](\d{2})/);
-  if (!match) return null;
-  
-  const [, openH, openM, closeH, closeM] = match.map(Number);
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const openMinutes = openH * 60 + openM;
-  let closeMinutes = closeH * 60 + closeM;
-  let isOpen;
-  
-  if (closeMinutes <= openMinutes) {
-    isOpen = nowMinutes >= openMinutes || nowMinutes < closeMinutes;
-  } else {
-    isOpen = nowMinutes >= openMinutes && nowMinutes < closeMinutes;
-  }
-  
-  return { isOpen, label: isOpen ? "Buka Sekarang" : "Tutup Sekarang" };
-}
-
+/* ── Helper untuk membuat tanggal relatif di masa lalu (n hari yang lalu) ── */
 function formatRelativeTime(dateString) {
   const diffMs = Date.now() - new Date(dateString).getTime();
   const minutes = Math.floor(diffMs / 60000);
@@ -304,20 +251,17 @@ export default function BusinessDetail() {
   const [business, setBusiness] = useState(null);
   const [fetchingBusiness, setFetchingBusiness] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState(null);
+  const [savingBusiness, setSavingBusiness] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const [reportSuccess, setReportSuccess] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
   const [showHours, setShowHours] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
-  // BARU: state untuk modal "Chat Dengan Penjual" - sebelumnya tombol ini
-  // salah pasang, memanggil handleWhatsApp yang sama persis dengan tombol
-  // WhatsApp di sebelahnya. Sekarang benar-benar mengirim pesan lewat
-  // sistem chat internal (masuk ke tab Inbox pemilik bisnis).
-  const [showChatModal, setShowChatModal] = useState(false);
-  const [chatName, setChatName] = useState(authUser?.name || "");
-  const [chatContact, setChatContact] = useState(authUser?.phone || authUser?.email || "");
-  const [chatMessage, setChatMessage] = useState("");
-  const [chatError, setChatError] = useState("");
-  const [chatSubmitting, setChatSubmitting] = useState(false);
-  const [chatSuccess, setChatSuccess] = useState(false);
   const [bookingName, setBookingName] = useState("");
   const [bookingPhone, setBookingPhone] = useState("");
   const [bookingDate, setBookingDate] = useState("");
@@ -328,11 +272,16 @@ export default function BusinessDetail() {
   const [bookingError, setBookingError] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showPriceDropdown, setShowPriceDropdown] = useState(false);
-  const [priceCategory, setPriceCategory] = useState(2);
   const [showWeeklyHours, setShowWeeklyHours] = useState(false);
+  const priceDropdownRef = useRef(null);
   const [menuItems, setMenuItems] = useState([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  // BARU: tab filter Galeri ("Semua"/"Foto"/"Video") - gayanya mirip
+  // filter chip di WhatsApp Web ("Semua/Belum dibaca/Favorit/Grup"),
+  // supaya galeri foto & video punya bagian-bagian yang jelas terpisah,
+  // bukan ditumpuk jadi satu grid panjang.
+  const [galleryTab, setGalleryTab] = useState("all");
   const [productPage, setProductPage] = useState(1);
   const [showGalleryLightbox, setShowGalleryLightbox] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -396,7 +345,7 @@ export default function BusinessDetail() {
         const img = data.image
           ? getImageUrl(data.image)
           : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1200&h=600&fit=crop";
-        const galleryImgs = (data.images || []).map((p) => getImageUrl(p));
+        const galleryImgs = Array.isArray(data.images) ? data.images.map((p) => getImageUrl(p)) : [];
 
         setBusiness({
           id: data.id,
@@ -409,6 +358,7 @@ export default function BusinessDetail() {
           email: data.email,
           website: data.website,
           hours: data.operating_hours || "08.00 - 17.00",
+          operating_hours: data.operating_hours || "",
           closedDays: data.closed_days || [],
           description: data.description,
           img,
@@ -443,6 +393,8 @@ export default function BusinessDetail() {
           },
           status: data.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
           is_open_now: data.is_open_now,
+          price_category: data.price_category || 2,
+          is_premium_active: data.is_premium_active,
           rating: data.rating || 0,
           reviews: data.reviews_count || 0,
           reviewList: (data.reviews || []).map((r) => ({
@@ -488,6 +440,7 @@ export default function BusinessDetail() {
             video: fallback.video || null,
             status: "Buka Sekarang",
             is_open_now: true,
+            is_premium_active: false,
             rating: fallback.rating,
             reviews: fallback.reviews,
             reviewList: fallbackReviews,
@@ -541,6 +494,37 @@ export default function BusinessDetail() {
     return () => clearInterval(interval);
   }, [business]);
 
+  // Cek apakah bisnis ini sudah ada di daftar favorit user yang login,
+  // supaya ikon bookmark langsung tampil terisi kalau memang sudah disimpan.
+  useEffect(() => {
+    if (!authUser || !business?.id) {
+      setSaved(false);
+      setSavedRecordId(null);
+      return;
+    }
+    let cancelled = false;
+    api.get("/my-saved-businesses")
+      .then((list) => {
+        if (cancelled) return;
+        const match = (list || []).find((s) => String(s.business_id) === String(business.id));
+        setSaved(!!match);
+        setSavedRecordId(match ? match.id : null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [authUser, business?.id]);
+
+  useEffect(() => {
+    if (!showPriceDropdown) return;
+    function handleClickOutside(e) {
+      if (priceDropdownRef.current && !priceDropdownRef.current.contains(e.target)) {
+        setShowPriceDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showPriceDropdown]);
+
   const handleShare = async () => {
     const url = window.location.href;
     if (navigator.share) {
@@ -583,6 +567,71 @@ export default function BusinessDetail() {
     navigate("/dashboard?tab=premium");
   };
 
+  /* ── SIMPAN / HAPUS DARI FAVORIT ── */
+  const handleToggleSave = async () => {
+    if (!authUser) {
+      window.location.href = "/login";
+      return;
+    }
+    if (savingBusiness) return;
+    setSavingBusiness(true);
+    try {
+      if (saved && savedRecordId) {
+        await api.delete(`/saved-businesses/${savedRecordId}`);
+        setSaved(false);
+        setSavedRecordId(null);
+      } else {
+        const result = await api.post("/saved-businesses", { business_id: business.id });
+        setSaved(true);
+        setSavedRecordId(result.id);
+        // PERBAIKAN: konsisten dengan Home.jsx & Category.jsx - begitu
+        // berhasil disimpan sebagai favorit, otomatis diarahkan ke
+        // Dashboard > Favorit supaya langsung kelihatan sudah masuk daftar.
+        setTimeout(() => navigate("/dashboard?tab=saved"), 500);
+      }
+    } catch (err) {
+      alert(err?.data?.message || "Gagal memperbarui daftar favorit. Silakan coba lagi.");
+    } finally {
+      setSavingBusiness(false);
+    }
+  };
+
+  /* ── LAPORKAN BISNIS ── */
+  const handleReportSubmit = async (e) => {
+    e.preventDefault();
+    if (!authUser) {
+      window.location.href = "/login";
+      return;
+    }
+    if (!reportReason) {
+      setReportError("Silakan pilih alasan laporan.");
+      return;
+    }
+    setReportError("");
+    setReportSubmitting(true);
+    try {
+      await api.post(`/businesses/${business.id}/report`, {
+        reason: reportReason,
+        description: reportDescription.trim() || null,
+      });
+      setReportSuccess(true);
+      setReportReason("");
+      setReportDescription("");
+    } catch (err) {
+      setReportError(err?.data?.message || "Gagal mengirim laporan. Silakan coba lagi.");
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const closeReportModal = () => {
+    setShowReportModal(false);
+    setReportSuccess(false);
+    setReportError("");
+    setReportReason("");
+    setReportDescription("");
+  };
+
   /* ── KIRIM ULASAN ── */
   const handleSubmitReview = async (e) => {
     e.preventDefault();
@@ -622,31 +671,6 @@ export default function BusinessDetail() {
       setSubmittingReview(false);
     }
   };
-
-  const handleChatSubmit = async (e) => {
-    e.preventDefault();
-    setChatError("");
-    if (!chatName.trim() || !chatMessage.trim()) {
-      setChatError("Nama dan pesan wajib diisi.");
-      return;
-    }
-    setChatSubmitting(true);
-    try {
-      await api.post("/messages", {
-        business_id: business.id,
-        sender_name: chatName.trim(),
-        sender_contact: chatContact.trim() || null,
-        message: chatMessage.trim(),
-      });
-      setChatSuccess(true);
-      setChatMessage("");
-    } catch (err) {
-      setChatError(err?.data?.message || "Gagal mengirim pesan. Silakan coba lagi.");
-    } finally {
-      setChatSubmitting(false);
-    }
-  };
-
 
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
@@ -706,11 +730,10 @@ export default function BusinessDetail() {
   const imagesList = business.images?.length > 0 ? business.images : [business.img];
   const seller = business.seller || DEFAULT_SELLER;
   const weeklySchedule = buildWeeklySchedule(business);
-  const openStatus = business.is_open_now ? 
-    { isOpen: true, label: "Buka Sekarang" } : 
-    { isOpen: false, label: "Tutup Sekarang" };
+  const openStatus = computeOpenStatus(business);
   const displayStatus = openStatus.label;
   const isOpenNow = openStatus.isOpen;
+  const priceTier = getPriceTier(business.price_category || 2);
 
   // Produk: dibatasi 3 per halaman, dengan pagination bernomor (kaya di
   // halaman kategori). Kalau produknya cuma 1 halaman, paginationnya
@@ -768,17 +791,40 @@ export default function BusinessDetail() {
               <span>/</span>
               <span>{business.name}</span>
             </div>
-            <h1 className="bd-hero__title">{business.name}</h1>
-            <p className="bd-hero__category">{business.category}</p>
-            <div className="bd-hero__meta">
-              <div className="bd-hero__rating">
-                <Star size={18} fill="#fbbf24" stroke="#fbbf24" />
-                <span>{business.rating}</span>
-                <span>({business.reviews} ulasan)</span>
-              </div>
-              <div className="bd-hero__status">
-                <span className={`bd-hero__status-dot ${isOpenNow ? "open" : "closed"}`} />
-                <span>{displayStatus}</span>
+
+            {/* PERBAIKAN: ditambahkan logo bulat usaha di sebelah nama -
+                sebelumnya di sini kosong sama sekali. Fotonya diambil dari
+                thumbnail yang di-upload pemilik usaha di form "Tambah Usaha"
+                (business.img), lalu ditampilkan bulat pakai CSS
+                border-radius: 50% di .bd-hero__logo. */}
+            <div className="bd-hero__top">
+              {business.img && (
+                <div className="bd-hero__logo">
+                  <img src={business.img} alt={business.name} />
+                </div>
+              )}
+              <div className="bd-hero__headings">
+                <h1 className="bd-hero__title">
+                  {business.name}
+                  {business.is_premium_active && (
+                    <span className="bd-verified-badge" title="Bisnis Terverifikasi">
+                      <CheckCircle size={14} strokeWidth={2.5} />
+                      Terverifikasi
+                    </span>
+                  )}
+                </h1>
+                <p className="bd-hero__category">{business.category}</p>
+                <div className="bd-hero__meta">
+                  <div className="bd-hero__rating">
+                    <Star size={18} fill="#fbbf24" stroke="#fbbf24" />
+                    <span>{business.rating}</span>
+                    <span>({business.reviews} ulasan)</span>
+                  </div>
+                  <div className="bd-hero__status">
+                    <span className={`bd-hero__status-dot ${isOpenNow ? "open" : "closed"}`} />
+                    <span>{displayStatus}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -791,22 +837,22 @@ export default function BusinessDetail() {
           <div className="bd-content__main">
             {/* Quick Action Icons */}
             <div className="bd-quick-actions">
-              <div className="bd-price-dropdown-wrapper">
-                <button type="button" className={`bd-quick-action ${showPriceDropdown ? "active" : ""}`} title="Kategori Harga" onClick={() => setShowPriceDropdown(!showPriceDropdown)}>
+              <div className="bd-price-dropdown-wrapper" ref={priceDropdownRef}>
+                <button type="button" className={`bd-quick-action ${showPriceDropdown ? "active" : ""}`} title={`Kategori Harga: ${priceTier.label}`} onClick={() => setShowPriceDropdown(!showPriceDropdown)}>
                   <DollarSign size={22} strokeWidth={1.8} />
-                  <span className="bd-price-count">{priceCategory}</span>
+                  <span className="bd-price-count">{priceTier.symbol}</span>
                 </button>
                 {showPriceDropdown && (
                   <div className="bd-price-dropdown">
-                    <button type="button" className={`bd-price-option ${priceCategory === 1 ? "active" : ""}`} onClick={() => { setPriceCategory(1); setShowPriceDropdown(false); }}>
+                    <div className={`bd-price-option ${(business.price_category || 2) === 1 ? "active" : ""}`}>
                       <DollarSign size={16} /><span>Murah</span>
-                    </button>
-                    <button type="button" className={`bd-price-option ${priceCategory === 2 ? "active" : ""}`} onClick={() => { setPriceCategory(2); setShowPriceDropdown(false); }}>
+                    </div>
+                    <div className={`bd-price-option ${(business.price_category || 2) === 2 ? "active" : ""}`}>
                       <div className="bd-price-dollars"><DollarSign size={16} /><DollarSign size={16} /></div><span>Sedang</span>
-                    </button>
-                    <button type="button" className={`bd-price-option ${priceCategory === 3 ? "active" : ""}`} onClick={() => { setPriceCategory(3); setShowPriceDropdown(false); }}>
+                    </div>
+                    <div className={`bd-price-option ${(business.price_category || 2) === 3 ? "active" : ""}`}>
                       <div className="bd-price-dollars"><DollarSign size={16} /><DollarSign size={16} /><DollarSign size={16} /></div><span>Mahal</span>
-                    </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -815,11 +861,13 @@ export default function BusinessDetail() {
               <button type="button" className="bd-quick-action bd-quick-action--disabled" title="Telepon" disabled><Phone size={22} strokeWidth={1.8} /></button>
               <button type="button" className="bd-quick-action" title="WhatsApp" onClick={handleWhatsApp}><MessageCircle size={22} strokeWidth={1.8} /></button>
               <button type="button" className="bd-quick-action" title="Dapatkan Arah" onClick={handleDirections}><Send size={22} strokeWidth={1.8} /></button>
-              <button type="button" className="bd-quick-action" title="Booking" onClick={() => { setBookingSuccess(false); setBookingError(""); setShowBookingModal(true); }}><CalendarCheck size={22} strokeWidth={1.8} /></button>
-              <button type="button" className={`bd-quick-action ${saved ? "active" : ""}`} title={saved ? "Disimpan" : "Simpan"} onClick={() => setSaved(!saved)}>
+              <button type="button" className={`bd-quick-action ${saved ? "active" : ""}`} title={saved ? "Disimpan" : "Simpan"} onClick={handleToggleSave} disabled={savingBusiness}>
                 <Bookmark size={22} strokeWidth={1.8} fill={saved ? "currentColor" : "none"} />
               </button>
               <button type="button" className="bd-quick-action" title="Bagikan" onClick={handleShare}><Share2 size={22} strokeWidth={1.8} /></button>
+              <button type="button" className="bd-quick-action bd-quick-action--report" title="Laporkan" onClick={() => { if (!authUser) { window.location.href = "/login"; return; } setShowReportModal(true); }}>
+                <AlertTriangle size={22} strokeWidth={1.8} />
+              </button>
             </div>
 
             {showHours && (
@@ -843,8 +891,37 @@ export default function BusinessDetail() {
                   <span className="bd-premium-badge">Premium</span>
                 )}
               </h2>
-              
-              {business.premium_features?.photo_gallery ? (
+
+              {/* BARU: filter chip supaya Foto & Video jadi bagian yang
+                  jelas terpisah, bukan satu grid panjang tercampur. */}
+              <div className="bd-gallery-tabs">
+                <button
+                  type="button"
+                  className={`bd-gallery-tab ${galleryTab === "all" ? "active" : ""}`}
+                  onClick={() => setGalleryTab("all")}
+                >
+                  Semua
+                </button>
+                <button
+                  type="button"
+                  className={`bd-gallery-tab ${galleryTab === "photo" ? "active" : ""}`}
+                  onClick={() => setGalleryTab("photo")}
+                >
+                  Foto
+                </button>
+                {business.video && (
+                  <button
+                    type="button"
+                    className={`bd-gallery-tab ${galleryTab === "video" ? "active" : ""}`}
+                    onClick={() => setGalleryTab("video")}
+                  >
+                    Video
+                  </button>
+                )}
+              </div>
+
+              {(galleryTab === "all" || galleryTab === "photo") && (
+              business.premium_features?.photo_gallery ? (
                 <div className="bd-photo-grid">
                   {(imagesList.length > 4 ? imagesList.slice(0, 3) : imagesList).map((src, i) => (
                     <div
@@ -897,9 +974,11 @@ export default function BusinessDetail() {
                     )}
                   </div>
                 </div>
+              )
               )}
               
-              {business.premium_features?.video_showcase && business.video ? (
+              {(galleryTab === "all" || galleryTab === "video") && (
+              business.premium_features?.video_showcase && business.video ? (
                 <div className="bd-video-container">
                   <h3 className="bd-video-title">Video Profil</h3>
                   <a href={business.video} target="_blank" rel="noopener noreferrer" className="bd-video-link">
@@ -925,6 +1004,7 @@ export default function BusinessDetail() {
                     </div>
                   </div>
                 </div>
+              )
               )}
             </div>
 
@@ -1037,12 +1117,12 @@ export default function BusinessDetail() {
               <div className="bd-tags">
                 <h3 className="bd-tags__title">Tags</h3>
                 <div className="bd-tags__list">
-                  {business.tags.map((tag) => (
+                  {Array.isArray(business.tags) && business.tags.map((tag) => (
                     <span key={tag} className="bd-tag">{tag}</span>
                   ))}
                 </div>
               </div>
-            ) : business.tags?.length > 0 && (
+            ) : (Array.isArray(business.tags) && business.tags.length > 0) && (
               <div className="bd-tags">
                 <h3 className="bd-tags__title">
                   Tags
@@ -1168,7 +1248,7 @@ export default function BusinessDetail() {
                   {displayStatus} &middot; {business.hours}
                 </span>
               </div>
-              {showWeeklyHours && (
+              <div className={`bd-hours-card__week-wrap${showWeeklyHours ? " open" : ""}`}>
                 <ul className="bd-hours-card__week">
                   {weeklySchedule.map((d) => (
                     <li key={d.day} className={`bd-hours-card__week-row${d.isToday ? " today" : ""}${d.closed ? " closed" : ""}`}>
@@ -1177,7 +1257,7 @@ export default function BusinessDetail() {
                     </li>
                   ))}
                 </ul>
-              )}
+              </div>
             </div>
 
             {/* Lokasi & Alamat */}
@@ -1228,7 +1308,24 @@ export default function BusinessDetail() {
                   <button type="button" className="bd-seller-btn" onClick={handleWhatsApp}>
                     <MessageCircle size={18} /><span>WhatsApp</span>
                   </button>
-                  <button type="button" className="bd-seller-btn" onClick={() => { setShowChatModal(true); setChatSuccess(false); setChatError(""); }}>
+                  <button
+                    type="button"
+                    className="bd-seller-btn"
+                    onClick={() => {
+                      if (!authUser) {
+                        navigate("/login");
+                        return;
+                      }
+                      // BARU: langsung masuk ke Inbox chat dengan penjual ini
+                      // (bukan isi form nama/email dulu). Kalau sebelumnya
+                      // sudah pernah chat, langsung ke percakapan yang ada;
+                      // kalau belum, Inbox akan menyiapkan percakapan baru
+                      // yang tinggal diketik & dikirim.
+                      navigate(
+                        `/dashboard?tab=inbox&startBusiness=${business.id}&startName=${encodeURIComponent(business.name)}`
+                      );
+                    }}
+                  >
                     <MessageCircle size={18} /><span>Chat Dengan Penjual</span>
                   </button>
                   <button type="button" className="bd-seller-phone" onClick={() => setShowPhone(!showPhone)}>
@@ -1268,42 +1365,6 @@ export default function BusinessDetail() {
           </div>
         </div>
       </section>
-
-      {/* Booking Modal */}
-      {/* ========== CHAT DENGAN PENJUAL MODAL ========== */}
-      {/* BARU: sebelumnya tombol ini cuma membuka WhatsApp (sama seperti
-          tombol WhatsApp di sebelahnya) - sekarang benar-benar mengirim
-          pesan lewat sistem chat internal (endpoint /messages), yang
-          langsung masuk ke tab Inbox pemilik bisnis dan bisa dibalas dari
-          sana seperti chat WhatsApp dua arah. */}
-      {showChatModal && (
-        <div className="login-modal-overlay" onClick={() => setShowChatModal(false)}>
-          <div className="login-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-            <div className="login-modal__header">
-              <div>
-                <h2 className="login-modal__title">Chat Dengan {seller.name}</h2>
-                <p className="login-modal__subtitle">Pesan Anda akan masuk ke Inbox penjual dan bisa dibalas langsung dari sini.</p>
-              </div>
-              <button className="login-modal__close" onClick={() => setShowChatModal(false)} aria-label="Tutup"><X size={24} /></button>
-            </div>
-            <div className="login-modal__divider" />
-            {chatSuccess ? (
-              <div className="login-modal__body">
-                <p style={{ textAlign: "center", padding: "20px 0" }}>✅ Pesan terkirim! Penjual akan membalas lewat Inbox {authUser ? "Anda" : "(cek lewat kontak yang Anda cantumkan)"}.</p>
-                <button type="button" className="login-register-btn" onClick={() => setShowChatModal(false)}>Tutup</button>
-              </div>
-            ) : (
-              <form className="login-modal__body" onSubmit={handleChatSubmit} noValidate>
-                {chatError && <div className="login-error"><span>{chatError}</span></div>}
-                <input type="text" className="login-input" placeholder="Nama Anda" value={chatName} onChange={(e) => setChatName(e.target.value)} />
-                <input type="text" className="login-input" placeholder="No. HP / Email (opsional)" value={chatContact} onChange={(e) => setChatContact(e.target.value)} />
-                <textarea className="login-input" placeholder="Tulis pesan Anda..." rows={4} value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} />
-                <button type="submit" className="login-register-btn" disabled={chatSubmitting}>{chatSubmitting ? "Mengirim..." : "Kirim Pesan"}</button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
 
       {showBookingModal && (
         <div className="login-modal-overlay" onClick={() => setShowBookingModal(false)}>
@@ -1362,6 +1423,44 @@ export default function BusinessDetail() {
                 {submittingReview ? "Mengirim..." : "Kirim Ulasan"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========== REPORT MODAL ========== */}
+      {showReportModal && (
+        <div className="login-modal-overlay" onClick={closeReportModal}>
+          <div className="login-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="login-modal__header">
+              <div>
+                <h2 className="login-modal__title">Laporkan {business.name}</h2>
+                <p className="login-modal__subtitle">Beri tahu kami jika ada kesalahan atau pelanggaran pada bisnis ini.</p>
+              </div>
+              <button className="login-modal__close" onClick={closeReportModal} aria-label="Tutup"><X size={24} /></button>
+            </div>
+            <div className="login-modal__divider" />
+            {reportSuccess ? (
+              <div className="login-modal__body">
+                <p style={{ textAlign: "center", padding: "20px 0" }}>✅ Laporan berhasil dikirim. Tim kami akan meninjaunya secepatnya.</p>
+                <button type="button" className="login-register-btn" onClick={closeReportModal}>Tutup</button>
+              </div>
+            ) : (
+              <form className="login-modal__body" onSubmit={handleReportSubmit} noValidate>
+                {reportError && <div className="login-error"><span>{reportError}</span></div>}
+                <select className="login-input" value={reportReason} onChange={(e) => setReportReason(e.target.value)} required>
+                  <option value="">Pilih alasan laporan</option>
+                  <option value="Informasi Palsu / Penipuan">Informasi Palsu / Penipuan</option>
+                  <option value="Konten Tidak Pantas">Konten Tidak Pantas</option>
+                  <option value="Bisnis Sudah Tutup / Tidak Aktif">Bisnis Sudah Tutup / Tidak Aktif</option>
+                  <option value="Duplikat / Bisnis Ganda">Duplikat / Bisnis Ganda</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
+                <textarea className="login-input" placeholder="Jelaskan lebih detail (opsional)" rows={4} value={reportDescription} onChange={(e) => setReportDescription(e.target.value)} />
+                <button type="submit" className="login-register-btn" disabled={reportSubmitting}>
+                  {reportSubmitting ? "Mengirim..." : "Kirim Laporan"}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
