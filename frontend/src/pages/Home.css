@@ -12,7 +12,6 @@ body { background: #f5f6fa; }
    PAGE SHELL
 ───────────────────────────────────────────── */
 .home-page {
-  min-height: 100vh;
   overflow-x: hidden;
 }
 
@@ -130,7 +129,8 @@ body { background: #f5f6fa; }
 ───────────────────────────────────────────── */
 .home-hero {
   position: relative;
-  min-height: 100vh;
+  min-height: auto;
+  padding: 120px 0 80px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -640,18 +640,9 @@ body { background: #f5f6fa; }
   white-space: nowrap;
 }
 
-<<<<<<< HEAD
 .standard-ad-card__rating {
   display: inline-flex;
-=======
-.ad-card__save.saved {
-  background: #059669;
-  color: #fff;
-}
 
-.ad-card__views {
-  display: flex;
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
   align-items: center;
   gap: 4px;
   color: #0f172a;
@@ -2915,16 +2906,12 @@ body { background: #f5f6fa; }
   top: 12px;
   left: 12px;
   z-index: 10;
-<<<<<<< HEAD
   display: inline-flex;
   align-items: center;
   gap: 4px;
   background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
   border-radius: 20px;
-=======
-  background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
-  border-radius: 12px;
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
   padding: 4px 10px;
   box-shadow: 0 2px 8px rgba(5, 150, 105, 0.45);
   transition: transform 0.2s ease;

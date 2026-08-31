@@ -1,5 +1,0 @@
-<<<<<<<< HEAD:backend/storage/framework/sessions/0PJwxhrMBGRh9fXXvHQtPmGayN1JsrnmT2xD1pYO
-a:3:{s:6:"_token";s:40:"D7S1zjCkypxsZdcaYzcBI9IBGYvaer1ZEBRYd840";s:9:"_previous";a:2:{s:3:"url";s:85:"http://127.0.0.1:8000/storage/menu-items/2la5l93pBrVo7mYjUo1MZiV2TFlnFSc66ZYcKGkV.png";s:5:"route";N;}s:6:"_flash";a:2:{s:3:"old";a:0:{}s:3:"new";a:0:{}}}
-========
-a:3:{s:6:"_token";s:40:"Dw8ccPTBetFJzLSaN1Vd9ONfQfGBDTBRRo8gmVDK";s:9:"_previous";a:2:{s:3:"url";s:85:"http://127.0.0.1:8000/storage/menu-items/HyNvanfL26q2tU50mamYgjZoM2BhVEfpIUEnFUIe.png";s:5:"route";N;}s:6:"_flash";a:2:{s:3:"old";a:0:{}s:3:"new";a:0:{}}}
->>>>>>>> 43511c35c312291308bc3e9f249d166401282bda:backend/storage/framework/sessions/J6ueLUA3Q1KAGNJUjLfV2bTJbre9vxoORMCNGNsC

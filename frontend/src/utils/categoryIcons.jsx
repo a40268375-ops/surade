@@ -117,17 +117,6 @@ export const DEFAULT_CATEGORY_TABS = [
   { id: "informasi-umum", label: "Informasi Umum", icon: <Info size={largeIconSize} strokeWidth={largeStrokeWidth} /> },
 ];
 
-<<<<<<< HEAD
-// PERHATIAN: konstanta CATEGORY_SUBCATEGORIES yang dulu ada di sini SUDAH
-// DIHAPUS. Isinya hardcode dan TIDAK PERNAH SAMA dengan subkategori asli di
-// database (mis. "perkantoran" di sini cuma berisi 4 subkategori dummy,
-// padahal kategori asli "Perkantoran" di database - lihat
-// CategorySeeder.php - punya 12 subkategori yang berbeda sama sekali).
-// Untungnya konstanta ini tidak pernah di-import di file lain, jadi aman
-// dihapus. Subkategori yang benar SELALU harus diambil dari API
-// GET /categories/tree (lihat Navbar.jsx) atau GET /categories lalu
-// difilter parent_id, JANGAN pernah hardcode ulang di file manapun.
-=======
 // Subcategories for each main category
 export const CATEGORY_SUBCATEGORIES = {
   "perkantoran": ["Kantor Pemerintahan", "Kantor Swasta", "Coworking Space", "Ruang Usaha"],
@@ -145,4 +134,3 @@ export const CATEGORY_SUBCATEGORIES = {
   "informasi-umum": ["Info Wilayah", "Info Acara", "Info Layanan Publik", "Berita Lokal"],
   "properti": ["Rumah", "Apartemen", "Tanah", "Ruko", "Kos-kosan"],
 };
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda

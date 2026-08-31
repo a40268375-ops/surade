@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './AdminTable.css';
+import '../Dashboard.css'; // Import our enhanced styles
 
 const AdminLayout = ({ children }) => {
     const navigate = useNavigate();
@@ -122,8 +123,9 @@ const AdminLayout = ({ children }) => {
     const mainStyle = {
         flex: '1',
         minWidth: '0',
-        padding: '26px 34px 60px',
-        background: '#f2f9f8'
+        padding: '0',
+        background: '#f8fafc',
+        minHeight: '100vh'
     };
 
     return (

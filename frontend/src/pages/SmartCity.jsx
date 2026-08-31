@@ -157,7 +157,6 @@ export default function SmartCity() {
   // `village` sendiri yang diisi dari dropdown yang sumbernya SAMA
   // PERSIS dengan SMART_CITIES (lihat data/desaList.js) - jadi
   // pencocokannya sekarang exact match, bukan tebak-tebakan lagi.
-<<<<<<< HEAD
   const mapBusiness = (b) => ({
     id: b.id,
     name: b.title,
@@ -180,20 +179,7 @@ export default function SmartCity() {
   const businessesInThisVillage = approvedBusinesses
     .filter((b) => b.village === city.name)
     .map(mapBusiness);
-=======
-  const businessesInThisVillage = dbBusinesses
-    .filter((b) => b.village === city.name && b.status === "approved")
-    .map((b) => ({
-      id: b.id,
-      name: b.title,
-      category: b.category?.name || "Lainnya",
-      location: b.address,
-      rating: null,
-      reviews: 0,
-      status: b.is_open_now ? "Buka Sekarang" : "Tutup Sekarang",
-      img: b.image ? getImageUrl(b.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=250&fit=crop",
-    }));
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
 
   // PERBAIKAN: sebelumnya kalau desa ini belum punya satu pun bisnis yang
   // kolom `village`-nya persis menyebut nama desa ini, halaman diam-diam
