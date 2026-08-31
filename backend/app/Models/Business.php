@@ -59,17 +59,28 @@ class Business extends Model
 
     public function getRatingAttribute(): float
     {
+        if (isset($this->attributes['reviews_avg_rating'])) {
+            return round((float) $this->attributes['reviews_avg_rating'], 1);
+        }
+        if (isset($this->attributes['rating']) && is_numeric($this->attributes['rating']) && $this->attributes['rating'] > 0) {
+            return round((float) $this->attributes['rating'], 1);
+        }
         if ($this->relationLoaded('reviews')) {
             $avg = $this->reviews->avg('rating');
-        } else {
-            $avg = $this->reviews()->avg('rating');
+            return $avg ? round($avg, 1) : 0;
         }
-        return $avg ? round($avg, 1) : 0;
+        return 0;
     }
 
     public function getReviewsCountAttribute(): int
     {
-        return $this->relationLoaded('reviews') ? $this->reviews->count() : $this->reviews()->count();
+        if (isset($this->attributes['reviews_count'])) {
+            return (int) $this->attributes['reviews_count'];
+        }
+        if ($this->relationLoaded('reviews')) {
+            return $this->reviews->count();
+        }
+        return 0;
     }
 
     public function reviews(): \Illuminate\Database\Eloquent\Relations\HasMany

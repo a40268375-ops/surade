@@ -249,9 +249,22 @@ export default function Dashboard() {
   const { user, loading: authLoading, logout, isAdmin, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tab } = useParams(); const activeTab = tab || (isAdmin ? "dashboard" : "saved"); const setActiveTab = (newTab) => navigate(`/dashboard/${newTab}`);
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 900);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { tab } = useParams();
+  const activeTab = tab || (isAdmin ? "dashboard" : "saved");
+  const setActiveTab = (newTab) => {
+    navigate(`/dashboard/${newTab}`);
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  };
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("dashboard_sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [dismissedBanners, setDismissedBanners] = useState([]);
   const [salesGraphCollapsed, setSalesGraphCollapsed] = useState(false);
   
@@ -293,26 +306,19 @@ export default function Dashboard() {
   // Responsive breakpoint detection
   const { isMobile, isTablet, isDesktop, breakpoint } = useResponsive();
 
-  // Responsive sidebar management
-  useEffect(() => {
-    if (isDesktop) {
-      setSidebarOpen(false); // Close sidebar when switching to desktop
-    }
-  }, [isDesktop]);
-
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (isMobile && sidebarOpen && !event.target.closest('.db-sidebar') && !event.target.closest('.db-hamburger-btn')) {
+      if (window.innerWidth < 1024 && sidebarOpen && !event.target.closest('.db-sidebar') && !event.target.closest('.db-hamburger-btn')) {
         setSidebarOpen(false);
       }
     };
 
-    if (isMobile && sidebarOpen) {
+    if (sidebarOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isMobile, sidebarOpen]);
+  }, [sidebarOpen]);
 
   // Data statistik referral milik user sendiri (tab "Referral"), diambil dari
   // GET /api/my-referral-stats - bukan dummy data.
@@ -3317,56 +3323,57 @@ export default function Dashboard() {
   return (
     <div className="dashboard-page">
       <div
-        className={`db-sidebar-overlay ${sidebarOpen ? "open" : ""}`}
+        className={`db-sidebar-overlay ${sidebarOpen ? "open active" : ""}`}
         onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
       />
 
-      <div className={`dashboard-container ${!sidebarOpen ? "dashboard-container--collapsed" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-        {/* Mobile sidebar overlay */}
-        {isMobile && (
-          <div 
-            className={`db-sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        
+      <div className={`dashboard-container ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
         {/* Sidebar */}
         <aside className={`db-sidebar ${sidebarOpen ? "open" : ""} ${sidebarCollapsed ? "collapsed" : ""}`}>
           <div className="db-sidebar-header">
-            <div className="db-sidebar-logo">
+            <div
+              className="db-sidebar-logo"
+              onClick={() => navigate("/")}
+              role="button"
+              tabIndex={0}
+              style={{ cursor: "pointer" }}
+              title="Ke Beranda Surade.co.id"
+            >
               <img src={logoImg} alt="Surade.co.id" className="db-sidebar-logo__img" />
-              {!sidebarCollapsed && <span className="db-sidebar-logo__text">Surade.co.id</span>}
+              {!sidebarCollapsed && (
+                <div className="db-sidebar-logo-text-group">
+                  <span className="db-sidebar-logo__text">Surade.co.id</span>
+                  <span className="db-sidebar-logo__subtitle">{isAdmin ? "Admin Panel" : "Dashboard"}</span>
+                </div>
+              )}
             </div>
-            {/* Desktop Toggle Button - positioned to the right of logo */}
+            {/* Desktop Toggle Button */}
             <button
+              type="button"
               className="db-sidebar-toggle-btn"
-              onClick={() => setSidebarCollapsed(prev => !prev)}
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              onClick={() => {
+                setSidebarCollapsed((prev) => {
+                  const next = !prev;
+                  try {
+                    localStorage.setItem("dashboard_sidebar_collapsed", String(next));
+                  } catch {}
+                  return next;
+                });
+              }}
+              aria-label={sidebarCollapsed ? "Perluas sidebar" : "Ciutkan sidebar"}
+              title={sidebarCollapsed ? "Perluas sidebar" : "Ciutkan sidebar"}
             >
               {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
             </button>
           </div>
 
-          {/* Mobile Hamburger - only for mobile */}
-          <div className="db-mobile-only">
-            <button
-              className="db-hamburger-btn"
-              onClick={() => setSidebarOpen(prev => !prev)}
-              aria-label="Toggle mobile sidebar"
-            >
-              <div className="hamburger-icon">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </button>
-          </div>
-
           <nav className="db-menu">
             <button
+              type="button"
               className={`db-menu-btn ${activeTab === "dashboard" ? "active" : ""}`}
               onClick={() => setActiveTab("dashboard")}
+              title="Dashboard"
             >
               <div className="db-menu-icon">
                 <LayoutDashboard size={20} />
@@ -3377,8 +3384,10 @@ export default function Dashboard() {
             {isAdmin ? (
               <>
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "users" ? "active" : ""}`}
                   onClick={() => setActiveTab("users")}
+                  title="Kelola User"
                 >
                   <div className="db-menu-icon">
                     <Users size={20} />
@@ -3387,8 +3396,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "businesses" ? "active" : ""}`}
                   onClick={() => setActiveTab("businesses")}
+                  title="Kelola Bisnis"
                 >
                   <div className="db-menu-icon">
                     <ShoppingBag size={20} />
@@ -3397,8 +3408,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "categories" ? "active" : ""}`}
                   onClick={() => setActiveTab("categories")}
+                  title="Kelola Kategori"
                 >
                   <div className="db-menu-icon">
                     <Grid size={20} />
@@ -3407,8 +3420,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "ads" ? "active" : ""}`}
                   onClick={() => setActiveTab("ads")}
+                  title="Kelola Iklan"
                 >
                   <div className="db-menu-icon">
                     <Megaphone size={20} />
@@ -3417,8 +3432,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "riwayat" ? "active" : ""}`}
                   onClick={() => setActiveTab("riwayat")}
+                  title="Paket Premium"
                 >
                   <div className="db-menu-icon">
                     <History size={20} />
@@ -3427,8 +3444,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "coupons" ? "active" : ""}`}
                   onClick={() => setActiveTab("coupons")}
+                  title="Kupon Diskon"
                 >
                   <div className="db-menu-icon">
                     <Ticket size={20} />
@@ -3437,8 +3456,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
                   onClick={handleOpenContentTab}
+                  title="Blog & Event"
                 >
                   <div className="db-menu-icon">
                     <BookOpen size={20} />
@@ -3447,8 +3468,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "reports" ? "active" : ""}`}
                   onClick={() => setActiveTab("reports")}
+                  title="Laporan Report"
                 >
                   <div className="db-menu-icon">
                     <AlertTriangle size={20} />
@@ -3457,8 +3480,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "settings" ? "active" : ""}`}
                   onClick={() => setActiveTab("settings")}
+                  title="Pengaturan"
                 >
                   <div className="db-menu-icon">
                     <Settings size={20} />
@@ -3469,8 +3494,10 @@ export default function Dashboard() {
             ) : (
               <>
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "businesses" ? "active" : ""}`}
                   onClick={() => setActiveTab("businesses")}
+                  title="Daftar Bisnis"
                 >
                   <div className="db-menu-icon">
                     <ShoppingBag size={20} />
@@ -3479,9 +3506,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
-
+                  type="button"
                   className={`db-menu-btn ${activeTab === "saved" ? "active" : ""}`}
                   onClick={() => setActiveTab("saved")}
+                  title="Favorit"
                 >
                   <div className="db-menu-icon">
                     <Bookmark size={20} />
@@ -3490,8 +3518,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "reviews" ? "active" : ""}`}
                   onClick={() => setActiveTab("reviews")}
+                  title="Ulasan"
                 >
                   <div className="db-menu-icon">
                     <Star size={20} />
@@ -3500,8 +3530,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "ads" ? "active" : ""}`}
                   onClick={() => setActiveTab("ads")}
+                  title="Iklan"
                 >
                   <div className="db-menu-icon">
                     <Megaphone size={20} />
@@ -3510,8 +3542,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "premium" ? "active" : ""}`}
                   onClick={() => setActiveTab("premium")}
+                  title="Premium"
                 >
                   <div className="db-menu-icon">
                     <Trophy size={20} />
@@ -3520,8 +3554,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "tickets" ? "active" : ""}`}
                   onClick={() => setActiveTab("tickets")}
+                  title="Tiket Pembayaran"
                 >
                   <div className="db-menu-icon">
                     <CreditCard size={20} />
@@ -3530,8 +3566,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "menu" ? "active" : ""}`}
                   onClick={() => setActiveTab("menu")}
+                  title="Produk"
                 >
                   <div className="db-menu-icon">
                     <Package size={20} />
@@ -3540,8 +3578,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "inbox" ? "active" : ""}`}
                   onClick={() => setActiveTab("inbox")}
+                  title="Inbox"
                 >
                   <div className="db-menu-icon">
                     <Inbox size={20} />
@@ -3552,15 +3592,11 @@ export default function Dashboard() {
                   )}
                 </button>
 
-                {/* Menu "Notifikasi" di sidebar sengaja dihapus - semua notifikasi
-                    sekarang cukup dibuka lewat ikon lonceng di topbar (lihat
-                    db-notification-dropdown di bawah), jadi tidak ada lagi menu
-                    terpisah. */}
-
-
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "referral" ? "active" : ""}`}
                   onClick={() => setActiveTab("referral")}
+                  title="Referral"
                 >
                   <div className="db-menu-icon">
                     <Users2 size={20} />
@@ -3569,9 +3605,10 @@ export default function Dashboard() {
                 </button>
 
                 <button
+                  type="button"
                   className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
                   onClick={() => setActiveTab("content")}
-
+                  title="Blog & Event"
                 >
                   <div className="db-menu-icon">
                     <BookOpen size={20} />
@@ -3583,15 +3620,22 @@ export default function Dashboard() {
           </nav>
 
           <div className="db-sidebar-bottom">
-            <button className="db-back-btn" onClick={() => navigate("/")}>
+            <button
+              type="button"
+              className="db-back-btn"
+              onClick={() => navigate("/")}
+              title="Kembali ke Website"
+            >
               <Home size={18} />
-              <span>Kembali ke Website</span>
+              {!sidebarCollapsed && <span>Kembali ke Website</span>}
             </button>
 
             <div className="db-profile-group">
               <button
+                type="button"
                 className={`db-profile-card ${activeTab === "profile" ? "active" : ""}`}
                 onClick={() => setActiveTab("profile")}
+                title={user?.name || "Profil Saya"}
               >
                 <div className="db-avatar">
                   {user?.avatar ? (
@@ -3600,15 +3644,18 @@ export default function Dashboard() {
                     <UserCircle2 size={22} />
                   )}
                 </div>
-                <div className="db-profile-info">
-                  <h3>{user?.name}</h3>
-                  <span className={`db-role-badge db-role--${user?.role}`}>
-                    {user?.role === "admin" ? "Administrator" : user?.role === "reseller" ? "Reseller" : "User"}
-                  </span>
-                </div>
+                {!sidebarCollapsed && (
+                  <div className="db-profile-info">
+                    <h3>{user?.name}</h3>
+                    <span className={`db-role-badge db-role--${user?.role}`}>
+                      {user?.role === "admin" ? "Administrator" : user?.role === "reseller" ? "Reseller" : "User"}
+                    </span>
+                  </div>
+                )}
               </button>
 
               <button
+                type="button"
                 className="db-logout-icon-btn"
                 onClick={logout}
                 title="Keluar"
@@ -3622,6 +3669,35 @@ export default function Dashboard() {
 
         {/* Main Content Area */}
         <main className="db-content">
+          {/* Mobile Top Header */}
+          <div className="db-mobile-header">
+            <button
+              type="button"
+              className="db-hamburger-btn"
+              onClick={() => setSidebarOpen((prev) => !prev)}
+              aria-label="Buka Menu Navigasi"
+              title="Menu Navigasi"
+            >
+              <MenuIcon size={20} />
+            </button>
+            <div className="db-mobile-header__brand" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
+              <img src={logoImg} alt="Surade.co.id" className="db-mobile-header__logo" />
+              <span>Surade.co.id</span>
+            </div>
+            <button
+              type="button"
+              className="db-mobile-header__user-btn"
+              onClick={() => setActiveTab("profile")}
+              aria-label="Profil Saya"
+              title={user?.name || "Profil"}
+            >
+              {user?.avatar ? (
+                <img src={getImageUrl(user.avatar)} alt={user?.name} className="db-mobile-header__avatar" />
+              ) : (
+                <UserCircle2 size={24} />
+              )}
+            </button>
+          </div>
           {/* Topbar (search, mail, notifikasi, profil) - tampil di tab
               Dasbor untuk SEMUA role (dulu sempat dibatasi admin-only,
               padahal user/reseller biasa juga perlu akses cepat ke

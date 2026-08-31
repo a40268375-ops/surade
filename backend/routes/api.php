@@ -89,6 +89,7 @@ Route::post('verify-reset-otp', [AuthController::class, 'verifyResetOtp']);
 Route::post('resend-reset-otp', [AuthController::class, 'resendResetOtp']);
 Route::post('reset-password', [AuthController::class, 'resetPassword']);
 
+Route::get('home-feed', [\App\Http\Controllers\HomeController::class, 'feed']);
 Route::get('businesses', [BusinessController::class, 'index']);
 Route::get('businesses/{id}', [BusinessController::class, 'show']);
 

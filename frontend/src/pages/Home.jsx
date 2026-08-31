@@ -349,32 +349,29 @@ import { useState, useRef, useEffect } from "react";
       setSearchHistory(history);
 
       async function loadData() {
-        // PERBAIKAN: sebelumnya kelima endpoint ini dipanggil satu-satu pakai
-        // await berurutan di dalam satu try/catch. Akibatnya kalau SATU saja
-        // endpoint gagal (mis. /events balas 401), seluruh proses langsung
-        // berhenti di situ - endpoint sesudahnya (blogs) tidak sempat
-        // dipanggil sama sekali, dan banner "tidak bisa terhubung ke server"
-        // ikut muncul padahal /businesses, /categories, /advertisements
-        // sebenarnya sudah berhasil diambil.
-        //
-        // Sekarang kelimanya dipanggil paralel & independen lewat
-        // Promise.allSettled: satu endpoint gagal tidak akan menghapus data
-        // dari endpoint lain yang sudah berhasil.
+        try {
+          const feed = await api.get('/home-feed');
+          if (feed) {
+            if (feed.businesses) setDbBusinesses(feed.businesses);
+            if (feed.categories) setDbCategories(feed.categories);
+            if (feed.advertisements) setDbAds(feed.advertisements);
+            if (feed.events) setDbEvents(feed.events);
+            if (feed.blogs) setDbBlogs(Array.isArray(feed.blogs) ? feed.blogs : []);
+            setApiError(false);
+            setLoading(false);
+            api.post('/track-view', { path: '/' }).catch(() => {});
+            return;
+          }
+        } catch (feedErr) {
+          console.warn("Home feed endpoint fallback:", feedErr);
+        }
+
+        // Fallback if home-feed is unavailable
         const [busRes, catRes, adsRes, eventsRes, blogRes] = await Promise.allSettled([
           api.get('/businesses'),
           api.get('/categories'),
-          // Public ad listing: the backend only returns ads whose owner still
-          // has an active (non-expired) Premium business subscription. Free
-          // accounts have no ads here, and an ad disappears automatically the
-          // moment its owner's premium period ends - no manual step needed.
           api.get('/advertisements'),
-          // Event & Promo: diisi Admin lewat Dashboard > Event, tayang otomatis
-          // untuk semua pengunjung begitu dibuat (tidak perlu premium/approval).
           api.get('/events'),
-          // BARU: blog asli dari admin/pengguna, dipakai di section "Berbagi
-          // Pengalaman Mereka" - sebelumnya bagian ini pakai data contoh yang
-          // ditulis langsung di kode (makanya tidak pernah berubah walau ada
-          // blog baru dibuat lewat dashboard).
           api.get('/blogs'),
         ]);
 
@@ -391,16 +388,9 @@ import { useState, useRef, useEffect } from "react";
         );
         failed.forEach((r) => console.error("Gagal memuat data dari API", r.reason));
 
-        // Banner "backend belum jalan" cuma masuk akal kalau memang koneksi ke
-        // backend gagal total (fetch() throw -> isNetworkError). Kalau backend
-        // hidup tapi satu endpoint balas error biasa (401/403/500), itu bukan
-        // soal "server belum dinyalakan", jadi jangan tampilkan pesan yang
-        // menyesatkan itu untuk kasus ini.
         const hasNetworkError = failed.some((r) => r.reason?.isNetworkError);
         setApiError(hasNetworkError);
 
-        // Catat kunjungan umum ke beranda untuk grafik "Tren Pertumbuhan
-        // Platform" di dashboard admin. Dikirim diam-diam, gagal pun tidak apa-apa.
         api.post('/track-view', { path: '/' }).catch(() => {});
         setLoading(false);
       }

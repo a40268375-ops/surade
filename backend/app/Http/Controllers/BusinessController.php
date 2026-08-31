@@ -9,6 +9,7 @@ use App\Http\Requests\ReviewStoreRequest;
 use App\Http\Helpers\SecurityHelper;
 use App\Services\PremiumFeatureService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -23,6 +24,13 @@ class BusinessController extends Controller
     public function __construct(PremiumFeatureService $premiumService)
     {
         $this->premiumService = $premiumService;
+    }
+
+    public static function clearCache()
+    {
+        Cache::forget('home_feed_public');
+        Cache::forget('categories_all');
+        Cache::forget('categories_tree');
     }
 
     /**
@@ -59,7 +67,12 @@ class BusinessController extends Controller
 
     public function index(Request $request)
     {
-        $query = Business::with('category', 'user', 'menuItems', 'reviews');
+        $query = Business::with([
+            'category:id,name,slug,icon,color',
+            'user:id,name,avatar'
+        ])
+        ->withCount('reviews')
+        ->withAvg('reviews', 'rating');
 
         if ($request->has('category_id') && $request->category_id != 'all' && $request->category_id != '') {
             // Find by category slug or id
@@ -194,23 +207,13 @@ class BusinessController extends Controller
     private function applySortByEngagementAndPriority($query)
     {
         return $query
-            ->leftJoin('business_reviews', 'businesses.id', '=', 'business_reviews.business_id')
-            ->selectRaw('businesses.*, 
-                COALESCE(AVG(business_reviews.rating), 0) as avg_rating,
-                COUNT(business_reviews.id) as review_count,
+            ->orderByRaw("
                 CASE 
-                    WHEN businesses.is_premium = 1 AND businesses.premium_expires_at > NOW() THEN
-                        (COALESCE(AVG(business_reviews.rating), 3) * 20) + 
-                        (COUNT(business_reviews.id) * 5) + 
-                        (DATEDIFF(NOW(), businesses.created_at) * -0.1) + 1000
-                    ELSE
-                        (COALESCE(AVG(business_reviews.rating), 3) * 10) + 
-                        (COUNT(business_reviews.id) * 2) + 
-                        (DATEDIFF(NOW(), businesses.created_at) * -0.05)
-                END as priority_score')
-            ->groupBy('businesses.id')
-            ->orderBy('priority_score', 'desc')
-            ->orderBy('businesses.created_at', 'desc');
+                    WHEN is_premium = 1 AND (premium_expires_at IS NULL OR premium_expires_at > NOW()) THEN 1000
+                    ELSE 0
+                END DESC
+            ")
+            ->orderBy('created_at', 'desc');
     }
 
     /**
@@ -341,6 +344,7 @@ class BusinessController extends Controller
         }
 
         $business = Business::create($data);
+        self::clearCache();
 
         // Log security event
         SecurityHelper::logSecurityEvent('business_created', [
@@ -474,6 +478,7 @@ class BusinessController extends Controller
 
         $originalData = $business->toArray();
         $business->update($data);
+        self::clearCache();
 
         // Log security event with changes
         SecurityHelper::logSecurityEvent('business_updated', [
@@ -510,6 +515,7 @@ class BusinessController extends Controller
         }
 
         $business->delete();
+        self::clearCache();
 
         return response()->json(['message' => 'Business deleted successfully']);
     }
@@ -528,6 +534,7 @@ class BusinessController extends Controller
         $business->status = 'approved';
         $business->suspend_reason = null;
         $business->save();
+        self::clearCache();
 
         return response()->json($business);
     }
@@ -548,6 +555,7 @@ class BusinessController extends Controller
         $business->status = 'suspended';
         $business->suspend_reason = $request->input('reason');
         $business->save();
+        self::clearCache();
 
         return response()->json($business);
     }
@@ -566,6 +574,7 @@ class BusinessController extends Controller
         $business->status = 'approved';
         $business->suspend_reason = null;
         $business->save();
+        self::clearCache();
 
         return response()->json($business);
     }
@@ -587,6 +596,7 @@ class BusinessController extends Controller
             ? now()->addDays(30)
             : null;
         $business->save();
+        self::clearCache();
 
         return response()->json($business);
     }
@@ -620,6 +630,7 @@ class BusinessController extends Controller
             'comment' => $request->comment,
             'helpful_count' => 0,
         ]);
+        self::clearCache();
 
         $review->load('reviewer:id,name,avatar');
 

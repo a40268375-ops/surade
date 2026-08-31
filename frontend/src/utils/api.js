@@ -14,6 +14,22 @@ export function getImageUrl(path) {
   return `${SERVER_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
+// In-memory cache for fast client-side navigation
+const apiCache = new Map();
+const inFlightRequests = new Map();
+
+export function clearApiCache(pattern) {
+  if (!pattern) {
+    apiCache.clear();
+    return;
+  }
+  for (const key of apiCache.keys()) {
+    if (key.includes(pattern)) {
+      apiCache.delete(key);
+    }
+  }
+}
+
 const api = {
   getHeaders() {
     const headers = {
@@ -27,7 +43,8 @@ const api = {
   },
 
   async request(endpoint, options = {}) {
-    const url = `${BASE_URL}/${endpoint.replace(/^\//, '')}`;
+    const cleanEndpoint = endpoint.replace(/^\//, '');
+    const url = `${BASE_URL}/${cleanEndpoint}`;
     const headers = { ...this.getHeaders(), ...options.headers };
     
     // If body is FormData, don't set Content-Type header manually (browser will set it with boundary)
@@ -45,10 +62,6 @@ const api = {
     try {
       response = await fetch(url, config);
     } catch (networkErr) {
-      // fetch() throws (not a normal HTTP error) when the request never
-      // reaches the server at all: backend not running, wrong port, or
-      // blocked by CORS. Surface that clearly instead of letting callers
-      // fall back to a vague "something failed" message.
       throw {
         status: 0,
         data: null,
@@ -60,6 +73,7 @@ const api = {
     if (response.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      apiCache.clear();
       window.dispatchEvent(new Event('auth-change'));
     }
 
@@ -73,27 +87,45 @@ const api = {
   },
 
   get(endpoint, options = {}) {
-    return this.request(endpoint, { ...options, method: 'GET' });
+    const { bypassCache = false, cacheTtl = 60000, ...fetchOptions } = options;
+    const cleanEndpoint = endpoint.replace(/^\//, '');
+    const cacheKey = `${cleanEndpoint}_${Boolean(localStorage.getItem('token'))}`;
+
+    // Return cached result if available and fresh
+    if (!bypassCache) {
+      const cached = apiCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < cacheTtl)) {
+        return Promise.resolve(cached.data);
+      }
+    }
+
+    // Deduplicate in-flight requests
+    if (inFlightRequests.has(cacheKey)) {
+      return inFlightRequests.get(cacheKey);
+    }
+
+    const promise = this.request(endpoint, { ...fetchOptions, method: 'GET' })
+      .then((data) => {
+        if (!bypassCache) {
+          apiCache.set(cacheKey, { data, timestamp: Date.now() });
+        }
+        return data;
+      })
+      .finally(() => {
+        inFlightRequests.delete(cacheKey);
+      });
+
+    inFlightRequests.set(cacheKey, promise);
+    return promise;
   },
 
   post(endpoint, body, options = {}) {
+    clearApiCache();
     return this.request(endpoint, { ...options, method: 'POST', body });
   },
 
   put(endpoint, body, options = {}) {
-    // PENTING: PHP TIDAK PERNAH mem-parsing body multipart/form-data
-    // (dipakai kalau ada upload file) untuk request dengan method PUT asli
-    // - ini keterbatasan PHP sendiri, bukan Laravel. Akibatnya kalau body-nya
-    // FormData (ada file di dalamnya) dan dikirim sebagai PUT betulan,
-    // backend Laravel akan melihat SEMUA field (termasuk teks biasa seperti
-    // judul/deskripsi) sebagai kosong - bukan cuma gambarnya yang gagal,
-    // TAPI SELURUH proses edit/update gagal diam-diam.
-    //
-    // Solusinya: kalau body berupa FormData, kirim sebagai POST biasa
-    // (yang PHP bisa parsing dengan benar) sambil menyisipkan field
-    // "_method=PUT" - ini konvensi resmi Laravel ("method spoofing") untuk
-    // tetap diarahkan ke route/controller method PUT yang sama persis,
-    // tanpa perlu ubah apapun di sisi backend.
+    clearApiCache();
     if (body instanceof FormData) {
       body.append('_method', 'PUT');
       return this.request(endpoint, { ...options, method: 'POST', body });
@@ -102,6 +134,7 @@ const api = {
   },
 
   delete(endpoint, options = {}) {
+    clearApiCache();
     return this.request(endpoint, { ...options, method: 'DELETE' });
   }
 };

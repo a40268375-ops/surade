@@ -11,23 +11,36 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class CategoryController extends Controller
 {
+    public static function clearCache()
+    {
+        Cache::forget('categories_all');
+        Cache::forget('categories_tree');
+        Cache::forget('home_feed_public');
+    }
+
     public function index()
     {
-        return response()->json(Category::withCount('businesses')->orderBy('name')->get());
+        $categories = Cache::remember('categories_all', 3600, function () {
+            return Category::withCount('businesses')->orderBy('name')->get();
+        });
+        return response()->json($categories);
     }
 
     /** Kategori hierarkis (induk + anak) untuk navbar & form daftar bisnis. */
     public function tree()
     {
-        $parents = Category::with(['children' => fn ($q) => $q->withCount('businesses')])
-            ->withCount('businesses')
-            ->whereNull('parent_id')
-            ->orderBy('name')
-            ->get();
+        $parents = Cache::remember('categories_tree', 3600, function () {
+            return Category::with(['children' => fn ($q) => $q->withCount('businesses')])
+                ->withCount('businesses')
+                ->whereNull('parent_id')
+                ->orderBy('name')
+                ->get();
+        });
 
         return response()->json($parents);
     }
@@ -58,6 +71,8 @@ class CategoryController extends Controller
             'color' => $request->color ?? '#10b981',
             'status' => $request->status ?? 'active',
         ]);
+
+        self::clearCache();
 
         return response()->json($category, 201);
     }
@@ -94,6 +109,8 @@ class CategoryController extends Controller
             'status' => $request->status ?? $category->status ?? 'active',
         ]);
 
+        self::clearCache();
+
         return response()->json($category);
     }
 
@@ -109,6 +126,7 @@ class CategoryController extends Controller
         }
 
         $category->delete();
+        self::clearCache();
 
         return response()->json(['message' => 'Category deleted successfully']);
     }

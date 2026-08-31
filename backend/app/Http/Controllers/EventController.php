@@ -7,26 +7,32 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class EventController extends Controller
 {
+    public static function clearCache()
+    {
+        Cache::forget('events_published');
+        Cache::forget('home_feed_public');
+    }
+
     public function index(Request $request)
     {
-        // Endpoint ini dipakai bersama oleh halaman publik Event (GET
-        // /events) dan halaman Admin Event Management (yang juga memanggil
-        // GET /events, bukan endpoint terpisah). Supaya draft tidak bocor
-        // ke pengunjung biasa, request yang bukan admin hanya diberi event
-        // berstatus "published". Guard 'sanctum' dipanggil eksplisit karena
-        // route ini tidak dibungkus middleware auth:sanctum.
         $user = $request->user('sanctum');
-        $query = Event::orderBy('event_date', 'desc');
 
-        if (!$user || $user->role !== 'admin') {
-            $query->where('status', 'published');
+        if ($user && $user->role === 'admin') {
+            return response()->json(Event::orderBy('event_date', 'desc')->get());
         }
 
-        return response()->json($query->get());
+        $events = Cache::remember('events_published', 600, function () {
+            return Event::where('status', 'published')
+                ->orderBy('event_date', 'desc')
+                ->get();
+        });
+
+        return response()->json($events);
     }
 
     public function show(Request $request, $id)
@@ -96,14 +102,13 @@ class EventController extends Controller
         }
 
         $event = Event::create($data);
+        self::clearCache();
 
         return response()->json($event, 201);
     }
 
     public function update(Request $request, $id)
     {
-        // Sama seperti store(): dulu admin-only, sekarang disamakan dengan
-        // Blog - cukup harus login.
         $event = Event::find($id);
         if (!$event) {
             return response()->json(['message' => 'Event not found'], 404);
@@ -146,20 +151,20 @@ class EventController extends Controller
         }
 
         $event->update($data);
+        self::clearCache();
 
         return response()->json($event->fresh());
     }
 
     public function destroy(Request $request, $id)
     {
-        // Sama seperti store()/update(): dulu admin-only, sekarang
-        // disamakan dengan Blog - cukup harus login.
         $event = Event::find($id);
         if (!$event) {
             return response()->json(['message' => 'Event not found'], 404);
         }
 
         $event->delete();
+        self::clearCache();
 
         return response()->json(['message' => 'Event deleted successfully']);
     }
