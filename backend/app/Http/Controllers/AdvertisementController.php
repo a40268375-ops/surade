@@ -10,6 +10,7 @@ use App\Http\Requests\AdvertisementStoreRequest;
 use App\Http\Helpers\SecurityHelper;
 use App\Services\PremiumFeatureService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -21,28 +22,47 @@ class AdvertisementController extends Controller
     {
         $this->premiumService = $premiumService;
     }
+
+    public static function clearCache()
+    {
+        Cache::forget('advertisements_public');
+        Cache::forget('home_feed_public');
+    }
+
     public function index(Request $request)
     {
-        $query = Advertisement::with('category', 'user');
-
         if ($request->has('status') && $request->user() && $request->user()->role === 'admin') {
-            $query->where('status', $request->status);
+            $ads = Advertisement::with('category', 'user')->where('status', $request->status)->latest()->get();
+            return response()->json($ads);
         } elseif ($request->has('status') && $request->user()) {
-            $query->where('status', $request->status)->where('user_id', $request->user()->id);
-        } else {
-            // Public listing: only show approved ads that are not expired
-            $query->where('status', 'approved')
-                  ->where(function ($q) {
-                      // Show ads without expiration or with future expiration
-                      $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            $ads = Advertisement::with('category', 'user')
+                ->where('status', $request->status)
+                ->where('user_id', $request->user()->id)
+                ->latest()
+                ->get();
+            return response()->json($ads);
+        }
+
+        // Public listing: cached and N+1 query fixed via SQL join
+        $ads = Cache::remember('advertisements_public', 300, function () {
+            return Advertisement::with([
+                'category:id,name,slug,icon,color',
+                'user:id,name,avatar'
+            ])
+            ->where('status', 'approved')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->whereHas('user.businesses', function ($q) {
+                $q->where('is_premium', true)
+                  ->where(function ($sq) {
+                      $sq->whereNull('premium_expires_at')
+                         ->orWhere('premium_expires_at', '>', now());
                   });
-        }
-
-        $ads = $query->latest()->get();
-
-        if (!$request->has('status')) {
-            $ads = $ads->filter(fn ($ad) => $ad->user && $ad->user->hasActivePremiumBusiness())->values();
-        }
+            })
+            ->latest()
+            ->get();
+        });
 
         return response()->json($ads);
     }
@@ -76,6 +96,7 @@ class AdvertisementController extends Controller
         }
 
         $advertisement = Advertisement::create($data);
+        self::clearCache();
 
         // Log security event
         SecurityHelper::logSecurityEvent('advertisement_created', [
@@ -124,6 +145,7 @@ class AdvertisementController extends Controller
         $advertisement->status = 'approved';
         $advertisement->expires_at = now()->addDays(30); // Masa tayang 30 hari sejak disetujui
         $advertisement->save();
+        self::clearCache();
 
         return response()->json($advertisement->load('category'));
     }
@@ -143,6 +165,7 @@ class AdvertisementController extends Controller
 
         $advertisement->status = 'rejected';
         $advertisement->save();
+        self::clearCache();
 
         return response()->json($advertisement->load('category'));
     }
@@ -196,6 +219,7 @@ class AdvertisementController extends Controller
         }
 
         $advertisement->update($data);
+        self::clearCache();
 
         return response()->json($advertisement->load('category'));
     }
@@ -224,6 +248,7 @@ class AdvertisementController extends Controller
         }
 
         $advertisement->delete();
+        self::clearCache();
 
         // Log security event
         SecurityHelper::logSecurityEvent('advertisement_deleted', [

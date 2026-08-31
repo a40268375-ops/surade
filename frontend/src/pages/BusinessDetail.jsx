@@ -25,9 +25,14 @@ import {
   ChevronRight,
   ChevronLeft,
   ThumbsUp,
-  Flag,
   AlertTriangle,
   CheckCircle,
+  ExternalLink,
+  Calendar,
+  Camera,
+  Play,
+  Globe,
+  Lock,
 } from "lucide-react";
 import "./Home.css";
 import "./Login.css";
@@ -73,13 +78,12 @@ const DEFAULT_SELLER = {
   rating: 4.8
 };
 
-/* ── Helper untuk membuat tanggal relatif di masa lalu (n hari yang lalu) ── */
 function formatRelativeTime(dateString) {
   const diffMs = Date.now() - new Date(dateString).getTime();
   const minutes = Math.floor(diffMs / 60000);
   if (minutes < 1) return "Baru saja";
   if (minutes < 60) return `${minutes} menit yang lalu`;
-  const hours = Math.floor(minutes / 60);
+  const hours = Math.floor(minutes / 24);
   if (hours < 24) return `${hours} jam yang lalu`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days} hari yang lalu`;
@@ -95,7 +99,6 @@ function maskPhone() {
   return "** *** **** ";
 }
 
-/* ── Data bisnis contoh (fallback kalau API gagal) ── */
 const BISNIS_DATA = [
   {
     id: 1, name: "Amel Irwanto cake", category: "Pertokoan",
@@ -133,114 +136,6 @@ const BISNIS_DATA = [
     video: "https://assets.mixkit.co/videos/preview/mixkit-cooking-in-a-professional-kitchen-4767-large.mp4",
     seller: DEFAULT_SELLER,
   },
-  {
-    id: 3, name: "Toko Elektronik Jaya", category: "Elektronik & Gadget",
-    tags: ["Handphone", "Aksesoris"], location: "Kabupaten Bogor",
-    description: "Toko Elektronik Jaya menyediakan berbagai macam elektronik dan gadget dengan harga terjangkau dan kualitas terjamin. Kami juga menyediakan layanan servis.",
-    phone: "+62 812 3456 7892",
-    email: "elektronikjaya@gmail.com",
-    address: "Jalan Mercurius 16680 Dramaga, Kabupaten Bogor, Jawa Barat",
-    rating: 4.3, reviews: 89, hours: "09:00 - 21:00",
-    closedDays: [],
-    images: [
-      "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=1200&h=600&fit=crop",
-    ],
-    video: "https://assets.mixkit.co/videos/preview/mixkit-hands-of-a-man-working-on-a-computer-40742-large.mp4",
-    seller: DEFAULT_SELLER,
-  },
-  {
-    id: 4, name: "Salon & Spa Cantik", category: "Pertokoan",
-    tags: ["Salon", "Perawatan"], location: "Kota Depok",
-    description: "Salon & Spa Cantik menawarkan berbagai layanan kecantikan dan perawatan tubuh dengan profesional. Dapatkan pengalaman relaksasi terbaik di sini.",
-    phone: "+62 812 3456 7893",
-    email: "saloncantik@gmail.com",
-    address: "Jalan Margonda Raya No. 56, Kota Depok, Jawa Barat",
-    rating: 4.6, reviews: 167, hours: "09:00 - 20:00",
-    closedDays: ["Senin"],
-    images: [
-      "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1200&h=600&fit=crop",
-    ],
-    video: "https://assets.mixkit.co/videos/preview/mixkit-spa-treatment-with-stones-and-flowers-close-up-42861-large.mp4",
-    seller: DEFAULT_SELLER,
-  },
-  {
-    id: 5, name: "Bengkel Motor Makmur", category: "Servis & Tukang",
-    tags: ["Bengkel", "Motor", "Oli"], location: "Kabupaten Bekasi",
-    description: "Bengkel Motor Makmur adalah bengkel motor terpercaya dengan mekanik berpengalaman. Kami melayani servis, ganti oli, dan perbaikan motor berbagai merek.",
-    phone: "+62 812 3456 7894",
-    email: "bengkelmakmur@gmail.com",
-    address: "Jalan Cikarang Barat No. 90, Kabupaten Bekasi, Jawa Barat",
-    rating: 4.4, reviews: 134, hours: "08:00 - 18:00",
-    closedDays: ["Minggu"],
-    images: [
-      "https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1508974239320-0a029497e820?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1517524206127-48bbd363f3d7?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=600&fit=crop",
-    ],
-    video: "https://assets.mixkit.co/videos/preview/mixkit-car-mechanic-hands-repairing-an-engine-42777-large.mp4",
-    seller: DEFAULT_SELLER,
-  },
-  {
-    id: 6, name: "Wisata Alam Puncak", category: "Wisata",
-    tags: ["Wisata", "Alam", "Liburan"], location: "Kabupaten Bogor",
-    description: "Wisata Alam Puncak menawarkan keindahan alam yang menakjubkan dengan udara sejuk dan pemandangan yang memukau. Tempat yang sempurna untuk liburan keluarga.",
-    phone: "+62 812 3456 7895",
-    email: "wisatapuncak@gmail.com",
-    address: "Jalan Raya Puncak No. 234, Kabupaten Bogor, Jawa Barat",
-    rating: 4.8, reviews: 312, hours: "06:00 - 18:00",
-    closedDays: [],
-    images: [
-      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1472214222541-d510753a8707?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=600&fit=crop",
-    ],
-    video: "https://assets.mixkit.co/videos/preview/mixkit-landscape-of-green-mountains-in-a-foggy-day-34301-large.mp4",
-    seller: DEFAULT_SELLER,
-  },
-  {
-    id: 101, name: "Global Bakery Leuwiliang", category: "Pertokoan",
-    tags: ["Global Bakery Leuwiliang"], location: "Kabupaten Bogor",
-    description: "Global Bakery Leuwiliang menyediakan berbagai roti dan kue segar setiap hari dengan bahan berkualitas tinggi.",
-    phone: "+62 812 3456 7801",
-    email: "globalbakery@gmail.com",
-    address: "Jalan Raya Leuwiliang No. 88, Kabupaten Bogor, Jawa Barat",
-    rating: 4.4, reviews: 67, hours: "07:00 - 19:00",
-    closedDays: [],
-    images: [
-      "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=1200&h=600&fit=crop",
-    ],
-    video: "https://assets.mixkit.co/videos/preview/mixkit-baking-cake-in-an-oven-13101-large.mp4",
-    seller: DEFAULT_SELLER,
-  },
-  {
-    id: 102, name: "TK Triwala", category: "Yayasan",
-    tags: ["Tk Triwala"], location: "Kuningan",
-    description: "TK Triwala adalah taman kanak-kanak yang menyediakan pendidikan anak usia dini dengan lingkungan belajar yang nyaman dan aman.",
-    phone: "+62 812 3456 7802",
-    email: "tktriwala@gmail.com",
-    address: "Jalan Pendidikan No. 12, Kuningan, Jawa Barat",
-    rating: 4.6, reviews: 42, hours: "07:30 - 15:00",
-    closedDays: ["Sabtu", "Minggu"],
-    images: [
-      "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1200&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=600&fit=crop",
-    ],
-    video: null,
-    seller: DEFAULT_SELLER,
-  },
 ];
 
 export default function BusinessDetail() {
@@ -260,7 +155,6 @@ export default function BusinessDetail() {
   const [reportError, setReportError] = useState("");
   const [reportSuccess, setReportSuccess] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
-  const [showHours, setShowHours] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingName, setBookingName] = useState("");
   const [bookingPhone, setBookingPhone] = useState("");
@@ -270,33 +164,28 @@ export default function BusinessDetail() {
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingError, setBookingError] = useState("");
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentCoverIndex, setCurrentCoverIndex] = useState(0);
   const [showPriceDropdown, setShowPriceDropdown] = useState(false);
   const [showWeeklyHours, setShowWeeklyHours] = useState(false);
   const priceDropdownRef = useRef(null);
   const [menuItems, setMenuItems] = useState([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  // BARU: tab filter Galeri ("Semua"/"Foto"/"Video") - gayanya mirip
-  // filter chip di WhatsApp Web ("Semua/Belum dibaca/Favorit/Grup"),
-  // supaya galeri foto & video punya bagian-bagian yang jelas terpisah,
-  // bukan ditumpuk jadi satu grid panjang.
   const [galleryTab, setGalleryTab] = useState("all");
   const [productPage, setProductPage] = useState(1);
   const [showGalleryLightbox, setShowGalleryLightbox] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [profileBusinesses, setProfileBusinesses] = useState([]);
+  const [showDescFull, setShowDescFull] = useState(false);
+  const [activeSection, setActiveSection] = useState("overview");
 
   /* ── State ulasan ── */
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewError, setReviewError] = useState("");
 
-  // Menyimpan ulasan mana saja yang sudah ditandai "Berguna" oleh browser ini,
-  // supaya tombolnya langsung kelihatan aktif tanpa nunggu reload halaman.
   const [helpfulVoted, setHelpfulVoted] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("helpful_votes_business") || "{}");
@@ -305,8 +194,6 @@ export default function BusinessDetail() {
     }
   });
 
-  // Kalau ulasan lebih dari 3, awalnya cuma 3 yang ditampilkan - sisanya
-  // baru muncul setelah klik "Lihat Semua Ulasan" (gaya Google Play Store).
   const [showAllReviews, setShowAllReviews] = useState(false);
 
   const handleToggleHelpful = async (reviewId) => {
@@ -357,7 +244,7 @@ export default function BusinessDetail() {
           phone: data.phone,
           email: data.email,
           website: data.website,
-          hours: data.operating_hours || "08.00 - 17.00",
+          hours: data.operating_hours || "08:00 - 17:00",
           operating_hours: data.operating_hours || "",
           closedDays: data.closed_days || [],
           description: data.description,
@@ -453,9 +340,7 @@ export default function BusinessDetail() {
     }
 
     loadBusiness();
-    setCurrentImageIndex(0);
     setShowPhone(false);
-    setShowHours(false);
 
     return () => { cancelled = true; };
   }, [id]);
@@ -478,8 +363,6 @@ export default function BusinessDetail() {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Balik ke halaman 1 tiap kali daftar produk berubah (misal ganti bisnis),
-  // supaya pagination-nya nggak nyangkut di halaman kosong.
   useEffect(() => {
     setProductPage(1);
   }, [menuItems]);
@@ -489,13 +372,11 @@ export default function BusinessDetail() {
     const imagesList = business.images?.length > 0 ? business.images : [business.img];
     if (imagesList.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % imagesList.length);
-    }, 3000);
+      setCurrentCoverIndex((prev) => (prev + 1) % imagesList.length);
+    }, 4500);
     return () => clearInterval(interval);
   }, [business]);
 
-  // Cek apakah bisnis ini sudah ada di daftar favorit user yang login,
-  // supaya ikon bookmark langsung tampil terisi kalau memang sudah disimpan.
   useEffect(() => {
     if (!authUser || !business?.id) {
       setSaved(false);
@@ -551,23 +432,17 @@ export default function BusinessDetail() {
       alert("Silakan login terlebih dahulu untuk upgrade ke Premium");
       return;
     }
-    
     if (authUser.role === 'admin') {
       alert("Admin tidak perlu upgrade Premium");
       return;
     }
-    
-    // Check if user owns this business
     if (authUser.id !== business.seller?.id) {
       alert("Anda hanya dapat upgrade bisnis milik sendiri");
       return;
     }
-    
-    // Redirect to dashboard premium tab
     navigate("/dashboard?tab=premium");
   };
 
-  /* ── SIMPAN / HAPUS DARI FAVORIT ── */
   const handleToggleSave = async () => {
     if (!authUser) {
       window.location.href = "/login";
@@ -584,11 +459,7 @@ export default function BusinessDetail() {
         const result = await api.post("/saved-businesses", { business_id: business.id });
         setSaved(true);
         setSavedRecordId(result.id);
-        // PERBAIKAN: konsisten dengan Home.jsx & Category.jsx - begitu
-        // berhasil disimpan sebagai favorit, otomatis diarahkan ke
-        // Dashboard > Favorit supaya langsung kelihatan sudah masuk daftar.
         setTimeout(() => navigate("/dashboard?tab=saved"), 500);
-
       }
     } catch (err) {
       alert(err?.data?.message || "Gagal memperbarui daftar favorit. Silakan coba lagi.");
@@ -597,7 +468,6 @@ export default function BusinessDetail() {
     }
   };
 
-  /* ── LAPORKAN BISNIS ── */
   const handleReportSubmit = async (e) => {
     e.preventDefault();
     if (!authUser) {
@@ -633,7 +503,6 @@ export default function BusinessDetail() {
     setReportDescription("");
   };
 
-  /* ── KIRIM ULASAN ── */
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!authUser) {
@@ -712,17 +581,27 @@ export default function BusinessDetail() {
     }
   };
 
+  const scrollToSection = (sectionId) => {
+    setActiveSection(sectionId);
+    const el = document.getElementById(sectionId);
+    if (el) {
+      const yOffset = -140;
+      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+  };
+
   if (pageLoading || fetchingBusiness) {
     return <Loading />;
   }
 
   if (!business) {
     return (
-      <div className="business-detail-page">
+      <div className="business-detail-page yelp-theme">
         <Navbar />
-        <div className="business-detail__not-found">
+        <div className="yelp-not-found">
           <h2>Bisnis tidak ditemukan</h2>
-          <Link to="/" className="business-detail__back-link">Kembali ke Home</Link>
+          <Link to="/" className="yelp-btn yelp-btn--primary">Kembali ke Home</Link>
         </div>
       </div>
     );
@@ -736,9 +615,6 @@ export default function BusinessDetail() {
   const isOpenNow = openStatus.isOpen;
   const priceTier = getPriceTier(business.price_category || 2);
 
-  // Produk: dibatasi 3 per halaman, dengan pagination bernomor (kaya di
-  // halaman kategori). Kalau produknya cuma 1 halaman, paginationnya
-  // disembunyikan sama sekali.
   const PRODUCTS_PAGE_SIZE = 3;
   const availableProducts = business.premium_features?.price_list
     ? menuItems
@@ -750,6 +626,7 @@ export default function BusinessDetail() {
     productSafePage * PRODUCTS_PAGE_SIZE
   );
   const isLastProductPage = productSafePage === productTotalPages;
+
   function getProductPageNumbers() {
     const pages = [];
     const delta = 1;
@@ -763,614 +640,817 @@ export default function BusinessDetail() {
     return pages;
   }
 
+  const isDescriptionLong = (business.description || "").length > 280;
+
   return (
-    <div className="business-detail-page">
+    <div className="business-detail-page yelp-theme">
       <Navbar />
 
-      {/* HERO SECTION */}
-      <section className="bd-hero">
-        <div className="bd-hero__bg">
-          <div className="bd-hero__slides-container" style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}>
-            {/* For premium businesses, start slideshow from 2nd image (index 1) */}
-            {business.is_premium_active && imagesList.length > 1 
-              ? imagesList.slice(1).map((src, i) => (
-                  <img key={i + 1} src={src} alt="" className="bd-hero__slide-img" />
-                ))
-              : imagesList.map((src, i) => (
-                  <img key={i} src={src} alt="" className="bd-hero__slide-img" />
-                ))
-            }
-          </div>
+      {/* 1. YELP HERO / BUSINESS HEADER */}
+      <section className="yelp-hero">
+        <div className="yelp-hero__bg-wrap">
+          <img
+            src={imagesList[currentCoverIndex] || business.img}
+            alt={business.name}
+            className="yelp-hero__bg-img"
+          />
+          <div className="yelp-hero__overlay" />
         </div>
-        <div className="bd-hero__overlay" />
-        <div className="bd-hero__content">
-          <div className="bd-hero__inner">
-            <div className="bd-hero__breadcrumb">
-              <Link to="/">Home</Link>
-              <span>/</span>
-              <span>{business.category}</span>
-              <span>/</span>
-              <span>{business.name}</span>
-            </div>
 
-            {/* PERBAIKAN: ditambahkan logo bulat usaha di sebelah nama -
-                sebelumnya di sini kosong sama sekali. Fotonya diambil dari
-                thumbnail yang di-upload pemilik usaha di form "Tambah Usaha"
-                (business.img), lalu ditampilkan bulat pakai CSS
-                border-radius: 50% di .bd-hero__logo. */}
-            <div className="bd-hero__top">
-              {business.img && (
-                <div className="bd-hero__logo">
-                  <img src={business.img} alt={business.name} />
-                </div>
-              )}
-              <div className="bd-hero__headings">
-                <h1 className="bd-hero__title">
-                  {business.name}
-                  {business.is_premium_active && (
-                    <span className="bd-verified-badge" title="Bisnis Terverifikasi">
-                      <CheckCircle size={14} strokeWidth={2.5} />
-                      Terverifikasi
-                    </span>
-                  )}
-                </h1>
-                <p className="bd-hero__category">{business.category}</p>
-                <div className="bd-hero__meta">
-                  <div className="bd-hero__rating">
-                    <Star size={18} fill="#fbbf24" stroke="#fbbf24" />
-                    <span>{business.rating}</span>
-                    <span>({business.reviews} ulasan)</span>
-                  </div>
-                  <div className="bd-hero__status">
-                    <span className={`bd-hero__status-dot ${isOpenNow ? "open" : "closed"}`} />
-                    <span>{displayStatus}</span>
-                  </div>
-                </div>
+        <div className="yelp-hero__container">
+          <nav className="yelp-breadcrumb" aria-label="Breadcrumb">
+            <Link to="/">Home</Link>
+            <span className="yelp-breadcrumb__sep">/</span>
+            <Link to={`/category/${encodeURIComponent(business.category.toLowerCase())}`}>{business.category}</Link>
+            <span className="yelp-breadcrumb__sep">/</span>
+            <span className="yelp-breadcrumb__current">{business.name}</span>
+          </nav>
 
+          <div className="yelp-hero__main">
+            {business.img && (
+              <div className="yelp-hero__logo">
+                <img src={business.img} alt={business.name} />
+              </div>
+            )}
+
+            <div className="yelp-hero__info">
+              <div className="yelp-hero__title-row">
+                <h1 className="yelp-hero__title">{business.name}</h1>
+                {business.is_premium_active && (
+                  <span className="yelp-verified-badge" title="Bisnis Terverifikasi Resmi">
+                    <CheckCircle size={14} strokeWidth={2.5} />
+                    Terverifikasi
+                  </span>
+                )}
+              </div>
+
+              {/* Yelp Rating & Stats Bar */}
+              <div className="yelp-hero__rating-bar">
+                <div className="yelp-stars" title={`Rating ${business.rating} dari 5`}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <div
+                      key={n}
+                      className={`yelp-star-box ${n <= Math.round(business.rating) ? "active" : ""}`}
+                    >
+                      <Star size={14} fill="currentColor" stroke="none" />
+                    </div>
+                  ))}
+                </div>
+                <span className="yelp-hero__rating-num">{business.rating.toFixed(1)}</span>
+                <button
+                  type="button"
+                  className="yelp-hero__review-count-btn"
+                  onClick={() => scrollToSection("reviews")}
+                >
+                  {business.reviews} ulasan
+                </button>
+              </div>
+
+              {/* Meta row: Category, Price tier, Open Status */}
+              <div className="yelp-hero__meta-row">
+                <span className="yelp-meta-chip yelp-meta-chip--category">{business.category}</span>
+                <span className="yelp-meta-bullet">•</span>
+                <span className="yelp-meta-chip yelp-meta-chip--price" title={`Kategori: ${priceTier.label}`}>
+                  {priceTier.symbol} {priceTier.label}
+                </span>
+                <span className="yelp-meta-bullet">•</span>
+                <div className="yelp-hero__open-status">
+                  <span className={`yelp-status-dot ${isOpenNow ? "open" : "closed"}`} />
+                  <strong className={isOpenNow ? "text-open" : "text-closed"}>{displayStatus}</strong>
+                  <span className="yelp-hours-text">{business.hours}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* MAIN CONTENT */}
-      <section className="bd-content">
-        <div className="bd-content__inner">
-          <div className="bd-content__main">
-            {/* Quick Action Icons */}
-            <div className="bd-quick-actions">
-              <div className="bd-price-dropdown-wrapper" ref={priceDropdownRef}>
-                <button type="button" className={`bd-quick-action ${showPriceDropdown ? "active" : ""}`} title={`Kategori Harga: ${priceTier.label}`} onClick={() => setShowPriceDropdown(!showPriceDropdown)}>
-                  <DollarSign size={22} strokeWidth={1.8} />
-                  <span className="bd-price-count">{priceTier.symbol}</span>
-                </button>
-                {showPriceDropdown && (
-                  <div className="bd-price-dropdown">
-                    <div className={`bd-price-option ${(business.price_category || 2) === 1 ? "active" : ""}`}>
-                      <DollarSign size={16} /><span>Murah</span>
-                    </div>
-                    <div className={`bd-price-option ${(business.price_category || 2) === 2 ? "active" : ""}`}>
-                      <div className="bd-price-dollars"><DollarSign size={16} /><DollarSign size={16} /></div><span>Sedang</span>
-                    </div>
-                    <div className={`bd-price-option ${(business.price_category || 2) === 3 ? "active" : ""}`}>
-                      <div className="bd-price-dollars"><DollarSign size={16} /><DollarSign size={16} /><DollarSign size={16} /></div><span>Mahal</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <a href={`mailto:${business.email}`} className="bd-quick-action" title="Email"><Mail size={22} strokeWidth={1.8} /></a>
-              <button type="button" className="bd-quick-action bd-quick-action--disabled" title="Telepon" disabled><Phone size={22} strokeWidth={1.8} /></button>
-              <button type="button" className="bd-quick-action" title="WhatsApp" onClick={handleWhatsApp}><MessageCircle size={22} strokeWidth={1.8} /></button>
-              <button type="button" className="bd-quick-action" title="Dapatkan Arah" onClick={handleDirections}><Send size={22} strokeWidth={1.8} /></button>
-              <button type="button" className={`bd-quick-action ${saved ? "active" : ""}`} title={saved ? "Disimpan" : "Simpan"} onClick={handleToggleSave} disabled={savingBusiness}>
-                <Bookmark size={22} strokeWidth={1.8} fill={saved ? "currentColor" : "none"} />
+      {/* 2. YELP ACTION BAR */}
+      <section className="yelp-action-bar">
+        <div className="yelp-container yelp-action-bar__inner">
+          <div className="yelp-action-bar__left">
+            {(!authUser || String(authUser.id) !== String(seller.id)) && (
+              <button
+                type="button"
+                className="yelp-btn yelp-btn--primary yelp-btn--review"
+                onClick={() => { setReviewError(""); setShowReviewModal(true); }}
+              >
+                <Star size={18} fill="currentColor" stroke="none" />
+                <span>Tulis Ulasan</span>
               </button>
-              <button type="button" className="bd-quick-action" title="Bagikan" onClick={handleShare}><Share2 size={22} strokeWidth={1.8} /></button>
-              <button type="button" className="bd-quick-action bd-quick-action--report" title="Laporkan" onClick={() => { if (!authUser) { window.location.href = "/login"; return; } setShowReportModal(true); }}>
-                <AlertTriangle size={22} strokeWidth={1.8} />
-              </button>
-            </div>
-
-            {showHours && (
-              <div className="bd-hours-banner">
-                <Clock size={18} />
-                <span>Jam Operasional: <strong>{business.hours}</strong> ({displayStatus})</span>
-              </div>
             )}
 
-            {/* About */}
-            <div className="bd-about-card">
-              <h2 className="bd-about-card__title">Tentang {business.name}</h2>
-              <p className="bd-about-card__text">{business.description}</p>
+            {business.premium_features?.booking_system && (
+              <button
+                type="button"
+                className="yelp-btn yelp-btn--secondary"
+                onClick={() => setShowBookingModal(true)}
+              >
+                <Calendar size={17} />
+                <span>Booking</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="yelp-btn yelp-btn--secondary"
+              onClick={handleWhatsApp}
+            >
+              <MessageCircle size={17} />
+              <span>Chat WhatsApp</span>
+            </button>
+
+            <button
+              type="button"
+              className="yelp-btn yelp-btn--secondary"
+              onClick={handleDirections}
+            >
+              <Send size={17} />
+              <span>Petunjuk Arah</span>
+            </button>
+          </div>
+
+          <div className="yelp-action-bar__right">
+            <button
+              type="button"
+              className={`yelp-btn yelp-btn--outline ${saved ? "is-saved" : ""}`}
+              onClick={handleToggleSave}
+              disabled={savingBusiness}
+              title={saved ? "Disimpan di Favorit" : "Simpan Bisnis"}
+            >
+              <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
+              <span>{saved ? "Tersimpan" : "Simpan"}</span>
+            </button>
+
+            <button
+              type="button"
+              className="yelp-btn yelp-btn--outline"
+              onClick={handleShare}
+              title="Bagikan Halaman"
+            >
+              <Share2 size={17} />
+              <span>Bagikan</span>
+            </button>
+
+            {/* Price tier trigger dropdown */}
+            <div className="yelp-price-wrapper" ref={priceDropdownRef}>
+              <button
+                type="button"
+                className={`yelp-btn yelp-btn--outline ${showPriceDropdown ? "active" : ""}`}
+                onClick={() => setShowPriceDropdown(!showPriceDropdown)}
+                title={`Kategori Harga: ${priceTier.label}`}
+              >
+                <DollarSign size={17} />
+                <span>{priceTier.symbol}</span>
+                <ChevronDown size={14} />
+              </button>
+              {showPriceDropdown && (
+                <div className="yelp-price-dropdown">
+                  <div className={`yelp-price-option ${(business.price_category || 2) === 1 ? "active" : ""}`}>
+                    <span className="symbol">$</span>
+                    <div>
+                      <strong>Murah</strong>
+                      <small>Rp0 - Rp50.000</small>
+                    </div>
+                  </div>
+                  <div className={`yelp-price-option ${(business.price_category || 2) === 2 ? "active" : ""}`}>
+                    <span className="symbol">$$</span>
+                    <div>
+                      <strong>Sedang</strong>
+                      <small>Rp50.000 - Rp150.000</small>
+                    </div>
+                  </div>
+                  <div className={`yelp-price-option ${(business.price_category || 2) === 3 ? "active" : ""}`}>
+                    <span className="symbol">$$$</span>
+                    <div>
+                      <strong>Mahal / Premium</strong>
+                      <small>&gt; Rp150.000</small>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Gallery - Premium Feature Check */}
-            <div className="bd-gallery-section">
-              <h2 className="bd-gallery-section__title">
-                Galeri Foto &amp; Video
-                {!business.premium_features?.photo_gallery && (
-                  <span className="bd-premium-badge">Premium</span>
-                )}
-              </h2>
+            <button
+              type="button"
+              className="yelp-btn yelp-btn--icon yelp-btn--report"
+              onClick={() => {
+                if (!authUser) { window.location.href = "/login"; return; }
+                setShowReportModal(true);
+              }}
+              title="Laporkan Bisnis"
+              aria-label="Laporkan Bisnis"
+            >
+              <AlertTriangle size={17} />
+            </button>
+          </div>
+        </div>
+      </section>
 
-              {/* BARU: filter chip supaya Foto & Video jadi bagian yang
-                  jelas terpisah, bukan satu grid panjang tercampur. */}
-              <div className="bd-gallery-tabs">
+      {/* 3. STICKY IN-PAGE SUB-NAV */}
+      <nav className="yelp-subnav">
+        <div className="yelp-container yelp-subnav__inner">
+          <button
+            type="button"
+            className={`yelp-subnav__link ${activeSection === "overview" ? "active" : ""}`}
+            onClick={() => scrollToSection("overview")}
+          >
+            Ringkasan
+          </button>
+          <button
+            type="button"
+            className={`yelp-subnav__link ${activeSection === "gallery" ? "active" : ""}`}
+            onClick={() => scrollToSection("gallery")}
+          >
+            Foto &amp; Video ({imagesList.length})
+          </button>
+          {menuItems.length > 0 && (
+            <button
+              type="button"
+              className={`yelp-subnav__link ${activeSection === "products" ? "active" : ""}`}
+              onClick={() => scrollToSection("products")}
+            >
+              Produk / Layanan
+            </button>
+          )}
+          <button
+            type="button"
+            className={`yelp-subnav__link ${activeSection === "reviews" ? "active" : ""}`}
+            onClick={() => scrollToSection("reviews")}
+          >
+            Ulasan ({business.reviews})
+          </button>
+          <button
+            type="button"
+            className={`yelp-subnav__link ${activeSection === "location-hours" ? "active" : ""}`}
+            onClick={() => scrollToSection("location-hours")}
+          >
+            Lokasi &amp; Jam
+          </button>
+        </div>
+      </nav>
+
+      {/* 4. MAIN TWO-COLUMN CONTENT */}
+      <main className="yelp-layout yelp-container">
+        {/* LEFT COLUMN: Main Business Content (68%) */}
+        <div className="yelp-main-content">
+
+          {/* GALLERY SECTION (Yelp Mosaic Style) */}
+          <section id="gallery" className="yelp-section yelp-gallery-section">
+            <div className="yelp-section-header">
+              <div className="yelp-section-header__left">
+                <h2 className="yelp-section-title">
+                  Galeri Foto &amp; Video
+                </h2>
+                {!business.premium_features?.photo_gallery && (
+                  <span className="yelp-badge-locked"><Lock size={12} /> Free Tier</span>
+                )}
+              </div>
+
+              <div className="yelp-gallery-filter">
                 <button
                   type="button"
-                  className={`bd-gallery-tab ${galleryTab === "all" ? "active" : ""}`}
+                  className={`yelp-filter-pill ${galleryTab === "all" ? "active" : ""}`}
                   onClick={() => setGalleryTab("all")}
                 >
-                  Semua
+                  Semua ({imagesList.length + (business.video ? 1 : 0)})
                 </button>
                 <button
                   type="button"
-                  className={`bd-gallery-tab ${galleryTab === "photo" ? "active" : ""}`}
+                  className={`yelp-filter-pill ${galleryTab === "photo" ? "active" : ""}`}
                   onClick={() => setGalleryTab("photo")}
                 >
-                  Foto
+                  Foto ({imagesList.length})
                 </button>
                 {business.video && (
                   <button
                     type="button"
-                    className={`bd-gallery-tab ${galleryTab === "video" ? "active" : ""}`}
+                    className={`yelp-filter-pill ${galleryTab === "video" ? "active" : ""}`}
                     onClick={() => setGalleryTab("video")}
                   >
-                    Video
+                    Video (1)
                   </button>
                 )}
               </div>
-
-              {(galleryTab === "all" || galleryTab === "photo") && (
-              business.premium_features?.photo_gallery ? (
-                <div className="bd-photo-grid">
-                  {(imagesList.length > 4 ? imagesList.slice(0, 3) : imagesList).map((src, i) => (
-                    <div
-                      key={i}
-                      className="bd-photo-item"
-                      onClick={() => { setLightboxIndex(i); setShowGalleryLightbox(true); }}
-                    >
-                      <img src={src} alt={`${business.name} ${i + 1}`} loading="lazy" />
-                    </div>
-                  ))}
-                  {imagesList.length > 4 && (
-                    <div
-                      className="bd-photo-item bd-photo-item--more"
-                      onClick={() => { setLightboxIndex(3); setShowGalleryLightbox(true); }}
-                    >
-                      <img src={imagesList[3]} alt={`${business.name} 4`} loading="lazy" />
-                      <div className="bd-more-overlay">
-                        <span className="bd-more-overlay__count">+{imagesList.length - 3}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bd-premium-restriction">
-                  <div className="bd-photo-grid bd-photo-grid--limited">
-                    {/* For premium businesses, show images starting from index 1 (2nd image), 
-                        For free businesses, show images starting from index 0 (1st image) */}
-                    {business.is_premium_active 
-                      ? imagesList.slice(1, (business.premium_features?.max_photos || 3) + 1).map((src, i) => (
-                          <div key={i + 1} className="bd-photo-item">
-                            <img src={src} alt={`${business.name} ${i + 2}`} loading="lazy" />
-                          </div>
-                        ))
-                      : imagesList.slice(0, business.premium_features?.max_photos || 3).map((src, i) => (
-                          <div key={i} className="bd-photo-item">
-                            <img src={src} alt={`${business.name} ${i + 1}`} loading="lazy" />
-                          </div>
-                        ))
-                    }
-                    {imagesList.length > 3 && (
-                      <div className="bd-photo-item bd-photo-item--locked">
-                        <div className="bd-locked-overlay">
-                          <div className="bd-locked-icon">🔒</div>
-                          <span>+{imagesList.length - 3} foto lainnya</span>
-                          <button className="bd-premium-upgrade-btn" onClick={handlePremiumUpgrade}>
-                            Upgrade ke Premium
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-              )}
-              
-              {(galleryTab === "all" || galleryTab === "video") && (
-              business.premium_features?.video_showcase && business.video ? (
-                <div className="bd-video-container">
-                  <h3 className="bd-video-title">Video Profil</h3>
-                  <a href={business.video} target="_blank" rel="noopener noreferrer" className="bd-video-link">
-                    <div className="bd-video-link__icon">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
-                    </div>
-                    <div className="bd-video-link__content">
-                      <span className="bd-video-link__label">Tonton Video</span>
-                      <span className="bd-video-link__url">{business.video}</span>
-                    </div>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                  </a>
-                </div>
-              ) : business.video && (
-                <div className="bd-premium-restriction">
-                  <div className="bd-video-locked">
-                    <div className="bd-locked-overlay">
-                      <div className="bd-locked-icon">🔒</div>
-                      <span>Video Profil (Premium Only)</span>
-                      <button className="bd-premium-upgrade-btn" onClick={handlePremiumUpgrade}>
-                        Upgrade ke Premium
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-              )}
             </div>
 
-            {/* Produk - Premium Feature Check */}
-            {!menuLoading && menuItems.length > 0 && (
-              <div className="bd-products-section">
-                <div className="bd-products-section__header">
-                  <div className="bd-products-section__header-icon"><Package size={20} /></div>
-                  <div>
-                    <h2 className="bd-gallery-section__title">
-                      Produk
-                      {!business.premium_features?.price_list && (
-                        <span className="bd-premium-badge">Premium</span>
-                      )}
-                    </h2>
-                    <p className="bd-products-section__subtitle">
-                      {business.premium_features?.price_list ? 
-                        `${menuItems.length} produk tersedia` :
-                        `${Math.min(menuItems.length, business.premium_features?.max_menu_items || 10)} dari ${menuItems.length} produk`
-                      }
-                    </p>
-                  </div>
-                </div>
-                <div className="bd-products-grid">
-                  {paginatedProducts.map((item) => (
-                    <button
-                      type="button"
-                      key={item.id}
-                      className="bd-product-card"
-                      onClick={() => setSelectedProduct(item)}
-                    >
-                      <div className="bd-product-card__img-wrap">
-                        <img src={item.image ? getImageUrl(item.image) : "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop"} alt={item.name} loading="lazy" />
-                      </div>
-                      <div className="bd-product-card__body">
-                        <h3 className="bd-product-card__name">{item.name}</h3>
-                        {business.premium_features?.price_list && item.price > 0 && (
-                          <span className="bd-product-card__price">
-                            <Tag size={12} /> Rp{item.price.toLocaleString('id-ID')}
-                          </span>
-                        )}
-                        {!business.premium_features?.price_list && (
-                          <span className="bd-product-card__price bd-product-card__price--locked">
-                            <Tag size={12} /> Harga tersembunyi
-                          </span>
-                        )}
-                        <span className="bd-product-card__footer-link">
-                          Lihat Detail <ArrowRight size={13} />
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                  {!business.premium_features?.price_list && isLastProductPage && menuItems.length > 10 && (
-                    <div className="bd-product-card bd-product-card--locked">
-                      <div className="bd-locked-overlay">
-                        <div className="bd-locked-icon">🔒</div>
-                        <span>+{menuItems.length - 10} produk lainnya</span>
-                        <button className="bd-premium-upgrade-btn" onClick={handlePremiumUpgrade}>
-                          Upgrade ke Premium
-                        </button>
-                      </div>
+            {(galleryTab === "all" || galleryTab === "photo") && (
+              business.premium_features?.photo_gallery ? (
+                <div className="yelp-mosaic-grid">
+                  {/* Large Featured Photo */}
+                  <div
+                    className="yelp-mosaic-item yelp-mosaic-item--hero"
+                    onClick={() => { setLightboxIndex(0); setShowGalleryLightbox(true); }}
+                  >
+                    <img src={imagesList[0]} alt={`${business.name} Utama`} loading="lazy" />
+                    <div className="yelp-mosaic-hover">
+                      <Camera size={20} />
+                      <span>Lihat Foto Penuh</span>
                     </div>
-                  )}
-                </div>
-
-                {/* Pagination produk: cuma muncul kalau lebih dari 1 halaman */}
-                {productTotalPages > 1 && (
-                  <nav className="bd-products-pagination" aria-label="Navigasi halaman produk">
-                    <button
-                      type="button"
-                      className="bd-products-pagination__nav"
-                      onClick={() => setProductPage((p) => Math.max(1, p - 1))}
-                      disabled={productSafePage === 1}
-                      aria-label="Halaman sebelumnya"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-
-                    {getProductPageNumbers().map((p, i) =>
-                      p === "..." ? (
-                        <span key={`ellipsis-${i}`} className="bd-products-pagination__ellipsis">…</span>
-                      ) : (
-                        <button
-                          type="button"
-                          key={p}
-                          className={`bd-products-pagination__num ${p === productSafePage ? "active" : ""}`}
-                          onClick={() => setProductPage(p)}
-                        >
-                          {p}
-                        </button>
-                      )
-                    )}
-
-                    <button
-                      type="button"
-                      className="bd-products-pagination__nav"
-                      onClick={() => setProductPage((p) => Math.min(productTotalPages, p + 1))}
-                      disabled={productSafePage === productTotalPages}
-                      aria-label="Halaman berikutnya"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </nav>
-                )}
-              </div>
-            )}
-
-            {/* Tags - Premium Feature Check */}
-            {business.premium_features?.tags_keywords ? (
-              <div className="bd-tags">
-                <h3 className="bd-tags__title">Tags</h3>
-                <div className="bd-tags__list">
-                  {Array.isArray(business.tags) && business.tags.map((tag) => (
-                    <span key={tag} className="bd-tag">{tag}</span>
-                  ))}
-                </div>
-              </div>
-            ) : (Array.isArray(business.tags) && business.tags.length > 0) && (
-              <div className="bd-tags">
-                <h3 className="bd-tags__title">
-                  Tags
-                  <span className="bd-premium-badge">Premium</span>
-                </h3>
-                <div className="bd-premium-restriction">
-                  <div className="bd-locked-overlay">
-                    <div className="bd-locked-icon">🔒</div>
-                    <span>Fitur Tags hanya tersedia untuk pengguna Premium</span>
-                    <button className="bd-premium-upgrade-btn" onClick={handlePremiumUpgrade}>
-                      Upgrade ke Premium
-                    </button>
                   </div>
-                </div>
-              </div>
-            )}
 
-            {/* ========== ULASAN ========== */}
-            <div className="bd-reviews-section">
-              <div className="bd-gallery-section__title-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 className="bd-gallery-section__title">Peringkat dan Ulasan</h2>
-                {(!authUser || String(authUser.id) !== String(seller.id)) && (
-                  <button type="button" className="bd-review-write-btn" onClick={() => { setReviewError(""); setShowReviewModal(true); }}>
-                    <Star size={16} />
-                    Beri Ulasan
-                  </button>
-                )}
-              </div>
-
-              {business.reviewList?.length > 0 && (
-                <div className="bd-reviews-summary">
-                  <div className="bd-reviews-summary__score">
-                    <span className="bd-reviews-summary__number">{business.rating.toFixed(1).replace(".", ",")}</span>
-                    <div className="bd-reviews-summary__stars">
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <Star key={n} size={14} fill={n <= Math.round(business.rating) ? "#f59e0b" : "none"} stroke="#f59e0b" />
-                      ))}
-                    </div>
-                    <span className="bd-reviews-summary__count">{business.reviewList.length} PERINGKAT</span>
-                  </div>
-                  <div className="bd-reviews-summary__bars">
-                    {[5, 4, 3, 2, 1].map((star) => {
-                      const count = business.reviewList.filter((r) => r.rating === star).length;
-                      const pct = business.reviewList.length ? (count / business.reviewList.length) * 100 : 0;
+                  {/* Supporting Photos */}
+                  <div className="yelp-mosaic-stack">
+                    {imagesList.slice(1, 4).map((src, idx) => {
+                      const actualIdx = idx + 1;
+                      const isLastWithMore = actualIdx === 3 && imagesList.length > 4;
                       return (
-                        <div className="bd-reviews-summary__bar-row" key={star}>
-                          <span className="bd-reviews-summary__bar-label">{star}<Star size={11} fill="#f59e0b" stroke="#f59e0b" /></span>
-                          <div className="bd-reviews-summary__bar-track">
-                            <div className="bd-reviews-summary__bar-fill" style={{ width: `${pct}%` }} />
-                          </div>
+                        <div
+                          key={actualIdx}
+                          className={`yelp-mosaic-item ${isLastWithMore ? "has-more" : ""}`}
+                          onClick={() => { setLightboxIndex(actualIdx); setShowGalleryLightbox(true); }}
+                        >
+                          <img src={src} alt={`${business.name} ${actualIdx + 1}`} loading="lazy" />
+                          {isLastWithMore && (
+                            <div className="yelp-mosaic-more-overlay">
+                              <span className="count">+{imagesList.length - 4}</span>
+                              <span className="label">Lihat Semua Foto</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              )}
-
-              {business.reviewList?.length > 0 ? (
-                <div className="bd-reviews-list">
-                  {(showAllReviews ? business.reviewList : business.reviewList.slice(0, 3)).map((review) => (
-                    <div key={review.id} className="bd-review-item">
-                      <div className="bd-review-item__header">
-                        <img
-                          src={review.user_avatar || "https://ui-avatars.com/api/?name=" + encodeURIComponent(review.user_name || "U")}
-                          alt={review.user_name}
-                          className="bd-review-item__avatar"
-                        />
-                        <div className="bd-review-item__info">
-                          <strong className="bd-review-item__name">{review.user_name}</strong>
-                          <div className="bd-review-item__meta">
-                            <div className="bd-review-item__stars">
-                              {[1, 2, 3, 4, 5].map((n) => (
-                                <Star key={n} size={13} fill={n <= review.rating ? "#f59e0b" : "none"} stroke="#f59e0b" />
-                              ))}
-                            </div>
-                            <span className="bd-review-item__date">{formatRelativeTime(review.created_at)}</span>
-                          </div>
+              ) : (
+                /* Free Tier Limited Mosaic */
+                <div className="yelp-mosaic-grid yelp-mosaic-grid--limited">
+                  <div
+                    className="yelp-mosaic-item yelp-mosaic-item--hero"
+                    onClick={() => { setLightboxIndex(0); setShowGalleryLightbox(true); }}
+                  >
+                    <img src={imagesList[0]} alt={`${business.name} 1`} loading="lazy" />
+                  </div>
+                  <div className="yelp-mosaic-stack">
+                    {imagesList.slice(1, 3).map((src, i) => (
+                      <div
+                        key={i + 1}
+                        className="yelp-mosaic-item"
+                        onClick={() => { setLightboxIndex(i + 1); setShowGalleryLightbox(true); }}
+                      >
+                        <img src={src} alt={`${business.name} ${i + 2}`} loading="lazy" />
+                      </div>
+                    ))}
+                    {imagesList.length > 3 && (
+                      <div className="yelp-mosaic-item yelp-mosaic-item--locked" onClick={handlePremiumUpgrade}>
+                        <div className="yelp-locked-card">
+                          <Lock size={20} />
+                          <span>+{imagesList.length - 3} Foto Terkunci</span>
+                          <span className="upgrade-link">Upgrade ke Premium &rarr;</span>
                         </div>
                       </div>
-                      <p className="bd-review-item__comment">{review.comment}</p>
-                      <button
-                        type="button"
-                        className={`bd-review-item__helpful ${helpfulVoted[review.id] ? "is-active" : ""}`}
-                        onClick={() => handleToggleHelpful(review.id)}
-                      >
-                        <ThumbsUp size={14} />
-                        <span>{review.helpful_count > 0 ? review.helpful_count : ""}</span>
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Kalau ulasan lebih dari 3, jangan langsung tampilkan semua -
-                      kasih tombol "Lihat Semua" seperti di Google Play Store. */}
-                  {!showAllReviews && business.reviewList.length > 3 && (
-                    <button
-                      type="button"
-                      className="bd-reviews-see-all-btn"
-                      onClick={() => setShowAllReviews(true)}
-                    >
-                      Lihat Semua Ulasan ({business.reviewList.length})
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="bd-products-empty">
-                  <p>Belum ada ulasan. Jadilah yang pertama memberikan ulasan untuk bisnis ini.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ========== SIDEBAR ========== */}
-          <div className="bd-content__sidebar">
-            {/* Hours */}
-            <div className="bd-hours-card">
-              <button type="button" className="bd-hours-card__toggle" onClick={() => setShowWeeklyHours(!showWeeklyHours)} aria-expanded={showWeeklyHours}>
-                <h3 className="bd-hours-card__title">Jam Buka</h3>
-                <ChevronDown size={18} className={`bd-hours-card__caret${showWeeklyHours ? " open" : ""}`} />
-              </button>
-              <div className="bd-hours-card__content">
-                <Clock size={20} className="bd-hours-card__icon" />
-                <span className={`bd-hours-card__time ${isOpenNow ? "is-open" : "is-closed"}`}>
-                  {displayStatus} &middot; {business.hours}
-                </span>
-              </div>
-              <div className={`bd-hours-card__week-wrap${showWeeklyHours ? " open" : ""}`}>
-                <ul className="bd-hours-card__week">
-                  {weeklySchedule.map((d) => (
-                    <li key={d.day} className={`bd-hours-card__week-row${d.isToday ? " today" : ""}${d.closed ? " closed" : ""}`}>
-                      <span className="bd-hours-card__week-day">{d.day}{d.isToday && <span className="bd-hours-card__today-badge">Hari ini</span>}</span>
-                      <span className="bd-hours-card__week-time">{d.hours}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Lokasi & Alamat */}
-            <div className="bd-location-card">
-              <h3 className="bd-location-card__title">Lokasi &amp; Alamat</h3>
-              <div className="bd-location-card__map" style={{ padding: 0, overflow: "hidden" }}>
-                <iframe
-                  title={`Peta lokasi ${business.name}`}
-                  src={`https://www.google.com/maps?q=${encodeURIComponent(business.address)}&z=16&output=embed`}
-                  width="100%" height="220"
-                  style={{ border: 0, display: "block" }}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
-              <p className="bd-address-card__text" style={{ marginTop: 10 }}>
-                <MapPin size={16} style={{ verticalAlign: "text-bottom", marginRight: 6, color: "#007570" }} />
-                {business.address}
-              </p>
-              <div className="bd-address-card__actions">
-                <button type="button" className="bd-address-action" onClick={handleDirections} aria-label="Dapatkan Arah"><Send size={22} strokeWidth={1.8} /></button>
-                <button type="button" className="bd-address-action" onClick={handleWhatsApp} aria-label="WhatsApp"><MessageCircle size={22} strokeWidth={1.8} /></button>
-              </div>
-              <button type="button" className="bd-location-card__directions-link" onClick={handleDirections} style={{ marginTop: 10, width: "100%", textAlign: "center", background: "none", border: "none", color: "#007570", fontWeight: 600, cursor: "pointer", padding: "6px 0" }}>
-                Buka di Google Maps &rarr;
-              </button>
-            </div>
-
-            {/* Seller Profile - Premium Contact Features */}
-            <div className="bd-seller-card">
-              {authUser?.id === seller.id ? (
-                <Link to="/dashboard?tab=profile" className="bd-seller-card__profile">
-                  <img src={seller.avatar} alt={seller.name} className="bd-seller-card__avatar" />
-                  <span className="bd-seller-card__name">{seller.name}</span>
-                </Link>
-              ) : (
-                <Link to={`/seller/${seller.id}`} className="bd-seller-card__profile bd-seller-card__profile--clickable">
-                  <img src={seller.avatar} alt={seller.name} className="bd-seller-card__avatar" />
-                  <span className="bd-seller-card__name">{seller.name}</span>
-                  <ChevronRight size={18} />
-                </Link>
-              )}
-              {seller.bio && <div className="bd-seller-card__bio" dangerouslySetInnerHTML={{ __html: seller.bio }} />}
-              
-              {/* Contact Buttons - Premium Check */}
-              {business.premium_features?.contact_form ? (
-                <>
-                  <button type="button" className="bd-seller-btn" onClick={handleWhatsApp}>
-                    <MessageCircle size={18} /><span>WhatsApp</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="bd-seller-btn"
-                    onClick={() => {
-                      if (!authUser) {
-                        navigate("/login");
-                        return;
-                      }
-                      // BARU: langsung masuk ke Inbox chat dengan penjual ini
-                      // (bukan isi form nama/email dulu). Kalau sebelumnya
-                      // sudah pernah chat, langsung ke percakapan yang ada;
-                      // kalau belum, Inbox akan menyiapkan percakapan baru
-                      // yang tinggal diketik & dikirim.
-                      navigate(
-                        `/dashboard?tab=inbox&startBusiness=${business.id}&startName=${encodeURIComponent(business.name)}`
-                      );
-                    }}
-                  >
-                    <MessageCircle size={18} /><span>Chat Dengan Penjual</span>
-                  </button>
-                  <button type="button" className="bd-seller-phone" onClick={() => setShowPhone(!showPhone)}>
-                    <Phone size={16} />
-                    <span>{showPhone ? (seller.phone || business.phone) : `${maskPhone()}Tampilkan nomor`}</span>
-                  </button>
-                </>
-              ) : (
-                <div className="bd-premium-restriction">
-                  <div className="bd-locked-overlay bd-locked-overlay--compact">
-                    <div className="bd-locked-icon">🔒</div>
-                    <span>Fitur kontak lengkap hanya tersedia untuk bisnis Premium</span>
-                    <button className="bd-premium-upgrade-btn bd-premium-upgrade-btn--small" onClick={handlePremiumUpgrade}>
-                      Upgrade ke Premium
-                    </button>
+                    )}
                   </div>
                 </div>
-              )}
+              )
+            )}
 
-              {/* Website Link - Premium Feature */}
-              {business.premium_features?.website_link && business.website && (
-                <a 
-                  href={business.website} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="bd-seller-btn bd-seller-btn--website"
+            {/* Video Showcase Section */}
+            {(galleryTab === "all" || galleryTab === "video") && business.video && (
+              <div className="yelp-video-showcase">
+                {business.premium_features?.video_showcase ? (
+                  <a
+                    href={business.video}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="yelp-video-banner"
+                  >
+                    <div className="yelp-video-banner__icon">
+                      <Play size={24} fill="currentColor" />
+                    </div>
+                    <div className="yelp-video-banner__text">
+                      <strong>Tonton Video Showcase Profil</strong>
+                      <small>{business.video}</small>
+                    </div>
+                    <ExternalLink size={18} className="yelp-video-banner__ext" />
+                  </a>
+                ) : (
+                  <div className="yelp-video-locked-box">
+                    <Lock size={22} />
+                    <div>
+                      <strong>Video Profil Bisnis</strong>
+                      <p>Fitur video showcase eksklusif untuk member Premium</p>
+                    </div>
+                    <button type="button" className="yelp-btn yelp-btn--primary yelp-btn--sm" onClick={handlePremiumUpgrade}>
+                      Upgrade Sekarang
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* ABOUT THE BUSINESS SECTION */}
+          <section id="overview" className="yelp-section yelp-about-section">
+            <h2 className="yelp-section-title">Tentang {business.name}</h2>
+            <div className="yelp-about-body">
+              <p className={`yelp-about-text ${!showDescFull && isDescriptionLong ? "is-clamped" : ""}`}>
+                {business.description || "Belum ada deskripsi detail untuk bisnis ini."}
+              </p>
+              {isDescriptionLong && (
+                <button
+                  type="button"
+                  className="yelp-readmore-btn"
+                  onClick={() => setShowDescFull(!showDescFull)}
                 >
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="2" y1="12" x2="22" y2="12"></line>
-                    <path d="m12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                  </svg>
-                  <span>Kunjungi Website</span>
-                </a>
+                  {showDescFull ? "Sembunyikan" : "Baca selengkapnya..."}
+                </button>
               )}
             </div>
-          </div>
-        </div>
-      </section>
 
+            {/* Tags list */}
+            {Array.isArray(business.tags) && business.tags.length > 0 && (
+              <div className="yelp-tags-row">
+                <span className="yelp-tags-label"><Tag size={14} /> Kata Kunci:</span>
+                <div className="yelp-tags-list">
+                  {business.tags.map((tag) => (
+                    <span key={tag} className="yelp-tag-pill">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* PRODUCTS & SERVICES / MENU */}
+          {!menuLoading && menuItems.length > 0 && (
+            <section id="products" className="yelp-section yelp-products-section">
+              <div className="yelp-section-header">
+                <div>
+                  <h2 className="yelp-section-title">Produk &amp; Layanan</h2>
+                  <p className="yelp-section-subtitle">
+                    {business.premium_features?.price_list
+                      ? `${menuItems.length} item tersedia`
+                      : `${Math.min(menuItems.length, business.premium_features?.max_menu_items || 10)} dari ${menuItems.length} item (Free limit)`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="yelp-products-grid">
+                {paginatedProducts.map((item) => (
+                  <div
+                    key={item.id}
+                    className="yelp-product-card"
+                    onClick={() => setSelectedProduct(item)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="yelp-product-card__img-wrap">
+                      <img
+                        src={item.image ? getImageUrl(item.image) : "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop"}
+                        alt={item.name}
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="yelp-product-card__content">
+                      <h3 className="yelp-product-card__name">{item.name}</h3>
+                      {business.premium_features?.price_list && item.price > 0 ? (
+                        <div className="yelp-product-card__price">
+                          Rp{item.price.toLocaleString("id-ID")}
+                        </div>
+                      ) : (
+                        <div className="yelp-product-card__price yelp-product-card__price--muted">
+                          Hubungi Penjual
+                        </div>
+                      )}
+                      <span className="yelp-product-card__link">
+                        Lihat Detail <ArrowRight size={13} />
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                {!business.premium_features?.price_list && isLastProductPage && menuItems.length > 10 && (
+                  <div className="yelp-product-card yelp-product-card--locked" onClick={handlePremiumUpgrade}>
+                    <div className="yelp-locked-card">
+                      <Lock size={20} />
+                      <span>+{menuItems.length - 10} Produk Lainnya</span>
+                      <span className="upgrade-link">Upgrade ke Premium</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Product pagination */}
+              {productTotalPages > 1 && (
+                <div className="yelp-pagination">
+                  <button
+                    type="button"
+                    className="yelp-pagination__arrow"
+                    onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                    disabled={productSafePage === 1}
+                    aria-label="Halaman sebelumnya"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  {getProductPageNumbers().map((p, i) =>
+                    p === "..." ? (
+                      <span key={`ell-${i}`} className="yelp-pagination__ellipsis">…</span>
+                    ) : (
+                      <button
+                        type="button"
+                        key={p}
+                        className={`yelp-pagination__num ${p === productSafePage ? "active" : ""}`}
+                        onClick={() => setProductPage(p)}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    className="yelp-pagination__arrow"
+                    onClick={() => setProductPage((p) => Math.min(productTotalPages, p + 1))}
+                    disabled={productSafePage === productTotalPages}
+                    aria-label="Halaman berikutnya"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* REVIEWS SECTION (Yelp Standard) */}
+          <section id="reviews" className="yelp-section yelp-reviews-section">
+            <div className="yelp-section-header">
+              <h2 className="yelp-section-title">Peringkat &amp; Ulasan</h2>
+              {(!authUser || String(authUser.id) !== String(seller.id)) && (
+                <button
+                  type="button"
+                  className="yelp-btn yelp-btn--primary yelp-btn--sm"
+                  onClick={() => { setReviewError(""); setShowReviewModal(true); }}
+                >
+                  <Star size={15} fill="currentColor" stroke="none" />
+                  <span>Beri Ulasan</span>
+                </button>
+              )}
+            </div>
+
+            {/* Yelp Rating Breakdown Summary */}
+            {business.reviewList?.length > 0 && (
+              <div className="yelp-rating-summary-card">
+                <div className="yelp-rating-overall">
+                  <span className="yelp-rating-big-num">{business.rating.toFixed(1)}</span>
+                  <div className="yelp-stars yelp-stars--large">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <div
+                        key={n}
+                        className={`yelp-star-box ${n <= Math.round(business.rating) ? "active" : ""}`}
+                      >
+                        <Star size={18} fill="currentColor" stroke="none" />
+                      </div>
+                    ))}
+                  </div>
+                  <span className="yelp-rating-total-text">{business.reviewList.length} ulasan terverifikasi</span>
+                </div>
+
+                <div className="yelp-rating-bars">
+                  {[5, 4, 3, 2, 1].map((star) => {
+                    const count = business.reviewList.filter((r) => r.rating === star).length;
+                    const pct = business.reviewList.length ? (count / business.reviewList.length) * 100 : 0;
+                    return (
+                      <div className="yelp-rating-bar-row" key={star}>
+                        <span className="yelp-rating-bar-label">{star} bintang</span>
+                        <div className="yelp-rating-bar-track">
+                          <div className="yelp-rating-bar-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="yelp-rating-bar-count">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Review List */}
+            {business.reviewList?.length > 0 ? (
+              <div className="yelp-reviews-feed">
+                {(showAllReviews ? business.reviewList : business.reviewList.slice(0, 3)).map((review) => (
+                  <article key={review.id} className="yelp-review-card">
+                    <header className="yelp-review-card__header">
+                      <img
+                        src={review.user_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.user_name || "U")}&background=007570&color=fff`}
+                        alt={review.user_name}
+                        className="yelp-review-card__avatar"
+                      />
+                      <div className="yelp-review-card__user-meta">
+                        <strong className="yelp-review-card__username">{review.user_name}</strong>
+                        <div className="yelp-review-card__stars-date">
+                          <div className="yelp-stars yelp-stars--sm">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <div
+                                key={n}
+                                className={`yelp-star-box ${n <= review.rating ? "active" : ""}`}
+                              >
+                                <Star size={11} fill="currentColor" stroke="none" />
+                              </div>
+                            ))}
+                          </div>
+                          <time className="yelp-review-card__date">{formatRelativeTime(review.created_at)}</time>
+                        </div>
+                      </div>
+                    </header>
+
+                    <p className="yelp-review-card__body">{review.comment}</p>
+
+                    <footer className="yelp-review-card__footer">
+                      <button
+                        type="button"
+                        className={`yelp-helpful-btn ${helpfulVoted[review.id] ? "active" : ""}`}
+                        onClick={() => handleToggleHelpful(review.id)}
+                        title="Tandai ulasan ini bermanfaat"
+                      >
+                        <ThumbsUp size={14} />
+                        <span>Berguna {review.helpful_count > 0 ? `(${review.helpful_count})` : ""}</span>
+                      </button>
+                    </footer>
+                  </article>
+                ))}
+
+                {!showAllReviews && business.reviewList.length > 3 && (
+                  <button
+                    type="button"
+                    className="yelp-btn yelp-btn--outline yelp-btn--full"
+                    onClick={() => setShowAllReviews(true)}
+                  >
+                    Tampilkan Semua ({business.reviewList.length}) Ulasan
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="yelp-empty-state">
+                <Star size={36} className="yelp-empty-icon" />
+                <h3>Belum ada ulasan untuk bisnis ini</h3>
+                <p>Bagikan pengalaman Anda agar membantu calon pelanggan lainnya.</p>
+                <button
+                  type="button"
+                  className="yelp-btn yelp-btn--primary yelp-btn--sm"
+                  onClick={() => setShowReviewModal(true)}
+                >
+                  Tulis Ulasan Pertama
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* RIGHT COLUMN: Business Information Sidebar (32%) */}
+        <aside id="location-hours" className="yelp-sidebar">
+          {/* Hours Card */}
+          <div className="yelp-card yelp-card--hours">
+            <div className="yelp-card__header" onClick={() => setShowWeeklyHours(!showWeeklyHours)}>
+              <div className="yelp-card__header-title">
+                <Clock size={18} className="text-primary" />
+                <h3>Jam Operasional</h3>
+              </div>
+              <ChevronDown size={18} className={`yelp-card__caret ${showWeeklyHours ? "open" : ""}`} />
+            </div>
+
+            <div className="yelp-hours-highlight">
+              <span className={`yelp-status-dot ${isOpenNow ? "open" : "closed"}`} />
+              <div>
+                <strong className={isOpenNow ? "text-open" : "text-closed"}>{displayStatus}</strong>
+                <p className="hours-subtitle">{business.hours}</p>
+              </div>
+            </div>
+
+            <div className={`yelp-weekly-hours ${showWeeklyHours ? "is-expanded" : ""}`}>
+              <ul className="yelp-weekly-list">
+                {weeklySchedule.map((d) => (
+                  <li key={d.day} className={`yelp-weekly-item ${d.isToday ? "is-today" : ""} ${d.closed ? "is-closed" : ""}`}>
+                    <span className="day-name">
+                      {d.day}
+                      {d.isToday && <span className="today-chip">Hari ini</span>}
+                    </span>
+                    <span className="day-hours">{d.hours}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Location & Map Card */}
+          <div className="yelp-card yelp-card--location">
+            <div className="yelp-card__header">
+              <div className="yelp-card__header-title">
+                <MapPin size={18} className="text-primary" />
+                <h3>Lokasi &amp; Peta</h3>
+              </div>
+            </div>
+
+            <div className="yelp-map-frame">
+              <iframe
+                title={`Peta lokasi ${business.name}`}
+                src={`https://www.google.com/maps?q=${encodeURIComponent(business.address)}&z=15&output=embed`}
+                width="100%"
+                height="190"
+                style={{ border: 0, display: "block" }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+
+            <div className="yelp-location-info">
+              <p className="yelp-address-text">{business.address}</p>
+              <div className="yelp-location-actions">
+                <button
+                  type="button"
+                  className="yelp-btn yelp-btn--outline yelp-btn--sm yelp-btn--full"
+                  onClick={handleDirections}
+                >
+                  <Send size={15} />
+                  <span>Buka Petunjuk Arah</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Business Contact Information */}
+          <div className="yelp-card yelp-card--contact">
+            <div className="yelp-card__header">
+              <div className="yelp-card__header-title">
+                <Phone size={18} className="text-primary" />
+                <h3>Informasi Kontak</h3>
+              </div>
+            </div>
+
+            <ul className="yelp-contact-list">
+              {business.phone && (
+                <li className="yelp-contact-item">
+                  <Phone size={16} className="contact-icon" />
+                  <div className="contact-info">
+                    <span className="contact-label">Telepon / WhatsApp</span>
+                    <div className="phone-reveal-wrap">
+                      <span className="contact-val">
+                        {showPhone ? business.phone : `${maskPhone()}`}
+                      </span>
+                      <button
+                        type="button"
+                        className="reveal-btn"
+                        onClick={() => setShowPhone(!showPhone)}
+                      >
+                        {showPhone ? "Sembunyikan" : "Tampilkan"}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              )}
+
+              {business.email && (
+                <li className="yelp-contact-item">
+                  <Mail size={16} className="contact-icon" />
+                  <div className="contact-info">
+                    <span className="contact-label">Email</span>
+                    <a href={`mailto:${business.email}`} className="contact-link">
+                      {business.email}
+                    </a>
+                  </div>
+                </li>
+              )}
+
+              {business.website && business.premium_features?.website_link && (
+                <li className="yelp-contact-item">
+                  <Globe size={16} className="contact-icon" />
+                  <div className="contact-info">
+                    <span className="contact-label">Website Resmi</span>
+                    <a
+                      href={business.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="contact-link"
+                    >
+                      {business.website.replace(/^https?:\/\//i, "")}
+                      <ExternalLink size={12} />
+                    </a>
+                  </div>
+                </li>
+              )}
+            </ul>
+
+            {/* Seller profile snippet */}
+            <div className="yelp-seller-snippet">
+              <Link
+                to={authUser?.id === seller.id ? "/dashboard?tab=profile" : `/seller/${seller.id}`}
+                className="yelp-seller-profile-link"
+              >
+                <img src={seller.avatar} alt={seller.name} className="yelp-seller-avatar" />
+                <div className="yelp-seller-details">
+                  <span className="yelp-seller-role">Pemilik Bisnis</span>
+                  <strong className="yelp-seller-name">{seller.name}</strong>
+                </div>
+                <ChevronRight size={16} className="yelp-seller-arrow" />
+              </Link>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      {/* ========== MODALS ========== */}
+
+      {/* 1. BOOKING MODAL */}
       {showBookingModal && (
         <div className="login-modal-overlay" onClick={() => setShowBookingModal(false)}>
-          <div className="login-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+          <div className="login-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="login-modal__header">
               <div>
                 <h2 className="login-modal__title">Booking {business.name}</h2>
@@ -1401,26 +1481,56 @@ export default function BusinessDetail() {
         </div>
       )}
 
-      {/* ========== REVIEW MODAL ========== */}
+      {/* 2. REVIEW MODAL */}
       {showReviewModal && (
         <div className="login-modal-overlay" onClick={() => setShowReviewModal(false)}>
-          <div className="login-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+          <div className="login-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="login-modal__header">
               <div>
-                <h2 className="login-modal__title">Beri Ulasan untuk {business.name}</h2>
-                <p className="login-modal__subtitle">Bagikan pengalaman Anda dengan bisnis ini.</p>
+                <h2 className="login-modal__title">Beri Ulasan</h2>
+                <p className="login-modal__subtitle">Bagikan pengalaman Anda dengan {business.name}.</p>
               </div>
               <button className="login-modal__close" onClick={() => setShowReviewModal(false)} aria-label="Tutup"><X size={24} /></button>
             </div>
             <div className="login-modal__divider" />
             <form className="login-modal__body" onSubmit={handleSubmitReview} noValidate>
               {reviewError && <div className="login-error"><span>{reviewError}</span></div>}
-              <div className="bd-review-form__stars">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Star key={n} size={28} fill={n <= reviewRating ? "#fbbf24" : "none"} stroke="#fbbf24" style={{ cursor: "pointer" }} onClick={() => setReviewRating(n)} />
-                ))}
+              <div className="yelp-modal-stars-select">
+                <div className="yelp-modal-stars-row" onMouseLeave={() => setHoverRating(0)}>
+                  {[1, 2, 3, 4, 5].map((n) => {
+                    const isFilled = n <= (hoverRating || reviewRating);
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        className={`yelp-modal-star-btn ${isFilled ? "active" : ""}`}
+                        onClick={() => setReviewRating(n)}
+                        onMouseEnter={() => setHoverRating(n)}
+                        title={`${n} Bintang`}
+                        aria-label={`${n} Bintang`}
+                      >
+                        <Star size={32} fill="currentColor" stroke="none" />
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="star-rating-text">
+                  {(hoverRating || reviewRating) === 1 && "1 Bintang - Sangat Buruk"}
+                  {(hoverRating || reviewRating) === 2 && "2 Bintang - Kurang Memuaskan"}
+                  {(hoverRating || reviewRating) === 3 && "3 Bintang - Cukup Baik"}
+                  {(hoverRating || reviewRating) === 4 && "4 Bintang - Bagus & Puas"}
+                  {(hoverRating || reviewRating) === 5 && "5 Bintang - Luar Biasa!"}
+                </span>
               </div>
-              <textarea className="login-input" placeholder="Ceritakan pengalaman Anda dengan bisnis ini..." rows={4} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required minLength={5} />
+              <textarea
+                className="login-input"
+                placeholder="Ceritakan pengalaman Anda secara detail..."
+                rows={4}
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                required
+                minLength={5}
+              />
               <button type="submit" className="login-register-btn" disabled={submittingReview}>
                 {submittingReview ? "Mengirim..." : "Kirim Ulasan"}
               </button>
@@ -1429,14 +1539,14 @@ export default function BusinessDetail() {
         </div>
       )}
 
-      {/* ========== REPORT MODAL ========== */}
+      {/* 3. REPORT MODAL */}
       {showReportModal && (
         <div className="login-modal-overlay" onClick={closeReportModal}>
-          <div className="login-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+          <div className="login-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="login-modal__header">
               <div>
-                <h2 className="login-modal__title">Laporkan {business.name}</h2>
-                <p className="login-modal__subtitle">Beri tahu kami jika ada kesalahan atau pelanggaran pada bisnis ini.</p>
+                <h2 className="login-modal__title">Laporkan Bisnis</h2>
+                <p className="login-modal__subtitle">Beri tahu kami jika ada kesalahan atau pelanggaran pada {business.name}.</p>
               </div>
               <button className="login-modal__close" onClick={closeReportModal} aria-label="Tutup"><X size={24} /></button>
             </div>
@@ -1467,7 +1577,7 @@ export default function BusinessDetail() {
         </div>
       )}
 
-      {/* Gallery Lightbox Modal */}
+      {/* 4. GALLERY LIGHTBOX */}
       {showGalleryLightbox && (
         <div className="login-modal-overlay" onClick={() => setShowGalleryLightbox(false)}>
           <div className="bd-lightbox" onClick={(e) => e.stopPropagation()}>
@@ -1524,7 +1634,7 @@ export default function BusinessDetail() {
         </div>
       )}
 
-      {/* Product Detail Modal */}
+      {/* 5. PRODUCT DETAIL MODAL */}
       {selectedProduct && (
         <div className="login-modal-overlay" onClick={() => setSelectedProduct(null)}>
           <div className="bd-product-modal" onClick={(e) => e.stopPropagation()}>
@@ -1574,54 +1684,6 @@ export default function BusinessDetail() {
                   <span>Tanya via WhatsApp</span>
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Profile Modal */}
-      {showProfileModal && (
-        <div className="login-modal-overlay" onClick={() => setShowProfileModal(false)}>
-          <div className="login-modal" style={{ maxWidth: 540 }} onClick={(e) => e.stopPropagation()}>
-            <div className="login-modal__header">
-              <div>
-                <h2 className="login-modal__title">Profil {seller.name}</h2>
-                <p className="login-modal__subtitle">Informasi penjual dan bisnis yang dimiliki</p>
-              </div>
-              <button className="login-modal__close" onClick={() => setShowProfileModal(false)} aria-label="Tutup"><X size={24} /></button>
-            </div>
-            <div className="login-modal__divider" />
-            <div className="login-modal__body" style={{ gap: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <img src={seller.avatar} alt={seller.name} style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover' }} />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{seller.name}</h3>
-                  {seller.phone && <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.9rem' }}><Phone size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />{seller.phone}</p>}
-                </div>
-              </div>
-              {seller.bio && <div style={{ padding: '0.75rem', background: '#f8fafc', borderRadius: '8px', fontSize: '0.9rem', color: '#475569' }}>{seller.bio}</div>}
-              <div>
-                <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>Bisnis yang Dimiliki ({profileBusinesses.length})</h4>
-                {profileBusinesses.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {profileBusinesses.map((biz) => (
-                      <Link key={biz.id} to={`/business/${biz.id}`} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', textDecoration: 'none', transition: 'all 0.2s' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#007570'; e.currentTarget.style.background = '#f0fdfa'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}>
-                        <img src={biz.image ? getImageUrl(biz.image) : 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=80&h=80&fit=crop'} alt={biz.title} style={{ width: 48, height: 48, borderRadius: '6px', objectFit: 'cover' }} />
-                        <div style={{ flex: 1 }}>
-                          <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#0f172a' }}>{biz.title}</h5>
-                          <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>{biz.category?.name || 'Lainnya'}</p>
-                        </div>
-                        <ChevronRight size={18} style={{ color: '#94a3b8' }} />
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ color: '#94a3b8', fontSize: '0.9rem', textAlign: 'center', padding: '1rem' }}>Belum ada bisnis lain</p>
-                )}
-              </div>
-              <button type="button" className="login-register-btn" onClick={() => setShowProfileModal(false)} style={{ marginTop: '0.5rem' }}>Tutup</button>
             </div>
           </div>
         </div>

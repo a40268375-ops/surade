@@ -4,28 +4,33 @@ namespace App\Http\Controllers;
 
 use App\Models\Blog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class BlogController extends Controller
 {
+    public static function clearCache()
+    {
+        Cache::forget('blogs_published');
+        Cache::forget('home_feed_public');
+    }
+
     public function index(Request $request)
     {
-        // Endpoint ini dipakai untuk 2 tujuan: halaman publik Blog (GET
-        // /blogs, tanpa login) dan halaman Admin Blog Management (GET
-        // /admin/blogs, wajib login sebagai admin). Supaya draft tidak
-        // bocor ke pengunjung biasa, request yang bukan admin (guest atau
-        // user biasa) hanya diberi blog berstatus "published". Pakai guard
-        // 'sanctum' secara eksplisit karena route publik /blogs tidak
-        // dibungkus middleware auth:sanctum, jadi $request->user() default
-        // tidak akan mendeteksi token Bearer yang tetap dikirim frontend.
         $user = $request->user('sanctum');
-        $query = Blog::with('author')->latest();
 
-        if (!$user || $user->role !== 'admin') {
-            $query->where('status', 'published');
+        if ($user && $user->role === 'admin') {
+            return response()->json(Blog::with('author:id,name,avatar')->latest()->get());
         }
 
-        return response()->json($query->get());
+        $blogs = Cache::remember('blogs_published', 600, function () {
+            return Blog::with('author:id,name,avatar')
+                ->where('status', 'published')
+                ->latest()
+                ->get();
+        });
+
+        return response()->json($blogs);
     }
 
     // Dipakai halaman detail blog publik (BlogDetail.jsx).
@@ -103,6 +108,7 @@ class BlogController extends Controller
             'gallery' => $galleryPaths,
             'created_by' => $request->user()->id,
         ]);
+        self::clearCache();
 
         return response()->json($blog->load('author'), 201);
     }
@@ -121,11 +127,6 @@ class BlogController extends Controller
             'excerpt' => 'nullable|string|max:500',
             'category' => 'sometimes|required|string',
             'status' => 'nullable|string|in:draft,published',
-            // Sama seperti store(): 'image' boleh file upload ATAU string.
-            // Sebelumnya divalidasi 'nullable|url' yang menolak path
-            // storage internal (mis. "/storage/blogs/xxx.jpg") karena itu
-            // bukan url absolut, jadi ganti foto blog yang sudah ada selalu
-            // gagal validasi.
             'image' => 'nullable',
             'image_url' => 'nullable|string|max:500',
             'banners.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
@@ -163,6 +164,7 @@ class BlogController extends Controller
         }
 
         $blog->update($data);
+        self::clearCache();
 
         return response()->json($blog->fresh('author'));
     }
@@ -176,6 +178,7 @@ class BlogController extends Controller
         }
 
         $blog->delete();
+        self::clearCache();
 
         return response()->json(['message' => 'Blog deleted']);
     }
