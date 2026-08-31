@@ -999,3 +999,395 @@
     height: 24px;
   }
 }
+/* ══════════════════════════════════════════════════════════════
+   SECTION IKLAN (Premium & Terverifikasi) - khusus bisnis Premium
+   di desa/kelurahan ini. Style-nya disalin persis dari Home.css
+   (class .premium-ads-* dan .standard-ads-*) supaya tampilannya
+   konsisten dengan carousel iklan yang sama di halaman Beranda.
+   ══════════════════════════════════════════════════════════════ */
+.premium-ads-section {
+  background: #f5f6fa;
+  padding: 40px 0 20px;
+}
+
+.premium-ads-carousel {
+  position: relative;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 40px;
+}
+
+.premium-ads-carousel__viewport {
+  overflow: hidden;
+  border-radius: 20px;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(15,23,42,0.15);
+}
+
+.premium-ads-carousel__track {
+  display: flex;
+  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.premium-ad-card {
+  flex: 0 0 100%;
+  width: 100%;
+  position: relative;
+  display: block;
+}
+
+.premium-ad-card__img-wrap {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+@media (max-width: 1024px) {
+  .premium-ad-card__img-wrap {
+    height: 360px;
+  }
+}
+
+@media (max-width: 768px) {
+  .premium-ad-card__img-wrap {
+    height: 320px;
+  }
+}
+
+.premium-ad-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scale(1.02);
+}
+
+.premium-ad-card__gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.6) 40%, rgba(15,23,42,0.1) 100%),
+              linear-gradient(180deg, rgba(15,23,42,0) 50%, rgba(15,23,42,0.7) 100%);
+  pointer-events: none;
+}
+
+.premium-ad-card__content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  max-width: 800px;
+  padding: 40px;
+  color: #fff;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+@media (max-width: 768px) {
+  .premium-ad-card__content {
+    padding: 28px;
+  }
+}
+
+.premium-ad-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.25);
+  padding: 6px 14px;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.premium-ad-card__name {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 900;
+  margin-bottom: 10px;
+  line-height: 1.1;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.premium-ad-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: clamp(0.9rem, 1.4vw, 1rem);
+  font-weight: 600;
+  margin-bottom: 26px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.premium-ad-card__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f59e0b;
+}
+
+.premium-ad-card__meta .meta-dim {
+  color: rgba(255,255,255,0.7);
+  font-weight: 400;
+}
+
+.premium-ad-card__location {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f8fafc;
+}
+
+.premium-ad-card__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #00e0b8;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 12px 24px;
+  border-radius: 30px;
+  text-decoration: none;
+  box-shadow: 0 4px 20px rgba(0, 224, 184, 0.4);
+  transition: all 0.3s ease;
+}
+
+.premium-ad-card__btn:hover {
+  background: #00c4a0;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 224, 184, 0.5);
+}
+
+.premium-ads-carousel__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.premium-ads-carousel__nav:hover {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.premium-ads-carousel__nav--prev {
+  left: 20px;
+}
+
+.premium-ads-carousel__nav--next {
+  right: 20px;
+}
+
+.premium-ads-carousel__dots {
+  position: absolute;
+  bottom: 24px;
+  right: 64px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+
+.premium-ads-carousel__dot {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.4);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.premium-ads-carousel__dot.active {
+  background: #00e0b8;
+  width: 32px;
+}
+
+/* ── Iklan Terverifikasi (baris kartu kecil, digulir otomatis) ── */
+.standard-ads-section {
+  background: #f5f6fa;
+  padding: 20px 0 40px;
+  overflow: hidden;
+}
+
+.standard-ads-header {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.standard-ads-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 224, 184, 0.1);
+  color: #00a88a;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.standard-ads-subtitle {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.standard-ads-marquee {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+}
+
+.standard-ads-marquee::before,
+.standard-ads-marquee::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100px;
+  z-index: 3;
+  pointer-events: none;
+}
+.standard-ads-marquee::before {
+  left: 0;
+  background: linear-gradient(to right, #f5f6fa, rgba(245, 246, 250, 0));
+}
+.standard-ads-marquee::after {
+  right: 0;
+  background: linear-gradient(to left, #f5f6fa, rgba(245, 246, 250, 0));
+}
+
+.standard-ads-marquee__track {
+  display: flex;
+  gap: 20px;
+  padding: 0 20px;
+  animation: standardAdsScrollSC 40s linear infinite;
+  width: max-content;
+}
+
+@media (hover: hover) {
+  .standard-ads-marquee:hover .standard-ads-marquee__track {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes standardAdsScrollSC {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.standard-ad-card {
+  flex: 0 0 280px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  text-decoration: none;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgba(15,23,42,0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid rgba(15,23,42,0.03);
+}
+
+.standard-ad-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(15,23,42,0.1);
+}
+
+.standard-ad-card__img-wrap {
+  width: 100%;
+  height: 160px;
+  position: relative;
+}
+
+.standard-ad-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.standard-ad-card__badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.standard-ad-card__content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.standard-ad-card__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #0f172a;
+}
+
+.standard-ad-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.standard-ad-card__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.standard-ad-card__dot {
+  color: #cbd5e1;
+}
+
+.standard-ad-card__location {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

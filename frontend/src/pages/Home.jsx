@@ -552,6 +552,13 @@ import { useState, useRef, useEffect } from "react";
     // Mapping businesses list
     const businessesList = dbBusinesses.length > 0 ? dbBusinesses.map(b => ({
       id: b.id,
+      // PERBAIKAN: kartu iklan (premium-ad-card & standard-ad-card) di
+      // bawah membaca field "businessId" untuk bikin link ke halaman
+      // bisnis (/business/:id). Field ini sebelumnya TIDAK ADA di sini -
+      // cuma ada "id" - jadi link-nya selalu jadi "/business/undefined"
+      // (rusak, tidak pernah nyambung ke bisnis aslinya). Sekarang
+      // ditambahkan supaya selalu terhubung ke bisnis yang benar.
+      businessId: b.id,
       name: b.title,
       category: b.category?.name || "Lainnya",
       tags: [b.title],
@@ -564,7 +571,7 @@ import { useState, useRef, useEffect } from "react";
       open: !!b.is_open_now,
       categoryColor: "#159c60",
       rating: "4.8"
-    })) : (apiError ? [...TEMUKAN_DATA, ...BISNIS_DATA].map(b => ({ ...b, is_premium: true, rating: "4.8" })) : []);
+    })) : (apiError ? [...TEMUKAN_DATA, ...BISNIS_DATA].map(b => ({ ...b, businessId: b.id, is_premium: true, rating: "4.8" })) : []);
 
     const premiumAds = businessesList.filter(b => b.package === 'premium' && b.is_premium);
     const standardAds = businessesList.filter(b => b.package === 'standard' && b.is_premium);

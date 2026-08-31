@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Navbar from "../components/Navbar";
 import Loading from "../components/Loading";
 import { usePageLoading } from "../hooks/usePageLoading";
@@ -16,10 +16,14 @@ import {
   Star,
   Search,
   ArrowRight,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
   Bookmark,
   Eye,
   Tag,
   BadgeCheck,
+  Sparkles,
 } from "lucide-react";
 import "./SmartCity.css";
 // PERBAIKAN: kartu bisnis di halaman ini sebelumnya pakai gaya sendiri
@@ -43,6 +47,13 @@ export default function SmartCity() {
   const [saved, setSaved] = useState({}); // { [businessId]: savedRecordId }
   const [savingIds, setSavingIds] = useState({}); // { [businessId]: true } while in-flight
   const { user: authUser } = useAuth();
+
+  // Carousel iklan Premium khusus desa/kelurahan ini - dipakai state &
+  // pola yang sama persis dengan carousel iklan di Home.jsx supaya
+  // perilakunya konsisten di seluruh situs.
+  const [currentAdIndex, setCurrentAdIndex] = useState(1);
+  const [adTransitionEnabled, setAdTransitionEnabled] = useState(true);
+  const carouselTrackRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -159,6 +170,7 @@ export default function SmartCity() {
   // pencocokannya sekarang exact match, bukan tebak-tebakan lagi.
   const mapBusiness = (b) => ({
     id: b.id,
+    businessId: b.id,
     name: b.title,
     category: b.category?.name || "Lainnya",
     categorySlug: b.category?.slug || "",
@@ -179,6 +191,18 @@ export default function SmartCity() {
   const businessesInThisVillage = approvedBusinesses
     .filter((b) => b.village === city.name)
     .map(mapBusiness);
+
+  // Iklan Premium & Terverifikasi KHUSUS desa/kelurahan ini - dipakai
+  // data ASLI (bisnis Premium aktif yang village-nya = desa ini), bukan
+  // data contoh/dummy. Kalau tidak ada satupun bisnis Premium di desa
+  // ini, kedua section iklan di bawah otomatis disembunyikan (tidak
+  // menampilkan apa-apa), bukan menampilkan data palsu.
+  const villagePremiumBusinesses = businessesInThisVillage.filter((b) => b.isPremium);
+  const villagePremiumAds = villagePremiumBusinesses.slice(0, 1);
+  const villageStandardAds = villagePremiumBusinesses.slice(1);
+  const extendedVillagePremiumAds = villagePremiumAds.length > 0
+    ? [villagePremiumAds[villagePremiumAds.length - 1], ...villagePremiumAds, villagePremiumAds[0]]
+    : [];
 
 
   // PERBAIKAN: sebelumnya kalau desa ini belum punya satu pun bisnis yang
@@ -273,6 +297,144 @@ export default function SmartCity() {
           </div>
         </div>
       </section>
+
+      {/* ── IKLAN: khusus bisnis Premium di desa/kelurahan ini ── */}
+      {/* Section ini sengaja SAMA PERSIS gayanya dengan carousel iklan di
+          Home.jsx (class "premium-ads-..." dan "standard-ads-..."), dan setiap
+          kartunya di-link ke /business/:id bisnis yang sebenarnya -
+          sebelumnya field "businessId" belum ada di sini sama sekali,
+          jadi tidak ada satupun kartu bisnis di halaman SmartCity yang
+          bisa dijadikan iklan yang mengarah dengan benar. Kalau desa ini
+          belum punya bisnis Premium sama sekali, kedua section di bawah
+          otomatis TIDAK ditampilkan (bukan data kosong/dummy). */}
+      {villagePremiumAds.length > 0 && (
+        <section className="premium-ads-section">
+          <div className="premium-ads-carousel">
+            {villagePremiumAds.length > 1 && (
+              <button
+                type="button"
+                className="premium-ads-carousel__nav premium-ads-carousel__nav--prev"
+                onClick={() => { setAdTransitionEnabled(true); setCurrentAdIndex((prev) => prev - 1); }}
+                aria-label="Iklan sebelumnya"
+              >
+                <ChevronLeft size={24} strokeWidth={2.5} />
+              </button>
+            )}
+
+            <div className="premium-ads-carousel__viewport">
+              <div
+                ref={carouselTrackRef}
+                className="premium-ads-carousel__track"
+                style={{
+                  transform: `translateX(-${currentAdIndex * 100}%)`,
+                  transition: adTransitionEnabled ? "transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)" : "none",
+                }}
+                onTransitionEnd={() => {
+                  if (currentAdIndex >= extendedVillagePremiumAds.length - 1) {
+                    setAdTransitionEnabled(false);
+                    setCurrentAdIndex(1);
+                  } else if (currentAdIndex <= 0) {
+                    setAdTransitionEnabled(false);
+                    setCurrentAdIndex(villagePremiumAds.length);
+                  }
+                }}
+              >
+                {extendedVillagePremiumAds.map((ad, index) => (
+                  <div key={`${ad.businessId}-${index}`} className="premium-ad-card">
+                    <div className="premium-ad-card__img-wrap">
+                      <img src={ad.img} alt={ad.name} className="premium-ad-card__img" loading="lazy" />
+                      <div className="premium-ad-card__gradient" />
+                      <div className="premium-ad-card__content">
+                        <div className="premium-ad-card__badge">
+                          <Sparkles size={14} fill="currentColor" />
+                          <span>Sponsored • Premium</span>
+                        </div>
+                        <h2 className="premium-ad-card__name">{ad.name}</h2>
+                        <div className="premium-ad-card__meta">
+                          {ad.rating && (
+                            <span className="premium-ad-card__rating">
+                              <Star size={16} fill="#f59e0b" color="#f59e0b" /> {ad.rating}
+                              {ad.reviewCount != null && <span className="meta-dim"> ({ad.reviewCount} ulasan)</span>}
+                            </span>
+                          )}
+                          <span className="premium-ad-card__location">
+                            <MapPin size={16} /> {city.name}
+                          </span>
+                        </div>
+                        <Link to={`/business/${ad.businessId}`} className="premium-ad-card__btn">
+                          Lihat Profil Usaha <ArrowUpRight size={18} />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {villagePremiumAds.length > 1 && (
+              <button
+                type="button"
+                className="premium-ads-carousel__nav premium-ads-carousel__nav--next"
+                onClick={() => { setAdTransitionEnabled(true); setCurrentAdIndex((prev) => prev + 1); }}
+                aria-label="Iklan berikutnya"
+              >
+                <ChevronRight size={24} strokeWidth={2.5} />
+              </button>
+            )}
+
+            {villagePremiumAds.length > 1 && (
+              <div className="premium-ads-carousel__dots">
+                {villagePremiumAds.map((ad, i) => (
+                  <button
+                    type="button"
+                    key={`dot-${ad.businessId}`}
+                    className={`premium-ads-carousel__dot ${((currentAdIndex - 1 + villagePremiumAds.length) % villagePremiumAds.length) === i ? "active" : ""}`}
+                    onClick={() => { setAdTransitionEnabled(true); setCurrentAdIndex(i + 1); }}
+                    aria-label={`Ke iklan ${i + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {villageStandardAds.length > 0 && (
+        <section className="standard-ads-section">
+          <div className="standard-ads-header">
+            <div className="standard-ads-title">
+              <Sparkles size={16} fill="currentColor" />
+              <span>IKLAN TERVERIFIKASI</span>
+            </div>
+            <div className="standard-ads-subtitle">Mitra Surade.co.id</div>
+          </div>
+
+          <div className="standard-ads-marquee">
+            <div className="standard-ads-marquee__track">
+              {[...villageStandardAds, ...villageStandardAds, ...villageStandardAds, ...villageStandardAds].map((ad, index) => (
+                <Link key={`std-${ad.businessId}-${index}`} to={`/business/${ad.businessId}`} className="standard-ad-card">
+                  <div className="standard-ad-card__img-wrap">
+                    <img src={ad.img} alt={ad.name} className="standard-ad-card__img" loading="lazy" />
+                    <div className="standard-ad-card__badge">Iklan</div>
+                  </div>
+                  <div className="standard-ad-card__content">
+                    <h4 className="standard-ad-card__name">{ad.name}</h4>
+                    <div className="standard-ad-card__meta">
+                      {ad.rating && (
+                        <>
+                          <span className="standard-ad-card__rating"><Star size={12} fill="#f59e0b" color="#f59e0b"/> {ad.rating}</span>
+                          <span className="standard-ad-card__dot">•</span>
+                        </>
+                      )}
+                      <span className="standard-ad-card__location"><MapPin size={12}/> {city.name}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Content Section */}
       <section className="sc-content">

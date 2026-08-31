@@ -365,7 +365,7 @@ class AuthController extends Controller
         }
 
         // Record successful login and reset failed attempts
-        SecurityHelper::recordSuccessfulLogin($request);
+        SecurityHelper::clearFailedLoginAttempts($request);
 
         // Generate secure token
         $token = $user->createToken('auth_token')->plainTextToken;
