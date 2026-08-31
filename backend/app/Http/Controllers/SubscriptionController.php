@@ -4,23 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\Business;
 use App\Models\Subscription;
+use App\Services\SubscriptionLifecycleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
 
 class SubscriptionController extends Controller
 {
-    // Plan definitions: id => [label, days, price]
-    private const PLANS = [
-        'monthly'   => ['label' => '1 Bulan', 'days' => 30,  'amount' => 49000],
-        'quarterly' => ['label' => '3 Bulan', 'days' => 90,  'amount' => 129000],
-        'yearly'    => ['label' => '12 Bulan', 'days' => 365, 'amount' => 449000],
-    ];
+    protected SubscriptionLifecycleService $lifecycleService;
 
-    public function plans()
+    public function __construct(SubscriptionLifecycleService $lifecycleService)
     {
-        return response()->json(self::PLANS);
+        $this->lifecycleService = $lifecycleService;
     }
 
     // List invoices: user sees their own, admin sees all
@@ -36,8 +31,7 @@ class SubscriptionController extends Controller
     }
 
     // User berlangganan premium untuk salah satu bisnisnya.
-    // Tidak langsung aktif - status jadi 'pending' sampai admin verifikasi
-    // bukti pembayarannya lewat verify().
+    // Now uses SubscriptionLifecycleService for enhanced processing
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -45,6 +39,8 @@ class SubscriptionController extends Controller
             'plan' => 'required|string|in:monthly,quarterly,yearly',
             'payment_method' => 'required|string|in:dana,bni,bca',
             'proof' => 'required|image|max:5120', // max 5MB
+            'referral_code' => 'sometimes|string|max:20',
+            'notes' => 'sometimes|string|max:500'
         ]);
 
         if ($validator->fails()) {
@@ -57,25 +53,32 @@ class SubscriptionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $plan = self::PLANS[$request->plan];
+        // Store proof file
         $proofPath = $request->file('proof')->store('payment-proofs', 'public');
 
-        $subscription = Subscription::create([
-            'invoice_number' => 'INV-' . strtoupper(Str::random(8)),
-            'user_id' => $request->user()->id,
-            'business_id' => $business->id,
+        $subscriptionData = [
             'plan' => $request->plan,
-            'duration_days' => $plan['days'],
-            'amount' => $plan['amount'],
             'payment_method' => $request->payment_method,
-            'notes' => $request->input('notes'),
             'proof_path' => $proofPath,
-            'status' => 'pending',
-        ]);
+            'referral_code' => $request->input('referral_code'),
+            'notes' => $request->input('notes')
+        ];
 
-        return response()->json([
-            'subscription' => $subscription,
-        ], 201);
+        $result = $this->lifecycleService->createSubscription(
+            $request->user(),
+            $business,
+            $subscriptionData
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'message' => $result['message'],
+                'error' => $result['error'],
+                'details' => $result['details'] ?? null
+            ], 400);
+        }
+
+        return response()->json($result, 201);
     }
 
     public function show(Request $request, $id)
@@ -94,6 +97,7 @@ class SubscriptionController extends Controller
     }
 
     // Admin: menyetujui bukti pembayaran -> baru sekarang premium bisnisnya diaktifkan.
+    // Now uses SubscriptionLifecycleService for proper activation
     public function verify(Request $request, $id)
     {
         if ($request->user()->role !== 'admin') {
@@ -110,33 +114,16 @@ class SubscriptionController extends Controller
             return response()->json(['message' => 'Invoice ini sudah diproses sebelumnya.'], 422);
         }
 
-        $business = $subscription->business;
+        $result = $this->lifecycleService->activateSubscription($subscription, $request->user());
 
-        // Extend from current expiry if still active, otherwise start from now
-        $start = ($business->premium_expires_at && $business->premium_expires_at->isFuture())
-            ? $business->premium_expires_at
-            : Carbon::now();
+        if (!$result['success']) {
+            return response()->json([
+                'message' => $result['message'],
+                'error' => $result['error']
+            ], 400);
+        }
 
-        $expiresAt = (clone $start)->addDays($subscription->duration_days);
-
-        $subscription->update([
-            'status' => 'paid',
-            'starts_at' => Carbon::now(),
-            'expires_at' => $expiresAt,
-            'verified_by' => $request->user()->id,
-            'verified_at' => Carbon::now(),
-        ]);
-
-        $business->update([
-            'is_premium' => true,
-            'premium_expires_at' => $expiresAt,
-            'premium_plan' => $subscription->plan,
-        ]);
-
-        return response()->json([
-            'subscription' => $subscription->fresh(),
-            'business' => $business->fresh(),
-        ]);
+        return response()->json($result);
     }
 
     // Admin: menolak bukti pembayaran (misalnya nominal tidak sesuai / bukti tidak jelas).
@@ -164,5 +151,262 @@ class SubscriptionController extends Controller
         ]);
 
         return response()->json($subscription->fresh());
+    }
+
+    /**
+     * Cancel subscription with lifecycle management
+     */
+    public function cancel(Request $request, $id)
+    {
+        $subscription = Subscription::find($id);
+
+        if (!$subscription) {
+            return response()->json(['message' => 'Subscription not found'], 404);
+        }
+
+        // Check authorization
+        if ($subscription->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if (!$subscription->canBeCancelled()) {
+            return response()->json([
+                'message' => 'Subscription tidak dapat dibatalkan',
+                'current_status' => $subscription->status
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'reason' => 'sometimes|string|max:500'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $result = $this->lifecycleService->cancelSubscription(
+            $subscription,
+            $request->user(),
+            $request->input('reason')
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'message' => $result['message'],
+                'error' => $result['error']
+            ], 400);
+        }
+
+        return response()->json($result);
+    }
+
+    /**
+     * Renew expired subscription
+     */
+    public function renew(Request $request, $id)
+    {
+        $expiredSubscription = Subscription::find($id);
+
+        if (!$expiredSubscription) {
+            return response()->json(['message' => 'Subscription not found'], 404);
+        }
+
+        // Check authorization
+        if ($expiredSubscription->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if (!$expiredSubscription->canBeRenewed()) {
+            return response()->json([
+                'message' => 'Subscription tidak dapat diperpanjang',
+                'current_status' => $expiredSubscription->status
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'plan' => 'required|string|in:monthly,quarterly,yearly',
+            'payment_method' => 'required|string|in:dana,bni,bca',
+            'proof' => 'required|image|max:5120',
+            'referral_code' => 'sometimes|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Store proof file
+        $proofPath = $request->file('proof')->store('payment-proofs', 'public');
+
+        $renewalData = [
+            'plan' => $request->plan,
+            'payment_method' => $request->payment_method,
+            'proof_path' => $proofPath,
+            'referral_code' => $request->input('referral_code'),
+            'notes' => $request->input('notes')
+        ];
+
+        $result = $this->lifecycleService->renewSubscription($expiredSubscription, $renewalData);
+
+        if (!$result['success']) {
+            return response()->json([
+                'message' => $result['message'],
+                'error' => $result['error']
+            ], 400);
+        }
+
+        return response()->json($result, 201);
+    }
+
+    /**
+     * Get subscription analytics for user
+     */
+    public function analytics(Request $request)
+    {
+        $user = $request->user();
+        $businessId = $request->query('business_id');
+        
+        $business = null;
+        if ($businessId) {
+            $business = Business::find($businessId);
+            if (!$business || $business->user_id !== $user->id) {
+                return response()->json(['message' => 'Business not found or unauthorized'], 404);
+            }
+        }
+
+        $analytics = $this->lifecycleService->getSubscriptionAnalytics($user, $business);
+
+        return response()->json([
+            'analytics' => $analytics,
+            'user_info' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'is_premium' => $user->hasActivePremiumBusiness()
+            ],
+            'business_info' => $business ? [
+                'id' => $business->id,
+                'title' => $business->title,
+                'is_premium' => $business->is_premium_active
+            ] : null
+        ]);
+    }
+
+    /**
+     * Get subscription lifecycle details
+     */
+    public function lifecycle(Request $request, $id)
+    {
+        $subscription = Subscription::with([
+            'business', 'user', 'cancelledBy', 'renewedBySubscription', 'renewalSubscriptions'
+        ])->find($id);
+
+        if (!$subscription) {
+            return response()->json(['message' => 'Subscription not found'], 404);
+        }
+
+        // Check authorization
+        if ($subscription->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json([
+            'subscription' => $subscription,
+            'lifecycle_status' => [
+                'is_active' => $subscription->isActive(),
+                'is_expired' => $subscription->isExpired(),
+                'is_cancelled' => $subscription->isCancelled(),
+                'is_renewed' => $subscription->isRenewed(),
+                'can_be_cancelled' => $subscription->canBeCancelled(),
+                'can_be_renewed' => $subscription->canBeRenewed(),
+                'days_until_expiration' => $subscription->getDaysUntilExpiration(),
+                'usage_days' => $subscription->getUsageDays(),
+                'refund_eligibility' => $subscription->getRefundEligibility()
+            ],
+            'lifecycle_events' => $subscription->lifecycle_events ?? [],
+            'related_subscriptions' => [
+                'renewed_from' => $subscription->renewedBySubscription,
+                'renewed_to' => $subscription->renewalSubscriptions
+            ]
+        ]);
+    }
+
+    /**
+     * Get subscription plans with enhanced details
+     */
+    public function plans()
+    {
+        return response()->json([
+            'plans' => SubscriptionLifecycleService::PREMIUM_PLANS,
+            'features_comparison' => [
+                'free' => [
+                    'businesses' => 1,
+                    'photos_per_business' => 3,
+                    'menu_items_per_business' => 10,
+                    'announcements_per_business' => 2,
+                    'videos_per_business' => 0,
+                    'priority_listing' => false,
+                    'advanced_analytics' => false,
+                    'booking_system' => false
+                ],
+                'premium' => [
+                    'businesses' => 'unlimited',
+                    'photos_per_business' => 'unlimited',
+                    'menu_items_per_business' => 'unlimited',
+                    'announcements_per_business' => 'unlimited',
+                    'videos_per_business' => 'unlimited',
+                    'priority_listing' => true,
+                    'advanced_analytics' => true,
+                    'booking_system' => true
+                ]
+            ],
+            'policies' => [
+                'refund_policy' => 'Full refund within 7 days of activation',
+                'cancellation_policy' => 'Cancel anytime, no questions asked',
+                'renewal_policy' => 'Auto-renewal available, manual renewal supported'
+            ]
+        ]);
+    }
+
+    /**
+     * Check expiring subscriptions (Admin only)
+     */
+    public function checkExpiring(Request $request)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $days = $request->query('days', 7); // Default to 7 days
+        
+        $expiringSubscriptions = Subscription::with(['business', 'user'])
+            ->expiringWithin($days)
+            ->get();
+
+        return response()->json([
+            'expiring_subscriptions' => $expiringSubscriptions,
+            'count' => $expiringSubscriptions->count(),
+            'days_ahead' => $days,
+            'summary' => [
+                'expiring_in_1_day' => $expiringSubscriptions->filter(fn($s) => $s->getDaysUntilExpiration() <= 1)->count(),
+                'expiring_in_3_days' => $expiringSubscriptions->filter(fn($s) => $s->getDaysUntilExpiration() <= 3)->count(),
+                'expiring_in_7_days' => $expiringSubscriptions->filter(fn($s) => $s->getDaysUntilExpiration() <= 7)->count()
+            ]
+        ]);
+    }
+
+    /**
+     * Process expired subscriptions manually (Admin only)
+     */
+    public function processExpired(Request $request)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $result = $this->lifecycleService->processExpiredSubscriptions();
+
+        return response()->json([
+            'message' => 'Expired subscriptions processed successfully',
+            'result' => $result
+        ]);
     }
 }

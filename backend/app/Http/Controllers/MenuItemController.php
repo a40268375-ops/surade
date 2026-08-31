@@ -4,11 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\Business;
 use App\Models\MenuItem;
+use App\Services\PremiumFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class MenuItemController extends Controller
 {
+    protected $premiumService;
+
+    public function __construct(PremiumFeatureService $premiumService)
+    {
+        $this->premiumService = $premiumService;
+    }
     // Publik: menu sebuah bisnis lewat ?business_id=. Login tanpa filter:
     // menu milik bisnis-bisnisnya sendiri (admin: semua menu).
     public function index(Request $request)
@@ -48,6 +55,21 @@ class MenuItemController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        // Check premium limits for menu items
+        $canAdd = $this->premiumService->canPerformAction($user, 'add_menu_item', $business);
+        if (!$canAdd['allowed']) {
+            return response()->json([
+                'message' => $canAdd['reason'] === 'limit_exceeded' 
+                    ? "Batas maksimal menu item untuk akun gratis adalah {$canAdd['limit']} item. Upgrade ke Premium untuk menu unlimited!"
+                    : 'Premium subscription required untuk menambah menu item.',
+                'error' => 'PREMIUM_LIMIT_EXCEEDED',
+                'feature' => $canAdd['feature'] ?? 'unlimited_menu_items',
+                'current_count' => $canAdd['current'] ?? null,
+                'limit' => $canAdd['limit'] ?? null,
+                'upgrade_url' => '/dashboard?tab=premium'
+            ], 403);
+        }
+
         $data = $request->only(['business_id', 'name', 'description', 'price']);
 
         if ($request->hasFile('image')) {
@@ -56,7 +78,14 @@ class MenuItemController extends Controller
 
         $menuItem = MenuItem::create($data);
 
-        return response()->json($menuItem->load('business'), 201);
+        // Return with usage stats for frontend
+        $response = $menuItem->load('business');
+        if (!$business->is_premium_active) {
+            $stats = $this->premiumService->getUserUsageStats($user);
+            $response->usage_stats = $stats['businesses_detail'][$business->id]['menu_items'] ?? null;
+        }
+
+        return response()->json($response, 201);
     }
 
     public function update(Request $request, $id)

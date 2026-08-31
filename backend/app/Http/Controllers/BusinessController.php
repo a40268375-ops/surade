@@ -3,6 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Business;
+use App\Http\Requests\BusinessStoreRequest;
+use App\Http\Requests\BusinessUpdateRequest;
+use App\Http\Requests\ReviewStoreRequest;
+use App\Http\Helpers\SecurityHelper;
+use App\Services\PremiumFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -12,6 +17,13 @@ class BusinessController extends Controller
     // Jumlah maksimal bisnis yang boleh dimiliki akun non-premium (gratis).
     // Lihat pemakaiannya di store().
     const FREE_BUSINESS_LIMIT = 1;
+
+    protected $premiumService;
+
+    public function __construct(PremiumFeatureService $premiumService)
+    {
+        $this->premiumService = $premiumService;
+    }
 
     /**
      * Ulasan bisnis terbaru buat widget "Ulasan Terbaru" di halaman Dasbor.
@@ -105,8 +117,21 @@ class BusinessController extends Controller
             }
         }
 
-        // Premium first
-        $businesses = $query->orderBy('is_premium', 'desc')->orderBy('created_at', 'desc')->get();
+        // Enhanced priority listing for premium businesses
+        $query = $this->applyPriorityListingSort($query, $request);
+        
+        // Add pagination support
+        $perPage = $request->get('per_page', 15); // Default 15 items per page
+        $perPage = min($perPage, 50); // Maximum 50 items per page
+        
+        $businesses = $query->paginate($perPage);
+
+        // Add priority indicators to response for frontend
+        $businesses->getCollection()->transform(function ($business) {
+            $business->priority_score = $this->calculatePriorityScore($business);
+            $business->is_boosted = $business->is_premium_active;
+            return $business;
+        });
 
         return response()->json($businesses);
     }
@@ -114,71 +139,153 @@ class BusinessController extends Controller
     public function myBusinesses(Request $request)
     {
         $user = $request->user();
-        $businesses = Business::with('category')->where('user_id', $user->id)->get();
+        $perPage = $request->get('per_page', 15); // Default 15 items per page
+        $perPage = min($perPage, 50); // Maximum 50 items per page
+        
+        $businesses = Business::with('category')->where('user_id', $user->id)->paginate($perPage);
         return response()->json($businesses);
     }
 
-    public function store(Request $request)
+    /**
+     * Apply sophisticated priority listing for premium businesses
+     */
+    private function applyPriorityListingSort($query, Request $request)
     {
-        if ($request->has('category_id') && !is_numeric($request->input('category_id'))) {
-            $catId = $request->input('category_id');
-            if (!empty($catId)) {
-                $cat = \App\Models\Category::firstOrCreate(
-                    ['name' => $catId],
-                    ['slug' => \Illuminate\Support\Str::slug($catId), 'icon' => 'tag']
-                );
-                $request->merge(['category_id' => $cat->id]);
-            }
+        // For search queries, use relevance-based priority scoring
+        if ($request->has('q') && !empty($request->q)) {
+            return $this->applySortByRelevanceAndPriority($query, $request->q);
         }
+        
+        // For category/location browsing, use engagement-based priority
+        return $this->applySortByEngagementAndPriority($query);
+    }
 
-        $validator = Validator::make($request->all(), [
-            'category_id' => 'required',
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'address' => 'required|string',
-            'village' => 'nullable|string',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'phone' => 'required|string',
-            'email' => 'nullable|email',
-            'operating_hours' => 'nullable|string',
-            'closed_days' => 'nullable|array',
-            'closed_days.*' => 'string',
-            'price_category' => 'nullable|integer|in:1,2,3',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string',
-            'website' => 'nullable|string',
-            'video_url' => 'nullable|string',
-            'video' => 'nullable|file|mimetypes:video/mp4,video/webm,video/quicktime|max:20480',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
-            'referred_by' => 'nullable|string',
-            'package' => 'nullable|string|in:Gratis,Bisnis,Premium',
+    /**
+     * Sort by search relevance with premium boost
+     */
+    private function applySortByRelevanceAndPriority($query, string $searchTerm)
+    {
+        return $query->orderByRaw("
+            CASE 
+                WHEN is_premium = 1 AND premium_expires_at > NOW() THEN
+                    CASE
+                        WHEN title LIKE ? THEN 1000
+                        WHEN description LIKE ? THEN 800
+                        WHEN address LIKE ? THEN 600
+                        ELSE 500
+                    END
+                WHEN title LIKE ? THEN 400
+                WHEN description LIKE ? THEN 200
+                WHEN address LIKE ? THEN 100
+                ELSE 0
+            END DESC,
+            is_premium DESC,
+            rating DESC,
+            created_at DESC
+        ", [
+            "%{$searchTerm}%", "%{$searchTerm}%", "%{$searchTerm}%", // Premium matches
+            "%{$searchTerm}%", "%{$searchTerm}%", "%{$searchTerm}%"  // Regular matches
         ]);
+    }
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+    /**
+     * Sort by engagement metrics with premium boost
+     */
+    private function applySortByEngagementAndPriority($query)
+    {
+        return $query
+            ->leftJoin('business_reviews', 'businesses.id', '=', 'business_reviews.business_id')
+            ->selectRaw('businesses.*, 
+                COALESCE(AVG(business_reviews.rating), 0) as avg_rating,
+                COUNT(business_reviews.id) as review_count,
+                CASE 
+                    WHEN businesses.is_premium = 1 AND businesses.premium_expires_at > NOW() THEN
+                        (COALESCE(AVG(business_reviews.rating), 3) * 20) + 
+                        (COUNT(business_reviews.id) * 5) + 
+                        (DATEDIFF(NOW(), businesses.created_at) * -0.1) + 1000
+                    ELSE
+                        (COALESCE(AVG(business_reviews.rating), 3) * 10) + 
+                        (COUNT(business_reviews.id) * 2) + 
+                        (DATEDIFF(NOW(), businesses.created_at) * -0.05)
+                END as priority_score')
+            ->groupBy('businesses.id')
+            ->orderBy('priority_score', 'desc')
+            ->orderBy('businesses.created_at', 'desc');
+    }
+
+    /**
+     * Calculate priority score for a business (for frontend display)
+     */
+    private function calculatePriorityScore($business): array
+    {
+        $score = 0;
+        $factors = [];
+
+        // Premium boost
+        if ($business->is_premium_active) {
+            $score += 1000;
+            $factors[] = 'Premium listing boost (+1000)';
         }
 
-        // ── Batas paket gratis ──────────────────────────────────────────
-        // User yang belum premium (tidak punya satu pun bisnis is_premium
-        // aktif) cuma boleh punya maksimal FREE_BUSINESS_LIMIT bisnis
-        // terdaftar. Untuk daftar bisnis tambahan, salah satu bisnisnya
-        // harus di-upgrade ke Premium dulu (lihat tab "Premium & Invoice").
-        // Admin tidak kena batasan ini.
-        if ($request->user()->role !== 'admin') {
-            $ownedBusinessCount = Business::where('user_id', $request->user()->id)->count();
-            $hasActivePremium = Business::where('user_id', $request->user()->id)
-                ->where('is_premium', true)
-                ->get()
-                ->contains(fn ($b) => $b->is_premium_active);
+        // Rating boost
+        if ($business->rating > 0) {
+            $ratingBoost = $business->rating * ($business->is_premium_active ? 20 : 10);
+            $score += $ratingBoost;
+            $factors[] = "Rating boost ({$business->rating}★ = +{$ratingBoost})";
+        }
 
-            if (!$hasActivePremium && $ownedBusinessCount >= self::FREE_BUSINESS_LIMIT) {
-                return response()->json([
-                    'message' => "Akun gratis maksimal punya " . self::FREE_BUSINESS_LIMIT . " bisnis terdaftar. Upgrade salah satu bisnis kamu ke Premium untuk bisa menambah bisnis lain.",
-                    'code' => 'FREE_LIMIT_REACHED',
-                ], 403);
+        // Review count boost
+        $reviewBoost = $business->reviews_count * ($business->is_premium_active ? 5 : 2);
+        if ($reviewBoost > 0) {
+            $score += $reviewBoost;
+            $factors[] = "Review count boost ({$business->reviews_count} reviews = +{$reviewBoost})";
+        }
+
+        // Recency factor (newer businesses get slight boost)
+        $daysOld = $business->created_at->diffInDays(now());
+        $recencyPenalty = $daysOld * ($business->is_premium_active ? -0.1 : -0.05);
+        $score += $recencyPenalty;
+        if ($recencyPenalty < -10) {
+            $factors[] = "Age factor ({$daysOld} days = {$recencyPenalty})";
+        }
+
+        // Complete profile bonus (premium only)
+        if ($business->is_premium_active) {
+            $profileBonus = 0;
+            $images = is_array($business->images) ? $business->images : (is_string($business->images) ? json_decode($business->images, true) : []);
+            if ($images && is_array($images) && count($images) >= 3) $profileBonus += 50;
+            if ($business->description && strlen($business->description) > 100) $profileBonus += 30;
+            if ($business->operating_hours) $profileBonus += 20;
+            if ($business->video_url) $profileBonus += 100;
+            
+            if ($profileBonus > 0) {
+                $score += $profileBonus;
+                $factors[] = "Complete profile bonus (+{$profileBonus})";
             }
+        }
+
+        return [
+            'total_score' => round($score, 1),
+            'factors' => $factors,
+            'is_premium_boosted' => $business->is_premium_active
+        ];
+    }
+
+    public function store(BusinessStoreRequest $request)
+    {
+        // Check business creation limits using PremiumFeatureService
+        $canCreate = $this->premiumService->canPerformAction($request->user(), 'create_business');
+        if (!$canCreate['allowed']) {
+            return response()->json([
+                'message' => $canCreate['reason'] === 'limit_exceeded' 
+                    ? "Akun gratis maksimal punya {$canCreate['limit']} bisnis terdaftar. Upgrade salah satu bisnis kamu ke Premium untuk bisa menambah bisnis lain."
+                    : 'Premium subscription required untuk membuat bisnis tambahan.',
+                'error' => 'BUSINESS_LIMIT_EXCEEDED',
+                'code' => 'FREE_LIMIT_REACHED',
+                'current_count' => $canCreate['current'] ?? null,
+                'limit' => $canCreate['limit'] ?? null,
+                'upgrade_url' => '/dashboard?tab=premium'
+            ], 403);
         }
 
         $data = $request->except(['image', 'images', 'video']);
@@ -198,30 +305,64 @@ class BusinessController extends Controller
             $data['image'] = '/storage/' . $path;
         }
 
+        // Handle multiple images with premium limits
         if ($request->hasFile('images')) {
-            $galleryPaths = [];
-            foreach ($request->file('images') as $file) {
-                $galleryPaths[] = '/storage/' . $file->store('businesses', 'public');
+            $uploadedImages = [];
+            $maxImages = $request->user()->hasActivePremiumBusiness() ? null : 3;
+            
+            foreach ($request->file('images') as $index => $file) {
+                if ($maxImages && $index >= $maxImages) {
+                    break; // Stop at free limit
+                }
+                $uploadedImages[] = '/storage/' . $file->store('businesses', 'public');
             }
-            $data['images'] = $galleryPaths;
+            $data['images'] = $uploadedImages;
+            
+            // Notify if some images were skipped due to limits
+            if ($maxImages && count($request->file('images')) > $maxImages) {
+                $data['_image_limit_notice'] = "Hanya {$maxImages} foto pertama yang diupload. Upgrade ke Premium untuk foto unlimited!";
+            }
         }
 
-        // Video: kalau ada file video yang diunggah langsung, itu yang dipakai
-        // (path storage-nya disimpan di kolom video_url yang sama), timpa link
-        // video_url dari teks kalau ada dua-duanya.
+        // Video: only for premium users
         if ($request->hasFile('video')) {
-            $videoPath = $request->file('video')->store('businesses/videos', 'public');
-            $data['video_url'] = '/storage/' . $videoPath;
+            $canUploadVideo = $this->premiumService->canPerformAction($request->user(), 'upload_video');
+            if ($canUploadVideo['allowed']) {
+                $videoPath = $request->file('video')->store('businesses/videos', 'public');
+                $data['video_url'] = '/storage/' . $videoPath;
+            } else {
+                return response()->json([
+                    'message' => 'Upload video hanya tersedia untuk pengguna Premium. Upgrade sekarang untuk fitur video showcase!',
+                    'error' => 'PREMIUM_REQUIRED',
+                    'feature' => 'video_showcase',
+                    'upgrade_url' => '/dashboard?tab=premium'
+                ], 403);
+            }
         }
 
         $business = Business::create($data);
+
+        // Log security event
+        SecurityHelper::logSecurityEvent('business_created', [
+            'business_id' => $business->id,
+            'user_id' => $request->user()->id,
+            'business_title' => $business->title,
+            'package' => $data['package'],
+            'ip' => $request->ip()
+        ]);
 
         // Create notification for admin about new business
         if ($request->user()->role !== 'admin') {
             \App\Http\Controllers\NotificationController::notifyAdminNewBusiness($business);
         }
 
-        return response()->json($business->load('category'), 201);
+        // Add usage stats to response for free users
+        $response = $business->load('category');
+        if (!$request->user()->hasActivePremiumBusiness()) {
+            $response->usage_stats = $this->premiumService->getUserUsageStats($request->user());
+        }
+
+        return response()->json($response, 201);
     }
 
     public function show($id)
@@ -235,7 +376,7 @@ class BusinessController extends Controller
         return response()->json($business);
     }
 
-    public function update(Request $request, $id)
+    public function update(BusinessUpdateRequest $request, $id)
     {
         $business = Business::find($id);
         
@@ -248,64 +389,36 @@ class BusinessController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($request->has('category_id') && !is_numeric($request->input('category_id'))) {
-            $catId = $request->input('category_id');
-            if (!empty($catId)) {
-                $cat = \App\Models\Category::firstOrCreate(
-                    ['name' => $catId],
-                    ['slug' => \Illuminate\Support\Str::slug($catId), 'icon' => 'tag']
-                );
-                $request->merge(['category_id' => $cat->id]);
-            }
-        }
-
-        $validator = Validator::make($request->all(), [
-            'category_id' => 'sometimes|required',
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'sometimes|required|string',
-            'address' => 'sometimes|required|string',
-            'village' => 'nullable|string',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'phone' => 'sometimes|required|string',
-            'email' => 'nullable|email',
-            'operating_hours' => 'nullable|string',
-            'closed_days' => 'nullable|array',
-            'closed_days.*' => 'string',
-            'price_category' => 'nullable|integer|in:1,2,3',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string',
-            'website' => 'nullable|string',
-            'video_url' => 'nullable|string',
-            'video' => 'nullable|file|mimetypes:video/mp4,video/webm,video/quicktime|max:20480',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // could be a new uploaded file
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
-            'remove_gallery' => 'nullable|array',
-            'remove_gallery.*' => 'string',
-            'is_premium' => 'nullable|boolean',
-            'status' => 'nullable|string|in:pending,approved,rejected',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $data = $request->except(['image', 'images', 'remove_gallery', 'video']);
+        $data = $request->except(['image', 'images', 'remove_gallery', 'video', 'remove_images', 'remove_logo']);
 
         if ($request->hasFile('image')) {
             // Delete old image if exists
             if ($business->image) {
-                $oldPath = str_replace('/storage/', '', $business->image);
-                Storage::disk('public')->delete($oldPath);
+                Storage::disk('public')->delete(str_replace('/storage/', '', $business->image));
             }
             $path = $request->file('image')->store('businesses', 'public');
             $data['image'] = '/storage/' . $path;
+        } elseif ($request->boolean('remove_logo')) {
+            if ($business->image) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $business->image));
+                $data['image'] = null;
+            }
         }
 
         // Video: file yang diunggah langsung menang atas link teks, dan
         // video lama (kalau berupa file storage, bukan link eksternal)
         // dihapus supaya tidak menumpuk sampah di server.
         if ($request->hasFile('video')) {
+            $canUploadVideo = $this->premiumService->canPerformAction($request->user(), 'upload_video', $business);
+            if (!$canUploadVideo['allowed']) {
+                return response()->json([
+                    'message' => 'Upload video hanya tersedia untuk pengguna Premium. Upgrade sekarang untuk fitur video showcase!',
+                    'error' => 'PREMIUM_REQUIRED',
+                    'feature' => 'video_showcase',
+                    'upgrade_url' => '/dashboard?tab=premium'
+                ], 403);
+            }
+            
             if ($business->video_url && str_starts_with($business->video_url, '/storage/')) {
                 Storage::disk('public')->delete(str_replace('/storage/', '', $business->video_url));
             }
@@ -313,19 +426,42 @@ class BusinessController extends Controller
             $data['video_url'] = '/storage/' . $videoPath;
         }
 
-        // Start from the existing gallery, drop any paths the user asked to
-        // remove, then append any newly-uploaded files.
+        // Handle new images with premium limits
         $gallery = $business->images ?? [];
-        if ($request->has('remove_gallery')) {
-            $toRemove = $request->input('remove_gallery', []);
+        if ($request->has('remove_images')) {
+            $toRemove = $request->input('remove_images', []);
             foreach ($toRemove as $removePath) {
-                Storage::disk('public')->delete(str_replace('/storage/', '', $removePath));
+                if (str_starts_with($removePath, '/storage/')) {
+                    Storage::disk('public')->delete(str_replace('/storage/', '', $removePath));
+                }
             }
             $gallery = array_values(array_diff($gallery, $toRemove));
         }
+        
         if ($request->hasFile('images')) {
+            $canUploadPhotos = $this->premiumService->canPerformAction($request->user(), 'upload_photos', $business);
+            if (!$canUploadPhotos['allowed']) {
+                return response()->json([
+                    'message' => $canUploadPhotos['reason'] === 'limit_exceeded'
+                        ? "Batas maksimal foto untuk akun gratis adalah {$canUploadPhotos['limit']} foto. Upgrade ke Premium untuk foto unlimited!"
+                        : 'Premium subscription required untuk upload foto.',
+                    'error' => 'PHOTO_LIMIT_EXCEEDED',
+                    'feature' => 'unlimited_photos',
+                    'current_count' => $canUploadPhotos['current'] ?? null,
+                    'limit' => $canUploadPhotos['limit'] ?? null,
+                    'upgrade_url' => '/dashboard?tab=premium'
+                ], 403);
+            }
+            
+            $maxPhotos = $business->is_premium_active ? null : 3;
+            $currentCount = count($gallery);
+            
             foreach ($request->file('images') as $file) {
+                if ($maxPhotos && $currentCount >= $maxPhotos) {
+                    break; // Stop at free limit
+                }
                 $gallery[] = '/storage/' . $file->store('businesses', 'public');
+                $currentCount++;
             }
         }
         $data['images'] = $gallery;
@@ -336,7 +472,17 @@ class BusinessController extends Controller
             unset($data['is_premium']);
         }
 
+        $originalData = $business->toArray();
         $business->update($data);
+
+        // Log security event with changes
+        SecurityHelper::logSecurityEvent('business_updated', [
+            'business_id' => $business->id,
+            'user_id' => $request->user()->id,
+            'business_title' => $business->title,
+            'changes' => array_diff_assoc($data, $originalData),
+            'ip' => $request->ip()
+        ]);
 
         return response()->json($business->load('category'));
     }
