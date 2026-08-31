@@ -1,0 +1,172 @@
+/* ====================================
+   RESPONSIVE TABLE COMPONENT STYLES
+   ==================================== */
+
+.responsive-table-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.responsive-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.responsive-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.responsive-table-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.responsive-table-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.responsive-table-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.table-scroll-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.table-scroll-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #475569;
+}
+
+.table-scroll-btn:hover:not(.disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.table-scroll-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.table-scroll-indicator {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.table-pagination-info {
+  font-weight: 500;
+}
+
+/* Mobile specific styles */
+@media (max-width: 768px) {
+  .responsive-table-container {
+    border-radius: 0;
+  }
+  
+  .table-scroll-controls {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .table-scroll-btn {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .table-pagination {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .table-scroll-controls {
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+  }
+  
+  .table-scroll-indicator {
+    text-align: center;
+    order: -1;
+    margin-bottom: 4px;
+  }
+  
+  .table-scroll-controls > div {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+}
+
+/* Enhanced table responsiveness */
+.responsive-table-wrapper .db-table {
+  min-width: 100%;
+  margin-bottom: 0;
+}
+
+.responsive-table-wrapper .db-table th,
+.responsive-table-wrapper .db-table td {
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.responsive-table-wrapper .db-table th:first-child,
+.responsive-table-wrapper .db-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #ffffff;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .responsive-table-wrapper .db-table th,
+  .responsive-table-wrapper .db-table td {
+    min-width: 100px;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  
+  .responsive-table-wrapper .db-table th:first-child,
+  .responsive-table-wrapper .db-table td:first-child {
+    min-width: 120px;
+  }
+}

@@ -1,0 +1,105 @@
+/* ====================================
+   ADAPTIVE GRID COMPONENT STYLES
+   ==================================== */
+
+.adaptive-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--grid-columns), 1fr);
+  gap: var(--grid-gap);
+  width: 100%;
+}
+
+/* Fallback for browsers that don't support CSS custom properties */
+.adaptive-grid {
+  grid-template-columns: repeat(auto-fit, minmax(var(--grid-min-width), 1fr));
+}
+
+.adaptive-grid-item {
+  grid-column: span var(--item-span, 1);
+  min-width: 0; /* Prevent grid blowout */
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 480px) {
+  .adaptive-grid {
+    grid-template-columns: 1fr;
+    gap: calc(var(--grid-gap) * 0.75);
+  }
+  
+  .adaptive-grid-item {
+    grid-column: span 1;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .adaptive-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: calc(var(--grid-gap) * 0.85);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .adaptive-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--grid-gap);
+  }
+}
+
+/* Enhanced grid for specific use cases */
+.adaptive-grid--stats {
+  --grid-gap: 16px;
+}
+
+.adaptive-grid--cards {
+  --grid-gap: 20px;
+  --grid-min-width: 280px;
+}
+
+.adaptive-grid--compact {
+  --grid-gap: 12px;
+  --grid-min-width: 200px;
+}
+
+/* Grid item variants */
+.adaptive-grid-item--featured {
+  grid-column: span 2;
+}
+
+.adaptive-grid-item--full {
+  grid-column: 1 / -1;
+}
+
+.adaptive-grid-item--half {
+  grid-column: span 1;
+}
+
+/* Mobile adjustments for variants */
+@media (max-width: 768px) {
+  .adaptive-grid-item--featured,
+  .adaptive-grid-item--half {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Animation support */
+.adaptive-grid-item {
+  animation: gridItemFadeIn 0.3s ease-out;
+}
+
+@keyframes gridItemFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Touch-friendly spacing on mobile */
+@media (hover: none) and (pointer: coarse) {
+  .adaptive-grid {
+    gap: max(var(--grid-gap), 16px);
+  }
+}
