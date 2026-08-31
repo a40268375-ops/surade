@@ -13,7 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'business.owner' => \App\Http\Middleware\BusinessOwnerMiddleware::class,
+            'premium' => \App\Http\Middleware\PremiumMiddleware::class,
+            'premium.analytics' => \App\Http\Middleware\PremiumAnalyticsMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API-only app: there is no 'login' web route to redirect to.

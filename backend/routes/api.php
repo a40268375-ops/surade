@@ -28,6 +28,8 @@ use App\Http\Controllers\PremiumHistoryController;
 use App\Http\Controllers\BusinessReportController;
 use App\Http\Controllers\PlatformCouponController;
 use App\Http\Controllers\SiteSettingController;
+use App\Http\Controllers\PremiumController;
+use App\Http\Controllers\UnifiedPaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -156,10 +158,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('profile', [AuthController::class, 'profile']);
 
     // Grafik tren kunjungan (admin: seluruh platform, user: bisnis miliknya)
+    // Grafik tren kunjungan (admin: seluruh platform, user: bisnis miliknya)
     Route::get('analytics/weekly', [AnalyticsController::class, 'weekly']);
     Route::get('analytics/my-business-views', [AnalyticsController::class, 'myBusinessViews']);
     Route::get('analytics/user-registrations', [AnalyticsController::class, 'userRegistrations']);
     Route::get('analytics/business-registrations', [AnalyticsController::class, 'businessRegistrations']);
+    
+    // Premium Analytics (Premium users only)
+    Route::middleware('premium.analytics')->group(function () {
+        Route::get('analytics/premium/business', [AnalyticsController::class, 'premiumBusinessAnalytics']);
+        Route::get('analytics/premium/dashboard', [AnalyticsController::class, 'premiumDashboard']);
+        Route::post('analytics/premium/export', [AnalyticsController::class, 'exportAnalytics']);
+        Route::get('analytics/premium/competitive', [AnalyticsController::class, 'competitiveAnalysis']);
+        Route::get('analytics/premium/realtime', [AnalyticsController::class, 'realtimeMetrics']);
+    });
     Route::post('user/profile', [AuthController::class, 'updateProfile']); // POST untuk support multipart form-data (foto profil)
     
     // -------------------------------------------------------------
@@ -168,14 +180,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('my-businesses', [BusinessController::class, 'myBusinesses']);
     Route::get('dashboard/recent-reviews', [BusinessController::class, 'recentReviews']);
     Route::post('businesses', [BusinessController::class, 'store']);
-    Route::post('businesses/{id}', [BusinessController::class, 'update']); // POST untuk support multipart form-data (gambar)
-    Route::delete('businesses/{id}', [BusinessController::class, 'destroy']);
+    Route::middleware('business.owner')->group(function () {
+        Route::post('businesses/{id}', [BusinessController::class, 'update']); // POST untuk support multipart form-data (gambar)
+        Route::delete('businesses/{id}', [BusinessController::class, 'destroy']);
+    });
     Route::post('businesses/{id}/reviews', [BusinessController::class, 'addReview']);
 
-    Route::post('advertisements', [AdvertisementController::class, 'store']);
+    Route::post('advertisements', [AdvertisementController::class, 'store'])->middleware('premium:create_advertisement');
     Route::put('advertisements/{id}', [AdvertisementController::class, 'update']);
     Route::delete('advertisements/{id}', [AdvertisementController::class, 'destroy']);
 
+    // Consolidated Payment System (replaces multiple payment controllers)
+    Route::post('payments/create', [UnifiedPaymentController::class, 'createPayment']);
+    Route::get('payments/methods', [UnifiedPaymentController::class, 'getPaymentMethods']);
+    Route::get('payments/history', [UnifiedPaymentController::class, 'getPaymentHistory']);
+    Route::get('payments/{transactionId}/status', [UnifiedPaymentController::class, 'getPaymentStatus']);
+    Route::post('payments/{transactionId}/retry', [UnifiedPaymentController::class, 'retryPayment']);
+    Route::post('payments/{transactionId}/cancel', [UnifiedPaymentController::class, 'cancelPayment']);
+    Route::post('payments/{transactionId}/refund', [UnifiedPaymentController::class, 'processRefund']);
+
+    // Payment Gateway Webhooks (public, no auth required)
+    Route::post('webhooks/payments/{gateway}', [UnifiedPaymentController::class, 'handleWebhook'])->withoutMiddleware(['auth:sanctum']);
+
+    // Existing subscriptions (enhanced)
+    Route::get('subscriptions/analytics', [SubscriptionController::class, 'analytics']);
+    Route::get('subscriptions/{id}/lifecycle', [SubscriptionController::class, 'lifecycle']);
+    Route::post('subscriptions/{id}/cancel', [SubscriptionController::class, 'cancel']);
+    Route::post('subscriptions/{id}/renew', [SubscriptionController::class, 'renew']);
+    Route::get('subscription-plans', [SubscriptionController::class, 'plans']);
+    
+    // Existing subscription routes
     Route::get('subscriptions', [SubscriptionController::class, 'index']);
     Route::post('subscriptions', [SubscriptionController::class, 'store']);
     Route::get('subscriptions/{id}', [SubscriptionController::class, 'show']);
@@ -241,13 +275,34 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('payment-tickets/{id}', [PaymentTicketController::class, 'update']);
     Route::delete('payment-tickets/{id}', [PaymentTicketController::class, 'destroy']);
 
+    // Premium features and usage
+    Route::get('premium/status', [PremiumController::class, 'getStatus']);
+    Route::get('premium/plans', [PremiumController::class, 'getPlans']);
+    Route::post('premium/check-permission', [PremiumController::class, 'checkPermission']);
+    Route::get('premium/limits', [PremiumController::class, 'getLimits']);
+    Route::get('premium/suggestions', [PremiumController::class, 'getSuggestions']);
+    
+    // Premium feature validation (new)
+    Route::post('premium/validate-feature', [PremiumController::class, 'validateFeature']);
+    Route::post('premium/batch-validate', [PremiumController::class, 'batchValidateFeatures']);
+    Route::get('premium/feature-access-report', [PremiumController::class, 'getFeatureAccessReport']);
+    Route::get('premium/feature-requirements', [PremiumController::class, 'getFeatureRequirements']);
+    
+    // Business profile and readiness validation
+    Route::post('premium/validate-business-profile', [PremiumController::class, 'validateBusinessProfile']);
+    Route::get('premium/check-eligibility', [PremiumController::class, 'checkPremiumEligibility']);
+    Route::get('premium/analyze-usage-patterns', [PremiumController::class, 'analyzeUsagePatterns']);
+    Route::get('premium/business-readiness-report', [PremiumController::class, 'getBusinessReadinessReport']);
+    
     // Premium Upgrade
     Route::post('premium-upgrade', [PremiumUpgradeController::class, 'store']);
-    Route::get('subscription-plans', [PremiumUpgradeController::class, 'getSubscriptionPlans']);
+    Route::get('premium/subscription-plans', [PremiumUpgradeController::class, 'getSubscriptionPlans']);
     
-    // Referral Code (protected routes)
+    // Referral Code & Withdrawals (protected routes)
     Route::post('generate-referral-code', [ReferralController::class, 'generateReferralCodeForUser']);
     Route::get('my-referral-stats', [ReferralController::class, 'myReferralStats']);
+    Route::post('withdrawals', [\App\Http\Controllers\WithdrawalController::class, 'store']);
+    Route::get('my-withdrawals', [\App\Http\Controllers\WithdrawalController::class, 'myWithdrawals']);
     
     // Payment
     Route::post('create-payment', [PaymentController::class, 'createPayment']);
@@ -293,7 +348,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // -------------------------------------------------------------
     // Fitur Khusus ADMIN (Grouped & Prefixed dengan 'admin/')
     // -------------------------------------------------------------
-    Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->middleware('admin')->group(function () {
         
         // 1. CRUD Users (Otomatis mencakup index, store, show, update, destroy)
         Route::apiResource('users', UserController::class);
@@ -327,6 +382,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('resellers', [UserController::class, 'indexResellers']); // Melihat daftar semua reseller
         Route::post('resellers/{id}/toggle-status', [UserController::class, 'toggleResellerStatus']); // Aktif/nonaktifkan reseller
         // 7. Verifikasi Pembayaran Premium (Admin Control)
+        Route::get('subscriptions/expiring', [SubscriptionController::class, 'checkExpiring']);
+        Route::post('subscriptions/process-expired', [SubscriptionController::class, 'processExpired']);
         Route::put('subscriptions/{id}/verify', [SubscriptionController::class, 'verify']);
         Route::put('subscriptions/{id}/reject', [SubscriptionController::class, 'reject']);
 
@@ -369,6 +426,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('platform-coupons', [PlatformCouponController::class, 'store']);
         Route::put('platform-coupons/{id}', [PlatformCouponController::class, 'update']);
         Route::delete('platform-coupons/{id}', [PlatformCouponController::class, 'destroy']);
+        
+        // 15. Premium Analytics (Admin Control)
+        Route::get('analytics/premium/admin-dashboard', [AnalyticsController::class, 'adminPremiumDashboard']);
+        Route::get('analytics/premium/reports', [AnalyticsController::class, 'premiumReports']);
+        
+        // 16. Payment Analytics (Admin Control)
+        Route::get('payments/analytics', [UnifiedPaymentController::class, 'getPaymentAnalytics']);
 
         // 15. Pengaturan Situs (Admin Control)
         Route::get('settings', [SiteSettingController::class, 'index']);
@@ -412,6 +476,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'getReferralSettings']);
             Route::put('/', [\App\Http\Controllers\Admin\ReferralManagementController::class, 'updateReferralSettings']);
         });
+
+        // 17. Penarikan Saldo Komisi (Admin Control)
+        Route::get('withdrawals', [\App\Http\Controllers\WithdrawalController::class, 'index']);
+        Route::put('withdrawals/{id}/status', [\App\Http\Controllers\WithdrawalController::class, 'updateStatus']);
     });
 
 });

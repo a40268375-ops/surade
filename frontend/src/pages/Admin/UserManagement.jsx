@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import './AdminTable.css';
+import '../Dashboard.css'; // Import our enhanced form styles
 
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
@@ -13,15 +14,22 @@ const UserManagement = () => {
     const [errors, setErrors] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [showForm, setShowForm] = useState(false);
+    const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
 
     const fetchUsers = async () => {
         try {
+            setLoading(true);
             const response = await api.get('/admin/users', {
                 params: { search: searchQuery }
             });
             setUsers(response.data);
         } catch (error) {
             console.error("Gagal mengambil data user", error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -44,6 +52,7 @@ const UserManagement = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErrors({});
+        setSubmitting(true);
         
         // Validate referral code uniqueness
         if (referralCode) {
@@ -52,6 +61,7 @@ const UserManagement = () => {
             );
             if (isDuplicate) {
                 setErrors({ referral_code: ['Kode referral sudah digunakan oleh user lain'] });
+                setSubmitting(false);
                 return;
             }
         }
@@ -65,7 +75,11 @@ const UserManagement = () => {
                 await api.put(`/admin/users/${editingId}`, payload);
                 alert('User berhasil diupdate!');
             } else {
-                if (!password) { alert('Password wajib diisi untuk user baru!'); return; }
+                if (!password) { 
+                    alert('Password wajib diisi untuk user baru!'); 
+                    setSubmitting(false);
+                    return; 
+                }
                 await api.post('/admin/users', payload);
                 alert('User berhasil ditambahkan!');
             }
@@ -73,6 +87,8 @@ const UserManagement = () => {
             fetchUsers();
         } catch (error) {
             if (error.response?.status === 422) setErrors(error.response.data.errors);
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -83,6 +99,7 @@ const UserManagement = () => {
         setRole(user.role);
         setReferralCode(user.referral_code || '');
         setPassword('');
+        setShowForm(true);
     };
 
     const handleDelete = async (id) => {
@@ -95,348 +112,532 @@ const UserManagement = () => {
     };
 
     const clearForm = () => {
-        setName(''); setEmail(''); setPassword(''); setRole('user'); setReferralCode(''); setEditingId(null);
+        setName(''); 
+        setEmail(''); 
+        setPassword(''); 
+        setRole('user'); 
+        setReferralCode(''); 
+        setEditingId(null);
+        setShowForm(false);
+        setErrors({});
     };
 
     return (
-        <div className="admin-table-container">
-            <h2 style={{ color: '#1f2937', marginBottom: '8px' }}>Panel Admin: Manajemen Users</h2>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
-                Kelola akun pengguna dan peran akses mereka.
-            </p>
-
-            {/* Statistics Summary */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
-                marginBottom: '24px'
-            }}>
-                <div style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    padding: '16px',
-                    borderRadius: '8px',
-                    textAlign: 'center'
-                }}>
-                    <div style={{ fontSize: '12px', opacity: '0.9' }}>Total Users</div>
-                    <div style={{ fontSize: '20px', fontWeight: '700' }}>
-                        {users.length}
+        <div className="db-form-wrapper">
+            {/* Header Section */}
+            <div className="db-form-hero">
+                <div className="db-form-hero-content">
+                    <div className="db-form-hero-text">
+                        <h1>👥 Manajemen Pengguna</h1>
+                        <p>Kelola akun pengguna, peran akses, dan sistem referral dengan mudah</p>
                     </div>
-                </div>
-                
-                <div style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    padding: '16px',
-                    borderRadius: '8px',
-                    textAlign: 'center'
-                }}>
-                    <div style={{ fontSize: '12px', opacity: '0.9' }}>Reseller</div>
-                    <div style={{ fontSize: '20px', fontWeight: '700' }}>
-                        {users.filter(u => u.role === 'reseller').length}
-                    </div>
-                </div>
-                
-                <div style={{
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                    color: 'white',
-                    padding: '16px',
-                    borderRadius: '8px',
-                    textAlign: 'center'
-                }}>
-                    <div style={{ fontSize: '12px', opacity: '0.9' }}>Kode Referral Aktif</div>
-                    <div style={{ fontSize: '20px', fontWeight: '700' }}>
-                        {users.filter(u => u.referral_code).length}
-                    </div>
-                </div>
-                
-                <div style={{
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                    color: 'white',
-                    padding: '16px',
-                    borderRadius: '8px',
-                    textAlign: 'center'
-                }}>
-                    <div style={{ fontSize: '12px', opacity: '0.9' }}>Reseller Tanpa Kode</div>
-                    <div style={{ fontSize: '20px', fontWeight: '700' }}>
-                        {users.filter(u => u.role === 'reseller' && !u.referral_code).length}
-                    </div>
-                </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="admin-form">
-                <h3>{editingId ? 'Edit Akun User' : 'Buat Akun Baru'}</h3>
-                
-                <div style={{ marginBottom: '15px' }}>
-                    <label>Nama:</label>
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        required
-                        placeholder="Nama lengkap"
-                    />
-                </div>
-
-                <div style={{ marginBottom: '15px' }}>
-                    <label>Email:</label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        required
-                        placeholder="email@example.com"
-                    />
-                    {errors.email && <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errors.email[0]}</p>}
-                </div>
-
-                <div style={{ marginBottom: '15px' }}>
-                    <label>{editingId ? "Password (kosongkan jika tidak diubah)" : "Password"}:</label>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        placeholder={editingId ? "Kosongkan jika tidak diubah" : "Masukkan password"}
-                    />
-                </div>
-
-                <div style={{ marginBottom: '15px' }}>
-                    <label>Role:</label>
-                    <select
-                        value={role}
-                        onChange={e => setRole(e.target.value)}
-                    >
-                        <option value="user">User Biasa</option>
-                        <option value="reseller">Reseller</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-
-                <div style={{ marginBottom: '15px' }}>
-                    <label>Kode Referral:</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <input
-                            type="text"
-                            value={referralCode}
-                            onChange={e => setReferralCode(e.target.value.toUpperCase())}
-                            placeholder="Masukkan kode referral (opsional)"
-                            style={{ flex: 1 }}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => {
-                                // Generate simple random code
-                                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                                let result = '';
-                                do {
-                                    result = '';
-                                    for (let i = 0; i < 8; i++) {
-                                        result += chars.charAt(Math.floor(Math.random() * chars.length));
-                                    }
-                                } while (users.some(u => u.referral_code === result && u.id !== editingId));
-                                
-                                setReferralCode(result);
-                            }}
-                            style={{
-                                padding: '8px 12px',
-                                background: '#8b5cf6',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                                cursor: 'pointer'
-                            }}
+                    <div className="db-form-hero-actions">
+                        <button 
+                            className={`db-btn ${viewMode === 'table' ? 'db-btn-primary' : 'db-btn-outline'}`}
+                            onClick={() => setViewMode('table')}
                         >
-                            Generate
+                            📋 Tabel
+                        </button>
+                        <button 
+                            className={`db-btn ${viewMode === 'cards' ? 'db-btn-primary' : 'db-btn-outline'}`}
+                            onClick={() => setViewMode('cards')}
+                        >
+                            🎴 Kartu
+                        </button>
+                        <button 
+                            className="db-btn db-btn-success"
+                            onClick={() => setShowForm(true)}
+                        >
+                            ➕ Tambah User
                         </button>
                     </div>
-                    {errors.referral_code && <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errors.referral_code[0]}</p>}
-                    <p style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px' }}>
-                        {role === 'reseller' ? 'Reseller memerlukan kode referral untuk sistem komisi' : 'Kode referral hanya diperlukan untuk reseller'}
-                    </p>
                 </div>
-
-                <button type="submit">
-                    {editingId ? 'Update User' : 'Buat User'}
-                </button>
-                {editingId && (
-                    <button
-                        type="button"
-                        onClick={clearForm}
-                        className="action-btn cancel"
-                        style={{ marginLeft: '10px' }}
-                    >
-                        Batal
-                    </button>
-                )}
-            </form>
-
-            {/* Search and Filter Section */}
-            <div style={{ 
-                display: 'flex', 
-                gap: '16px', 
-                marginBottom: '20px', 
-                alignItems: 'center',
-                flexWrap: 'wrap'
-            }}>
-                <div style={{ flex: 1, minWidth: '250px' }}>
-                    <input
-                        type="text"
-                        placeholder="🔍 Cari berdasarkan nama atau email..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '2px solid #e5e7eb',
-                            borderRadius: '8px',
-                            fontSize: '14px'
-                        }}
-                    />
-                </div>
-                <select
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                    style={{
-                        padding: '10px 12px',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        minWidth: '150px'
-                    }}
-                >
-                    <option value="all">Semua Role</option>
-                    <option value="user">User Biasa</option>
-                    <option value="reseller">Reseller</option>
-                    <option value="admin">Admin</option>
-                </select>
-                <button
-                    onClick={fetchUsers}
-                    style={{
-                        padding: '10px 16px',
-                        background: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        fontWeight: '600'
-                    }}
-                >
-                    🔄 Refresh
-                </button>
             </div>
 
-            <table className="admin-table">
+            {/* Statistics Section */}
+            <div className="db-stats-grid">
+                <div className="db-stat-card db-stat-primary">
+                    <div className="db-stat-icon">👥</div>
+                    <div className="db-stat-content">
+                        <div className="db-stat-number">{users.length}</div>
+                        <div className="db-stat-label">Total Pengguna</div>
+                    </div>
+                </div>
+                
+                <div className="db-stat-card db-stat-success">
+                    <div className="db-stat-icon">🏪</div>
+                    <div className="db-stat-content">
+                        <div className="db-stat-number">{users.filter(u => u.role === 'reseller').length}</div>
+                        <div className="db-stat-label">Reseller</div>
+                    </div>
+                </div>
+                
+                <div className="db-stat-card db-stat-warning">
+                    <div className="db-stat-icon">🎫</div>
+                    <div className="db-stat-content">
+                        <div className="db-stat-number">{users.filter(u => u.referral_code).length}</div>
+                        <div className="db-stat-label">Kode Referral Aktif</div>
+                    </div>
+                </div>
+                
+                <div className="db-stat-card db-stat-danger">
+                    <div className="db-stat-icon">⚠️</div>
+                    <div className="db-stat-content">
+                        <div className="db-stat-number">{users.filter(u => u.role === 'reseller' && !u.referral_code).length}</div>
+                        <div className="db-stat-label">Reseller Tanpa Kode</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* User Form Modal */}
+            {showForm && (
+                <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && clearForm()}>
+                    <div className="db-modal-content">
+                        <div className="db-modal-header">
+                            <h3>
+                                {editingId ? '✏️ Edit Pengguna' : '➕ Tambah Pengguna Baru'}
+                            </h3>
+                            <button className="db-modal-close" onClick={clearForm}>✕</button>
+                        </div>
+                        
+                        <form onSubmit={handleSubmit} className="db-form">
+                            <div className="db-form-grid">
+                                <div className="db-form-section">
+                                    <h4>📝 Informasi Dasar</h4>
+                                    
+                                    <div className="db-input-group">
+                                        <label className="db-input-label">
+                                            <span>👤 Nama Lengkap</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="db-input"
+                                            value={name}
+                                            onChange={e => setName(e.target.value)}
+                                            placeholder="Masukkan nama lengkap"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="db-input-group">
+                                        <label className="db-input-label">
+                                            <span>📧 Email</span>
+                                        </label>
+                                        <input
+                                            type="email"
+                                            className="db-input"
+                                            value={email}
+                                            onChange={e => setEmail(e.target.value)}
+                                            placeholder="email@example.com"
+                                            required
+                                        />
+                                        {errors.email && (
+                                            <div className="db-input-error">{errors.email[0]}</div>
+                                        )}
+                                    </div>
+
+                                    <div className="db-input-group">
+                                        <label className="db-input-label">
+                                            <span>🔒 {editingId ? 'Password (kosongkan jika tidak diubah)' : 'Password'}</span>
+                                        </label>
+                                        <input
+                                            type="password"
+                                            className="db-input"
+                                            value={password}
+                                            onChange={e => setPassword(e.target.value)}
+                                            placeholder={editingId ? "Kosongkan jika tidak diubah" : "Masukkan password"}
+                                            required={!editingId}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="db-form-section">
+                                    <h4>👔 Pengaturan Akses</h4>
+                                    
+                                    <div className="db-input-group">
+                                        <label className="db-input-label">
+                                            <span>🎭 Peran Pengguna</span>
+                                        </label>
+                                        <select
+                                            className="db-select"
+                                            value={role}
+                                            onChange={e => setRole(e.target.value)}
+                                        >
+                                            <option value="user">👤 User Biasa</option>
+                                            <option value="reseller">🏪 Reseller</option>
+                                            <option value="admin">👑 Administrator</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="db-input-group">
+                                        <label className="db-input-label">
+                                            <span>🎫 Kode Referral</span>
+                                            <small>{role === 'reseller' ? 'Wajib untuk reseller' : 'Opsional untuk user biasa'}</small>
+                                        </label>
+                                        <div className="db-input-with-button">
+                                            <input
+                                                type="text"
+                                                className="db-input"
+                                                value={referralCode}
+                                                onChange={e => setReferralCode(e.target.value.toUpperCase())}
+                                                placeholder="Masukkan kode referral"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="db-btn db-btn-outline"
+                                                onClick={() => {
+                                                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                                                    let result = '';
+                                                    do {
+                                                        result = '';
+                                                        for (let i = 0; i < 8; i++) {
+                                                            result += chars.charAt(Math.floor(Math.random() * chars.length));
+                                                        }
+                                                    } while (users.some(u => u.referral_code === result && u.id !== editingId));
+                                                    
+                                                    setReferralCode(result);
+                                                }}
+                                            >
+                                                🎲 Generate
+                                            </button>
+                                        </div>
+                                        {errors.referral_code && (
+                                            <div className="db-input-error">{errors.referral_code[0]}</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="db-form-actions">
+                                <button 
+                                    type="button" 
+                                    className="db-btn db-btn-secondary"
+                                    onClick={clearForm}
+                                >
+                                    ❌ Batal
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="db-btn db-btn-primary"
+                                    disabled={submitting}
+                                >
+                                    {submitting ? (
+                                        <>⏳ Menyimpan...</>
+                                    ) : (
+                                        editingId ? '💾 Update User' : '➕ Tambah User'
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Search and Filter Section */}
+            <div className="db-toolbar">
+                <div className="db-search-section">
+                    <div className="db-search-wrapper">
+                        <input
+                            type="text"
+                            className="db-search-input"
+                            placeholder="🔍 Cari berdasarkan nama atau email..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <select
+                        className="db-filter-select"
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                    >
+                        <option value="all">Semua Role</option>
+                        <option value="user">👤 User Biasa</option>
+                        <option value="reseller">🏪 Reseller</option>
+                        <option value="admin">👑 Admin</option>
+                    </select>
+                    <button
+                        className="db-btn db-btn-outline"
+                        onClick={fetchUsers}
+                        disabled={loading}
+                    >
+                        {loading ? '⏳' : '🔄'} Refresh
+                    </button>
+                </div>
+            </div>
+
+            {/* Users Display */}
+            {loading ? (
+                <div className="db-loading-state">
+                    <div className="db-spinner"></div>
+                    <p>Memuat data pengguna...</p>
+                </div>
+            ) : viewMode === 'table' ? (
+                <UserTable 
+                    users={filteredUsers}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onRefreshCode={fetchUsers}
+                />
+            ) : (
+                <UserCards 
+                    users={filteredUsers}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onRefreshCode={fetchUsers}
+                />
+            )}
+        </div>
+    );
+};
+
+export default UserManagement;
+
+// UserTable Component
+const UserTable = ({ users, onEdit, onDelete, onRefreshCode }) => {
+    const handleRegenerateCode = async (user) => {
+        if (window.confirm('Generate kode referral baru untuk reseller ini?')) {
+            try {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let newCode = '';
+                do {
+                    newCode = '';
+                    for (let i = 0; i < 8; i++) {
+                        newCode += chars.charAt(Math.floor(Math.random() * chars.length));
+                    }
+                } while (users.some(u => u.referral_code === newCode));
+                
+                await api.put(`/admin/users/${user.id}`, {
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    referral_code: newCode
+                });
+                alert('Kode referral berhasil diperbarui!');
+                onRefreshCode();
+            } catch (error) {
+                alert('Gagal memperbarui kode referral');
+                console.error(error);
+            }
+        }
+    };
+
+    if (users.length === 0) {
+        return (
+            <div className="db-empty-state">
+                <div className="db-empty-icon">👥</div>
+                <h3>Tidak ada pengguna ditemukan</h3>
+                <p>Belum ada data pengguna atau hasil pencarian kosong</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="db-table-wrapper">
+            <table className="db-table">
                 <thead>
                     <tr>
-                        <th>Nama</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Kode Referral</th>
-                        <th>Aksi</th>
+                        <th>👤 Pengguna</th>
+                        <th>📧 Email</th>
+                        <th>🎭 Peran</th>
+                        <th>🎫 Kode Referral</th>
+                        <th>⚙️ Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {filteredUsers.length === 0 ? (
-                        <tr><td colSpan="5" className="empty-state">
-                            {roleFilter !== 'all' ? `Tidak ada ${roleFilter} ditemukan.` : 'Belum ada data user.'}
-                        </td></tr>
-                    ) : (
-                        filteredUsers.map(u => (
-                            <tr key={u.id}>
-                                <td><strong>{u.name}</strong></td>
-                                <td style={{ color: '#6b7280', fontSize: '14px' }}>{u.email}</td>
-                                <td>
-                                    <span className={`status-badge ${u.role}`}>
-                                        {u.role.toUpperCase()}
-                                    </span>
-                                </td>
-                                <td>
-                                    {u.referral_code ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <div style={{ 
-                                                background: u.role === 'reseller' ? '#ecfdf5' : '#fef3c7', 
-                                                color: u.role === 'reseller' ? '#059669' : '#d97706', 
-                                                padding: '4px 8px', 
-                                                borderRadius: '4px',
-                                                fontSize: '12px',
-                                                fontWeight: '600',
-                                                fontFamily: 'monospace'
-                                            }}>
-                                                {u.referral_code}
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(u.referral_code);
-                                                    alert('Kode referral disalin!');
-                                                }}
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    fontSize: '14px',
-                                                    opacity: '0.7'
-                                                }}
-                                                title="Copy kode referral"
-                                            >
-                                                📋
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>
-                                            {u.role === 'reseller' ? '⚠️ Belum ada kode' : '-'}
+                    {users.map(user => (
+                        <tr key={user.id}>
+                            <td>
+                                <div className="db-table-user">
+                                    <div className="db-user-avatar">
+                                        {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="db-user-info">
+                                        <div className="db-user-name">{user.name}</div>
+                                        <div className="db-user-meta">ID: {user.id}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span className="db-email">{user.email}</span>
+                            </td>
+                            <td>
+                                <span className={`db-badge db-badge-${user.role}`}>
+                                    {user.role === 'admin' && '👑'}
+                                    {user.role === 'reseller' && '🏪'}
+                                    {user.role === 'user' && '👤'}
+                                    {user.role.toUpperCase()}
+                                </span>
+                            </td>
+                            <td>
+                                {user.referral_code ? (
+                                    <div className="db-referral-code">
+                                        <span className={`db-code ${user.role === 'reseller' ? 'db-code-active' : 'db-code-normal'}`}>
+                                            {user.referral_code}
                                         </span>
-                                    )}
-                                </td>
-                                <td>
-                                    <button onClick={() => handleEdit(u)} className="action-btn edit">Edit</button>
-                                    <button onClick={() => handleDelete(u.id)} className="action-btn delete">Hapus</button>
-                                    {u.role === 'reseller' && (
+                                        <button
+                                            className="db-btn-copy"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(user.referral_code);
+                                                alert('Kode referral disalin!');
+                                            }}
+                                            title="Salin kode referral"
+                                        >
+                                            📋
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <span className="db-no-code">
+                                        {user.role === 'reseller' ? '⚠️ Belum ada kode' : '➖'}
+                                    </span>
+                                )}
+                            </td>
+                            <td>
+                                <div className="db-table-actions">
+                                    <button 
+                                        className="db-btn db-btn-sm db-btn-primary"
+                                        onClick={() => onEdit(user)}
+                                    >
+                                        ✏️ Edit
+                                    </button>
+                                    <button 
+                                        className="db-btn db-btn-sm db-btn-danger"
+                                        onClick={() => onDelete(user.id)}
+                                    >
+                                        🗑️ Hapus
+                                    </button>
+                                    {user.role === 'reseller' && (
                                         <button 
-                                            onClick={async () => {
-                                                if (window.confirm('Generate kode referral baru untuk reseller ini?')) {
-                                                    try {
-                                                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                                                        let newCode = '';
-                                                        for (let i = 0; i < 8; i++) {
-                                                            newCode += chars.charAt(Math.floor(Math.random() * chars.length));
-                                                        }
-                                                        
-                                                        await api.put(`/admin/users/${u.id}`, {
-                                                            name: u.name,
-                                                            email: u.email,
-                                                            role: u.role,
-                                                            referral_code: newCode
-                                                        });
-                                                        alert('Kode referral berhasil diperbarui!');
-                                                        fetchUsers();
-                                                    } catch (error) {
-                                                        alert('Gagal memperbarui kode referral');
-                                                        console.error(error);
-                                                    }
-                                                }
-                                            }}
-                                            className="action-btn"
-                                            style={{ 
-                                                background: '#8b5cf6', 
-                                                color: 'white',
-                                                fontSize: '12px',
-                                                padding: '4px 8px'
-                                            }}
+                                            className="db-btn db-btn-sm db-btn-warning"
+                                            onClick={() => handleRegenerateCode(user)}
                                         >
                                             🔄 Regen
                                         </button>
                                     )}
-                                </td>
-                            </tr>
-                        ))
-                    )}
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
         </div>
     );
 };
 
-export default UserManagement;
+// UserCards Component
+const UserCards = ({ users, onEdit, onDelete, onRefreshCode }) => {
+    const handleRegenerateCode = async (user) => {
+        if (window.confirm('Generate kode referral baru untuk reseller ini?')) {
+            try {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let newCode = '';
+                do {
+                    newCode = '';
+                    for (let i = 0; i < 8; i++) {
+                        newCode += chars.charAt(Math.floor(Math.random() * chars.length));
+                    }
+                } while (users.some(u => u.referral_code === newCode));
+                
+                await api.put(`/admin/users/${user.id}`, {
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    referral_code: newCode
+                });
+                alert('Kode referral berhasil diperbarui!');
+                onRefreshCode();
+            } catch (error) {
+                alert('Gagal memperbarui kode referral');
+                console.error(error);
+            }
+        }
+    };
+
+    if (users.length === 0) {
+        return (
+            <div className="db-empty-state">
+                <div className="db-empty-icon">👥</div>
+                <h3>Tidak ada pengguna ditemukan</h3>
+                <p>Belum ada data pengguna atau hasil pencarian kosong</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="db-cards-grid">
+            {users.map(user => (
+                <div key={user.id} className="db-user-card">
+                    <div className="db-user-card-header">
+                        <div className="db-user-card-avatar">
+                            {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="db-user-card-info">
+                            <h4>{user.name}</h4>
+                            <p>{user.email}</p>
+                        </div>
+                        <span className={`db-badge db-badge-${user.role}`}>
+                            {user.role === 'admin' && '👑'}
+                            {user.role === 'reseller' && '🏪'}
+                            {user.role === 'user' && '👤'}
+                            {user.role.toUpperCase()}
+                        </span>
+                    </div>
+                    
+                    <div className="db-user-card-body">
+                        <div className="db-user-detail">
+                            <span className="db-detail-label">🆔 User ID:</span>
+                            <span className="db-detail-value">{user.id}</span>
+                        </div>
+                        
+                        <div className="db-user-detail">
+                            <span className="db-detail-label">🎫 Kode Referral:</span>
+                            {user.referral_code ? (
+                                <div className="db-referral-code">
+                                    <span className={`db-code ${user.role === 'reseller' ? 'db-code-active' : 'db-code-normal'}`}>
+                                        {user.referral_code}
+                                    </span>
+                                    <button
+                                        className="db-btn-copy"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(user.referral_code);
+                                            alert('Kode referral disalin!');
+                                        }}
+                                        title="Salin kode referral"
+                                    >
+                                        📋
+                                    </button>
+                                </div>
+                            ) : (
+                                <span className="db-no-code">
+                                    {user.role === 'reseller' ? '⚠️ Belum ada kode' : '➖ Tidak ada'}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    
+                    <div className="db-user-card-actions">
+                        <button 
+                            className="db-btn db-btn-sm db-btn-primary"
+                            onClick={() => onEdit(user)}
+                        >
+                            ✏️ Edit
+                        </button>
+                        <button 
+                            className="db-btn db-btn-sm db-btn-danger"
+                            onClick={() => onDelete(user.id)}
+                        >
+                            🗑️ Hapus
+                        </button>
+                        {user.role === 'reseller' && (
+                            <button 
+                                className="db-btn db-btn-sm db-btn-warning"
+                                onClick={() => handleRegenerateCode(user)}
+                            >
+                                🔄 Regen
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};

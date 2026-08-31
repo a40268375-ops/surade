@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\OtpVerification;
 use App\Mail\OtpMail;
+use App\Http\Requests\UserRegistrationRequest;
+use App\Http\Helpers\SecurityHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -13,43 +15,34 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function register(Request $request)
+    public function register(UserRegistrationRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6|confirmed',
-            'referral_code' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            // Provide more specific error messages
-            $errors = $validator->errors();
-            if ($errors->has('email')) {
-                $emailError = $errors->first('email');
-                if (str_contains($emailError, 'unique')) {
-                    return response()->json([
-                        'message' => 'Email ini sudah terdaftar. Silakan login atau gunakan email lain.',
-                        'errors' => $errors
-                    ], 422);
-                }
-            }
-            return response()->json(['errors' => $errors], 422);
+        // Rate limiting check
+        $rateLimitCheck = SecurityHelper::checkOtpRateLimit($request->email, 'registration');
+        if ($rateLimitCheck['blocked']) {
+            return response()->json([
+                'message' => $rateLimitCheck['message'],
+                'error' => 'RATE_LIMITED'
+            ], 429);
         }
 
         // Generate unique referral code for new user
         $referralCode = $this->generateUniqueReferralCode();
 
         $user = User::create([
-            'name' => $request->name,
+            'name' => SecurityHelper::sanitizeInput($request->name),
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'phone' => $request->phone ? SecurityHelper::sanitizeInput($request->phone) : null,
             'role' => 'user',
             'status' => 'active',
             'referral_code' => $referralCode,
             'is_active' => true,
             // Don't set email_verified_at yet - wait for OTP verification
         ]);
+
+        // Record OTP request for rate limiting
+        SecurityHelper::recordOtpRequest($request->email, 'registration');
 
         // Create OTP for email verification
         $otpRecord = OtpVerification::createOtp($request->email, 'register', $user->id);
@@ -65,6 +58,7 @@ class AuthController extends Controller
             'requires_verification' => true,
             'email_sent' => $mailResult['sent'],
         ];
+        
         if (isset($mailResult['debug_otp_code'])) {
             $response['debug_otp_code'] = $mailResult['debug_otp_code'];
         }
@@ -319,9 +313,23 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        // Rate limiting check for login attempts
+        $rateLimitCheck = SecurityHelper::checkLoginRateLimit($request);
+        if ($rateLimitCheck['blocked']) {
+            return response()->json([
+                'message' => $rateLimitCheck['message'],
+                'error' => 'RATE_LIMITED'
+            ], 429);
+        }
+
+        // Sanitize input
+        $email = SecurityHelper::sanitizeInput($request->email);
+        $user = User::where('email', $email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
+            // Record failed login attempt
+            SecurityHelper::recordFailedLogin($request);
+            
             return response()->json([
                 'message' => 'Email atau password salah.'
             ], 401);
@@ -356,7 +364,19 @@ class AuthController extends Controller
             return response()->json($response, 403);
         }
 
+        // Record successful login and reset failed attempts
+        SecurityHelper::recordSuccessfulLogin($request);
+
+        // Generate secure token
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Log security event
+        SecurityHelper::logSecurityEvent('user_login', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent()
+        ]);
 
         return response()->json([
             'user' => $user,

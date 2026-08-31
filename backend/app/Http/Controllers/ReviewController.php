@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BusinessReview;
 use App\Models\ReviewHelpfulVote;
 use App\Models\SellerReview;
+use App\Http\Helpers\SecurityHelper;
 use Illuminate\Http\Request;
 
 class ReviewController extends Controller
@@ -103,9 +104,21 @@ class ReviewController extends Controller
             'reply' => 'required|string|max:1000',
         ]);
 
+        // Sanitize the reply content
+        $sanitizedReply = SecurityHelper::sanitizeInput($request->reply);
+
         $review->update([
-            'owner_reply' => $request->reply,
+            'owner_reply' => $sanitizedReply,
             'owner_reply_at' => now(),
+        ]);
+
+        // Log security event
+        SecurityHelper::logSecurityEvent('review_replied', [
+            'review_id' => $review->id,
+            'business_id' => $review->business_id,
+            'user_id' => $user->id,
+            'reply_length' => strlen($sanitizedReply),
+            'ip' => $request->ip()
         ]);
 
         return response()->json($review->load(['business:id,title,image,user_id', 'reviewer:id,name,avatar']));
@@ -127,7 +140,26 @@ class ReviewController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        // Store info for logging before deletion
+        $reviewInfo = [
+            'id' => $review->id,
+            'business_id' => $review->business_id,
+            'reviewer_id' => $review->user_id,
+            'rating' => $review->rating,
+            'comment_length' => strlen($review->comment ?? '')
+        ];
+
         $review->delete();
+
+        // Log security event
+        SecurityHelper::logSecurityEvent('review_deleted', [
+            'review_id' => $reviewInfo['id'],
+            'business_id' => $reviewInfo['business_id'],
+            'deleted_by_user_id' => $user->id,
+            'original_reviewer_id' => $reviewInfo['reviewer_id'],
+            'rating' => $reviewInfo['rating'],
+            'ip' => $request->ip()
+        ]);
 
         return response()->json(['message' => 'Ulasan berhasil dihapus']);
     }

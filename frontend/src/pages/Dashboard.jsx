@@ -5,6 +5,26 @@ import api, { getImageUrl } from "../utils/api";
 import "./Dashboard.css";
 import "./Pricing.css";
 import Loading from "../components/Loading";
+import { 
+  LoadingSpinner, 
+  ErrorState, 
+  EmptyState, 
+  InlineAlert,
+  SkeletonCard,
+  SkeletonTable,
+  RetryButton
+} from "../components/StateComponents";
+import "../components/StateComponents.css";
+import { useAsyncState, useMultipleAsyncState } from "../hooks/useAsyncState";
+import errorHandler from "../utils/errorHandler";
+import ConfirmDialog from "../components/ConfirmDialog";
+import "../components/ConfirmDialog.css";
+import { useConfirm } from "../hooks/useConfirm";
+import { useNotification } from "../hooks/useNotification";
+import ToastContainer from "../components/Toast";
+import "../components/Toast.css";
+import { useResponsive } from "../hooks/useResponsive";
+import { useIntersectionAnimation } from "../hooks/useAnimation";
 import AvatarCropperModal from "../components/AvatarCropperModal";
 import CameraCaptureModal from "../components/CameraCaptureModal";
 import AdDescriptionEditor from "../components/AdDescriptionEditor";
@@ -28,6 +48,8 @@ import {
   Settings,
   Plus,
   Edit2,
+  ChevronLeft,
+  ChevronRight,
   Trash2,
   CheckCircle,
   XCircle,
@@ -50,7 +72,6 @@ import {
   Megaphone,
   CalendarDays,
   ChevronDown,
-  ChevronRight,
   Tag,
   Upload,
   Check,
@@ -94,11 +115,10 @@ import {
   Image as ImageIcon,
   Package,
   AlertTriangle,
-<<<<<<< HEAD
-  Ticket, Wallet, Copy, Target,
-=======
-  Ticket,
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+  Ticket, 
+  Wallet, 
+  Copy, 
+  Target,
 } from "lucide-react";
 import emptyStateIcon from "../assets/icon-empty-state.png";
 import logoImg from "../assets/logo.png";
@@ -106,6 +126,19 @@ import RichTextEditor from "../components/RichTextEditor";
 import DashboardChart from "../components/DashboardChart";
 import PaymentGateway from "../components/PaymentGateway";
 import MiniCalendar from "../components/MiniCalendar";
+
+// Utility function to format dates
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+};
 
 /**
  * Tampilan kosong seragam buat semua tab Dashboard (gaya "trofi" seperti
@@ -218,6 +251,7 @@ export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { tab } = useParams(); const activeTab = tab || (isAdmin ? "dashboard" : "saved"); const setActiveTab = (newTab) => navigate(`/dashboard/${newTab}`);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 900);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [dismissedBanners, setDismissedBanners] = useState([]);
   const [salesGraphCollapsed, setSalesGraphCollapsed] = useState(false);
   
@@ -239,6 +273,46 @@ export default function Dashboard() {
   const [premiumHistory, setPremiumHistory] = useState({ history: [], approved_count: 0, active_businesses: 0, expired_businesses: 0, rejected_count: 0 });
   const [plans, setPlans] = useState({});
   const [resellerData, setResellerData] = useState(null); // legacy, unused now that Reseller tab is removed
+
+  // Enhanced loading and error states
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState(null);
+  const [tabLoading, setTabLoading] = useState(false);
+  const [tabError, setTabError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+
+  // Enhanced CRUD operations with better error handling
+  const [crudLoading, setCrudLoading] = useState({});
+  const [crudErrors, setCrudErrors] = useState({});
+
+  // Enhanced UI interactions
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
+  const { notifications: notificationList, success, error: notifyError, warning, info, removeNotification } = useNotification();
+  
+  // Responsive breakpoint detection
+  const { isMobile, isTablet, isDesktop, breakpoint } = useResponsive();
+
+  // Responsive sidebar management
+  useEffect(() => {
+    if (isDesktop) {
+      setSidebarOpen(false); // Close sidebar when switching to desktop
+    }
+  }, [isDesktop]);
+
+  // Close sidebar when clicking outside on mobile
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isMobile && sidebarOpen && !event.target.closest('.db-sidebar') && !event.target.closest('.db-hamburger-btn')) {
+        setSidebarOpen(false);
+      }
+    };
+
+    if (isMobile && sidebarOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isMobile, sidebarOpen]);
 
   // Data statistik referral milik user sendiri (tab "Referral"), diambil dari
   // GET /api/my-referral-stats - bukan dummy data.
@@ -282,6 +356,15 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Tarik Saldo Komisi (Withdrawal)
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawMethod, setWithdrawMethod] = useState("BCA");
+  const [withdrawAccountNumber, setWithdrawAccountNumber] = useState("");
+  const [withdrawAccountName, setWithdrawAccountName] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [myWithdrawals, setMyWithdrawals] = useState([]);
 
   // Jaring pengaman: gabungkan hasil pending/approved/rejected tanpa duplikat.
   // Kalau suatu saat ada iklan yang kebetulan muncul di lebih dari satu hasil
@@ -398,7 +481,8 @@ export default function Dashboard() {
       alert(`Kode referral berhasil dibuat: ${response.referral_code}`);
     } catch (error) {
       console.error("Error generating referral code:", error);
-      alert("Gagal membuat kode referral. Silakan coba lagi.");
+      const errorMessage = errorHandler.getErrorMessage(error, 'Gagal membuat kode referral');
+      setProfileMessage({ type: "error", text: errorMessage });
     }
   };
 
@@ -451,6 +535,17 @@ export default function Dashboard() {
     r.name.toLowerCase().includes(resellerSearch.toLowerCase()) ||
     r.region.toLowerCase().includes(resellerSearch.toLowerCase())
   );
+  
+  // Pagination states for business table
+  const [businessCurrentPage, setBusinessCurrentPage] = useState(1);
+  const [businessPagination, setBusinessPagination] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+    total: 0
+  });
+  const BUSINESS_PAGE_SIZE = 10; // 10 businesses per page
+  
   const [bookings, setBookings] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -868,9 +963,18 @@ export default function Dashboard() {
     const loadTabData = async () => {
       try {
         if (activeTab === "businesses") {
-          const endpoint = isAdmin ? "/businesses?status=all" : "/my-businesses";
-          const data = await api.get(endpoint);
-          setBusinesses(data);
+          const endpoint = isAdmin ? "/businesses" : "/my-businesses";
+          const params = new URLSearchParams({
+            per_page: '10',
+            page: businessCurrentPage.toString()
+          });
+          
+          if (isAdmin) {
+            params.append('status', 'all');
+          }
+          
+          const data = await api.get(`${endpoint}?${params.toString()}`);
+          handleBusinessApiResponse(data);
         } else if (activeTab === "categories" && isAdmin) {
           const data = await api.get("/categories");
           setCategories(data);
@@ -884,8 +988,9 @@ export default function Dashboard() {
             api.get("/advertisements?status=rejected"),
           ]);
           setAds(dedupeAdsById([...pending, ...approved, ...rejected]));
-          const myBiz = await api.get(isAdmin ? "/businesses?status=all" : "/my-businesses");
-          setBusinesses(myBiz);
+          const myBizEndpoint = isAdmin ? "/businesses?status=all&per_page=10&page=1" : "/my-businesses?per_page=10&page=1";
+          const myBiz = await api.get(myBizEndpoint);
+          handleBusinessApiResponse(myBiz);
         } else if (activeTab === "tickets") {
           const data = isAdmin ? 
             await api.get("/admin/payment-tickets") : 
@@ -902,8 +1007,12 @@ export default function Dashboard() {
           setReferralStatsLoading(true);
           setReferralStatsError(null);
           try {
-            const res = await api.get("/my-referral-stats");
-            setReferralStats(res.data || null);
+            const [res, withRes] = await Promise.all([
+              api.get("/my-referral-stats"),
+              api.get("/my-withdrawals").catch(() => ({ data: [] }))
+            ]);
+            setReferralStats(res.data || res || null);
+            setMyWithdrawals(withRes.data || withRes || []);
           } catch (err) {
             setReferralStatsError(err?.message || "Gagal memuat data referral.");
           } finally {
@@ -1010,9 +1119,16 @@ export default function Dashboard() {
     };
   }, []);
 
-  const fetchInitialData = async () => {
-    setError("");
+  const fetchInitialData = async (retry = false) => {
     try {
+      if (!retry) {
+        setDashboardLoading(true);
+        setDashboardError(null);
+      } else {
+        setTabLoading(true);
+        setTabError(null);
+      }
+      
       if (activeTab === "dashboard") {
         // Ambil data asli buat kartu statistik & grafik di halaman Dasbor.
         // Admin lihat data seluruh platform, user biasa cuma lihat punya sendiri.
@@ -1031,8 +1147,8 @@ export default function Dashboard() {
         // percobaan pertama. Sekarang keduanya independen satu sama lain.
         try {
           if (isAdmin) {
-            const bizData = await api.get("/businesses?status=all");
-            setBusinesses(bizData);
+            const bizData = await api.get("/businesses?status=all&per_page=10&page=1");
+            handleBusinessApiResponse(bizData);
             const userData = await api.get("/admin/users");
             setUsers(userData);
             const catData = await api.get("/categories");
@@ -1049,8 +1165,8 @@ export default function Dashboard() {
             const ticketData = await api.get("/admin/payment-tickets");
             setTickets(ticketData);
           } else {
-            const bizData = await api.get("/my-businesses");
-            setBusinesses(bizData);
+            const bizData = await api.get("/my-businesses?per_page=10&page=1");
+            handleBusinessApiResponse(bizData);
             const bookingData = await api.get("/my-bookings");
             setBookings(bookingData);
             // PERBAIKAN: sebelumnya kategori (`/categories`) cuma diambil untuk
@@ -1089,6 +1205,7 @@ export default function Dashboard() {
           }
         } catch (statsErr) {
           console.error("Gagal memuat statistik kartu dashboard:", statsErr);
+          // Don't throw here, let other parts load
         }
         // Grafik kunjungan diambil terpisah dari statistik utama di atas -
         // supaya kalau tabel page_views belum ada / analytics gagal, kartu
@@ -1097,9 +1214,18 @@ export default function Dashboard() {
         // tidaknya request di atas.
         await fetchWeeklyAnalytics();
       } else if (activeTab === "businesses") {
-        const endpoint = isAdmin ? "/businesses?status=all" : "/my-businesses";
-        const data = await api.get(endpoint);
-        setBusinesses(data);
+        const endpoint = isAdmin ? "/businesses" : "/my-businesses";
+        const params = new URLSearchParams({
+          per_page: '10',
+          page: businessCurrentPage.toString()
+        });
+        
+        if (isAdmin) {
+          params.append('status', 'all');
+        }
+        
+        const data = await api.get(`${endpoint}?${params.toString()}`);
+        handleBusinessApiResponse(data);
       } else if (activeTab === "categories") {
         const data = await api.get("/categories");
         setCategories(data);
@@ -1119,11 +1245,11 @@ export default function Dashboard() {
         setBusinesses(myBiz);
       } else if (activeTab === "premium") {
         const [myBiz, subs, planData] = await Promise.all([
-          api.get(isAdmin ? "/businesses?status=all" : "/my-businesses"),
+          api.get(isAdmin ? "/businesses?status=all&per_page=10&page=1" : "/my-businesses?per_page=10&page=1"),
           api.get("/subscriptions"),
           api.get("/subscription-plans"),
         ]);
-        setBusinesses(myBiz);
+        handleBusinessApiResponse(myBiz);
         setSubscriptions(subs);
         setPlans(planData);
         setSubBusinessId((prev) => {
@@ -1138,17 +1264,17 @@ export default function Dashboard() {
       } else if (activeTab === "menu") {
         const [menuData, myBiz] = await Promise.all([
           api.get("/my-menu-items"),
-          api.get(isAdmin ? "/businesses?status=all" : "/my-businesses"),
+          api.get(isAdmin ? "/businesses?status=all&per_page=10&page=1" : "/my-businesses?per_page=10&page=1"),
         ]);
         setMenuItems(menuData);
-        setBusinesses(myBiz);
+        handleBusinessApiResponse(myBiz);
       } else if (activeTab === "inbox") {
         const [data, myBiz] = await Promise.all([
           api.get("/my-messages"),
-          api.get(isAdmin ? "/businesses?status=all" : "/my-businesses"),
+          api.get(isAdmin ? "/businesses?status=all&per_page=10&page=1" : "/my-businesses?per_page=10&page=1"),
         ]);
         setMessages(data);
-        setBusinesses(myBiz);
+        handleBusinessApiResponse(myBiz);
       } else if (activeTab === "saved") {
         const data = await api.get("/my-saved-businesses");
         setSavedBusinesses(data);
@@ -1215,25 +1341,44 @@ export default function Dashboard() {
       } catch (e) {
         console.error("Failed to fetch notifications:", e);
       }
-    } catch (err) {
-      console.error("fetchInitialData failed:", err);
-      if (err?.isNetworkError) {
-        setError(err.message || "Tidak dapat terhubung ke server backend.");
-      } else if (err?.status === 401) {
-        setError("Sesi login sudah habis. Silakan login ulang.");
-      } else if (err?.status === 403) {
-        setError("Anda tidak punya izin untuk mengakses data ini.");
-      } else if (err?.status >= 500) {
-        setError(`Server backend mengalami error (${err.status}). Cek log Laravel (storage/logs/laravel.log) untuk detailnya.`);
-      } else if (err?.data?.message) {
-        setError(err.data.message);
-      } else {
-        setError("Gagal memuat data dari server.");
+      } catch (err) {
+        console.error("fetchInitialData failed:", err);
+        errorHandler.logError(err, 'Dashboard fetchInitialData');
+        
+        const parsedError = errorHandler.parseApiError(err);
+        const errorMessage = errorHandler.getErrorMessage(err, 'Gagal memuat data dashboard');
+        
+        if (!retry) {
+          setDashboardError(parsedError);
+        } else {
+          setTabError(parsedError);
+        }
+        
+        // Auto-retry for retryable errors
+        if (parsedError.retryable && retryCount < MAX_RETRIES) {
+          setRetryCount(prev => prev + 1);
+          const delay = errorHandler.calculateRetryDelay(retryCount);
+          
+          setTimeout(() => {
+            fetchInitialData(true);
+          }, delay);
+        }
+      } finally {
+        if (!retry) {
+          setDashboardLoading(false);
+        } else {
+          setTabLoading(false);
+        }
       }
-    } finally {
-      // Don't set loading to false here - it's handled in useEffect
-    }
-  };
+    };
+
+    // Retry function for manual retry
+    const handleRetry = () => {
+      setRetryCount(0);
+      setDashboardError(null);
+      setTabError(null);
+      fetchInitialData();
+    };
 
   // --- BUSINESS CRUD HANDLERS ---
   const handleOpenBizModal = (biz = null) => {
@@ -1423,38 +1568,37 @@ export default function Dashboard() {
         // Create flow
         await api.post("/businesses", formData);
       }
+      setShowBizModal(false);
+      setBizFormStep(1);
       
-      // Refresh businesses data
-      const endpoint = isAdmin ? "/businesses?status=all" : "/my-businesses";
-      const data = await api.get(endpoint);
-      setBusinesses(data);
+      // Immediately refresh businesses data
+      await fetchBusinessesPage(businessCurrentPage);
 
       if (selectedPackage === "Bisnis" || selectedPackage === "Premium") {
-        alert("Usaha berhasil didaftarkan. Anda akan diarahkan ke tab Premium untuk aktivasi paket.");
-        setShowBizModal(false);
-        setBizFormStep(1);
+        success("Usaha berhasil didaftarkan. Anda akan diarahkan ke tab Premium untuk aktivasi paket.");
         setActiveTab("premium");
       } else {
         // Show success step
         setBizFormStep(7);
+        success("Usaha berhasil disimpan");
       }
       setActionLoading(false);
     } catch (err) {
       console.error("handleSaveBusiness failed:", err);
       if (err?.isNetworkError) {
-        alert(err.message || "Tidak dapat terhubung ke server.");
+        notifyError(err.message || "Tidak dapat terhubung ke server.");
       } else if (err?.data?.errors) {
         // Laravel validation error shape: { errors: { field: ["message", ...] } }
         const messages = Object.values(err.data.errors).flat().join("\n");
-        alert("Gagal menyimpan bisnis:\n\n" + messages);
+        notifyError("Gagal menyimpan bisnis:\n\n" + messages);
       } else if (err?.data?.code === "FREE_LIMIT_REACHED") {
-        alert(err.data.message + "\n\nKamu akan diarahkan ke tab Premium & Invoice.");
+        warning(err.data.message + "\n\nKamu akan diarahkan ke tab Premium & Invoice.");
         setShowBizModal(false);
         setActiveTab("premium");
       } else if (err?.data?.message) {
-        alert("Gagal menyimpan bisnis: " + err.data.message);
+        notifyError("Gagal menyimpan bisnis: " + err.data.message);
       } else {
-        alert(`Gagal menyimpan bisnis (status ${err?.status || "?"}). Cek console browser (F12) untuk detail teknisnya.`);
+        notifyError(`Gagal menyimpan bisnis (status ${err?.status || "?"}). Cek console browser (F12) untuk detail teknisnya.`);
       }
     } finally {
       setActionLoading(false);
@@ -1462,43 +1606,79 @@ export default function Dashboard() {
   };
 
   const handleDeleteBusiness = async (id) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus bisnis ini?")) return;
+    const confirmed = await confirm({
+      title: 'Hapus Bisnis',
+      message: 'Apakah Anda yakin ingin menghapus bisnis ini? Tindakan ini tidak dapat dibatalkan.',
+      type: 'danger',
+      confirmText: 'Hapus',
+      cancelText: 'Batal'
+    });
+
+    if (!confirmed) return;
+
+    setCrudLoading(prev => ({ ...prev, [`business-${id}`]: true }));
+    
     try {
       await api.delete(`/businesses/${id}`);
       
       // Refresh businesses data instead of full reload
-      const endpoint = isAdmin ? "/businesses?status=all" : "/my-businesses";
-      const data = await api.get(endpoint);
-      setBusinesses(data);
+      await fetchBusinessesPage(businessCurrentPage);
+      
+      success('Bisnis berhasil dihapus');
     } catch (err) {
-      alert("Gagal menghapus bisnis.");
+      errorHandler.logError(err, 'Delete business');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menghapus bisnis');
+      notifyError(errorMessage);
+    } finally {
+      setCrudLoading(prev => ({ ...prev, [`business-${id}`]: false }));
     }
   };
 
   const handleApproveBusiness = async (id) => {
+    setCrudLoading(prev => ({ ...prev, [`approve-${id}`]: true }));
+    
     try {
       await api.post(`/admin/businesses/${id}/approve`);
       
       // Refresh businesses data instead of full reload
-      const endpoint = isAdmin ? "/businesses?status=all" : "/my-businesses";
-      const data = await api.get(endpoint);
-      setBusinesses(data);
+      await fetchBusinessesPage(businessCurrentPage);
+      
+      success('Bisnis berhasil disetujui');
     } catch (err) {
-      alert("Gagal menyetujui bisnis.");
+      errorHandler.logError(err, 'Approve business');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menyetujui bisnis');
+      notifyError(errorMessage);
+    } finally {
+      setCrudLoading(prev => ({ ...prev, [`approve-${id}`]: false }));
     }
   };
 
   const handleRejectBusiness = async (id) => {
-    if (!confirm("Tolak bisnis ini? Bisnis akan berstatus ditolak/ditangguhkan.")) return;
+    const confirmed = await confirm({
+      title: 'Tolak Bisnis',
+      message: 'Tolak bisnis ini? Bisnis akan berstatus ditolak/ditangguhkan.',
+      type: 'warning',
+      confirmText: 'Tolak',
+      cancelText: 'Batal'
+    });
+
+    if (!confirmed) return;
+
+    setCrudLoading(prev => ({ ...prev, [`reject-${id}`]: true }));
+    
     try {
       await api.post(`/admin/businesses/${id}/suspend`, { reason: "Ditolak oleh admin" });
       
       // Refresh businesses data instead of full reload
-      const endpoint = isAdmin ? "/businesses?status=all" : "/my-businesses";
-      const data = await api.get(endpoint);
-      setBusinesses(data);
+      await fetchBusinessesPage(businessCurrentPage);
+      
+      warning('Bisnis telah ditolak');
     } catch (err) {
-      alert("Gagal menolak bisnis.");
+      errorHandler.logError(err, 'Reject business');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menolak bisnis');
+      error(errorMessage);
+    } finally {
+      setCrudLoading(prev => ({ ...prev, [`reject-${id}`]: false }));
     }
   };
 
@@ -1507,9 +1687,7 @@ export default function Dashboard() {
       await api.post(`/admin/businesses/${id}/toggle-premium`);
       
       // Refresh businesses data instead of full reload
-      const endpoint = isAdmin ? "/businesses?status=all" : "/my-businesses";
-      const data = await api.get(endpoint);
-      setBusinesses(data);
+      await fetchBusinessesPage(businessCurrentPage);
     } catch (err) {
       alert("Gagal mengubah status premium.");
     }
@@ -1658,7 +1836,7 @@ export default function Dashboard() {
   const [cpExpiresAt, setCpExpiresAt] = useState("");
 
   const handleOpenCouponModal = (coupon = null) => {
-    const myBiz = businesses.filter((b) => isAdmin || b.user_id === user?.id);
+    const myBiz = Array.isArray(businesses) ? businesses.filter((b) => isAdmin || b.user_id === user?.id) : [];
     setSelectedCoupon(coupon);
     setCpBusinessId(coupon?.business_id || myBiz[0]?.id || "");
     setCpCode(coupon?.code || "");
@@ -1713,15 +1891,44 @@ export default function Dashboard() {
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState(null);
   const menuSectionRefs = useRef([]);
-  const menuFormStep = useStepScrollSpy(showMenuModal, menuSectionRefs, 3);
+  // Enhanced menu form step management
+  const [menuFormStep, setMenuFormStep] = useState(0);
+  
+  const nextMenuStep = () => {
+    if (menuFormStep < 2) {
+      setMenuFormStep(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  
+  const prevMenuStep = () => {
+    if (menuFormStep > 0) {
+      setMenuFormStep(prev => prev - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  
+  const canProceedToNextStep = () => {
+    switch (menuFormStep) {
+      case 0:
+        return mnBusinessId && mnName.trim();
+      case 1:
+        return mnPrice && parseInt(mnPrice) > 0;
+      case 2:
+        return true; // Media step is optional
+      default:
+        return false;
+    }
+  };
   const [mnBusinessId, setMnBusinessId] = useState("");
   const [mnName, setMnName] = useState("");
   const [mnDescription, setMnDescription] = useState("");
   const [mnPrice, setMnPrice] = useState("");
+  const [mnCategory, setMnCategory] = useState("");
   const [mnImage, setMnImage] = useState(null);
 
   const handleOpenMenuModal = (item = null) => {
-    const myBiz = businesses.filter((b) => isAdmin || b.user_id === user?.id);
+    const myBiz = Array.isArray(businesses) ? businesses.filter((b) => isAdmin || b.user_id === user?.id) : [];
     // PENTING: kalau belum punya bisnis terdaftar sama sekali, dropdown
     // "Pilih bisnis..." di form bakal kosong dan submit-nya nggak akan
     // pernah berhasil (browser cuma nunjukin validasi bawaan yang kurang
@@ -1736,12 +1943,27 @@ export default function Dashboard() {
     setMnName(item?.name || "");
     setMnDescription(item?.description || "");
     setMnPrice(item?.price || "");
+    setMnCategory(item?.category || "");
     setMnImage(null);
+    setMenuFormStep(0); // Reset to first step
     setShowMenuModal(true);
   };
 
   const handleSaveMenu = async (e) => {
     e.preventDefault();
+    
+    // Client-side validation
+    const errors = {};
+    if (!mnBusinessId) errors.business_id = "Pilih bisnis terlebih dahulu";
+    if (!mnName.trim()) errors.name = "Nama produk wajib diisi";
+    if (!mnPrice || parseInt(mnPrice) <= 0) errors.price = "Harga harus lebih dari 0";
+    
+    if (Object.keys(errors).length > 0) {
+      setMenuFormErrors(errors);
+      return;
+    }
+
+    setMenuFormErrors({});
     setActionLoading(true);
     try {
       const formData = new FormData();
@@ -1749,35 +1971,64 @@ export default function Dashboard() {
       formData.append("name", mnName);
       formData.append("description", mnDescription || "");
       formData.append("price", parseInt(mnPrice) || 0);
+      if (mnCategory) formData.append("category", mnCategory);
       if (mnImage) formData.append("image", mnImage);
 
       if (selectedMenu) {
         await api.post(`/menu-items/${selectedMenu.id}`, formData);
+        success('Menu berhasil diperbarui');
       } else {
         await api.post("/menu-items", formData);
+        success('Menu berhasil ditambahkan');
       }
       setShowMenuModal(false);
+      setMenuFormStep(0); // Reset form step
       
       // Refresh menu items data instead of full reload
       const data = await api.get("/my-menu-items");
       setMenuItems(data);
     } catch (err) {
-      alert(err?.data?.errors ? Object.values(err.data.errors).flat().join("\n") : "Gagal menyimpan menu.");
+      errorHandler.logError(err, 'Menu form submission');
+      const validationErrors = errorHandler.formatValidationErrors(err);
+      
+      if (Object.keys(validationErrors).length > 0) {
+        setMenuFormErrors(validationErrors);
+      } else {
+        const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menyimpan menu');
+        setMenuFormErrors({ general: errorMessage });
+      }
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteMenu = async (id) => {
-    if (!confirm("Hapus menu ini?")) return;
+    const confirmed = await confirm({
+      title: 'Hapus Menu',
+      message: 'Apakah Anda yakin ingin menghapus menu ini?',
+      type: 'danger',
+      confirmText: 'Hapus',
+      cancelText: 'Batal'
+    });
+
+    if (!confirmed) return;
+
+    setCrudLoading(prev => ({ ...prev, [`menu-${id}`]: true }));
+    
     try {
       await api.delete(`/menu-items/${id}`);
       
       // Refresh menu items data instead of full reload
       const data = await api.get("/my-menu-items");
       setMenuItems(data);
+      
+      success('Menu berhasil dihapus');
     } catch (err) {
-      alert("Gagal menghapus menu.");
+      errorHandler.logError(err, 'Delete menu');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menghapus menu');
+      notifyError(errorMessage);
+    } finally {
+      setCrudLoading(prev => ({ ...prev, [`menu-${id}`]: false }));
     }
   };
 
@@ -1792,15 +2043,32 @@ export default function Dashboard() {
   };
 
   const handleDeleteMessage = async (id) => {
-    if (!confirm("Hapus pesan ini?")) return;
+    const confirmed = await confirm({
+      title: 'Hapus Pesan',
+      message: 'Apakah Anda yakin ingin menghapus pesan ini?',
+      type: 'danger',
+      confirmText: 'Hapus',
+      cancelText: 'Batal'
+    });
+
+    if (!confirmed) return;
+
+    setCrudLoading(prev => ({ ...prev, [`message-${id}`]: true }));
+    
     try {
       await api.delete(`/messages/${id}`);
       
       // Refresh messages data instead of full reload
       const data = await api.get("/my-messages");
       setMessages(data);
+      
+      success('Pesan berhasil dihapus');
     } catch (err) {
-      alert("Gagal menghapus pesan.");
+      errorHandler.logError(err, 'Delete message');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menghapus pesan');
+      notifyError(errorMessage);
+    } finally {
+      setCrudLoading(prev => ({ ...prev, [`message-${id}`]: false }));
     }
   };
 
@@ -1907,18 +2175,36 @@ export default function Dashboard() {
 
   const handleDeleteUser = async (id) => {
     if (id === user.id) {
-      alert("Anda tidak bisa menghapus akun Anda sendiri!");
+      error("Anda tidak bisa menghapus akun Anda sendiri!");
       return;
     }
-    if (!confirm("Apakah Anda yakin ingin menghapus user ini?")) return;
+    
+    const confirmed = await confirm({
+      title: 'Hapus Pengguna',
+      message: 'Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak dapat dibatalkan.',
+      type: 'danger',
+      confirmText: 'Hapus',
+      cancelText: 'Batal'
+    });
+
+    if (!confirmed) return;
+
+    setCrudLoading(prev => ({ ...prev, [`user-${id}`]: true }));
+    
     try {
       await api.delete(`/admin/users/${id}`);
       
       // Refresh users data instead of full reload
       const data = await api.get("/admin/users");
       setUsers(data);
+      
+      success('Pengguna berhasil dihapus');
     } catch (err) {
-      alert("Gagal menghapus user.");
+      errorHandler.logError(err, 'Delete user');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menghapus pengguna');
+      notifyError(errorMessage);
+    } finally {
+      setCrudLoading(prev => ({ ...prev, [`user-${id}`]: false }));
     }
   };
 
@@ -2032,7 +2318,18 @@ export default function Dashboard() {
   };
 
   const handleDeleteTicket = async (id) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus tiket ini?")) return;
+    const confirmed = await confirm({
+      title: 'Hapus Tiket',
+      message: 'Apakah Anda yakin ingin menghapus tiket ini?',
+      type: 'danger',
+      confirmText: 'Hapus',
+      cancelText: 'Batal'
+    });
+
+    if (!confirmed) return;
+
+    setCrudLoading(prev => ({ ...prev, [`ticket-${id}`]: true }));
+    
     try {
       await api.delete(`/payment-tickets/${id}`);
       
@@ -2044,8 +2341,14 @@ export default function Dashboard() {
         const data = await api.get("/my-payment-tickets");
         setTickets(data);
       }
+      
+      success('Tiket berhasil dihapus');
     } catch (err) {
-      alert("Gagal menghapus tiket.");
+      errorHandler.logError(err, 'Delete ticket');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menghapus tiket');
+      notifyError(errorMessage);
+    } finally {
+      setCrudLoading(prev => ({ ...prev, [`ticket-${id}`]: false }));
     }
   };
 
@@ -2066,10 +2369,47 @@ export default function Dashboard() {
   const handlePaymentError = (message) => {
     alert('Pembayaran gagal: ' + message);
   };
-
   const handlePaymentCancel = () => {
     setShowPaymentGateway(false);
-    setSelectedBusinessForPayment(null);
+  };
+
+  // --- WITHDRAWAL (TARIK SALDO KOMISI) HANDLER ---
+  const handleRequestWithdrawal = async (e) => {
+    e.preventDefault();
+    if (!withdrawAmount || Number(withdrawAmount) < 50000) {
+      alert("Minimal penarikan komisi adalah Rp 50.000.");
+      return;
+    }
+    if (!withdrawAccountNumber.trim() || !withdrawAccountName.trim()) {
+      alert("Nomor dan nama pemilik rekening wajib diisi.");
+      return;
+    }
+    setWithdrawLoading(true);
+    try {
+      const res = await api.post("/withdrawals", {
+        amount: Number(withdrawAmount),
+        payment_method: withdrawMethod,
+        account_number: withdrawAccountNumber.trim(),
+        account_name: withdrawAccountName.trim(),
+      });
+      alert(res?.message || "Pengajuan penarikan komisi berhasil dikirim ke admin!");
+      setShowWithdrawModal(false);
+      setWithdrawAmount("");
+      setWithdrawAccountNumber("");
+      setWithdrawAccountName("");
+      // Refresh
+      const [refRes, withRes] = await Promise.all([
+        api.get("/my-referral-stats"),
+        api.get("/my-withdrawals").catch(() => ({ data: [] }))
+      ]);
+      setReferralStats(refRes.data || refRes || null);
+      setMyWithdrawals(withRes.data || withRes || []);
+    } catch (err) {
+      const errMsg = err?.data?.message || err?.message || "Gagal mengajukan penarikan komisi.";
+      alert(errMsg);
+    } finally {
+      setWithdrawLoading(false);
+    }
   };
 
   // --- PREMIUM PACKAGE CRUD HANDLERS ---
@@ -2136,7 +2476,9 @@ export default function Dashboard() {
   };
 
   // --- ADVERTISEMENT (IKLAN) CRUD HANDLERS ---
-  const myActivePremiumBiz = businesses.filter((b) => b.is_premium_active && (isAdmin || b.user_id === user?.id));
+  const myActivePremiumBiz = Array.isArray(businesses) 
+    ? businesses.filter((b) => b.is_premium_active && (isAdmin || b.user_id === user?.id))
+    : [];
   const canPostAds = isAdmin || myActivePremiumBiz.length > 0;
 
   const handleOpenAdModal = (ad = null) => {
@@ -2198,12 +2540,27 @@ export default function Dashboard() {
 
       if (selectedAd) {
         await api.put(`/advertisements/${selectedAd.id}`, formData);
+        success('Iklan berhasil diperbarui');
       } else {
         await api.post("/advertisements", formData);
+        success('Iklan berhasil dibuat');
       }
-      setShowAdModal(false);
       
-      // Refresh ads data instead of full reload
+      // Close modal first for immediate feedback
+      setShowAdModal(false);
+      setSelectedAd(null);
+      
+      // Clear form
+      setAdTitle('');
+      setAdCategory('');
+      setAdDescription('');
+      setAdCompany('');
+      setAdLocation('');
+      setAdPhone('');
+      setAdWebsite('');
+      setAdImage('');
+      
+      // Then refresh data
       const [pending, approved, rejected] = await Promise.all([
         api.get("/advertisements?status=pending"),
         api.get("/advertisements?status=approved"),
@@ -2218,14 +2575,26 @@ export default function Dashboard() {
       const firstValidationError = err?.data?.errors
         ? Object.values(err.data.errors)[0]?.[0]
         : null;
-      alert(firstValidationError || err?.data?.message || "Gagal menyimpan iklan.");
+      const errorMessage = firstValidationError || err?.data?.message || "Gagal menyimpan iklan.";
+      error(errorMessage);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteAd = async (id) => {
-    if (!confirm("Hapus iklan ini?")) return;
+    const confirmed = await confirm({
+      title: 'Hapus Iklan',
+      message: 'Apakah Anda yakin ingin menghapus iklan ini?',
+      type: 'danger',
+      confirmText: 'Hapus',
+      cancelText: 'Batal'
+    });
+
+    if (!confirmed) return;
+
+    setCrudLoading(prev => ({ ...prev, [`ad-${id}`]: true }));
+    
     try {
       await api.delete(`/advertisements/${id}`);
       
@@ -2236,8 +2605,14 @@ export default function Dashboard() {
         api.get("/advertisements?status=rejected"),
       ]);
       setAds(dedupeAdsById([...pending, ...approved, ...rejected]));
+      
+      success('Iklan berhasil dihapus');
     } catch (err) {
-      alert("Gagal menghapus iklan.");
+      errorHandler.logError(err, 'Delete ad');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menghapus iklan');
+      notifyError(errorMessage);
+    } finally {
+      setCrudLoading(prev => ({ ...prev, [`ad-${id}`]: false }));
     }
   };
 
@@ -2698,7 +3073,7 @@ export default function Dashboard() {
 
   // --- PREMIUM SUBSCRIPTION HANDLERS ---
   const handleOpenSubModal = () => {
-    const myBiz = businesses.filter((b) => isAdmin || b.user_id === user?.id);
+    const myBiz = Array.isArray(businesses) ? businesses.filter((b) => isAdmin || b.user_id === user?.id) : [];
     setSubBusinessId(myBiz[0]?.id || "");
     setSubPlan("monthly");
     setShowSubModal(true);
@@ -2743,6 +3118,29 @@ export default function Dashboard() {
     return diff;
   };
 
+  // Helper function to handle business API responses with pagination
+  const handleBusinessApiResponse = (response) => {
+    if (response.data && response.current_page !== undefined) {
+      // Paginated response from Laravel
+      setBusinesses(response.data);
+      setBusinessPagination({
+        current_page: response.current_page,
+        last_page: response.last_page,
+        per_page: response.per_page,
+        total: response.total
+      });
+    } else {
+      // Non-paginated response (fallback)
+      setBusinesses(Array.isArray(response) ? response : []);
+      setBusinessPagination({
+        current_page: 1,
+        last_page: 1,
+        per_page: response.length || 0,
+        total: response.length || 0
+      });
+    }
+  };
+
   // Filter lists
   const filteredContentItems = contentItems.filter(
     (item) =>
@@ -2750,17 +3148,116 @@ export default function Dashboard() {
       item.title.toLowerCase().includes(contentSearch.toLowerCase())
   );
 
-  const filteredBusinesses = businesses.filter((b) =>
-    b.title.toLowerCase().includes(bizSearch.toLowerCase()) ||
-    b.address.toLowerCase().includes(bizSearch.toLowerCase())
-  );
+  // Function to fetch businesses for a specific page with search
+  const fetchBusinessesPage = async (page = 1, search = bizSearch) => {
+    setTabLoading(true);
+    try {
+      const endpoint = isAdmin ? "/businesses" : "/my-businesses";
+      const params = new URLSearchParams({
+        per_page: '10',
+        page: page.toString()
+      });
+      
+      if (isAdmin) {
+        params.append('status', 'all');
+      }
+      
+      if (search.trim()) {
+        params.append('q', search.trim());
+      }
+      
+      const data = await api.get(`${endpoint}?${params.toString()}`);
+      handleBusinessApiResponse(data);
+      setBusinessCurrentPage(page);
+    } catch (err) {
+      console.error("Error fetching businesses page:", err);
+      setTabError(errorHandler.parseApiError(err));
+    } finally {
+      setTabLoading(false);
+    }
+  };
+
+  // Debounced search function
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (activeTab === "businesses") {
+        fetchBusinessesPage(1, bizSearch);
+      }
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [bizSearch, activeTab]);
+
+  // Update pagination logic to use real pagination data
+  const businessTotalPages = businessPagination.last_page;
+  const businessSafePage = businessCurrentPage;
+  const paginatedBusinesses = businesses; // Data is already paginated from API
+
+  // Helper function to get page numbers for pagination component
+  const getBusinessPageNumbers = () => {
+    const pages = [];
+    const totalPages = businessTotalPages;
+    const currentPage = businessSafePage;
+    
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+      
+      if (currentPage > 3) {
+        pages.push("...");
+      }
+      
+      // Show pages around current page
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      
+      if (currentPage < totalPages - 2) {
+        pages.push("...");
+      }
+      
+      // Always show last page (if > 1)
+      if (totalPages > 1) {
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
+
+  // Update page change handler
+  const handleBusinessPageChange = (page) => {
+    fetchBusinessesPage(page, bizSearch);
+  };
+
+  // Debounced search function
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (activeTab === "businesses") {
+        fetchBusinessesPage(1, bizSearch);
+      }
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [bizSearch, activeTab]);
 
   const filteredUsers = users.filter((u) =>
     u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
     u.email.toLowerCase().includes(userSearch.toLowerCase())
   );
 
-  const filteredAds = (isAdmin ? ads : ads.filter((a) => a.user_id === user?.id)).filter((a) =>
+  // Safe guard untuk businesses array
+  const safeBusinesses = Array.isArray(businesses) ? businesses : [];
+  const safeAds = Array.isArray(ads) ? ads : [];
+  const safeUsers = Array.isArray(users) ? users : [];
+
+  const filteredAds = (isAdmin ? safeAds : safeAds.filter((a) => a.user_id === user?.id)).filter((a) =>
     a.title.toLowerCase().includes(adSearch.toLowerCase()) ||
     a.company_name.toLowerCase().includes(adSearch.toLowerCase())
   );
@@ -2771,11 +3268,11 @@ export default function Dashboard() {
     const q = topbarQuery.trim().toLowerCase();
     if (q.length < 2) return { businesses: [], users: [] };
     return {
-      businesses: businesses
+      businesses: safeBusinesses
         .filter((b) => b.title?.toLowerCase().includes(q) || b.address?.toLowerCase().includes(q))
         .slice(0, 5),
       users: isAdmin
-        ? users.filter((u) => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)).slice(0, 5)
+        ? safeUsers.filter((u) => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)).slice(0, 5)
         : [],
     };
   })();
@@ -2785,11 +3282,36 @@ export default function Dashboard() {
   // the profile) - render nothing but a simple loader instead of either a
   // flash of empty dashboard or a premature redirect to /login.
   if (authLoading) {
-    return <Loading />;
+    return <Loading text="Memuat dashboard..." />;
   }
 
   if (!user) {
     return null; // navigate("/login") from the effect above is already firing
+  }
+
+  // Show loading overlay for initial dashboard loading
+  if (dashboardLoading) {
+    return (
+      <LoadingSpinner 
+        overlay={true} 
+        size="xl" 
+        text="Memuat dashboard Anda..." 
+      />
+    );
+  }
+
+  // Show critical errors that prevent dashboard from loading
+  if (dashboardError && !errorHandler.isRetryableError(dashboardError)) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <ErrorState
+          title="Gagal Memuat Dashboard"
+          message={dashboardError.userMessage || dashboardError.message}
+          retry={handleRetry}
+          type={dashboardError.type}
+        />
+      </div>
+    );
   }
 
   return (
@@ -2799,18 +3321,39 @@ export default function Dashboard() {
         onClick={() => setSidebarOpen(false)}
       />
 
-      <div className={`dashboard-container ${!sidebarOpen ? "dashboard-container--collapsed" : ""}`}>
+      <div className={`dashboard-container ${!sidebarOpen ? "dashboard-container--collapsed" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+        {/* Mobile sidebar overlay */}
+        {isMobile && (
+          <div 
+            className={`db-sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        
         {/* Sidebar */}
-        <aside className={`db-sidebar ${sidebarOpen ? "open" : ""}`}>
+        <aside className={`db-sidebar ${sidebarOpen ? "open" : ""} ${sidebarCollapsed ? "collapsed" : ""}`}>
           <div className="db-sidebar-header">
             <div className="db-sidebar-logo">
               <img src={logoImg} alt="Surade.co.id" className="db-sidebar-logo__img" />
-              <span className="db-sidebar-logo__text">Surade.co.id</span>
+              {!sidebarCollapsed && <span className="db-sidebar-logo__text">Surade.co.id</span>}
             </div>
+            {/* Desktop Toggle Button - positioned to the right of logo */}
+            <button
+              className="db-sidebar-toggle-btn"
+              onClick={() => setSidebarCollapsed(prev => !prev)}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            </button>
+          </div>
+
+          {/* Mobile Hamburger - only for mobile */}
+          <div className="db-mobile-only">
             <button
               className="db-hamburger-btn"
-              onClick={() => setSidebarOpen((v) => !v)}
-              aria-label={sidebarOpen ? "Tutup menu" : "Buka menu"}
+              onClick={() => setSidebarOpen(prev => !prev)}
+              aria-label="Toggle mobile sidebar"
             >
               <div className="hamburger-icon">
                 <span></span>
@@ -2926,8 +3469,6 @@ export default function Dashboard() {
             ) : (
               <>
                 <button
-<<<<<<< HEAD
-=======
                   className={`db-menu-btn ${activeTab === "businesses" ? "active" : ""}`}
                   onClick={() => setActiveTab("businesses")}
                 >
@@ -2938,7 +3479,7 @@ export default function Dashboard() {
                 </button>
 
                 <button
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
                   className={`db-menu-btn ${activeTab === "saved" ? "active" : ""}`}
                   onClick={() => setActiveTab("saved")}
                 >
@@ -3011,14 +3552,12 @@ export default function Dashboard() {
                   )}
                 </button>
 
-<<<<<<< HEAD
-=======
                 {/* Menu "Notifikasi" di sidebar sengaja dihapus - semua notifikasi
                     sekarang cukup dibuka lewat ikon lonceng di topbar (lihat
                     db-notification-dropdown di bawah), jadi tidak ada lagi menu
                     terpisah. */}
 
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
                 <button
                   className={`db-menu-btn ${activeTab === "referral" ? "active" : ""}`}
                   onClick={() => setActiveTab("referral")}
@@ -3031,11 +3570,8 @@ export default function Dashboard() {
 
                 <button
                   className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
-<<<<<<< HEAD
                   onClick={() => setActiveTab("content")}
-=======
-                  onClick={handleOpenContentTab}
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
                 >
                   <div className="db-menu-icon">
                     <BookOpen size={20} />
@@ -3094,7 +3630,7 @@ export default function Dashboard() {
               lihat isinya, lihat pengecekan `isAdmin` di dalam). */}
           {activeTab === "dashboard" && (
             <div className="db-topbar">
-              <div className="db-topbar__search" style={{ position: "relative" }}>
+              <div className="db-topbar__search hide-mobile" style={{ position: "relative" }}>
                 <Search size={16} />
                 <input
                   type="text"
@@ -3253,7 +3789,7 @@ export default function Dashboard() {
                 </div>
                 <div className="db-topbar__divider" />
                 <button type="button" className="db-topbar__user" onClick={() => setActiveTab("profile")}>
-                  <div className="db-topbar__user-info">
+                  <div className="db-topbar__user-info hide-mobile">
                     <strong>{user?.name || "Pengguna"}</strong>
                     <span>{user?.role === "admin" ? "Super Admin" : user?.role === "reseller" ? "Reseller" : "User"}</span>
                   </div>
@@ -3283,14 +3819,13 @@ export default function Dashboard() {
                     <p className="db-dashboard-titlebar__subtitle">Selamat Datang {user?.name || "Pengguna"}</p>
                   )}
                 </div>
-                <div className="db-dashboard-breadcrumb">
+                <div className="db-dashboard-breadcrumb hide-mobile">
                   <Home size={14} />
                   <ChevronRight size={13} />
                   <span className="db-dashboard-breadcrumb__current">Dashboard</span>
                 </div>
               </div>
 
-              {/* Admin banners - keep as original */}
               {isAdmin && !dismissedBanners.includes("info") && (
                 <div className="db-dashboard-banner db-dashboard-banner--info">
                   <div className="db-dashboard-banner__content">
@@ -3355,7 +3890,7 @@ export default function Dashboard() {
 
                   <div className="db-kpi-card">
                     <div className="db-kpi-card__icon db-kpi-card__icon--green"><Crown size={16} /></div>
-                    <span className="db-kpi-card__value">{businesses.filter((b) => b.is_premium_active).length}</span>
+                    <span className="db-kpi-card__value">{Array.isArray(businesses) ? businesses.filter((b) => b.is_premium_active).length : 0}</span>
                     <span className="db-kpi-card__label">Premium</span>
                     <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("premium-packages")}>
                       More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
@@ -3413,7 +3948,8 @@ export default function Dashboard() {
                   user/reseller tampil DOBEL sekaligus untuk semua orang.
                   Sekarang dibungkus {isAdmin ? (...) : (...)} yang benar. */}
               {isAdmin ? (
-              <div className="db-dashboard-widgets">
+                <>
+                <div className="db-dashboard-widgets">
                   <div className="db-dashboard-widgets__col">
                     <div className="db-widget-card db-widget-card--sales">
                       <div className="db-widget-card__header db-widget-card__header--dark">
@@ -3594,120 +4130,188 @@ export default function Dashboard() {
 
                   </div>
                 </div>
-              ) : (
+                </>
+              ) : null}
 
-                // Dashboard User - Sesuai gambar contoh yang diberikan
-                <div className="db-panel db-panel--dashboard">
-                  {/* Admin banners - keep as original */}
-                  {!dismissedBanners.includes("info") && (
-                    <div className="db-dashboard-banner db-dashboard-banner--info">
-                      <div className="db-dashboard-banner__content">
-                        <Shield size={16} />
-                        <span>Surade.co.id dapat meningkatkan daya saing usaha Anda.</span>
+                  {!isAdmin && (
+                    <>
+                      {/* Enhanced Welcome Banner */}
+                      <div className="db-welcome-banner">
+                        <div className="db-welcome-content">
+                          <div className="db-welcome-date">
+                            {new Date().toLocaleDateString("id-ID", { 
+                              weekday: 'long', 
+                              day: "numeric", 
+                              month: "long", 
+                              year: "numeric" 
+                            })}
+                          </div>
+                          <h2 className="db-welcome-title">
+                            Selamat Datang, {user?.name?.split(' ')[0] || 'Pengguna'} 👋
+                          </h2>
+                          <p className="db-welcome-subtitle">
+                            Dashboard usaha Anda berjalan dengan baik hari ini.
+                          </p>
+                        </div>
+                        <div className="db-welcome-actions">
+                          <button
+                            className="db-action-btn"
+                            onClick={() => setActiveTab("businesses")}
+                          >
+                            <Building2 size={16} /> 
+                            Kelola Bisnis
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        className="db-dashboard-banner__close"
-                        onClick={() => setDismissedBanners((p) => [...p, "info"])}
-                        aria-label="Tutup"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
 
-                  {!dismissedBanners.includes("warning") && (
-                    <div className="db-dashboard-banner db-dashboard-banner--warning">
-                      <div className="db-dashboard-banner__content">
-                        <Megaphone size={16} />
-                        <span>Publikasikan Bisnis/Usaha Anda hari ini dan dapatkan pelanggan baru!</span>
-                      </div>
-                      <button
-                        className="db-dashboard-banner__close"
-                        onClick={() => setDismissedBanners((p) => [...p, "warning"])}
-                        aria-label="Tutup"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="db-dashboard-stats-wrap">
-                  <p className="db-dashboard-date">
-                    {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
-                  </p>
-
-                  <div className="db-kpi-grid">
-                    <div className="db-kpi-card">
-                      <div className="db-kpi-card__icon db-kpi-card__icon--blue"><Building2 size={16} /></div>
-                      <span className="db-kpi-card__value">{businesses.filter((b) => b.user_id === user?.id).length}</span>
-                      <span className="db-kpi-card__label">Total Bisnis</span>
-                      <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("businesses")}>
-                        More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                      </button>
-                    </div>
-
-                    <div className="db-kpi-card">
-                      <div className="db-kpi-card__icon db-kpi-card__icon--green"><Crown size={16} /></div>
-                      <span className="db-kpi-card__value">{businesses.filter((b) => b.user_id === user?.id && b.is_premium_active).length}</span>
-                      <span className="db-kpi-card__label">Premium</span>
-                      <button 
-                        type="button" 
-                        className="db-kpi-card__more" 
-                        onClick={() => {
-                          const userBusinesses = businesses.filter((b) => b.user_id === user?.id);
-                          if (userBusinesses.length > 0) {
-                            handleOpenPaymentGateway(userBusinesses[0], 'monthly');
-                          } else {
-                            alert('Anda perlu menambahkan bisnis terlebih dahulu');
-                          }
-                        }}
-                      >
-                        Upgrade Premium <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                      </button>
-                    </div>
-
-                    <div className="db-kpi-card">
-                      <div className="db-kpi-card__icon db-kpi-card__icon--blue"><Eye size={16} /></div>
-                      <span className="db-kpi-card__value">{weeklyAnalytics?.user_total ?? 0}</span>
-                      <span className="db-kpi-card__label">Pengunjung</span>
-                      <button type="button" className="db-kpi-card__more" onClick={() => setActiveTab("businesses")}>
-                        More info <span className="db-kpi-card__more-arrow"><ArrowUpRight size={12} /></span>
-                      </button>
-                    </div>
-                  </div>
-                  </div>
-
-                  {/* Charts Row - 2 grafik seperti gambar ketiga */}
-                  <div className="db-charts-row">
-                    <div className="db-chart-card db-chart-card--wide">
-                      <div className="db-chart-card__header">
-                        <div className="db-chart-card__icon"><Eye size={18} /></div>
-                        <h3>Grafik Kunjungan Pelanggan</h3>
-                        <button
-                          type="button"
-                          className="db-widget-card__header-link"
-                          onClick={() => setShowVisitChartDetail((v) => !v)}
+                      {/* Enhanced Statistics Cards */}
+                      <div className="db-stats-grid stagger-children fade-in">
+                        <div 
+                          className="db-stat-card hover-lift slide-in-up" 
+                          style={{'--accent-color': '#0d9488', '--accent-color-light': '#14b8a6', '--accent-bg': 'linear-gradient(135deg, #0d9488, #0f766e)', '--accent-shadow': 'rgba(13, 148, 136, 0.3)'}}
                         >
-                          {showVisitChartDetail ? "Sembunyikan Detail" : "Lihat Detail"}
+                          <div className="db-stat-icon">
+                            <Building2 size={24} color="#fff" />
+                          </div>
+                          <div className="db-stat-content">
+                            <div className="db-stat-label">Total Bisnis</div>
+                            <div className="db-stat-value">{Array.isArray(businesses) ? businesses.filter(b => b.user_id === user?.id).length : 0}</div>
+                            <div className="db-stat-trend positive">
+                              <TrendingUp size={12} />
+                              Aktif
+                            </div>
+                          </div>
+                        </div>
+
+                        <div 
+                          className="db-stat-card hover-lift slide-in-up" 
+                          style={{'--accent-color': '#f59e0b', '--accent-color-light': '#fbbf24', '--accent-bg': 'linear-gradient(135deg, #f59e0b, #d97706)', '--accent-shadow': 'rgba(245, 158, 11, 0.3)'}}
+                          onClick={() => setActiveTab("ads")}
+                        >
+                          <div className="db-stat-icon">
+                            <Megaphone size={24} color="#fff" />
+                          </div>
+                          <div className="db-stat-content">
+                            <div className="db-stat-label">Iklan Aktif</div>
+                            <div className="db-stat-value">{ads.filter(a => a.user_id === user?.id && a.status === 'approved').length}</div>
+                            <div className="db-stat-trend positive">
+                              <Eye size={12} />
+                              Dilihat
+                            </div>
+                          </div>
+                        </div>
+
+                        <div 
+                          className="db-stat-card hover-lift slide-in-up" 
+                          style={{'--accent-color': '#3b82f6', '--accent-color-light': '#60a5fa', '--accent-bg': 'linear-gradient(135deg, #3b82f6, #2563eb)', '--accent-shadow': 'rgba(59, 130, 246, 0.3)'}}
+                        >
+                          <div className="db-stat-icon">
+                            <Eye size={24} color="#fff" />
+                          </div>
+                          <div className="db-stat-content">
+                            <div className="db-stat-label">Pengunjung</div>
+                            <div className="db-stat-value">{weeklyAnalytics?.user_total ?? 0}</div>
+                            <div className="db-stat-trend positive">
+                              <Users size={12} />
+                              Minggu ini
+                            </div>
+                          </div>
+                        </div>
+
+                        <div 
+                          className="db-stat-card hover-lift slide-in-up" 
+                          style={{'--accent-color': '#8b5cf6', '--accent-color-light': '#a78bfa', '--accent-bg': 'linear-gradient(135deg, #8b5cf6, #7c3aed)', '--accent-shadow': 'rgba(139, 92, 246, 0.3)'}}
+                          onClick={() => setActiveTab("referral")}
+                        >
+                          <div className="db-stat-icon">
+                            <Wallet size={24} color="#fff" />
+                          </div>
+                          <div className="db-stat-content">
+                            <div className="db-stat-label">Komisi Referral</div>
+                            <div className="db-stat-value">
+                              {referralStats?.total_komisi_diterima ? 
+                                `Rp ${Number(referralStats.total_komisi_diterima).toLocaleString('id-ID')}` : 
+                                'Rp 0'
+                              }
+                            </div>
+                            <div className="db-stat-trend positive">
+                              <DollarSign size={12} />
+                              Tersedia
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Enhanced Quick Actions */}
+                      <div className="db-quick-actions">
+                        <div className="db-quick-actions-label">Aksi Cepat:</div>
+                        <button 
+                          className="db-action-btn" 
+                          onClick={() => setActiveTab("businesses")}
+                        >
+                          <Building2 size={16} /> 
+                          + Tambah Bisnis
+                        </button>
+                        <button 
+                          className="db-action-btn db-action-btn--secondary" 
+                          onClick={() => setActiveTab("ads")}
+                        >
+                          <Megaphone size={16} /> 
+                          + Buat Iklan
+                        </button>
+                        <button 
+                          className="db-action-btn db-action-btn--premium" 
+                          onClick={() => {
+                            const userBiz = Array.isArray(businesses) ? businesses.filter(b => b.user_id === user?.id) : [];
+                            if (userBiz.length > 0) {
+                              handleOpenPaymentGateway(userBiz[0], 'monthly');
+                            } else {
+                              alert('Anda perlu menambahkan bisnis terlebih dahulu.');
+                            }
+                          }}
+                        >
+                          <Crown size={16} /> 
+                          ⭐ Upgrade Premium
+                        </button>
+                        <button 
+                          className="db-action-btn db-action-btn--success" 
+                          onClick={() => setActiveTab("referral")}
+                        >
+                          <Wallet size={16} /> 
+                          💳 Tarik Komisi
                         </button>
                       </div>
-                      <div className="db-chart-container">
+
+                      {/* Dashboard Content Grid */}
+                      <div className="db-content-grid">
+                        <div className="db-content-main">
+                          {/* Charts and main content */}
+                          <div className="db-chart-card">
+                            <div className="db-chart-card__header">
+                              <div className="db-chart-card__icon"><Eye size={18} /></div>
+                              <h3>Grafik Kunjungan Pelanggan</h3>
+                              <button
+                                type="button"
+                                className="db-widget-card__header-link"
+                                onClick={() => setShowVisitChartDetail(v => !v)}
+                              >
+                                {showVisitChartDetail ? "Sembunyikan Detail" : "Lihat Detail"}
+                              </button>
+                            </div>
+                            <div className="db-chart-container">
                         <DashboardChart
-                          labels={weeklyAnalytics?.labels || ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]}
-                          series={[
-                            { name: "Kunjungan", color: "#22c55e", values: weeklyAnalytics?.values || [0, 0, 0, 0, 0, 0, 0] },
-                          ]}
+                          labels={weeklyAnalytics?.labels || ["Sen","Sel","Rab","Kam","Jum","Sab","Min"]}
+                          series={[{ name:"Kunjungan", color:"#22c55e", values: weeklyAnalytics?.values || [0,0,0,0,0,0,0] }]}
                         />
                         {showVisitChartDetail && (
                           <div className="db-chart-detail-table">
                             <div className="db-chart-detail-table__row db-chart-detail-table__row--head">
-                              <span>Tanggal</span>
-                              <span>Kunjungan</span>
+                              <span>Tanggal</span><span>Kunjungan</span>
                             </div>
-                            {(weeklyAnalytics?.labels || ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]).map((lbl, i) => {
-                              const values = weeklyAnalytics?.values || [0, 0, 0, 0, 0, 0, 0];
-                              const prev = i > 0 ? values[i - 1] : null;
+                            {(weeklyAnalytics?.labels || ["Sen","Sel","Rab","Kam","Jum","Sab","Min"]).map((lbl, i) => {
+                              const values = weeklyAnalytics?.values || [0,0,0,0,0,0,0];
                               const val = values[i] || 0;
+                              const prev = i > 0 ? values[i - 1] : null;
                               const trend = prev === null ? null : val > prev ? "up" : val < prev ? "down" : "flat";
                               return (
                                 <div className="db-chart-detail-table__row" key={lbl + i}>
@@ -3715,7 +4319,7 @@ export default function Dashboard() {
                                   <span className="db-chart-detail-table__value">
                                     {val}
                                     {trend === "up" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--up" />}
-                                    {trend === "down" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--down" style={{ transform: "rotate(90deg)" }} />}
+                                    {trend === "down" && <ArrowUpRight size={12} className="db-chart-detail-table__trend db-chart-detail-table__trend--down" style={{transform:"rotate(90deg)"}} />}
                                   </span>
                                 </div>
                               );
@@ -3724,23 +4328,60 @@ export default function Dashboard() {
                         )}
                       </div>
                     </div>
+                  </div>
 
-                    {/* Sidebar dengan Kalender */}
-                    <div className="db-sidebar-widgets">
-                      <div className="db-calendar-widget">
-                        <div className="db-widget-header">
-                          <div className="db-widget-icon">📅</div>
-                          <h3>Kalender</h3>
+                  <div className="db-content-sidebar">
+                    <div className="db-widget-card">
+                      <div className="db-widget-header">
+                        <div className="db-widget-icon">
+                          <Calendar size={18} />
                         </div>
-                        <div className="db-calendar-container">
-                          <MiniCalendar />
+                        <h3 className="db-widget-title">Kalender</h3>
+                      </div>
+                      <div className="db-widget-body">
+                        <MiniCalendar />
+                      </div>
+                    </div>
+
+                    {/* Recent Activity Widget */}
+                    <div className="db-widget-card">
+                      <div className="db-widget-header">
+                        <div className="db-widget-icon">
+                          <Clock size={18} />
                         </div>
+                        <h3 className="db-widget-title">Aktivitas Terbaru</h3>
+                      </div>
+                      <div className="db-widget-body">
+                        {recentReviews.length > 0 ? (
+                          <div className="db-recent-activity">
+                            {recentReviews.slice(0, 3).map((review, idx) => (
+                              <div key={idx} className="db-activity-item">
+                                <div className="db-activity-icon">
+                                  <Star size={14} />
+                                </div>
+                                <div className="db-activity-content">
+                                  <p className="db-activity-title">
+                                    Ulasan baru dari {review.user_name}
+                                  </p>
+                                  <p className="db-activity-meta">
+                                    {formatDate(review.created_at)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="db-widget-empty">Belum ada aktivitas terbaru</p>
+                        )}
                       </div>
                     </div>
                   </div>
+                </div>
+                </>
+              )}
 
-                  {/* Bottom Row - Riwayat Premium & Ulasan */}
-                  <div className="db-bottom-row db-bottom-row--split">
+                {/* Bottom Row - Riwayat Premium & Ulasan */}
+                <div className="db-bottom-row db-bottom-row--split">
                     <div className="db-premium-history">
                       <div className="db-section-header">
                         <div className="db-section-icon"><Receipt size={18} /></div>
@@ -3748,7 +4389,7 @@ export default function Dashboard() {
                       </div>
                       <div className="db-history-items">
                         {subscriptions && subscriptions.length > 0 ? (
-                          subscriptions.slice(0, showAllHistory ? subscriptions.length : 3).map((sub) => (
+                          subscriptions.slice(0, showAllHistory ? subscriptions.length : 3).map(sub => (
                             <div key={sub.id} className="db-history-item">
                               <div className="db-history-content">
                                 <p className="db-history-title">Pengajuan dari: {sub.user?.name || "User"}</p>
@@ -3764,10 +4405,7 @@ export default function Dashboard() {
                           <p className="db-widget-empty">Belum ada pengajuan premium.</p>
                         )}
                         {subscriptions && subscriptions.length > 3 && (
-                          <button 
-                            className="db-view-all-btn"
-                            onClick={() => setShowAllHistory(!showAllHistory)}
-                          >
+                          <button className="db-view-all-btn" onClick={() => setShowAllHistory(!showAllHistory)}>
                             {showAllHistory ? 'Tampilkan Lebih Sedikit' : 'Lihat Semua'}
                           </button>
                         )}
@@ -3779,18 +4417,14 @@ export default function Dashboard() {
                         <div className="db-section-icon"><Star size={18} /></div>
                         <h3>Ulasan Terbaru</h3>
                         {recentReviews.length > 3 && (
-                          <button
-                            type="button"
-                            className="db-view-all-link"
-                            onClick={() => setShowAllReviews(!showAllReviews)}
-                          >
+                          <button type="button" className="db-view-all-link" onClick={() => setShowAllReviews(!showAllReviews)}>
                             {showAllReviews ? "Tampilkan Sedikit" : "Lihat Semua"}
                           </button>
                         )}
                       </div>
                       <div className="db-review-list">
                         {recentReviews.length > 0 ? (
-                          (showAllReviews ? recentReviews : recentReviews.slice(0, 3)).map((r) => (
+                          (showAllReviews ? recentReviews : recentReviews.slice(0, 3)).map(r => (
                             <div key={r.id} className="db-review-item">
                               <div className="db-review-avatar">
                                 {r.reviewer_avatar ? (
@@ -3819,12 +4453,10 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-              )}
 
-              <div className="db-dashboard-footer">
-                <span>Copyright © {new Date().getFullYear()} <strong>Surade.co.id</strong>. All rights reserved.</span>
-              </div>
-              </div>
+                <div className="db-dashboard-footer">
+                  <span>Copyright &copy; {new Date().getFullYear()} <strong>Surade.co.id</strong>. All rights reserved.</span>
+                </div>
             </div>
           )}
 
@@ -3832,45 +4464,54 @@ export default function Dashboard() {
           {activeTab === "businesses" && (
             <div className="db-panel">
             {showBizModal ? (
-              <div className="biz-form-wrapper">
-                {/* HERO */}
-                <div className="biz-form-hero">
-                  <div className="biz-form-hero-inner">
-                    <button type="button" className="biz-form-back-btn" onClick={() => setShowBizModal(false)}>
-                      <ArrowLeft size={15} />
+              <div className="db-form-wrapper">
+                {/* Enhanced Hero */}
+                <div className="db-form-hero">
+                  <div className="db-form-hero-inner">
+                    <button type="button" className="db-form-back-btn" onClick={() => setShowBizModal(false)}>
+                      <ArrowLeft size={16} />
                       <span>Kembali ke Dashboard</span>
                     </button>
-                    <h1>Daftarkan Usaha Kamu</h1>
-                    <p className="sub">Jangkau lebih banyak pelanggan di seluruh Indonesia</p>
+                    <div className="db-form-title-group">
+                      <h1>{selectedBiz ? "Edit Bisnis" : "Tambah Bisnis Baru"}</h1>
+                      <p className="db-form-subtitle">
+                        {selectedBiz ? "Perbarui informasi bisnis Anda" : "Daftarkan bisnis atau usaha Anda di Surade.co.id"}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* STEPPER */}
+                {/* Enhanced Stepper */}
                 {bizFormStep <= 5 && (
-                  <div className="biz-form-stepper-section">
-                    <div className="biz-form-stepper-inner">
-                      <div className="biz-form-stepper">
-                        <div className="biz-form-stepper-track"></div>
-                        <div className="biz-form-stepper-progress" style={{ width: `${((Math.min(bizFormStep, 5) - 1) / 4) * 80}%` }}></div>
-                        <div className={`biz-form-step ${bizFormStep > 1 ? 'done' : ''} ${bizFormStep === 1 ? 'active' : ''}`} data-step="1">
-                          <div className="circle"><Crown size={22} /></div>
+                  <div className="db-form-stepper-section">
+                    <div className="db-form-stepper-inner">
+                      <div className="db-form-stepper">
+                        <div className="db-form-stepper-track"></div>
+                        <div className="db-form-stepper-progress" style={{ width: `${((Math.min(bizFormStep, 5) - 1) / 4) * 80}%` }}></div>
+                        
+                        <div className={`db-form-step ${bizFormStep > 1 ? 'done' : ''} ${bizFormStep === 1 ? 'active' : ''}`}>
+                          <div className="circle"><Crown size={20} /></div>
                           <div className="label">Paket</div>
                         </div>
-                        <div className={`biz-form-step ${bizFormStep > 2 ? 'done' : ''} ${bizFormStep === 2 ? 'active' : ''}`} data-step="2">
-                          <div className="circle"><Info size={22} /></div>
+                        
+                        <div className={`db-form-step ${bizFormStep > 2 ? 'done' : ''} ${bizFormStep === 2 ? 'active' : ''}`}>
+                          <div className="circle"><Info size={20} /></div>
                           <div className="label">Info Dasar</div>
                         </div>
-                        <div className={`biz-form-step ${bizFormStep > 3 ? 'done' : ''} ${bizFormStep === 3 ? 'active' : ''}`} data-step="3">
-                          <div className="circle"><Image size={22} /></div>
-                          <div className="label">Banner</div>
+                        
+                        <div className={`db-form-step ${bizFormStep > 3 ? 'done' : ''} ${bizFormStep === 3 ? 'active' : ''}`}>
+                          <div className="circle"><Image size={20} /></div>
+                          <div className="label">Media</div>
                         </div>
-                        <div className={`biz-form-step ${bizFormStep > 4 ? 'done' : ''} ${bizFormStep === 4 ? 'active' : ''}`} data-step="4">
-                          <div className="circle"><MapPin size={22} /></div>
+                        
+                        <div className={`db-form-step ${bizFormStep > 4 ? 'done' : ''} ${bizFormStep === 4 ? 'active' : ''}`}>
+                          <div className="circle"><MapPin size={20} /></div>
                           <div className="label">Lokasi</div>
                         </div>
-                        <div className={`biz-form-step ${bizFormStep > 5 ? 'done' : ''} ${bizFormStep === 5 ? 'active' : ''}`} data-step="5">
-                          <div className="circle"><Gallery size={22} /></div>
-                          <div className="label">Galeri</div>
+                        
+                        <div className={`db-form-step ${bizFormStep > 5 ? 'done' : ''} ${bizFormStep === 5 ? 'active' : ''}`}>
+                          <div className="circle"><CheckCircle size={20} /></div>
+                          <div className="label">Review</div>
                         </div>
                       </div>
                     </div>
@@ -4106,7 +4747,6 @@ export default function Dashboard() {
                         <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(1)}>
                           Kembali
                         </button>
-<<<<<<< HEAD
                         <button
                           type="button"
                           className="biz-form-btn biz-form-btn-primary"
@@ -4122,9 +4762,7 @@ export default function Dashboard() {
                             setBizFormStep(3);
                           }}
                         >
-=======
-                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={() => setBizFormStep(3)}>
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
                           Lanjutkan
                         </button>
                       </div>
@@ -4578,7 +5216,7 @@ export default function Dashboard() {
                         <button type="button" className="biz-form-btn biz-form-btn-ghost" onClick={() => setBizFormStep(5)}>
                           Kembali
                         </button>
-                        <button type="button" className="biz-form-btn biz-form-btn-primary" onClick={handleSaveBusiness}>
+                        <button type="button" className="biz-form-btn biz-form-btn-primary hover-lift press-effect" onClick={handleSaveBusiness}>
                           <Check size={15} />
                           Daftarkan Usaha
                         </button>
@@ -4633,43 +5271,57 @@ export default function Dashboard() {
               </div>
 
               {loading ? (
-                <div className="db-loader-wrap">
-                  <div className="db-spinner" />
-                  <span>Memuat data...</span>
+                <div className="db-loading-section">
+                  <LoadingSpinner size="lg" text="Memuat data bisnis..." />
                 </div>
-              ) : filteredBusinesses.length > 0 ? (
+              ) : dashboardError ? (
+                <ErrorState
+                  title={errorHandler.getErrorTitle(dashboardError.type)}
+                  message={dashboardError.userMessage || dashboardError.message}
+                  retry={handleRetry}
+                  type={dashboardError.type}
+                />
+              ) : tabLoading ? (
+                <div className="db-loading-section">
+                  <SkeletonTable rows={5} columns={8} />
+                </div>
+              ) : tabError ? (
+                <ErrorState
+                  title={errorHandler.getErrorTitle(tabError.type)}
+                  message={tabError.userMessage || tabError.message}
+                  retry={() => {
+                    setTabError(null);
+                    setRetryCount(0);
+                    fetchBusinessesPage(businessCurrentPage, bizSearch);
+                  }}
+                  type={tabError.type}
+                />
+              ) : businesses.length > 0 ? (
                 <div className="db-table-responsive">
+                  <div className="db-table-responsive">
                   <table className="db-table">
                     <thead>
                       <tr>
-                        <th>Foto</th>
-                        <th>Nama Bisnis</th>
-                        <th>Kategori</th>
-                        <th>Pemilik</th>
-                        <th>Kontak</th>
-                        <th>Status</th>
-                        <th>Premium</th>
-                        <th>Aksi</th>
+                        <th style={{ width: '80px' }}>Foto</th>
+                        <th style={{ minWidth: '200px' }}>Nama Bisnis</th>
+                        <th style={{ minWidth: '120px' }}>Kategori</th>
+                        <th style={{ minWidth: '120px' }}>Pemilik</th>
+                        <th style={{ minWidth: '100px' }}>Kontak</th>
+                        <th style={{ minWidth: '100px' }}>Status</th>
+                        <th style={{ width: '80px' }}>Premium</th>
+                        <th style={{ minWidth: '140px' }}>Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredBusinesses.map((biz) => (
+                      {paginatedBusinesses.map((biz) => (
                         <tr key={biz.id}>
                           <td>
-                            <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                            <div className="db-table-thumb-wrapper">
                               <img
                                 src={biz.images?.length > 0 ? getImageUrl(biz.images[0]) : biz.image ? getImageUrl(biz.image) : "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=100&h=80&fit=crop"}
                                 alt={biz.title}
                                 className="db-table-thumb"
-                                style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px' }}
                               />
-                              {biz.images?.length > 1 && (
-                                <img
-                                  src={getImageUrl(biz.images[1])}
-                                  alt={`${biz.title} gallery`}
-                                  style={{ width: '34px', height: '34px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                                />
-                              )}
                             </div>
                           </td>
                           <td>
@@ -4717,17 +5369,25 @@ export default function Dashboard() {
                                     className="db-table-btn db-btn-approve"
                                     onClick={() => handleApproveBusiness(biz.id)}
                                     title="Setujui"
-                                    disabled={biz.status === "approved"}
+                                    disabled={biz.status === "approved" || crudLoading[`approve-${biz.id}`]}
                                   >
-                                    <CheckCircle size={16} />
+                                    {crudLoading[`approve-${biz.id}`] ? (
+                                      <div className="db-spinner-small"></div>
+                                    ) : (
+                                      <CheckCircle size={16} />
+                                    )}
                                   </button>
                                   <button
                                     className="db-table-btn db-btn-reject"
                                     onClick={() => handleRejectBusiness(biz.id)}
                                     title="Tolak"
-                                    disabled={biz.status === "suspended" || biz.status === "rejected"}
+                                    disabled={biz.status === "suspended" || biz.status === "rejected" || crudLoading[`reject-${biz.id}`]}
                                   >
-                                    <XCircle size={16} />
+                                    {crudLoading[`reject-${biz.id}`] ? (
+                                      <div className="db-spinner-small"></div>
+                                    ) : (
+                                      <XCircle size={16} />
+                                    )}
                                   </button>
                                 </>
                               )}
@@ -4745,14 +5405,59 @@ export default function Dashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
+
+                {/* Business Table Pagination */}
+                {businesses.length > 0 && businessTotalPages > 1 && (
+                  <nav className="db-pagination" aria-label="Navigasi halaman bisnis">
+                    <button
+                      type="button"
+                      className="db-pagination__nav"
+                      onClick={() => handleBusinessPageChange(Math.max(1, businessSafePage - 1))}
+                      disabled={businessSafePage === 1}
+                      aria-label="Halaman sebelumnya"
+                    >
+                      &lt;
+                    </button>
+                    
+                    {getBusinessPageNumbers().map((p, i) =>
+                      p === "..." ? (
+                        <span key={`ellipsis-${i}`} className="db-pagination__ellipsis">…</span>
+                      ) : (
+                        <button
+                          type="button"
+                          key={p}
+                          className={`db-pagination__num ${p === businessSafePage ? "active" : ""}`}
+                          onClick={() => handleBusinessPageChange(p)}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
+                    
+                    <button
+                      type="button"
+                      className="db-pagination__nav"
+                      onClick={() => handleBusinessPageChange(Math.min(businessTotalPages, businessSafePage + 1))}
+                      disabled={businessSafePage === businessTotalPages}
+                      aria-label="Halaman berikutnya"
+                    >
+                      &gt;
+                    </button>
+                    
+                    <div className="db-pagination__info" style={{ marginLeft: '16px', fontSize: '14px', color: '#64748b' }}>
+                      Menampilkan {((businessSafePage - 1) * businessPagination.per_page) + 1} - {Math.min(businessSafePage * businessPagination.per_page, businessPagination.total)} dari {businessPagination.total} bisnis
+                    </div>
+                  </nav>
+                )}
+
                 </div>
               ) : (
-                <DashboardEmptyState
-                  title="Tingkatkan Jangkauan Bisnis Anda"
-                  subtitle="Anda harus berada di sini untuk pertama kalinya. Jika Anda ingin menambahkan sesuatu, klik tombol di bawah ini."
-                  actionLabel="Tambah Bisnis Baru"
-                  onAction={() => handleOpenBizModal()}
+                <EmptyState
+                  type="businesses"
+                  action={() => handleOpenBizModal()}
+                  actionText="Tambah Bisnis Baru"
                 />
               )}
               </>
@@ -5046,7 +5751,8 @@ export default function Dashboard() {
                   </div>
                 ) : filteredAds.length > 0 ? (
                   <div className="db-table-responsive">
-                    <table className="db-table">
+                    <div className="db-table-responsive">
+                  <table className="db-table">
                       <thead>
                         <tr>
                           <th>Judul</th>
@@ -5118,22 +5824,30 @@ export default function Dashboard() {
                                 <button className="db-btn-table db-btn-table--edit" onClick={() => handleOpenAdModal(ad)}>
                                   <Edit2 size={14} />
                                 </button>
-                                <button className="db-btn-table db-btn-table--delete" onClick={() => handleDeleteAd(ad.id)}>
-                                  <Trash2 size={14} />
+                                <button 
+                                  className="db-btn-table db-btn-table--delete" 
+                                  onClick={() => handleDeleteAd(ad.id)}
+                                  disabled={crudLoading[`ad-${ad.id}`]}
+                                >
+                                  {crudLoading[`ad-${ad.id}`] ? (
+                                    <div className="db-spinner-small"></div>
+                                  ) : (
+                                    <Trash2 size={14} />
+                                  )}
                                 </button>
                               </div>
                             </td>
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                      </table>
+                </div>
                   </div>
                 ) : (
-                  <DashboardEmptyState
-                    title="Belum Ada Iklan"
-                    subtitle="Iklan yang kamu pasang akan tampil di sini. Klik tombol di bawah untuk pasang iklan pertamamu."
-                    actionLabel="Pasang Iklan Baru"
-                    onAction={() => handleOpenAdModal()}
+                  <EmptyState
+                    type="products"
+                    action={() => handleOpenAdModal()}
+                    actionText="Pasang Iklan Baru"
                   />
                 )}
               </>
@@ -5145,10 +5859,39 @@ export default function Dashboard() {
         {activeTab === "premium" && (
           <div className="premium-content">
             {!isAdmin && (
-              <>
-                {/* Hero Banner */}
-                <div 
-                  className="premium-hero"
+              <div className="db-premium-container">
+                {/* Left Side: 3D Membership Card */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
+                  <div className="db-3d-card-wrapper">
+                    <div className="db-3d-membership-card">
+                      <div className="db-3d-card-badge">
+                        <Crown size={12} /> PREMIUM MEMBER
+                      </div>
+                      <div className="db-3d-card-chip"></div>
+                      <div className="db-3d-card-number">
+                        {user?.id ? `SRD ${String(user.id).padStart(4, '0')} ${new Date(user.created_at || Date.now()).getFullYear()} 8888` : 'SRD 0001 2026 8888'}
+                      </div>
+                      <div className="db-3d-card-footer">
+                        <div>
+                          <div className="db-3d-card-holder-label">CARD HOLDER</div>
+                          <div className="db-3d-card-holder-name">{user?.name || 'SURADE MEMBER'}</div>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#f59e0b', fontStyle: 'italic' }}>
+                          SURADE.CO.ID
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center', maxWidth: '320px', color: 'var(--s-slate-500)', fontSize: '0.82rem', lineHeight: 1.4 }}>
+                    Hover pada kartu untuk interaksi 3D premium. Kartu ini menunjukkan keanggotaan bisnis terverifikasi Anda.
+                  </div>
+                </div>
+
+                {/* Right Side: Hero & Pricing */}
+                <div>
+                  {/* Hero Banner */}
+                  <div 
+                    className="premium-hero"
                   style={{
                     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     borderRadius: '20px',
@@ -5220,8 +5963,8 @@ export default function Dashboard() {
                     </div>
 
                     {(() => {
-                      const myFree = businesses.filter((b) => b.user_id === user?.id && !b.is_premium_active);
-                      const myTotal = businesses.filter((b) => b.user_id === user?.id).length;
+                      const myFree = Array.isArray(businesses) ? businesses.filter((b) => b.user_id === user?.id && !b.is_premium_active) : [];
+                      const myTotal = Array.isArray(businesses) ? businesses.filter((b) => b.user_id === user?.id).length : 0;
                       if (myTotal === 0) {
                         return (
                           <button className="plan-btn current" onClick={() => setActiveTab("businesses")}>
@@ -5296,8 +6039,9 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-              </>
-            )}
+              </div>
+            </div>
+          )}
 
             <h3 className="db-subheading">
               {isAdmin ? "Riwayat Pengajuan Premium (Semua User & Reseller)" : "Riwayat Invoice"}
@@ -5309,7 +6053,8 @@ export default function Dashboard() {
               </div>
             ) : subscriptions.length > 0 ? (
               <div className="db-table-responsive">
-                <table className="db-table">
+                <div className="db-table-responsive">
+                  <table className="db-table">
                   <thead>
                     <tr>
                       <th>ID Invoice</th>
@@ -5394,7 +6139,8 @@ export default function Dashboard() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>
+                </div>
                 
                 {/* Show All Button */}
                 {subscriptions.length > 5 && (
@@ -5422,173 +6168,303 @@ export default function Dashboard() {
           {activeTab === "menu" && (
             <div className="db-panel">
             {showMenuModal ? (
-              <div className="db-inline-form-page db-inline-form-page--biz">
-                {/* ── Hero Section ── */}
-                <div className="db-hero">
-                  <div className="db-hero__content">
-                    <button type="button" className="db-hero__back" onClick={() => setShowMenuModal(false)}>
+              <div className="db-form-wrapper">
+                {/* Enhanced Product Form Hero */}
+                <div className="db-form-hero">
+                  <div className="db-form-hero-inner">
+                    <button type="button" className="db-form-back-btn" onClick={() => setShowMenuModal(false)}>
                       <ArrowLeft size={16} />
                       <span>Kembali ke Dashboard</span>
-                      <span className="db-hero__back-dot" />
                     </button>
-                    <h1 className="db-hero__title">
-                      Tambah <span className="db-hero__title-highlight">Produk</span> Baru
-                    </h1>
-                    <p className="db-hero__subtitle">
-                      Tambahkan produk atau layanan ke dalam daftar produk bisnis Anda
-                    </p>
-                  </div>
-                  <div className="db-hero__illustration">
-                    <div className="db-mock-card">
-                      <div className="db-mock-card__dots">
-                        <span /><span /><span />
-                      </div>
-                      <div className="db-mock-card__icon">
-                        <MenuIcon size={24} />
-                      </div>
+                    <div className="db-form-title-group">
+                      <h1>{selectedMenu ? "Edit Produk" : "Tambah Produk Baru"}</h1>
+                      <p className="db-form-subtitle">
+                        {selectedMenu ? "Perbarui informasi produk atau layanan" : "Tambahkan produk atau layanan ke bisnis Anda"}
+                      </p>
                     </div>
-                    <div className="db-mock-plant" aria-hidden="true">🍽️</div>
                   </div>
                 </div>
 
-                {/* Progress Tabs */}
-                <div className="db-progress-container">
-                  <div className={`db-progress-step ${menuFormStep > 0 ? "completed" : "active"}`}>
-                    <div className="db-progress-icon">
-                      <Info size={20} />
+                {/* Enhanced Progress Steps */}
+                <div className="db-form-stepper-section">
+                  <div className="db-form-stepper-inner">
+                    <div className="db-form-stepper">
+                      <div className="db-form-stepper-track"></div>
+                      <div className="db-form-stepper-progress" style={{ width: `${(menuFormStep / 2) * 80}%` }}></div>
+                      
+                      <div className={`db-form-step ${menuFormStep > 0 ? 'done' : 'active'}`}>
+                        <div className="circle"><Info size={18} /></div>
+                        <div className="label">Info Dasar</div>
+                      </div>
+                      
+                      <div className={`db-form-step ${menuFormStep > 1 ? 'done' : menuFormStep === 1 ? 'active' : ''}`}>
+                        <div className="circle"><Package size={18} /></div>
+                        <div className="label">Detail</div>
+                      </div>
+                      
+                      <div className={`db-form-step ${menuFormStep === 2 ? 'active' : ''}`}>
+                        <div className="circle"><Camera size={18} /></div>
+                        <div className="label">Media</div>
+                      </div>
                     </div>
-                    <div className="db-progress-label">Info Dasar</div>
-                  </div>
-                  <div className="db-progress-line"></div>
-                  <div className={`db-progress-step ${menuFormStep > 1 ? "completed" : menuFormStep === 1 ? "active" : ""}`}>
-                    <div className="db-progress-icon">
-                      <Edit2 size={20} />
-                    </div>
-                    <div className="db-progress-label">Detail</div>
-                  </div>
-                  <div className="db-progress-line"></div>
-                  <div className={`db-progress-step ${menuFormStep === 2 ? "active" : ""}`}>
-                    <div className="db-progress-icon">
-                      <Image size={20} />
-                    </div>
-                    <div className="db-progress-label">Foto</div>
                   </div>
                 </div>
 
-                {/* ── Form Card ── */}
-                <form onSubmit={handleSaveMenu} className="db-card">
-                  {/* Info Dasar Section */}
-                  <div className="db-form-section" ref={(el) => (menuSectionRefs.current[0] = el)}>
-                    <div className="db-form-section__header">
-                      <div className="db-form-section__icon">
-                        <Info size={20} />
-                      </div>
-                      <div>
-                        <h3>Informasi Dasar</h3>
-                        <p>Data utama tentang produk atau layanan</p>
-                      </div>
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Bisnis <span className="req">*</span></label>
-                      <select required value={mnBusinessId} onChange={(e) => setMnBusinessId(e.target.value)}>
-                        <option value="">Pilih bisnis...</option>
-                        {businesses.filter((b) => isAdmin || b.user_id === user?.id).map((b) => (
-                          <option key={b.id} value={b.id}>{b.title}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Nama Produk <span className="req">*</span></label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={mnName} 
-                        onChange={(e) => setMnName(e.target.value)} 
-                        placeholder="Nama produk atau layanan" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="db-form-section__divider" />
-
-                  {/* Detail Section */}
-                  <div className="db-form-section" ref={(el) => (menuSectionRefs.current[1] = el)}>
-                    <div className="db-form-section__header">
-                      <div className="db-form-section__icon">
-                        <Edit2 size={20} />
-                      </div>
-                      <div>
-                        <h3>Detail Produk</h3>
-                        <p>Deskripsi dan harga produk</p>
-                      </div>
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Deskripsi</label>
-                      <textarea 
-                        rows={4} 
-                        value={mnDescription} 
-                        onChange={(e) => setMnDescription(e.target.value)} 
-                        placeholder="Jelaskan produk atau layanan ini dengan detail..." 
-                      />
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Harga (Rp) <span className="req">*</span></label>
-                      <input 
-                        type="number" 
-                        required 
-                        min="0" 
-                        value={mnPrice} 
-                        onChange={(e) => setMnPrice(e.target.value)} 
-                        placeholder="Contoh: 25000" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="db-form-section__divider" />
-
-                  {/* Foto Section */}
-                  <div className="db-form-section" ref={(el) => (menuSectionRefs.current[2] = el)}>
-                    <div className="db-form-section__header">
-                      <div className="db-form-section__icon">
-                        <Image size={20} />
-                      </div>
-                      <div>
-                        <h3>Foto Produk</h3>
-                        <p>Upload foto menarik untuk produk Anda</p>
-                      </div>
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Foto Produk (opsional)</label>
-                      <div className="db-upload-area">
-                        <div className="db-upload-area__icon">
-                          <Camera size={32} />
+                <div className="db-form-content">
+                  <form onSubmit={handleSaveMenu}>
+                    {/* Step 1: Basic Information */}
+                    <div className={`db-form-panel ${menuFormStep === 0 ? 'show' : ''}`}>
+                      <div className="db-form-card">
+                        <div className="db-form-card-head">
+                          <div className="ci"><Info size={20} /></div>
+                          <div>
+                            <h2>Informasi Dasar</h2>
+                            <p className="db-form-card-sub">Pilih bisnis dan masukkan nama produk</p>
+                          </div>
                         </div>
-                        <div className="db-upload-area__text">Klik untuk upload foto</div>
-                        <div className="db-upload-area__subtext">JPG, PNG - Max 2MB</div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => setMnImage(e.target.files?.[0] || null)}
-                          className="db-upload-area__input"
-                        />
+                        <div className="db-form-divider" />
+                        
+                        <div className="db-form-card-body">
+                          <div className="db-form-row-2">
+                            <div className="db-form-field">
+                              <label>Bisnis <span className="req">*</span></label>
+                              <select 
+                                required 
+                                value={mnBusinessId} 
+                                onChange={(e) => setMnBusinessId(e.target.value)}
+                                className={!mnBusinessId ? 'error' : ''}
+                              >
+                                <option value="">Pilih bisnis...</option>
+                                {safeBusinesses.filter((b) => isAdmin || b.user_id === user?.id).map((b) => (
+                                  <option key={b.id} value={b.id}>{b.title}</option>
+                                ))}
+                              </select>
+                              <div className="db-form-help">Pilih bisnis tempat produk ini akan ditambahkan</div>
+                              {safeBusinesses.filter((b) => isAdmin || b.user_id === user?.id).length === 0 && (
+                                <div className="db-form-error">
+                                  <AlertTriangle size={14} />
+                                  Anda perlu membuat bisnis terlebih dahulu
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="db-form-field">
+                              <label>Nama Produk/Layanan <span className="req">*</span></label>
+                              <input 
+                                type="text" 
+                                required 
+                                value={mnName} 
+                                onChange={(e) => setMnName(e.target.value)} 
+                                placeholder="Contoh: Nasi Goreng Special"
+                                className={!mnName.trim() ? 'error' : ''}
+                              />
+                              <div className="db-form-help">Nama yang akan ditampilkan kepada pelanggan</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="db-form-actions">
+                          <div className="db-form-actions-left">
+                            <button type="button" className="db-form-btn db-form-btn--outline" onClick={() => setShowMenuModal(false)}>
+                              Batal
+                            </button>
+                          </div>
+                          <div className="db-form-actions-right">
+                            <button 
+                              type="button" 
+                              className="db-form-btn db-form-btn--primary" 
+                              onClick={nextMenuStep}
+                              disabled={!canProceedToNextStep()}
+                            >
+                              Lanjutkan
+                              <ArrowRight size={16} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="db-card__footer">
-                    <button type="button" className="db-btn-cancel" onClick={() => setShowMenuModal(false)}>
-                      Batal
-                    </button>
-                    <button type="submit" className="db-btn-submit" disabled={actionLoading}>
-                      {actionLoading ? "Menyimpan..." : "Simpan Produk"}
-                    </button>
-                  </div>
-                </form>
+                    {/* Step 2: Product Details */}
+                    <div className={`db-form-panel ${menuFormStep === 1 ? 'show' : ''}`}>
+                      <div className="db-form-card">
+                        <div className="db-form-card-head">
+                          <div className="ci"><Package size={20} /></div>
+                          <div>
+                            <h2>Detail Produk</h2>
+                            <p className="db-form-card-sub">Deskripsi dan penetapan harga</p>
+                          </div>
+                        </div>
+                        <div className="db-form-divider" />
+                        
+                        <div className="db-form-card-body">
+                          <div className="db-form-field">
+                            <label>Deskripsi Produk</label>
+                            <textarea 
+                              rows={4} 
+                              value={mnDescription} 
+                              onChange={(e) => setMnDescription(e.target.value)} 
+                              placeholder="Jelaskan produk atau layanan ini dengan detail. Contoh: Nasi goreng dengan telur, ayam, dan sayuran segar. Disajikan dengan kerupuk dan acar..."
+                            />
+                            <div className="db-form-help">Deskripsi yang menarik membantu pelanggan memahami produk Anda</div>
+                          </div>
+
+                          <div className="db-form-row-2">
+                            <div className="db-form-field">
+                              <label>Harga (Rp) <span className="req">*</span></label>
+                              <input 
+                                type="number" 
+                                required 
+                                min="0" 
+                                value={mnPrice} 
+                                onChange={(e) => setMnPrice(e.target.value)} 
+                                placeholder="25000"
+                                className={!mnPrice || parseInt(mnPrice) <= 0 ? 'error' : ''}
+                              />
+                              <div className="db-form-help">Masukkan harga dalam rupiah (tanpa titik atau koma)</div>
+                              {mnPrice && parseInt(mnPrice) > 0 && (
+                                <div className="db-form-success">
+                                  <CheckCircle size={14} />
+                                  Rp {parseInt(mnPrice).toLocaleString('id-ID')}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="db-form-field">
+                              <label>Kategori</label>
+                              <select 
+                                value={mnCategory} 
+                                onChange={(e) => setMnCategory(e.target.value)}
+                              >
+                                <option value="">Pilih kategori (opsional)</option>
+                                <option value="makanan">Makanan</option>
+                                <option value="minuman">Minuman</option>
+                                <option value="snack">Snack</option>
+                                <option value="paket">Paket</option>
+                                <option value="lainnya">Lainnya</option>
+                              </select>
+                              <div className="db-form-help">Membantu pelanggan menemukan produk dengan mudah</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="db-form-actions">
+                          <div className="db-form-actions-left">
+                            <button type="button" className="db-form-btn db-form-btn--outline" onClick={prevMenuStep}>
+                              <ArrowLeft size={16} />
+                              Kembali
+                            </button>
+                          </div>
+                          <div className="db-form-actions-right">
+                            <button type="button" className="db-form-btn db-form-btn--secondary" onClick={() => setShowMenuModal(false)}>
+                              Batal
+                            </button>
+                            <button 
+                              type="button" 
+                              className="db-form-btn db-form-btn--primary"
+                              onClick={nextMenuStep}
+                              disabled={!canProceedToNextStep()}
+                            >
+                              Lanjutkan
+                              <ArrowRight size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 3: Product Media */}
+                    <div className={`db-form-panel ${menuFormStep === 2 ? 'show' : ''}`}>
+                      <div className="db-form-card">
+                        <div className="db-form-card-head">
+                          <div className="ci"><Camera size={20} /></div>
+                          <div>
+                            <h2>Foto Produk</h2>
+                            <p className="db-form-card-sub">Upload foto menarik untuk mempromosikan produk</p>
+                          </div>
+                        </div>
+                        <div className="db-form-divider" />
+                        
+                        <div className="db-form-card-body">
+                          <div className="db-form-field">
+                            <label>Foto Produk (Opsional)</label>
+                            <div className="db-form-upload-area" onClick={() => document.getElementById('productImageInput')?.click()}>
+                              <div className="db-form-upload-icon">
+                                <Camera size={32} />
+                              </div>
+                              <div className="db-form-upload-title">
+                                {mnImage ? 'Klik untuk ganti foto' : 'Klik untuk upload foto produk'}
+                              </div>
+                              <div className="db-form-upload-subtitle">JPG, PNG, WebP - Maks. 2MB</div>
+                              <input
+                                id="productImageInput"
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setMnImage(e.target.files?.[0] || null)}
+                                style={{ display: 'none' }}
+                              />
+                            </div>
+                            
+                            {mnImage && (
+                              <div className="db-form-file-grid" style={{ marginTop: '16px' }}>
+                                <div className="db-form-file-item">
+                                  <button
+                                    type="button"
+                                    className="db-form-file-remove"
+                                    onClick={() => setMnImage(null)}
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                  <img
+                                    src={URL.createObjectURL(mnImage)}
+                                    alt="Preview"
+                                    className="db-form-file-preview"
+                                  />
+                                  <div className="db-form-file-name">{mnImage.name}</div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="db-form-help">
+                              Foto yang baik akan meningkatkan daya tarik produk. 
+                              {!mnImage && " Anda dapat menambahkan foto nanti jika belum tersedia."}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="db-form-actions">
+                          <div className="db-form-actions-left">
+                            <button type="button" className="db-form-btn db-form-btn--outline" onClick={prevMenuStep}>
+                              <ArrowLeft size={16} />
+                              Kembali
+                            </button>
+                          </div>
+                          <div className="db-form-actions-right">
+                            <button type="button" className="db-form-btn db-form-btn--secondary" onClick={() => setShowMenuModal(false)}>
+                              Batal
+                            </button>
+                            <button 
+                              type="submit" 
+                              className={`db-form-btn db-form-btn--primary ${actionLoading ? 'db-form-btn--loading' : ''}`}
+                              disabled={actionLoading || !mnBusinessId || !mnName.trim() || !mnPrice}
+                            >
+                              {actionLoading ? (
+                                <>
+                                  <div className="db-spinner-sm" />
+                                  Menyimpan...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle size={16} />
+                                  {selectedMenu ? "Update Produk" : "Simpan Produk"}
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                </div>
               </div>
             ) : (
               <>
@@ -5604,6 +6480,7 @@ export default function Dashboard() {
                 <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat...</span></div>
               ) : menuItems.length > 0 ? (
                 <div className="db-table-responsive">
+                  <div className="db-table-responsive">
                   <table className="db-table">
                     <thead>
                       <tr>
@@ -5630,23 +6507,34 @@ export default function Dashboard() {
                           <td>
                             <div className="db-table-actions">
                               <button className="db-table-btn db-btn-edit" onClick={() => handleOpenMenuModal(m)}><Edit2 size={14} /></button>
-                              <button className="db-table-btn db-btn-delete" onClick={() => handleDeleteMenu(m.id)}><Trash2 size={14} /></button>
+                              <button 
+                                className="db-table-btn db-btn-delete" 
+                                onClick={() => handleDeleteMenu(m.id)}
+                                disabled={crudLoading[`menu-${m.id}`]}
+                              >
+                                {crudLoading[`menu-${m.id}`] ? (
+                                  <div className="db-spinner-small"></div>
+                                ) : (
+                                  <Trash2 size={14} />
+                                )}
+                              </button>
                             </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
                 </div>
               ) : (
                 <DashboardEmptyState
                   title={
-                    businesses.filter((b) => isAdmin || b.user_id === user?.id).length === 0
+                    safeBusinesses.filter((b) => isAdmin || b.user_id === user?.id).length === 0
                       ? "Daftarkan Usahamu Dulu"
                       : "Tingkatkan Jangkauan Bisnis Anda"
                   }
                   subtitle={
-                    businesses.filter((b) => isAdmin || b.user_id === user?.id).length === 0
+                    safeBusinesses.filter((b) => isAdmin || b.user_id === user?.id).length === 0
                       ? "Kamu belum punya bisnis yang terdaftar & disetujui. Produk hanya bisa ditambahkan setelah usahamu terdaftar."
                       : "Anda harus berada di sini untuk pertama kalinya. Jika Anda ingin menambahkan sesuatu, klik tombol di bawah ini."
                   }
@@ -5829,7 +6717,7 @@ export default function Dashboard() {
                           </div>
                         ) : selectedInboxThread.amOwner &&
                           !isAdmin &&
-                          !businesses.find((b) => b.id === selectedInboxThread.business_id)?.is_premium_active ? (
+                          !safeBusinesses.find((b) => b.id === selectedInboxThread.business_id)?.is_premium_active ? (
                           <div className="db-chat-composer db-chat-composer--locked">
                             <Crown size={18} />
                             <p>Upgrade bisnis ini ke Premium untuk bisa membalas pesan pelanggan.</p>
@@ -5868,9 +6756,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               ) : (
-                <DashboardEmptyState
-                  title="Belum Ada Pesan Masuk"
-                  subtitle="Pesan dari calon pelanggan akan muncul di sini."
+                <EmptyState
+                  type="messages"
                 />
               )}
             </div>
@@ -6155,6 +7042,7 @@ export default function Dashboard() {
                 <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat kupon...</span></div>
               ) : platformCoupons.length > 0 ? (
                 <div className="db-table-responsive" style={{ marginTop: "20px" }}>
+                  <div className="db-table-responsive">
                   <table className="db-table">
                     <thead>
                       <tr>
@@ -6198,7 +7086,8 @@ export default function Dashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
                 </div>
               ) : (
                 <DashboardEmptyState
@@ -6395,6 +7284,7 @@ export default function Dashboard() {
                 </div>
               ) : tickets.length > 0 ? (
                 <div className="db-table-responsive">
+                  <div className="db-table-responsive">
                   <table className="db-table">
                     <thead>
                       <tr>
@@ -6461,7 +7351,8 @@ export default function Dashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
                 </div>
               ) : (
                 <DashboardEmptyState
@@ -6963,6 +7854,7 @@ export default function Dashboard() {
                 </div>
               ) : filteredContentItems.length > 0 ? (
                 <div className="db-table-responsive">
+                  <div className="db-table-responsive">
                   <table className="db-table">
                     <thead>
                       <tr>
@@ -7025,7 +7917,8 @@ export default function Dashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
                 </div>
               ) : (
                 <DashboardEmptyState
@@ -7051,369 +7944,335 @@ export default function Dashboard() {
 
         {/* TAB: REFERRAL */}
           {activeTab === "referral" && (
-<<<<<<< HEAD
-            <div className="db-panel referral-dashboard">
-              <div className="referral-header">
-                <div className="referral-header-title">
-                  <h2>Program Referral</h2>
-                  <p>Kelola kode referral Anda, pantau pendapatan komisi, penggunaan kode, dan riwayat transaksi.</p>
-=======
             <div className="db-panel">
               <div className="db-panel-header">
-                <h2>Referral</h2>
-              </div>
-
-              {/* Ringkasan kode referral & komisi milik user sendiri.
-                  Data asli dari API /my-referral-stats, bukan dummy.
-                  Kotak kode referral SELALU tampil (tidak tersembunyi di
-                  belakang loading/error) supaya jelas kelihatan bagian ini aktif. */}
-              <div style={{ marginBottom: '20px', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px' }}>
-                <div className="db-form-group" style={{ maxWidth: 420, marginBottom: 0 }}>
-                  <label>Kode Referral Saya</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      value={referralStats?.referral_code || user?.referral_code || "Belum ada kode referral"}
-                      disabled
-                      style={{
-                        backgroundColor: '#f8fafc',
-                        color: (referralStats?.referral_code || user?.referral_code) ? '#059669' : '#6b7280',
-                        fontWeight: (referralStats?.referral_code || user?.referral_code) ? '600' : 'normal'
-                      }}
-                    />
-                    {(referralStats?.referral_code || user?.referral_code) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(referralStats?.referral_code || user?.referral_code);
-                          alert('Kode referral berhasil disalin!');
-                        }}
-                        style={{
-                          position: 'absolute',
-                          right: '8px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#059669',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          borderRadius: '4px'
-                        }}
-                        title="Copy kode referral"
-                      >
-                        📋
-                      </button>
-                    )}
-                  </div>
-                  <small style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                    {(referralStats?.referral_code || user?.referral_code)
-                      ? `Bagikan kode ini. Pemakai kode dapat diskon ${referralStats?.discount_percent ?? 5}%, dan Anda mendapat komisi ${referralStats?.commission_percent ?? 15}% dari transaksi setelah disetujui Admin.`
-                      : "Anda belum memiliki kode referral. Kode referral diberikan oleh Admin."}
-                  </small>
+                <div>
+                  <h2>Program Referral</h2>
+                  <p style={{margin:'4px 0 0', color:'var(--s-slate-500)', fontSize:'0.9rem'}}>Ajak rekan bisnis bergabung, dapatkan komisi 15% setiap transaksi premium berhasil.</p>
                 </div>
-
-                {referralStatsLoading ? (
-                  <div className="db-empty-state">Memuat statistik referral...</div>
-                ) : referralStatsError ? (
-                  <div className="db-empty-state">{referralStatsError}</div>
-                ) : referralStats ? (
-                  <>
-                    <div className="db-stat-grid db-stat-grid--admin" style={{ marginTop: '16px' }}>
-                      <div className="db-stat-card db-stat-card--blue">
-                        <span className="db-stat-card__label">Total Pemakaian</span>
-                        <span className="db-stat-card__value">{referralStats.total_penggunaan}</span>
-                      </div>
-                      <div className="db-stat-card db-stat-card--violet">
-                        <span className="db-stat-card__label">Total Transaksi</span>
-                        <span className="db-stat-card__value">{referralStats.total_transaksi}</span>
-                      </div>
-                      <div className="db-stat-card db-stat-card--green">
-                        <span className="db-stat-card__label">Komisi Disetujui + Dibayar</span>
-                        <span className="db-stat-card__value db-stat-card__value--currency">Rp {Number(referralStats.total_komisi_diterima || 0).toLocaleString('id-ID')}</span>
-                      </div>
-                      <div className="db-stat-card db-stat-card--teal">
-                        <span className="db-stat-card__label">Komisi Sudah Dibayar</span>
-                        <span className="db-stat-card__value db-stat-card__value--currency">Rp {Number(referralStats.total_komisi_dibayar || 0).toLocaleString('id-ID')}</span>
-                      </div>
-                    </div>
-
-                    {referralStats.riwayat_terbaru && referralStats.riwayat_terbaru.length > 0 ? (
-                      <div style={{ marginTop: '20px', overflowX: 'auto' }}>
-                        <table className="db-table">
-                          <thead>
-                            <tr>
-                              <th>Transaction ID</th>
-                              <th>User</th>
-                              <th>Diskon</th>
-                              <th>Komisi</th>
-                              <th>Status</th>
-                              <th>Tanggal</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {referralStats.riwayat_terbaru.map((r) => (
-                              <tr key={r.id}>
-                                <td>{r.transaction_id || `#${r.id}`}</td>
-                                <td>{r.referred_user || '-'}</td>
-                                <td>Rp {Number(r.discount_amount || 0).toLocaleString('id-ID')}</td>
-                                <td>Rp {Number(r.commission_amount || 0).toLocaleString('id-ID')}</td>
-                                <td>{r.status}</td>
-                                <td>{new Date(r.created_at).toLocaleDateString('id-ID')}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="db-empty-state" style={{ marginTop: '16px' }}>Belum ada transaksi referral.</div>
-                    )}
-                  </>
-                ) : null}
-              </div>
-
-              <div className="db-panel-header">
-                <h2>Direktori Reseller</h2>
-              </div>
-
-              <div className="db-search-input">
-                <Search size={18} />
-                <input
-                  type="text"
-                  placeholder="Cari nama reseller atau wilayah..."
-                  value={resellerSearch}
-                  onChange={(e) => setResellerSearch(e.target.value)}
-                />
-              </div>
-
-              {filteredResellers.length > 0 ? (
-                <div className="db-reseller-grid">
-                  {filteredResellers.map((r) => (
-                    <div className="db-reseller-card" key={r.id}>
-                      <div className="db-reseller-card__avatar">
-                        <UserIcon size={28} />
-                      </div>
-                      <h3>{r.name}</h3>
-                      <span className="db-reseller-card__region">
-                        <MapPin size={13} /> {r.region}
-                      </span>
-                      <div className="db-reseller-card__stats">
-                        <div>
-                          <strong>{r.sales}</strong>
-                          <span>Penjualan</span>
-                        </div>
-                        <div>
-                          <strong><Star size={13} fill="currentColor" /> {r.rating}</strong>
-                          <span>Rating</span>
-                        </div>
-                      </div>
-                      <button className="db-reseller-card__btn">Hubungi Agen</button>
-                    </div>
-                  ))}
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
-                </div>
-                <div className="referral-user-badge">
-                  <UserIcon size={16} />
-                  <span>Halo, <strong>{user?.name || "User"}</strong></span>
-                </div>
-              </div>
-
-              <div className="referral-banner">
-                <div className="referral-banner-content">
-                  <span className="referral-badge">🎁 Program Kemitraan & Referral</span>
-                  <h3>Dapatkan Komisi 15% Dari Setiap Referral!</h3>
-                  <p>Bagikan kode unik Anda kepada rekan usaha atau kerabat. Teman Anda mendapat potongan harga saat bertransaksi, dan Anda otomatis menerima komisi tunai sebesar 15%.</p>
-                </div>
-                <button className="btn-tarik-komisi" onClick={() => {
-                  const totalKomisi = Number(referralStats?.total_komisi_diterima || 0);
-                  if (totalKomisi < 50000) {
-                      alert(`Saldo komisi Anda (Rp ${totalKomisi.toLocaleString('id-ID')}) belum mencapai batas minimal penarikan (Rp 50.000).`);
+                <button
+                  className="db-action-btn"
+                  onClick={() => {
+                    const total = Number(referralStats?.total_komisi_diterima || 0);
+                    if (total < 50000) {
+                      alert(`Saldo komisi Anda (Rp ${total.toLocaleString('id-ID')}) belum mencapai minimal penarikan Rp 50.000.`);
                       return;
-                  }
-                  alert("Silakan hubungi Admin melalui WhatsApp untuk memproses penarikan komisi Anda.");
-                }}>
+                    }
+                    setShowWithdrawModal(true);
+                  }}
+                >
                   <Wallet size={16} /> Tarik Saldo Komisi
                 </button>
               </div>
 
-              <div className="referral-stats-grid">
-                {/* Card 1 */}
-                <div className="ref-stat-card ref-code-card">
-                  <div className="ref-stat-header">
-                    <span>KODE REFERRAL SAYA</span>
-                    <Gift size={18} color="#059669" />
-                  </div>
-                  <div className="ref-code-box">
-                    <span className="code-text">{referralStats?.referral_code || user?.referral_code || "Belum Ada"}</span>
-                    <button onClick={() => {
-                        if (referralStats?.referral_code || user?.referral_code) {
-                            navigator.clipboard.writeText(referralStats?.referral_code || user?.referral_code);
-                            alert('Kode referral berhasil disalin!');
-                        }
-                    }}>
-                      <Copy size={14} /> Salin
-                    </button>
-                  </div>
-                  <div className="ref-code-footer">
-                    <small>Bonus Teman:<br/><strong>Diskon 5%</strong></small>
-                    <button className="share-link" onClick={() => {
-                        const code = referralStats?.referral_code || user?.referral_code;
-                        if (!code) {
-                            alert('Anda belum memiliki kode referral.');
-                            return;
-                        }
-                        const shareUrl = `${window.location.origin}/register?ref=${code}`;
-                        if (navigator.share) {
-                            navigator.share({
-                                title: 'Daftar di Surade.co.id',
-                                text: `Dapatkan diskon khusus menggunakan kode referral saya: ${code}`,
-                                url: shareUrl,
-                            }).catch(console.error);
-                        } else {
-                            navigator.clipboard.writeText(shareUrl);
-                            alert('Link referral berhasil disalin ke clipboard!');
-                        }
-                    }}>
-                      <Share2 size={12} /> Bagikan Link
-                    </button>
-                  </div>
+              {referralStatsLoading ? (
+                <div className="db-loading-section">
+                  <LoadingSpinner size="lg" text="Memuat data referral..." />
                 </div>
-
-                {/* Card 2 */}
-                <div className="ref-stat-card">
-                  <div className="ref-stat-header">
-                    <span>TOTAL PENDAPATAN (KOMISI)</span>
-                    <TrendingUp size={18} color="#059669" />
-                  </div>
-                  <div className="ref-stat-value">
-                    Rp {Number(referralStats?.total_komisi_diterima || 0).toLocaleString('id-ID')}
-                  </div>
-                  <div className="ref-stat-status success">
-                    <CheckCircle size={14} /> komisi terverifikasi
-                  </div>
-                  <div className="ref-stat-footer">Minimal penarikan: Rp 50.000</div>
-                </div>
-
-                {/* Card 3 */}
-                <div className="ref-stat-card">
-                  <div className="ref-stat-header">
-                    <span>PENGGUNAAN KODE</span>
-                    <Users2 size={18} color="#3b82f6" />
-                  </div>
-                  <div className="ref-stat-value text-dark">
-                    {referralStats?.total_penggunaan || 0} Kali Dipakai
-                  </div>
-                  <div className="ref-stat-sub">
-                    <strong>{referralStats?.total_transaksi || 0}</strong> transaksi berhasil diselesaikan
-                  </div>
-                  <div className="ref-stat-status-text">Status: <span className="active">Aktif</span></div>
-                </div>
-
-                {/* Card 4 */}
-                <div className="ref-stat-card">
-                  <div className="ref-stat-header">
-                    <span>KOMISI PENDING</span>
-                    <Clock size={18} color="#f59e0b" />
-                  </div>
-                  <div className="ref-stat-value text-orange">
-                    Rp {Number((referralStats?.total_komisi || 0) - (referralStats?.total_komisi_diterima || 0)).toLocaleString('id-ID')}
-                  </div>
-                  <div className="ref-stat-sub">
-                    Menunggu verifikasi pembayaran transaksi
-                  </div>
-                  <div className="ref-stat-status-text">Status: <span className="pending">Sedang Diproses</span></div>
-                </div>
-              </div>
-
-              {/* 3 Langkah Mudah */}
-              <div className="ref-steps-section">
-                <h4><Target size={18} /> Cara Kerja Program Referral 3 Langkah Mudah</h4>
-                <div className="ref-steps-grid">
-                  <div className="ref-step-card">
-                    <div className="step-number">1</div>
-                    <div className="step-content">
-                      <h5>Bagikan Kode Unik</h5>
-                      <p>Salin kode <strong>{referralStats?.referral_code || user?.referral_code || "KODE"}</strong> atau link pendaftaran dan bagikan ke rekan bisnis Anda.</p>
+              ) : referralStatsError ? (
+                <ErrorState
+                  title="Gagal Memuat Data Referral"
+                  message={referralStatsError}
+                  retry={() => {
+                    setReferralStatsError(null);
+                    // Trigger referral data reload
+                    const loadTabData = async () => {
+                      setReferralStatsLoading(true);
+                      try {
+                        const [res, withRes] = await Promise.all([
+                          api.get("/my-referral-stats"),
+                          api.get("/my-withdrawals").catch(() => ({ data: [] }))
+                        ]);
+                        setReferralStats(res.data || res || null);
+                        setMyWithdrawals(withRes.data || withRes || []);
+                      } catch (err) {
+                        setReferralStatsError(err?.message || "Gagal memuat data referral.");
+                      } finally {
+                        setReferralStatsLoading(false);
+                      }
+                    };
+                    loadTabData();
+                  }}
+                  type="error"
+                />
+              ) : (
+                <>
+                  {/* Referral Hero Banner */}
+                  <div className="db-referral-hero">
+                    <div className="db-referral-hero__left">
+                      <span className="db-referral-hero__badge">🎁 Program Kemitraan</span>
+                      <h3>Dapatkan Komisi <span style={{color:'#f59e0b'}}>15%</span> Dari Setiap Referral!</h3>
+                      <p>Bagikan kode unik Anda kepada rekan usaha. Teman Anda mendapat diskon 5%, Anda mendapat komisi tunai 15% otomatis.</p>
+                      <div className="db-referral-code-row">
+                        <div className="db-referral-code-box">
+                          <span>{referralStats?.referral_code || user?.referral_code || "Belum Ada"}</span>
+                        </div>
+                        <button
+                          className="db-btn-secondary"
+                          style={{gap:'6px'}}
+                          onClick={() => {
+                            const code = referralStats?.referral_code || user?.referral_code;
+                            if (code) {
+                              navigator.clipboard.writeText(code);
+                              alert('Kode referral berhasil disalin!');
+                            }
+                          }}
+                        >
+                          <Copy size={14} /> Salin Kode
+                        </button>
+                        <button
+                          className="db-btn-secondary"
+                          style={{gap:'6px'}}
+                          onClick={() => {
+                            const code = referralStats?.referral_code || user?.referral_code;
+                            if (!code) { alert('Anda belum memiliki kode referral.'); return; }
+                            const shareUrl = `${window.location.origin}/register?ref=${code}`;
+                            if (navigator.share) {
+                              navigator.share({ title: 'Daftar di Surade.co.id', text: `Gunakan kode referral saya: ${code}`, url: shareUrl }).catch(console.error);
+                            } else {
+                              navigator.clipboard.writeText(shareUrl);
+                              alert('Link referral berhasil disalin!');
+                            }
+                          }}
+                        >
+                          <Share2 size={14} /> Bagikan Link
+                        </button>
+                      </div>
+                    </div>
+                    <div className="db-referral-hero__right">
+                      <div className="db-referral-commission-badge">
+                        <span className="db-referral-commission-badge__pct">15%</span>
+                        <span>Komisi per referral</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="ref-step-card">
-                    <div className="step-number">2</div>
-                    <div className="step-content">
-                      <h5>Teman Mendaftar & Transaksi</h5>
-                      <p>Pengguna mendaftar dengan kode Anda dan membeli Paket Premium dengan potongan diskon 5%.</p>
-                    </div>
-                  </div>
-                  <div className="ref-step-card">
-                    <div className="step-number">3</div>
-                    <div className="step-content">
-                      <h5>Nikmati Komisi 15%</h5>
-                      <p>Komisi tunai 15% otomatis masuk setelah pembayaran diverifikasi admin dan dapat ditarik kapan saja.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Riwayat Transaksi */}
-              <div className="ref-history-section">
-                <div className="ref-history-header">
-                  <div>
-                    <h4><FileText size={18} /> Riwayat Transaksi Kode Referral</h4>
-                    <p>Daftar transaksi pengguna yang menggunakan kode referral Anda</p>
-                  </div>
-                  <div className="ref-history-actions">
-                    <div className="search-box">
-                      <Search size={14} />
-                      <input type="text" placeholder="Cari ID, nama, atau layanan..." />
+                  {/* Stat Cards */}
+                  <div className="db-saas-stats-row" style={{marginTop:'24px'}}>
+                    <div className="db-saas-stat-card">
+                      <div className="db-saas-stat-card__icon" style={{background:'linear-gradient(135deg,#0d9488,#0f766e)'}}>
+                        <TrendingUp size={22} color="#fff" />
+                      </div>
+                      <div className="db-saas-stat-card__body">
+                        <span>Total Komisi Diterima</span>
+                        <strong>Rp {Number(referralStats?.total_komisi_diterima || 0).toLocaleString('id-ID')}</strong>
+                      </div>
                     </div>
-                    <select>
-                      <option>Semua Status</option>
-                    </select>
+                    <div className="db-saas-stat-card">
+                      <div className="db-saas-stat-card__icon" style={{background:'linear-gradient(135deg,#f59e0b,#d97706)'}}>
+                        <Clock size={22} color="#fff" />
+                      </div>
+                      <div className="db-saas-stat-card__body">
+                        <span>Komisi Pending</span>
+                        <strong>Rp {Number((referralStats?.total_komisi || 0) - (referralStats?.total_komisi_diterima || 0)).toLocaleString('id-ID')}</strong>
+                      </div>
+                    </div>
+                    <div className="db-saas-stat-card">
+                      <div className="db-saas-stat-card__icon" style={{background:'linear-gradient(135deg,#3b82f6,#2563eb)'}}>
+                        <Users2 size={22} color="#fff" />
+                      </div>
+                      <div className="db-saas-stat-card__body">
+                        <span>Penggunaan Kode</span>
+                        <strong>{referralStats?.total_penggunaan || 0} Kali</strong>
+                      </div>
+                    </div>
+                    <div className="db-saas-stat-card">
+                      <div className="db-saas-stat-card__icon" style={{background:'linear-gradient(135deg,#8b5cf6,#7c3aed)'}}>
+                        <CheckCircle size={22} color="#fff" />
+                      </div>
+                      <div className="db-saas-stat-card__body">
+                        <span>Transaksi Selesai</span>
+                        <strong>{referralStats?.total_transaksi || 0} Transaksi</strong>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="ref-history-table-container">
-                  <table className="ref-history-table">
-                    <thead>
-                      <tr>
-                        <th>ID TRANSAKSI</th>
-                        <th>PENGGUNA / PEMBELI</th>
-                        <th>LAYANAN & BISNIS</th>
-                        <th>TANGGAL</th>
-                        <th>TOTAL TRANSAKSI</th>
-                        <th>KOMISI ANDA (15%)</th>
-                        <th>STATUS</th>
-                        <th>AKSI</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {referralStats?.riwayat_terbaru && referralStats.riwayat_terbaru.length > 0 ? (
-                        referralStats.riwayat_terbaru.map((r) => (
-                          <tr key={r.id}>
-                            <td>{r.transaction_id || '#' + r.id}</td>
-                            <td>{r.referred_user || '-'}</td>
-                            <td>Paket Premium</td>
-                            <td>{new Date(r.created_at).toLocaleDateString('id-ID')}</td>
-                            <td>Rp {Number((r.discount_amount || 0) * 20).toLocaleString('id-ID')}</td> {/* dummy calculation for visual */}
-                            <td>Rp {Number(r.commission_amount || 0).toLocaleString('id-ID')}</td>
-                            <td><span className={"status-badge " + r.status.toLowerCase()}>{r.status}</span></td>
-                            <td><button className="action-btn">Detail</button></td>
+                  {/* 3 Langkah */}
+                  <div className="db-card" style={{marginTop:'24px',padding:'24px'}}>
+                    <h4 style={{fontWeight:800,color:'var(--s-slate-800)',margin:'0 0 16px',display:'flex',alignItems:'center',gap:'8px'}}>
+                      <Target size={18} color="#0d9488" /> Cara Kerja Program Referral
+                    </h4>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'16px'}}>
+                      {[
+                        { n:1, icon:<Gift size={24} color="#0d9488"/>, title:'Bagikan Kode Unik', desc:`Salin kode ${referralStats?.referral_code || user?.referral_code || 'KODE'} dan bagikan ke rekan bisnis Anda.` },
+                        { n:2, icon:<Users2 size={24} color="#3b82f6"/>, title:'Teman Daftar & Transaksi', desc:'Pengguna mendaftar dengan kode Anda dan membeli Paket Premium dengan diskon 5%.' },
+                        { n:3, icon:<Wallet size={24} color="#f59e0b"/>, title:'Nikmati Komisi 15%', desc:'Komisi 15% otomatis masuk setelah pembayaran diverifikasi. Tarik kapan saja.' },
+                      ].map(s => (
+                        <div key={s.n} style={{background:'var(--s-slate-50)',borderRadius:'12px',padding:'18px',display:'flex',flexDirection:'column',gap:'10px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                            <div style={{width:36,height:36,borderRadius:'50%',background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 8px rgba(0,0,0,0.08)',fontWeight:800,color:'var(--s-teal-600)',fontSize:'1rem'}}>{s.n}</div>
+                            {s.icon}
+                          </div>
+                          <strong style={{fontSize:'0.92rem',color:'var(--s-slate-800)'}}>{s.title}</strong>
+                          <p style={{fontSize:'0.82rem',color:'var(--s-slate-500)',margin:0}}>{s.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Riwayat Transaksi Referral */}
+                  <div className="db-card" style={{marginTop:'24px',padding:'24px'}}>
+                    <h4 style={{fontWeight:800,color:'var(--s-slate-800)',margin:'0 0 4px',display:'flex',alignItems:'center',gap:'8px'}}>
+                      <FileText size={18} color="#0d9488" /> Riwayat Transaksi Referral
+                    </h4>
+                    <p style={{fontSize:'0.85rem',color:'var(--s-slate-500)',margin:'0 0 16px'}}>Daftar pengguna yang mendaftar dan bertransaksi menggunakan kode referral Anda.</p>
+                    <div className="db-table-container">
+                      <div className="db-table-responsive">
+                  <table className="db-table">
+                        <thead>
+                          <tr>
+                            <th>ID</th><th>Pengguna</th><th>Layanan</th><th>Tanggal</th><th>Komisi (15%)</th><th>Status</th>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="8" className="empty-state-cell">
-                            <div className="empty-state-content">
-                              <Share2 size={32} color="#94a3b8" />
-                              <h5>Belum ada referral yang berhasil.</h5>
-                              <p>Bagikan kode referral Anda ({referralStats?.referral_code || user?.referral_code || "KODE"}) ke rekan bisnis<br/>untuk mulai mendapatkan komisi 15% dari setiap pembelian<br/>Paket Premium.</p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody>
+                          {referralStats?.riwayat_terbaru?.length > 0 ? referralStats.riwayat_terbaru.map(r => (
+                            <tr key={r.id}>
+                              <td><span style={{fontFamily:'monospace',fontSize:'0.8rem'}}>#{r.id}</span></td>
+                              <td>{r.referred_user || '-'}</td>
+                              <td>Paket Premium</td>
+                              <td>{new Date(r.created_at).toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'})}</td>
+                              <td><strong style={{color:'#0d9488'}}>Rp {Number(r.commission_amount || 0).toLocaleString('id-ID')}</strong></td>
+                              <td>
+                                <span className={`db-badge db-badge--${r.status === 'approved' || r.status === 'paid' ? 'approved' : r.status === 'pending' ? 'pending' : 'rejected'}`}>
+                                  {r.status === 'approved' || r.status === 'paid' ? '✓ Terverifikasi' : r.status === 'pending' ? '⏳ Pending' : '✗ Ditolak'}
+                                </span>
+                              </td>
+                            </tr>
+                          )) : (
+                            <tr>
+                              <td colSpan={6} style={{textAlign:'center',padding:'40px'}}>
+                                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'10px',color:'var(--s-slate-400)'}}>
+                                  <Share2 size={36} />
+                                  <strong style={{color:'var(--s-slate-600)'}}>Belum ada transaksi referral</strong>
+                                  <span style={{fontSize:'0.85rem'}}>Bagikan kode referral Anda untuk mulai mendapatkan komisi 15%.</span>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                        </table>
                 </div>
-              </div>
+                    </div>
+                  </div>
+
+                  {/* Riwayat Penarikan Komisi */}
+                  <div className="db-card" style={{marginTop:'24px',padding:'24px'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}>
+                      <h4 style={{fontWeight:800,color:'var(--s-slate-800)',margin:0,display:'flex',alignItems:'center',gap:'8px'}}>
+                        <Wallet size={18} color="#0d9488" /> Riwayat Penarikan Saldo
+                      </h4>
+                      <button className="db-action-btn" style={{fontSize:'0.8rem',padding:'8px 14px'}} onClick={() => setShowWithdrawModal(true)}>
+                        + Tarik Sekarang
+                      </button>
+                    </div>
+                    <div className="db-table-container">
+                      <div className="db-table-responsive">
+                  <table className="db-table">
+                        <thead>
+                          <tr><th>Tanggal</th><th>Nominal</th><th>Metode</th><th>Rekening</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                          {myWithdrawals.length > 0 ? myWithdrawals.map(w => (
+                            <tr key={w.id}>
+                              <td>{new Date(w.created_at).toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'})}</td>
+                              <td><strong>Rp {Number(w.amount).toLocaleString('id-ID')}</strong></td>
+                              <td>{w.payment_method}</td>
+                              <td style={{fontSize:'0.82rem'}}>{w.account_name} • {w.account_number}</td>
+                              <td>
+                                <span className={`db-badge db-badge--${w.status === 'approved' ? 'approved' : w.status === 'pending' ? 'pending' : 'rejected'}`}>
+                                  {w.status === 'approved' ? '✓ Disetujui' : w.status === 'pending' ? '⏳ Diproses' : '✗ Ditolak'}
+                                </span>
+                              </td>
+                            </tr>
+                          )) : (
+                            <tr>
+                              <td colSpan={5} style={{textAlign:'center',padding:'32px',color:'var(--s-slate-400)'}}>
+                                Belum ada riwayat penarikan.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                        </table>
+                </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* MODAL TARIK SALDO KOMISI */}
+              {showWithdrawModal && (
+                <div className="db-modal-overlay" onClick={() => setShowWithdrawModal(false)}>
+                  <div className="db-modal" style={{maxWidth:'480px'}} onClick={e => e.stopPropagation()}>
+                    <div className="db-modal-header">
+                      <div>
+                        <h3 style={{margin:0,fontWeight:800}}>Tarik Saldo Komisi</h3>
+                        <p style={{margin:'4px 0 0',fontSize:'0.82rem',color:'var(--s-slate-500)'}}>
+                          Saldo tersedia: <strong style={{color:'#0d9488'}}>Rp {Number(referralStats?.total_komisi_diterima || 0).toLocaleString('id-ID')}</strong>
+                        </p>
+                      </div>
+                      <button className="db-modal-close-btn" onClick={() => setShowWithdrawModal(false)}>✕</button>
+                    </div>
+                    <form onSubmit={handleRequestWithdrawal}>
+                      <div className="db-modal-body">
+                        <div className="db-form-group">
+                          <label>Nominal Penarikan (min. Rp 50.000)</label>
+                          <input
+                            type="number"
+                            min="50000"
+                            max={referralStats?.total_komisi_diterima || 0}
+                            placeholder="Contoh: 150000"
+                            value={withdrawAmount}
+                            onChange={e => setWithdrawAmount(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="db-form-group">
+                          <label>Metode Penarikan</label>
+                          <select value={withdrawMethod} onChange={e => setWithdrawMethod(e.target.value)}>
+                            <option value="BCA">Transfer Bank — BCA</option>
+                            <option value="BRI">Transfer Bank — BRI</option>
+                            <option value="BNI">Transfer Bank — BNI</option>
+                            <option value="Mandiri">Transfer Bank — Mandiri</option>
+                            <option value="GoPay">GoPay</option>
+                            <option value="OVO">OVO</option>
+                            <option value="DANA">DANA</option>
+                            <option value="ShopeePay">ShopeePay</option>
+                          </select>
+                        </div>
+                        <div className="db-form-group">
+                          <label>Nama Pemilik Rekening</label>
+                          <input
+                            type="text"
+                            placeholder="Sesuai nama di rekening / e-wallet"
+                            value={withdrawAccountName}
+                            onChange={e => setWithdrawAccountName(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="db-form-group">
+                          <label>Nomor Rekening / Nomor HP</label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: 1234567890"
+                            value={withdrawAccountNumber}
+                            onChange={e => setWithdrawAccountNumber(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div style={{background:'#fef3c7',border:'1px solid #fde68a',borderRadius:'8px',padding:'12px',fontSize:'0.82rem',color:'#92400e',marginTop:'4px'}}>
+                          ⚠️ Penarikan akan diproses admin dalam 1–3 hari kerja. Pastikan data rekening Anda sudah benar.
+                        </div>
+                      </div>
+                      <div className="db-modal-footer">
+                        <button type="button" className="db-btn-secondary" onClick={() => setShowWithdrawModal(false)}>Batal</button>
+                        <button type="submit" className="db-action-btn" disabled={withdrawLoading}>
+                          {withdrawLoading ? 'Memproses...' : <><Wallet size={14} /> Ajukan Penarikan</>}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -7673,9 +8532,12 @@ export default function Dashboard() {
                   </div>
 
                   {profileMessage && (
-                    <div className={`db-profile-message db-profile-message--${profileMessage.type}`}>
-                      {profileMessage.text}
-                    </div>
+                    <InlineAlert
+                      type={profileMessage.type}
+                      message={profileMessage.text}
+                      dismissible={true}
+                      onDismiss={() => setProfileMessage(null)}
+                    />
                   )}
 
                   <button type="submit" className="db-action-btn" disabled={profileSaving}>
@@ -7890,6 +8752,7 @@ export default function Dashboard() {
                 </div>
               ) : categories.length > 0 ? (
                 <div className="db-table-responsive">
+                  <div className="db-table-responsive">
                   <table className="db-table">
                     <thead>
                       <tr>
@@ -7928,7 +8791,8 @@ export default function Dashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
                 </div>
               ) : (
                 <DashboardEmptyState
@@ -7967,12 +8831,34 @@ export default function Dashboard() {
               </div>
 
               {loading ? (
-                <div className="db-loader-wrap">
-                  <div className="db-spinner" />
-                  <span>Memuat user...</span>
+                <div className="db-loading-section">
+                  <LoadingSpinner size="lg" text="Memuat data pengguna..." />
                 </div>
+              ) : dashboardError ? (
+                <ErrorState
+                  title={errorHandler.getErrorTitle(dashboardError.type)}
+                  message={dashboardError.userMessage || dashboardError.message}
+                  retry={handleRetry}
+                  type={dashboardError.type}
+                />
+              ) : tabLoading ? (
+                <div className="db-loading-section">
+                  <SkeletonTable rows={5} columns={6} />
+                </div>
+              ) : tabError ? (
+                <ErrorState
+                  title={errorHandler.getErrorTitle(tabError.type)}
+                  message={tabError.userMessage || tabError.message}
+                  retry={() => {
+                    setTabError(null);
+                    setRetryCount(0);
+                    fetchInitialData(true);
+                  }}
+                  type={tabError.type}
+                />
               ) : filteredUsers.length > 0 ? (
                 <div className="db-table-responsive">
+                  <div className="db-table-responsive">
                   <table className="db-table">
                     <thead>
                       <tr>
@@ -8015,10 +8901,15 @@ export default function Dashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
                 </div>
               ) : (
-                <div className="db-empty-state">User tidak ditemukan.</div>
+                <EmptyState
+                  type="users"
+                  action={() => handleOpenUserModal()}
+                  actionText="Tambah User Baru"
+                />
               )}
             </div>
           )}
@@ -8102,6 +8993,7 @@ export default function Dashboard() {
                 <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat paket...</span></div>
               ) : premiumPackages.length > 0 ? (
                 <div className="db-table-responsive">
+                  <div className="db-table-responsive">
                   <table className="db-table">
                     <thead>
                       <tr>
@@ -8146,7 +9038,8 @@ export default function Dashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
                 </div>
               ) : (
                 <DashboardEmptyState
@@ -8198,7 +9091,8 @@ export default function Dashboard() {
               ) : premiumHistory.history?.length > 0 ? (
                 <>
                   <div className="db-table-responsive">
-                    <table className="db-table">
+                    <div className="db-table-responsive">
+                  <table className="db-table">
                       <thead>
                         <tr>
                           <th>Tanggal</th>
@@ -8298,7 +9192,8 @@ export default function Dashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                </div>
                   </div>
                   
                   {premiumHistory.history.length > 5 && (
@@ -8330,6 +9225,24 @@ export default function Dashboard() {
               )}
             </div>
           )}
+
+      {/* Enhanced UI Components */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        onClose={handleCancel}
+        onConfirm={handleConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        loading={confirmState.loading}
+      />
+      
+      <ToastContainer 
+        notifications={notifications}
+        onRemove={removeNotification}
+      />
 
         </main>
       </div>
@@ -8446,7 +9359,7 @@ export default function Dashboard() {
               <div className="db-form-group">
                 <label>Bisnis <span className="req">*</span></label>
                 <select required value={ticketBusinessId} onChange={(e) => setTicketBusinessId(e.target.value)}>
-                  {businesses.filter((b) => isAdmin || b.user_id === user?.id).map((b) => (
+                  {safeBusinesses.filter((b) => isAdmin || b.user_id === user?.id).map((b) => (
                     <option key={b.id} value={b.id}>{b.title}</option>
                   ))}
                 </select>
@@ -8744,8 +9657,5 @@ function AdminReportTab() {
       )}
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+

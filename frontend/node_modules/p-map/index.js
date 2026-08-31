@@ -215,18 +215,20 @@ export function pMapIterable(
 
 				pendingPromisesCount++;
 
+				// Errors must be returned as a value instead of rejecting, otherwise a promise that
+				// the consumer abandons after an earlier error becomes an unhandled rejection.
 				const promise = (async () => {
-					const {done, value} = await iterator.next();
-
-					if (done) {
-						pendingPromisesCount--;
-						return {done: true};
-					}
-
-					// Spawn if still below concurrency and backpressure limit
-					trySpawn();
-
 					try {
+						const {done, value} = await iterator.next();
+
+						if (done) {
+							pendingPromisesCount--;
+							return {done: true};
+						}
+
+						// Spawn if still below concurrency and backpressure limit
+						trySpawn();
+
 						const currentIndex = index++;
 						const returnValue = await mapper(await value, currentIndex);
 
@@ -257,12 +259,13 @@ export function pMapIterable(
 			trySpawn();
 
 			while (promises.length > 0) {
-				const {error, done, value} = await promises[0]; // eslint-disable-line no-await-in-loop
+				const result = await promises[0]; // eslint-disable-line no-await-in-loop
+				const {done, value} = result;
 
 				promises.shift();
 
-				if (error) {
-					throw error;
+				if (Object.hasOwn(result, 'error')) {
+					throw result.error;
 				}
 
 				if (done) {

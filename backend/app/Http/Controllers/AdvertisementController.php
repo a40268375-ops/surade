@@ -6,12 +6,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\Advertisement;
+use App\Http\Requests\AdvertisementStoreRequest;
+use App\Http\Helpers\SecurityHelper;
+use App\Services\PremiumFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class AdvertisementController extends Controller
 {
+    protected $premiumService;
+
+    public function __construct(PremiumFeatureService $premiumService)
+    {
+        $this->premiumService = $premiumService;
+    }
     public function index(Request $request)
     {
         $query = Advertisement::with('category', 'user');
@@ -38,38 +47,25 @@ class AdvertisementController extends Controller
         return response()->json($ads);
     }
 
-    public function store(Request $request)
+    public function store(AdvertisementStoreRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'category_id' => 'required|exists:categories,id',
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'company_name' => 'required|string|max:255',
-            'location' => 'required|string|max:255',
-            'phone' => 'nullable|string',
-            'website' => 'nullable|string',
-            // PERBAIKAN: sebelumnya tidak ada validasi/handling untuk
-            // gambar sama sekali - form "Pasang Iklan Baru" tidak bisa
-            // upload foto apa pun.
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        if ($request->user()->role !== 'admin' && !$request->user()->hasActivePremiumBusiness()) {
+        // Check premium permission using service
+        $canCreateAd = $this->premiumService->canPerformAction($request->user(), 'create_advertisement');
+        if (!$canCreateAd['allowed']) {
             return response()->json([
-                'message' => 'Hanya bisnis dengan langganan Premium aktif yang bisa memasang iklan. Silakan berlangganan premium terlebih dahulu.',
+                'message' => 'Posting iklan hanya tersedia untuk pengguna Premium. Upgrade sekarang untuk mulai beriklan!',
+                'error' => 'PREMIUM_REQUIRED',
+                'feature' => 'create_advertisement',
+                'upgrade_url' => '/dashboard?tab=premium',
+                'benefits' => [
+                    'Jangkauan lebih luas dengan iklan berbayar',
+                    'Targeting audience yang tepat',
+                    'Analytics performa iklan',
+                    'Prioritas tampil di hasil pencarian'
+                ]
             ], 403);
         }
 
-        // PERBAIKAN: sebelumnya `$data = $request->all()` dipakai apa
-        // adanya untuk Advertisement::create() - kalau ada file gambar di
-        // request, field 'image' akan berisi objek UploadedFile mentah
-        // (bukan path string), yang bakal gagal disimpan ke kolom varchar
-        // di database. Sekarang file gambar dikeluarkan dulu dari $data,
-        // lalu ditangani terpisah persis seperti BusinessController.
         $data = $request->except(['image']);
         $data['user_id'] = $request->user()->id;
         $data['status'] = 'pending';
@@ -80,6 +76,14 @@ class AdvertisementController extends Controller
         }
 
         $advertisement = Advertisement::create($data);
+
+        // Log security event
+        SecurityHelper::logSecurityEvent('advertisement_created', [
+            'advertisement_id' => $advertisement->id,
+            'user_id' => $request->user()->id,
+            'title' => $advertisement->title,
+            'ip' => $request->ip()
+        ]);
 
         return response()->json($advertisement->load('category'), 201);
     }
@@ -208,11 +212,27 @@ class AdvertisementController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        // Store info for logging before deletion
+        $advertisementInfo = [
+            'id' => $advertisement->id,
+            'title' => $advertisement->title,
+            'user_id' => $advertisement->user_id
+        ];
+
         if ($advertisement->image) {
             Storage::disk('public')->delete(str_replace('/storage/', '', $advertisement->image));
         }
 
         $advertisement->delete();
+
+        // Log security event
+        SecurityHelper::logSecurityEvent('advertisement_deleted', [
+            'advertisement_id' => $advertisementInfo['id'],
+            'user_id' => $request->user()->id,
+            'title' => $advertisementInfo['title'],
+            'original_owner_id' => $advertisementInfo['user_id'],
+            'ip' => $request->ip()
+        ]);
 
         return response()->json(['message' => 'Advertisement deleted successfully']);
     }

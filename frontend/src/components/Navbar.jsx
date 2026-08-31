@@ -136,14 +136,11 @@ export default function Navbar() {
                     onFocus={() => setActiveParentIdx(idx)}
                     onClick={() => setDropdownOpen(false)}
                   >
-<<<<<<< HEAD
                     <span className="home-nav__dropdown-label">
                       <span className="home-nav__dropdown-icon">{iconForCategory(item.name, { size: 16, iconKey: item.icon })}</span>
                       <span>{item.name}</span>
                     </span>
-=======
-                    <span>{item.name}</span>
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
                     {(item.children?.length ?? 0) > 0 && (
                       <ChevronRight size={14} className="home-nav__dropdown-chevron" />
                     )}
@@ -159,10 +156,8 @@ export default function Navbar() {
                       className="home-nav__sub-item"
                       onClick={() => setDropdownOpen(false)}
                     >
-<<<<<<< HEAD
                       <span className="home-nav__dropdown-icon">{iconForCategory(child.name, { size: 15, iconKey: child.icon })}</span>
-=======
->>>>>>> 43511c35c312291308bc3e9f249d166401282bda
+
                       {child.name}
                     </Link>
                   ))

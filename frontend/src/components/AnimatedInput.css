@@ -1,0 +1,346 @@
+/* ====================================
+   ANIMATED INPUT COMPONENT STYLES
+   ==================================== */
+
+.animated-input {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.animated-input__field {
+  width: 100%;
+  padding: 16px 12px 8px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 2;
+}
+
+.animated-input__field::placeholder {
+  color: #94a3b8;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.animated-input--focused .animated-input__field::placeholder,
+.animated-input:not(.animated-input--has-value) .animated-input__field:not(:focus)::placeholder {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   FLOATING LABEL
+   ========================================================================== */
+
+.animated-input__label {
+  position: absolute;
+  top: 16px;
+  left: 12px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: none;
+  transform-origin: left center;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+  background: #ffffff;
+  padding: 0 4px;
+  margin-left: -4px;
+}
+
+.animated-input--focused .animated-input__label,
+.animated-input--has-value .animated-input__label {
+  top: -8px;
+  left: 8px;
+  font-size: 12px;
+  color: #0d9488;
+  transform: scale(1);
+}
+
+.animated-input__required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+/* ==========================================================================
+   ICON SUPPORT
+   ========================================================================== */
+
+.animated-input--with-icon-left .animated-input__field {
+  padding-left: 44px;
+}
+
+.animated-input--with-icon-left .animated-input__label {
+  left: 44px;
+}
+
+.animated-input--with-icon-left.animated-input--focused .animated-input__label,
+.animated-input--with-icon-left.animated-input--has-value .animated-input__label {
+  left: 40px;
+}
+
+.animated-input--with-icon-right .animated-input__field {
+  padding-right: 44px;
+}
+
+.animated-input__icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  z-index: 4;
+  transition: color 0.25s ease;
+}
+
+.animated-input__icon--left {
+  left: 12px;
+}
+
+.animated-input__icon--right {
+  right: 12px;
+}
+
+.animated-input--focused .animated-input__icon {
+  color: #0d9488;
+}
+
+/* ==========================================================================
+   FOCUS RING
+   ========================================================================== */
+
+.animated-input__focus-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.animated-input--focused .animated-input__focus-ring {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+/* ==========================================================================
+   STATES
+   ========================================================================== */
+
+/* Focused State */
+.animated-input--focused .animated-input__field {
+  border-color: #0d9488;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Error State */
+.animated-input--error .animated-input__field {
+  border-color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.animated-input--error .animated-input__label {
+  color: #ef4444;
+}
+
+.animated-input--error .animated-input__icon {
+  color: #ef4444;
+}
+
+.animated-input--error .animated-input__focus-ring {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Success State */
+.animated-input--success .animated-input__field {
+  border-color: #22c55e;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
+}
+
+.animated-input--success .animated-input__label {
+  color: #22c55e;
+}
+
+.animated-input--success .animated-input__icon {
+  color: #22c55e;
+}
+
+.animated-input--success .animated-input__focus-ring {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+/* Disabled State */
+.animated-input--disabled .animated-input__field {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+}
+
+.animated-input--disabled .animated-input__label {
+  color: #94a3b8;
+}
+
+.animated-input--disabled .animated-input__icon {
+  color: #94a3b8;
+}
+
+/* ==========================================================================
+   TEXTAREA VARIANT
+   ========================================================================== */
+
+.animated-input--textarea .animated-input__field {
+  resize: vertical;
+  min-height: 100px;
+  padding-top: 20px;
+}
+
+.animated-input--textarea .animated-input__label {
+  top: 20px;
+}
+
+.animated-input--textarea.animated-input--focused .animated-input__label,
+.animated-input--textarea.animated-input--has-value .animated-input__label {
+  top: -8px;
+}
+
+/* ==========================================================================
+   MESSAGE
+   ========================================================================== */
+
+.animated-input__message {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  animation: slideInUp 0.25s ease-out;
+}
+
+.animated-input__message--error {
+  color: #ef4444;
+}
+
+.animated-input__message--success {
+  color: #22c55e;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .animated-input__field {
+    padding: 14px 10px 6px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  .animated-input__label {
+    top: 14px;
+    left: 10px;
+    font-size: 13px;
+  }
+  
+  .animated-input--focused .animated-input__label,
+  .animated-input--has-value .animated-input__label {
+    top: -8px;
+    left: 6px;
+    font-size: 11px;
+  }
+  
+  .animated-input--with-icon-left .animated-input__field {
+    padding-left: 40px;
+  }
+  
+  .animated-input--with-icon-left .animated-input__label {
+    left: 40px;
+  }
+  
+  .animated-input--with-icon-left.animated-input--focused .animated-input__label,
+  .animated-input--with-icon-left.animated-input--has-value .animated-input__label {
+    left: 36px;
+  }
+  
+  .animated-input__icon--left {
+    left: 10px;
+  }
+  
+  .animated-input__icon--right {
+    right: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .animated-input {
+    margin-bottom: 16px;
+  }
+  
+  .animated-input__field {
+    border-radius: 8px;
+  }
+  
+  .animated-input__focus-ring {
+    border-radius: 8px;
+  }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-input__field,
+  .animated-input__label,
+  .animated-input__focus-ring,
+  .animated-input__icon {
+    transition: none;
+  }
+  
+  .animated-input--focused .animated-input__field {
+    transform: none;
+  }
+  
+  .animated-input__message {
+    animation: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .animated-input__field {
+    border-width: 3px;
+  }
+  
+  .animated-input--focused .animated-input__field {
+    border-width: 3px;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .animated-input__field {
+    min-height: 48px; /* Minimum touch target */
+  }
+}
