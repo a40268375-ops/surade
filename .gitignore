@@ -20,10 +20,18 @@ backend/public/hot/
 
 # Storage & Logs
 backend/storage/*.key
-backend/storage/logs/*.log
+backend/storage/app/*
+!backend/storage/app/public
 backend/storage/framework/cache/*
+!backend/storage/framework/cache/.gitignore
 backend/storage/framework/sessions/*
+!backend/storage/framework/sessions/.gitignore
 backend/storage/framework/views/*
+!backend/storage/framework/views/.gitignore
+backend/storage/logs/*
+!backend/storage/logs/.gitignore
+backend/storage/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
