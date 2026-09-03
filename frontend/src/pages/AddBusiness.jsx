@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
 import SubCategorySelector from "../components/SubCategorySelector";
@@ -99,19 +99,21 @@ const spinCls = "animate-[spin360_1s_linear_infinite]";
 
 const PAYMENT_METHODS = [
   {
-    category: "E-Wallet",
+    category: "Transfer Bank / Rekening Resmi",
     items: [
-      { id: "DANA", name: "DANA", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#008cff] text-white" },
-      { id: "GoPay", name: "GoPay", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#00a5cf] text-white" },
-      { id: "OVO", name: "OVO", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#4c2a86] text-white" },
+      { id: "Mandiri", name: "Bank Mandiri", accountName: "Triwala Mitra Bestari", accountNumber: "133-0011-409-331", badgeColor: "bg-[#003d79] text-white" },
+      { id: "BNI", name: "Bank BNI", accountName: "Triwala Mitra Bestari", accountNumber: "0973607008", badgeColor: "bg-[#f15a24] text-white" },
+      { id: "BCA", name: "Bank BCA", accountName: "Triwala Mitra Bestari", accountNumber: "0954152045", badgeColor: "bg-[#00529c] text-white" },
+      { id: "Maybank", name: "Maybank", accountName: "Triwala Mitra Bestari", accountNumber: "2097000009", badgeColor: "bg-[#ffc800] text-black" },
+      { id: "BJB", name: "Bank BJB", accountName: "Triwala Mitra Bestari", accountNumber: "0119213282001", badgeColor: "bg-[#0072bc] text-white" },
     ]
   },
   {
-    category: "Virtual Account / Transfer Bank",
+    category: "E-Wallet",
     items: [
-      { id: "BCA VA", name: "BCA Virtual Account", accountName: "PT Info Media", accountNumber: "8830-1234-5678", badgeColor: "bg-[#00529c] text-white" },
-      { id: "Mandiri VA", name: "Mandiri Virtual Account", accountName: "PT Info Media", accountNumber: "137-00-1234-5678", badgeColor: "bg-[#003d79] text-white" },
-      { id: "BRI VA", name: "BRI Virtual Account", accountName: "PT Info Media", accountNumber: "0341-01-000123-56-7", badgeColor: "bg-[#00529c] text-white" },
+      { id: "OVO", name: "OVO", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#4c2a86] text-white" },
+      { id: "DANA", name: "DANA", accountName: "Triwala Mitra Bestari", accountNumber: "XXX (Belum Terdaftar)", badgeColor: "bg-[#008cff] text-white" },
+      { id: "GoPay", name: "GoPay", accountName: "Triwala Mitra Bestari", accountNumber: "XXX (Belum Terdaftar)", badgeColor: "bg-[#00a5cf] text-white" },
     ]
   }
 ];
@@ -119,9 +121,14 @@ const PAYMENT_METHODS = [
 export default function AddBusiness() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const isEditing = !!id;
+  const isUpgradeParam = searchParams.get("upgrade") === "true" || searchParams.get("mode") === "upgrade";
 
   const [step, setStep] = useState(isEditing ? 2 : 1);
+  const [isUpgradeMode, setIsUpgradeMode] = useState(isUpgradeParam);
+  const [isAlreadyPremium, setIsAlreadyPremium] = useState(false);
+  const [isPendingUpgrade, setIsPendingUpgrade] = useState(false);
   const [categories, setCategories] = useState([]);
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(false);
@@ -132,6 +139,8 @@ export default function AddBusiness() {
   const [createdId, setCreatedId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [isPendingVerification, setIsPendingVerification] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [businessStatus, setBusinessStatus] = useState("");
 
   // ── Package Selection State ──
   const [selectedPackage, setSelectedPackage] = useState(null); // null, or { isFree: true, id: 'free', ... } or plan object
@@ -254,10 +263,13 @@ export default function AddBusiness() {
         const raw = Array.isArray(d) ? d : (d?.data || []);
         const list = raw.filter((p) => Number(p.price) > 0 || !p.name?.toLowerCase().includes("free"));
         setPlans(list);
+        if (list.length > 0 && isUpgradeParam) {
+          setSelectedPackage({ ...list[0], isFree: false });
+        }
       })
       .catch(console.error)
       .finally(() => setPlansLoading(false));
-  }, []);
+  }, [isUpgradeParam]);
 
   // Update form.category_id when subcategory changes
   useEffect(() => {
@@ -368,10 +380,42 @@ export default function AddBusiness() {
               setLogoPreview(getStorageUrl(data.logo));
             }
 
+            const existingProof = data.subscriptions?.[0]?.payment?.proof || data.latest_subscription?.payment?.proof || data.payment?.proof || data.proof;
+            if (existingProof) {
+              setProofPreview(getStorageUrl(existingProof));
+            }
+
+            if (data.rejection_reason) {
+              setRejectionReason(data.rejection_reason);
+            }
+            if (data.status) {
+              setBusinessStatus(data.status);
+            }
+
+            const subs = data.subscriptions || [];
+            const latestSub = subs[0];
+            const isPendingSub = Boolean(data.has_pending_subscription || (latestSub?.status === "pending" && latestSub?.payment?.status === "pending"));
+
             // Set default package if editing
             if (data.is_premium) {
+              setIsAlreadyPremium(true);
+              setIsPendingUpgrade(false);
+              setIsUpgradeMode(false);
               setSelectedPackage({ id: 1, name: "Premium", price: 50000, isFree: false });
+            } else if (isPendingSub) {
+              setIsAlreadyPremium(false);
+              setIsPendingUpgrade(true);
+              setIsUpgradeMode(false);
+              setSelectedPackage({ id: "free", name: "Free", price: 0, isFree: true });
+            } else if (isUpgradeParam) {
+              setIsAlreadyPremium(false);
+              setIsPendingUpgrade(false);
+              setIsUpgradeMode(true);
+              const premPlan = plans.find(p => !p.name?.toLowerCase().includes("free") && Number(p.price) > 0) || { id: 1, name: "Premium Business", price: 50000, duration_value: 1, duration_unit: "month", formatted_duration: "1 Bulan", isFree: false };
+              setSelectedPackage(premPlan);
             } else {
+              setIsAlreadyPremium(false);
+              setIsPendingUpgrade(false);
               setSelectedPackage({ id: "free", name: "Free", price: 0, isFree: true });
             }
             setStep(2);
@@ -383,7 +427,7 @@ export default function AddBusiness() {
         })
         .finally(() => setLoading(false));
     }
-  }, [isEditing, id, categories]);
+  }, [isEditing, id, categories, isUpgradeParam, plans]);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -440,9 +484,12 @@ export default function AddBusiness() {
 
   const removeProof = () => {
     setProofFile(null);
-    if (proofPreview) URL.revokeObjectURL(proofPreview);
+    if (proofPreview && proofPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(proofPreview);
+    }
     setProofPreview(null);
   };
+  const handleRemoveProof = removeProof;
 
   const geocodeAddress = async () => {
     const query = address.trim();
@@ -654,7 +701,7 @@ export default function AddBusiness() {
       });
       if (res.data?.valid) {
         setAppliedReferral(res.data);
-        setReferralSuccessMsg(res.data.message || "Kode referral valid! Diskon 5% berhasil diterapkan.");
+        setReferralSuccessMsg(res.data.message || "Kode referral valid! Diskon Rp 5.000 berhasil diterapkan.");
       } else {
         setAppliedReferral(null);
         setReferralError(res.data?.message || "Kode referral tidak valid.");
@@ -675,27 +722,39 @@ export default function AddBusiness() {
     setReferralError("");
   };
 
-  // Dynamic Step Indicator configuration based on Free vs Premium
-  const isFreeSelection = selectedPackage?.isFree;
+  // Dynamic Step Indicator configuration based on Free vs Premium vs Upgrade
+  const isFreeSelection = isEditing ? (!isUpgradeMode && selectedPackage?.isFree) : selectedPackage?.isFree;
   
-  const currentSteps = isEditing
-    ? [{ id: 2, label: "Edit Data Usaha", icon: <Store size={18} /> }]
-    : (isFreeSelection
-        ? [
-            { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
-            { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
-            { id: 3, label: "Review & Daftar", icon: <Check size={18} /> },
-          ]
-        : [
-            { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
-            { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
-            { id: 3, label: "Ringkasan", icon: <FileText size={18} /> },
-            { id: 4, label: "Pembayaran", icon: <CreditCard size={18} /> },
-            { id: 5, label: "Upload Bukti", icon: <Upload size={18} /> },
-          ]);
+  let currentSteps = [];
+  if (isEditing) {
+    if (isUpgradeMode) {
+      currentSteps = [
+        { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
+        { id: 3, label: "Ringkasan", icon: <FileText size={18} /> },
+        { id: 4, label: "Pembayaran", icon: <CreditCard size={18} /> },
+        { id: 5, label: "Upload Bukti", icon: <Upload size={18} /> },
+      ];
+    } else {
+      currentSteps = [{ id: 2, label: "Edit Data Usaha", icon: <Store size={18} /> }];
+    }
+  } else {
+    currentSteps = isFreeSelection
+      ? [
+          { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
+          { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
+          { id: 3, label: "Review & Daftar", icon: <Check size={18} /> },
+        ]
+      : [
+          { id: 1, label: "Pilih Paket", icon: <Crown size={18} /> },
+          { id: 2, label: "Data Bisnis", icon: <Store size={18} /> },
+          { id: 3, label: "Ringkasan", icon: <FileText size={18} /> },
+          { id: 4, label: "Pembayaran", icon: <CreditCard size={18} /> },
+          { id: 5, label: "Upload Bukti", icon: <Upload size={18} /> },
+        ];
+  }
 
   const validateCurrentStep = () => {
-    if (step === 1) {
+    if (step === 1 && !isEditing) {
       if (!selectedPackage) return "Silakan pilih salah satu paket terlebih dahulu.";
     }
     if (step === 2) {
@@ -736,14 +795,15 @@ export default function AddBusiness() {
       return;
     }
     setError("");
-    const maxSteps = isFreeSelection ? 3 : 5;
+    const maxSteps = isEditing ? (isUpgradeMode ? 5 : 2) : (isFreeSelection ? 3 : 5);
     setStep((s) => Math.min(s + 1, maxSteps));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const prevStep = () => {
     setError("");
-    setStep((s) => Math.max(s - 1, 1));
+    const minStep = isEditing ? 2 : 1;
+    setStep((s) => Math.max(s - 1, minStep));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -1007,6 +1067,12 @@ export default function AddBusiness() {
         }
       }
 
+      if (proofFile) {
+        const fd = new FormData();
+        fd.append("proof", proofFile);
+        await api.post(`/businesses/${bizId}/proof`, fd);
+      }
+
       setCreatedId(bizId);
       setIsPendingVerification(false);
       setSuccess(true);
@@ -1064,7 +1130,7 @@ export default function AddBusiness() {
                 <Clock size={48} />
               </div>
               <h1 className="text-[1.8rem] font-extrabold text-[#0f172a] mb-3.5">
-                Pendaftaran &amp; Pembayaran Berhasil Dikirim!
+                {isEditing ? "Permohonan Upgrade & Pembayaran Berhasil Dikirim!" : "Pendaftaran & Pembayaran Berhasil Dikirim!"}
               </h1>
               <p className="text-base text-[#64748b] leading-[1.7] mb-8">
                 Bukti pembayaran paket Premium kamu untuk <strong className="text-[#0f172a]">{form.name}</strong> sedang dalam proses verifikasi oleh Admin. Status Premium akan otomatis aktif setelah pembayaran disetujui.
@@ -1467,8 +1533,8 @@ export default function AddBusiness() {
               </div>
               {isEditing ? (
                 <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 bg-[#f0fffe] border border-[#007570]/30 rounded-full text-xs font-bold text-[#007570]">
-                  {selectedPackage?.isFree === false ? <Sparkles size={14} className="text-amber-500" /> : <Store size={14} />}
-                  <span>{selectedPackage?.isFree === false ? "Paket Premium Active" : "Paket Free"}</span>
+                  {isUpgradeMode || selectedPackage?.isFree === false ? <Sparkles size={14} className="text-amber-500" /> : <Store size={14} />}
+                  <span>{isUpgradeMode ? "Mode Upgrade Premium" : (isAlreadyPremium ? "Paket Premium Aktif" : "Paket Free")}</span>
                 </div>
               ) : selectedPackage && (
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[#f0fffe] border border-[#007570]/30 rounded-full text-xs font-bold text-[#007570]">
@@ -1477,6 +1543,163 @@ export default function AddBusiness() {
                 </div>
               )}
             </div>
+
+            {/* Alert if already premium in upgrade mode */}
+            {isEditing && isAlreadyPremium && isUpgradeParam && (
+              <div className="mb-8 rounded-2xl p-5 bg-amber-50 border-2 border-amber-300 text-amber-950 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fadeIn">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center font-bold shrink-0 shadow-xs">
+                    <Crown size={22} />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold bg-amber-200 text-amber-900 uppercase tracking-wider">
+                        Sudah Premium Aktif
+                      </span>
+                      <h4 className="text-sm font-bold text-amber-950">
+                        Usaha "{form.name || 'Ini'}" Sudah Memiliki Paket Premium
+                      </h4>
+                    </div>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Profil bisnis Anda sudah berstatus <strong>Premium Aktif</strong> dengan seluruh fasilitas lengkap (Peta Lokasi, Galeri Foto &amp; Video, Direct Chat, dan Badge Terverifikasi). Anda tidak dapat melakukan upgrade ganda. Silakan pilih usaha Anda yang lain jika ingin meng-upgrade usaha berstatus Free.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/premium')}
+                    className="px-4 py-2 bg-[#007570] hover:bg-[#005a58] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border-0 flex items-center gap-1.5"
+                  >
+                    <span>Pilih Usaha Lain</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Alert if pending verification in upgrade mode */}
+            {isEditing && isPendingUpgrade && isUpgradeParam && (
+              <div className="mb-8 rounded-2xl p-5 bg-blue-50 border-2 border-blue-300 text-blue-950 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fadeIn">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-blue-200 text-blue-900 flex items-center justify-center font-bold shrink-0 shadow-xs">
+                    <Clock size={22} />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold bg-blue-200 text-blue-900 uppercase tracking-wider">
+                        Sedang Diverifikasi Admin
+                      </span>
+                      <h4 className="text-sm font-bold text-blue-950">
+                        Pengajuan Upgrade Usaha "{form.name || 'Ini'}" Sedang Diproses
+                      </h4>
+                    </div>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      Bukti pembayaran paket Premium untuk usaha ini telah berhasil dikirim dan saat ini sedang menunggu antrean verifikasi oleh Admin. Anda tidak perlu mengajukan atau membayar ulang. Silakan pilih usaha lain jika ingin meng-upgrade usaha yang berbeda.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/premium')}
+                    className="px-4 py-2 bg-[#007570] hover:bg-[#005a58] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border-0 flex items-center gap-1.5"
+                  >
+                    <span>Pilih Usaha Lain</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Upgrade Mode Banner for Existing Business */}
+            {isEditing && isUpgradeMode && !isAlreadyPremium && !isPendingUpgrade && (
+              <div className="mb-8 rounded-2xl p-5 bg-gradient-to-r from-[#0c2b27] via-[#053733] to-[#021f1d] text-white border-2 border-amber-400 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fadeIn">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shrink-0 shadow-sm">
+                    <Crown size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-extrabold text-amber-300">Mode Upgrade ke Premium Aktif</span>
+                      <span className="text-xs bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2.5 py-0.5 rounded-full font-bold">
+                        {selectedPackage?.name || "Premium Business"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-200 mt-1 leading-relaxed">
+                      Data usaha Anda sudah terisi otomatis. Anda dapat meninjau/memperbarui informasi (fitur peta lokasi &amp; galeri luas terbuka!), lalu lanjutkan ke tahap pembayaran &amp; upload bukti transfer.
+                    </p>
+                  </div>
+                </div>
+                {!isUpgradeParam && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUpgradeMode(false);
+                      setSelectedPackage({ id: 'free', name: 'Free', price: 0, isFree: true });
+                    }}
+                    className="text-xs text-slate-300 hover:text-white underline cursor-pointer bg-transparent border-0 shrink-0 self-end sm:self-center"
+                  >
+                    Batalkan Upgrade
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Upgrade Opportunity Banner for Free Business */}
+            {isEditing && !isUpgradeMode && !isAlreadyPremium && !isPendingUpgrade && (
+              <div className="mb-8 rounded-3xl p-6 bg-gradient-to-r from-[#0c2b27] via-[#053733] to-[#021f1d] text-white border-2 border-amber-400/80 shadow-[0_12px_32px_rgba(0,117,112,0.25)] relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 animate-fadeIn">
+                <div className="relative z-10 space-y-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950">
+                    <Crown size={12} />
+                    <span>UPGRADE KE PREMIUM</span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white">Tingkatkan Visibilitas &amp; Fitur Usaha Ini</h3>
+                  <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                    Buka integrasi peta Leaflet interaktif, galeri foto &amp; video tanpa batas, katalog produk luas, dan badge terverifikasi dengan upgrade ke paket Premium.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUpgradeMode(true);
+                    const premPlan = plans.find(p => !p.name?.toLowerCase().includes("free") && Number(p.price) > 0) || { id: 1, name: "Premium Business", price: 50000, duration_value: 1, duration_unit: "month", formatted_duration: "1 Bulan", isFree: false };
+                    setSelectedPackage(premPlan);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="relative z-10 px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-black text-xs sm:text-sm hover:scale-105 active:scale-95 transition-all shadow-lg shadow-amber-400/20 shrink-0 cursor-pointer border-0 flex items-center gap-2"
+                >
+                  <Sparkles size={16} />
+                  <span>Upgrade ke Premium Sekarang</span>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Rejection Alert Banner (If business was rejected by admin - Only in normal edit mode) */}
+            {!isUpgradeMode && businessStatus === "rejected" && rejectionReason && (
+              <div className="mb-8 p-4 sm:p-5 bg-rose-50 border-2 border-rose-200 rounded-2xl flex items-start gap-3.5 shadow-sm animate-fadeIn">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertCircle size={22} />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-200 text-rose-800 uppercase tracking-wider">
+                      Perlu Perbaikan
+                    </span>
+                    <h4 className="text-sm font-bold text-rose-900">
+                      Profil Usaha Ini Sebelumnya Ditolak Oleh Admin
+                    </h4>
+                  </div>
+                  <p className="text-xs text-rose-700 leading-relaxed">
+                    <strong>Catatan Alasan Penolakan:</strong> {rejectionReason}
+                  </p>
+                  <p className="text-[11.5px] text-rose-600 font-medium">
+                    Silakan periksa dan perbarui data bisnis Anda di bawah ini sesuai catatan admin, kemudian klik tombol <strong>"Simpan &amp; Ajukan Ulang Bisnis"</strong> untuk diverifikasi ulang oleh admin.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-8">
               {/* ── SECTION 1: INFORMASI BISNIS ── */}
@@ -1935,6 +2158,87 @@ export default function AddBusiness() {
                     )}
                   </div>
                 </div>
+
+                {/* ── SECTION 4 (EDIT / REVISI): BUKTI PEMBAYARAN HANYA JIKA DITOLAK SEBELUMNYA ── */}
+                {isEditing && !isUpgradeMode && businessStatus === "rejected" && (
+                  <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 sm:p-6 space-y-5">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+                      <div className="flex items-center gap-2.5">
+                        <CreditCard size={18} className="text-[#007570]" />
+                        <h3 className="text-base font-bold text-slate-800">
+                          4. Bukti Pembayaran / Transfer (Revisi)
+                        </h3>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#f0fdfa] text-[#007570] border border-[#ccfbf1]">
+                        Gratis Revisi — Tanpa Biaya Tambahan
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Jika penolakan sebelumnya terkait bukti pembayaran (buram / tidak terbaca), silakan unggah foto struk transfer yang baru dan jelas di bawah ini. Anda <strong>tidak perlu membayar ulang</strong>.
+                    </p>
+
+                    <input
+                      type="file"
+                      ref={proofInputRef}
+                      onChange={handleProofChange}
+                      accept="image/jpeg,image/png,image/jpg,image/webp"
+                      className="hidden"
+                    />
+
+                    {proofPreview ? (
+                      <div className="p-4 bg-white border-2 border-[#007570] rounded-2xl flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5 overflow-hidden">
+                          <img
+                            src={proofPreview}
+                            alt="Bukti Transfer"
+                            className="w-16 h-16 rounded-xl object-cover border border-slate-300 shrink-0"
+                          />
+                          <div className="overflow-hidden">
+                            <span className="text-xs font-bold text-slate-900 block truncate">
+                              {proofFile ? proofFile.name : "Foto Bukti Transfer Terpasang"}
+                            </span>
+                            <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                              <CheckCircle2 size={12} /> {proofFile ? `Siap diunggah (${(proofFile.size / 1024).toFixed(1)} KB)` : "Bukti transfer tersimpan"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => proofInputRef.current?.click()}
+                            className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 rounded-lg text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                          >
+                            Ganti Foto
+                          </button>
+                          {proofFile && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveProof}
+                              className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold hover:bg-rose-100 cursor-pointer border-0"
+                            >
+                              Batal
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => proofInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-300 hover:border-[#007570] bg-white hover:bg-teal-50/20 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-teal-50 text-[#007570] flex items-center justify-center">
+                          <Upload size={20} />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-slate-800">Klik untuk mengunggah foto struk bukti transfer baru</span>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Format: JPG, PNG, WEBP (Maksimal 10MB)</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1997,6 +2301,40 @@ export default function AddBusiness() {
               </div>
             </div>
 
+            {/* Quick Plan Selector if multiple plans exist */}
+            {plans && plans.length > 1 && (
+              <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-600 block mb-2.5">
+                  Pilihan Durasi Paket:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                  {plans.map((p) => {
+                    const isSel = selectedPackage?.id === p.id;
+                    const durText = p.formatted_duration || `${p.duration_value || 1} ${p.duration_unit === 'year' || p.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`;
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => setSelectedPackage({ ...p, isFree: false })}
+                        className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
+                          isSel
+                            ? "bg-[#007570] text-white border-[#007570] shadow-sm"
+                            : "bg-white text-slate-800 border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <div>
+                          <span className={`text-xs font-bold block ${isSel ? "text-white" : "text-slate-900"}`}>{p.name}</span>
+                          <span className={`text-[11px] ${isSel ? "text-teal-100" : "text-slate-500"}`}>{durText}</span>
+                        </div>
+                        <span className={`text-xs font-extrabold ${isSel ? "text-amber-300" : "text-[#007570]"}`}>
+                          Rp {Number(p.price || 0).toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Order Detail Card */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-6 space-y-3.5">
               <div className="flex justify-between items-center text-sm pb-3 border-b border-slate-200">
@@ -2005,7 +2343,7 @@ export default function AddBusiness() {
               </div>
               <div className="flex justify-between items-center text-sm pb-3 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Bisnis</span>
-                <span className="font-bold text-[#0f172a]">{form.name || "Usaha Baru"}</span>
+                <span className="font-bold text-[#0f172a]">{form.name || "Usaha"}</span>
               </div>
               <div className="flex justify-between items-center text-sm pb-3 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Masa Aktif</span>
@@ -2082,7 +2420,7 @@ export default function AddBusiness() {
             <div className="border border-slate-200 rounded-2xl p-5 bg-white mb-6">
               <label className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
                 <Sparkles size={16} className="text-[#007570]" />
-                Kode Referral <span className="text-xs font-normal text-slate-400">(Opsional - Diskon 5%)</span>
+                Kode Referral <span className="text-xs font-normal text-slate-400">(Opsional - Potongan Rp 5.000)</span>
               </label>
 
               {appliedReferral ? (
@@ -2091,7 +2429,7 @@ export default function AddBusiness() {
                     <CheckCircle2 size={20} className="text-[#007570] shrink-0" />
                     <div>
                       <span className="text-xs font-bold text-[#007570] uppercase block">Referral Terpasang: {appliedReferral.referral_code}</span>
-                      <span className="text-xs text-teal-700 font-medium">Diskon 5% (-Rp {appliedReferral.discount_amount?.toLocaleString('id-ID')})</span>
+                      <span className="text-xs text-teal-700 font-medium">Potongan Diskon (-Rp {appliedReferral.discount_amount?.toLocaleString('id-ID')})</span>
                     </div>
                   </div>
                   <button
@@ -2320,35 +2658,78 @@ export default function AddBusiness() {
         {/* ── NAVIGATION BUTTONS ── */}
         <div className="flex items-center gap-3 mt-8">
           {isEditing ? (
-            <>
-              <button
-                type="button"
-                onClick={() => navigate("/admin-user")}
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] border-[#e2e8f0] bg-white text-[#374151] transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8]"
-              >
-                <ChevronLeft size={18} /> Kembali ke Dashboard
-              </button>
+            isUpgradeMode ? (
+              <>
+                {step === 2 ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/admin-user")}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] border-[#e2e8f0] bg-white text-[#374151] transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8]"
+                  >
+                    <ChevronLeft size={18} /> Kembali ke Dashboard
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] border-[#e2e8f0] bg-white text-[#374151] transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8]"
+                  >
+                    <ChevronLeft size={18} /> Kembali
+                  </button>
+                )}
 
-              <div style={{ flex: 1 }} />
+                <div style={{ flex: 1 }} />
 
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] transition-all duration-[0.25s] bg-[#fef2f2] text-[#dc2626] border-[#fecaca] hover:bg-[#fee2e2] disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {deleting ? <><Loader2 size={18} className={spinCls} /> Menghapus...</> : <><Trash2 size={18} /> Hapus Usaha</>}
-              </button>
+                {step < 5 ? (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)]"
+                  >
+                    {step === 2 ? "Lanjut ke Pembayaran" : step === 3 ? "Lanjut ke Metode Bayar" : "Lanjut Upload Bukti"} <ChevronRight size={18} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handlePremiumSubmit}
+                    disabled={loading || !proofFile}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#16a34a] to-[#22c55e] text-white shadow-[0_4px_16px_rgba(22,163,74,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(22,163,74,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? <><Loader2 size={18} className={spinCls} /> Mengirim Bukti...</> : <><Check size={18} /> Kirim Pembayaran &amp; Selesaikan Upgrade</>}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin-user")}
+                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] border-[#e2e8f0] bg-white text-[#374151] transition-all duration-[0.25s] hover:bg-[#f8fafc] hover:border-[#94a3b8]"
+                >
+                  <ChevronLeft size={18} /> Kembali ke Dashboard
+                </button>
 
-              <button
-                type="button"
-                onClick={handleSaveEdit}
-                disabled={loading}
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)] disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {loading ? <><Loader2 size={18} className={spinCls} /> Menyimpan...</> : <><Check size={18} /> Simpan Perubahan</>}
-              </button>
-            </>
+                <div style={{ flex: 1 }} />
+
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-[1.5px] transition-all duration-[0.25s] bg-[#fef2f2] text-[#dc2626] border-[#fecaca] hover:bg-[#fee2e2] disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {deleting ? <><Loader2 size={18} className={spinCls} /> Menghapus...</> : <><Trash2 size={18} /> Hapus Usaha</>}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-[14px] text-[0.95rem] font-semibold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)] disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {loading ? <><Loader2 size={18} className={spinCls} /> Menyimpan...</> : <><Check size={18} /> {businessStatus === "rejected" ? "Simpan & Ajukan Ulang Bisnis" : "Simpan Perubahan"}</>}
+                </button>
+              </>
+            )
           ) : (
             <>
               {step > 1 && (

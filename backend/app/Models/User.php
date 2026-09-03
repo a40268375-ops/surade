@@ -164,6 +164,21 @@ class User extends Authenticatable implements MustVerifyEmail
     |--------------------------------------------------------------------------
     */
 
+    public function userPackages()
+    {
+        return $this->hasMany(UserPackage::class);
+    }
+
+    public function packageTransactions()
+    {
+        return $this->hasMany(PackageTransaction::class);
+    }
+
+    public function contentTransactions()
+    {
+        return $this->hasMany(ContentTransaction::class);
+    }
+
     public function isAdmin()
     {
         return $this->role === 'admin';

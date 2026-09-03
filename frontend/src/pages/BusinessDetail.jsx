@@ -21,6 +21,7 @@ import {
   Building2,
   ArrowRight,
   Package,
+  User,
   Loader2,
   AlertTriangle,
   Flag,
@@ -35,6 +36,8 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  Crown,
+  Edit,
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 
@@ -738,14 +741,14 @@ export default function BusinessDetail() {
     ? {
         id: business.user.id,
         name: business.user.name,
-        avatar: business.user.avatar ? getStorageUrlLocal(business.user.avatar) : DEFAULT_AVATAR,
-        banner: business.user.banner ? getStorageUrlLocal(business.user.banner) : null,
+        username: business.user.username,
+        avatar: business.user.avatar ? getStorageUrl(business.user.avatar) : DEFAULT_AVATAR,
       }
     : {
         id: null,
         name: "Pengelola Bisnis",
+        username: null,
         avatar: DEFAULT_AVATAR,
-        banner: null,
       };
 
   const isVerifiedBusiness = Boolean(
@@ -755,11 +758,74 @@ export default function BusinessDetail() {
     business.user?.role === "premium"
   );
 
-  const logoUrl = business.logo ? getStorageUrlLocal(business.logo) : null;
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const isOwner = Boolean(currentUser?.id && business?.user_id && Number(currentUser.id) === Number(business.user_id));
+
+  const logoUrl = business.logo ? getStorageUrl(business.logo) : null;
 
   return (
     <div className="business-detail-page bg-[#f8fafc] min-h-screen text-slate-800 antialiased">
       <Navbar />
+
+      {/* OWNER MANAGEMENT & UPGRADE BAR */}
+      {isOwner && (
+        <section className="bg-gradient-to-r from-[#0c2b27] via-[#053733] to-[#021f1d] border-b border-teal-800 text-white shadow-sm relative z-20">
+          <div className="bd-container py-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider">
+                Pemilik Usaha
+              </span>
+              <span className="text-xs text-slate-200">
+                Anda adalah pemilik profil usaha ini.
+              </span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              {(() => {
+                const subs = business.subscriptions || [];
+                const latestSub = subs[0];
+                const isPendingSub = Boolean(business.has_pending_subscription || (latestSub?.status === "pending" && latestSub?.payment?.status === "pending"));
+
+                if (isVerifiedBusiness) {
+                  return (
+                    <span className="px-3 py-1.5 rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs font-extrabold flex items-center gap-1.5">
+                      <Crown size={14} />
+                      <span>⭐ Premium Aktif</span>
+                    </span>
+                  );
+                }
+
+                if (isPendingSub) {
+                  return (
+                    <span className="px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-bold flex items-center gap-1.5">
+                      <Clock size={14} />
+                      <span>⏳ Verifikasi Sedang Diproses</span>
+                    </span>
+                  );
+                }
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/add-business/${business.id}?upgrade=true`)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-black text-xs shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer border-0"
+                  >
+                    <Crown size={14} className="text-slate-950" />
+                    <span>Upgrade ke Premium</span>
+                  </button>
+                );
+              })()}
+              <button
+                type="button"
+                onClick={() => navigate(`/add-business/${business.id}`)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition-all cursor-pointer"
+              >
+                <Edit size={13} />
+                <span>Edit Profil Usaha</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ========================================================================= */}
       {/* 1. HERO BUSINESS HEADER (FULL WIDTH SHOWCASE + STRUCTURED OVERLAY) */}
@@ -1666,34 +1732,61 @@ export default function BusinessDetail() {
             </div>
 
             {/* SIDEBAR CARD 4: PROFIL PENGELOLA */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs">
-              <div className="h-14 bg-gradient-to-r from-slate-800 to-teal-900 relative">
-                {seller.banner && (
-                  <img src={seller.banner} alt="Banner" className="w-full h-full object-cover" />
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Pengelola Bisnis
+                </span>
+                {isVerifiedBusiness && (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-teal-50 text-[#007570] border border-teal-200">
+                    Verified Owner
+                  </span>
                 )}
               </div>
-              <div className="p-4 pt-0 relative space-y-3">
-                <div className="flex items-end justify-between -mt-7 mb-1">
-                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white shadow-md bg-white">
-                    <img src={seller.avatar} alt={seller.name} className="w-full h-full object-cover" />
-                  </div>
-                  {isVerifiedBusiness && (
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-teal-50 text-[#007570] border border-teal-200">
-                      Verified Owner
-                    </span>
-                  )}
-                </div>
 
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 truncate">{seller.name}</h4>
-                  <p className="text-[11px] text-slate-500">Pengelola Profil Bisnis</p>
+              {/* Clickable Profile Info */}
+              <div
+                onClick={() => seller.id && navigate(`/profile/${seller.id}`)}
+                className={`flex items-center gap-3.5 p-2 -mx-2 rounded-xl transition-all ${seller.id ? "hover:bg-slate-50 cursor-pointer group" : ""}`}
+                title={seller.id ? "Lihat Profil Pengguna" : undefined}
+              >
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-100 shadow-2xs bg-white shrink-0 group-hover:ring-2 group-hover:ring-[#007570]/30 transition-all">
+                  <img
+                    src={seller.avatar || DEFAULT_AVATAR}
+                    alt={seller.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
+                  />
                 </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-bold text-slate-900 truncate group-hover:text-[#007570] transition-colors flex items-center gap-1.5">
+                    <span className="truncate">{seller.name}</span>
+                    {seller.id && <ExternalLink size={12} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {seller.username ? `@${seller.username}` : "Pemilik Profil Bisnis"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2 pt-1">
+                {seller.id && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/profile/${seller.id}`)}
+                    className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border-0"
+                  >
+                    <User size={13} />
+                    <span>Lihat Profil Pengelola</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
                   onClick={handleChatWithSeller}
                   disabled={startingChat}
-                  className="w-full py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 border-0"
+                  className="w-full py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 border-0"
                 >
                   {startingChat ? <Loader2 size={13} className="animate-spin" /> : <MessageCircle size={13} />}
                   <span>Kirim Pesan ke Penjual</span>

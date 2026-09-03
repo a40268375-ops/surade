@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import api from "../services/api";
@@ -16,11 +16,16 @@ import {
   X,
   Tag,
   Bookmark,
+  PlusCircle,
+  Sparkles,
+  Zap,
+  CheckCircle,
 } from "lucide-react";
 import "./Blog.css";
 import { DEFAULT_AVATAR } from "../utils/constants";
 
 export default function Blog() {
+  const navigate = useNavigate();
   const [activeType, setActiveType] = useState("all"); // 'all' | 'blog' | 'event'
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -33,6 +38,16 @@ export default function Blog() {
     window.scrollTo(0, 0);
     fetchBlogs();
   }, []);
+
+  const handleCreatePostClick = (targetType) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      if (requireAuth()) return;
+      return;
+    }
+
+    navigate(`/add-blog?type=${targetType}`);
+  };
 
   const fetchUserSavedState = async () => {
     const token = localStorage.getItem("token");
@@ -197,6 +212,55 @@ export default function Blog() {
           </div>
           <h1 className="blog-hero__title">Blog & Event</h1>
           <p className="blog-hero__subtitle">Jelajahi Wawasan Bisnis, Berita Terkini, dan Agenda Event Menarik di Indonesia</p>
+          
+          {/* Action Buttons */}
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", marginTop: "1.25rem", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => handleCreatePostClick("blog")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                background: "#0b4f8a",
+                color: "#ffffff",
+                padding: "0.625rem 1.25rem",
+                borderRadius: "9999px",
+                border: "2px solid rgba(255,255,255,0.2)",
+                fontSize: "0.875rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+                transition: "all 0.2s",
+              }}
+            >
+              <BookOpen size={16} />
+              <span>+ Buat Blog Baru</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleCreatePostClick("event")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                background: "#0284c7",
+                color: "#ffffff",
+                padding: "0.625rem 1.25rem",
+                borderRadius: "9999px",
+                border: "2px solid rgba(255,255,255,0.2)",
+                fontSize: "0.875rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+                transition: "all 0.2s",
+              }}
+            >
+              <Calendar size={16} />
+              <span>+ Buat Event Baru</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -309,7 +373,9 @@ export default function Blog() {
                 return (
                   <article key={post.id} className="blog-card">
                     <div className="blog-card__img-wrap" style={{ position: "relative" }}>
-                      <img src={getThumbnailUrl(post)} alt={post.title} className="blog-card__img" loading="lazy" />
+                      <Link to={`/blog/${post.slug || post.id}`} className="block w-full h-full">
+                        <img src={getThumbnailUrl(post)} alt={post.title} className="blog-card__img" loading="lazy" />
+                      </Link>
                       {isEvent ? (
                         <span className="blog-badge-tag blog-badge-tag--event">EVENT</span>
                       ) : (
@@ -334,7 +400,11 @@ export default function Blog() {
                       {post.blog_category && (
                         <p className="blog-card__category">{post.blog_category}</p>
                       )}
-                      <h2 className="blog-card__title">{post.title}</h2>
+                      <h2 className="blog-card__title">
+                        <Link to={`/blog/${post.slug || post.id}`} className="hover:text-[#007570] transition-colors">
+                          {post.title}
+                        </Link>
+                      </h2>
                       <p className="blog-card__excerpt">{post.excerpt || post.content?.substring(0, 140)}</p>
 
                       {isEvent && post.event_location && (

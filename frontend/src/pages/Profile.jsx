@@ -12,6 +12,7 @@ import {
   Tag,
   Loader2,
   FileText,
+  CheckCircle2,
 } from "lucide-react";
 import "./Home.css";
 import "./Profile.css";
@@ -68,70 +69,13 @@ export default function Profile() {
   const [loadingBlogs, setLoadingBlogs] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-    fetchUserProfile();
-    fetchUserBusinesses();
-    fetchUserBlogs();
-
-    // Listen for user auth changes
-    const loadUser = () => {
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        try {
-          const parsed = JSON.parse(storedUser);
-          setAuthUser(parsed);
-        } catch { }
-      }
-      fetchUserProfile();
-      fetchUserBusinesses();
-      fetchUserBlogs();
-    };
-    window.addEventListener("userAuthChanged", loadUser);
-
-    return () => {
-      window.removeEventListener("userAuthChanged", loadUser);
-    };
-  }, [id]);
-
   const isOwnProfile = !id || String(id) === String(authUser.id);
 
-  const fetchUserBusinesses = async () => {
-    try {
-      setLoadingBusinesses(true);
-      const endpoint = isOwnProfile ? '/my-businesses' : `/businesses?user_id=${id}`;
-      const res = await api.get(endpoint);
-      const businesses = res.data?.data || res.data || [];
-      const list = Array.isArray(businesses) ? businesses : (businesses?.data || []);
-      setUserBusinesses(list);
-    } catch (err) {
-      console.error("Failed to fetch businesses:", err);
-    } finally {
-      setLoadingBusinesses(false);
-    }
-  };
-
-  const fetchUserBlogs = async () => {
-    try {
-      setLoadingBlogs(true);
-      const endpoint = isOwnProfile ? '/my-blogs' : `/blogs?user_id=${id}`;
-      const res = await api.get(endpoint);
-      const blogResponse = res.data?.data || res.data;
-      const blogs = Array.isArray(blogResponse) ? blogResponse : (blogResponse?.data || []);
-      setUserBlogs(blogs);
-    } catch (err) {
-      console.error("Failed to fetch blogs:", err);
-    } finally {
-      setLoadingBlogs(false);
-    }
-  };
-
-  const fetchUserProfile = async () => {
+  const fetchUserData = async () => {
     setLoadingProfile(true);
     try {
       let userData = null;
 
-      // If viewing own profile - use localStorage first, then try API
       if (isOwnProfile) {
         try {
           const stored = JSON.parse(localStorage.getItem("user") || "{}");
@@ -139,22 +83,18 @@ export default function Profile() {
         } catch {
           userData = {};
         }
-        
-        // Try to fetch from API to get latest data
+
         try {
           const res = await api.get('/users/profile');
           const apiData = res.data?.data || res.data;
           if (apiData) {
             userData = apiData;
-            const updatedUserObj = { ...userData, ...apiData };
-            localStorage.setItem("user", JSON.stringify(updatedUserObj));
+            localStorage.setItem("user", JSON.stringify({ ...userData, ...apiData }));
           }
         } catch (apiErr) {
-          console.error("Failed to fetch own profile from API, using local data:", apiErr);
-          // Continue with stored data
+          console.error("Failed to fetch own profile from API:", apiErr);
         }
       } else {
-        // Viewing another user's public profile - fetch from API
         try {
           const res = await api.get(`/users/${id}`);
           userData = res.data?.data || res.data;
@@ -182,12 +122,86 @@ export default function Profile() {
           rating: 0,
           reviews: 0,
         });
+
+        const targetId = isOwnProfile ? (userData.id || authUser.id) : (userData.id || id);
+        fetchUserBusinesses(targetId, isOwnProfile);
+        fetchUserBlogs(targetId, isOwnProfile);
       }
     } catch (err) {
-      console.error("Failed to fetch profile:", err);
+      console.error("Error loading user profile:", err);
     } finally {
       setLoadingProfile(false);
     }
+  };
+
+  const fetchUserBusinesses = async (targetId, own) => {
+    try {
+      setLoadingBusinesses(true);
+      const endpoint = own ? '/my-businesses' : `/businesses?user_id=${targetId}&all=true`;
+      const res = await api.get(endpoint);
+      const businesses = res.data?.data || res.data || [];
+      const list = Array.isArray(businesses) ? businesses : (businesses?.data || []);
+      setUserBusinesses(list);
+    } catch (err) {
+      console.error("Failed to fetch businesses:", err);
+      setUserBusinesses([]);
+    } finally {
+      setLoadingBusinesses(false);
+    }
+  };
+
+  const fetchUserBlogs = async (targetId, own) => {
+    try {
+      setLoadingBlogs(true);
+      const endpoint = own ? '/my-blogs' : `/blogs?user_id=${targetId}&all=true`;
+      const res = await api.get(endpoint);
+      const blogResponse = res.data?.data || res.data;
+      const blogs = Array.isArray(blogResponse) ? blogResponse : (blogResponse?.data || []);
+      setUserBlogs(blogs);
+    } catch (err) {
+      console.error("Failed to fetch blogs:", err);
+      setUserBlogs([]);
+    } finally {
+      setLoadingBlogs(false);
+    }
+  };
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    fetchUserData();
+
+    const loadUser = () => {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          setAuthUser(JSON.parse(storedUser));
+        } catch { }
+      }
+      fetchUserData();
+    };
+    window.addEventListener("userAuthChanged", loadUser);
+
+    return () => {
+      window.removeEventListener("userAuthChanged", loadUser);
+    };
+  }, [id]);
+
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Profil ${seller.name || seller.username} - Info.co.id`,
+          url: url,
+        });
+        return;
+      } catch {}
+    }
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const getMediaUrl = (url, fallback) => {
@@ -197,10 +211,10 @@ export default function Profile() {
 
   if (loadingProfile) {
     return (
-      <div className="profile-page">
+      <div className="profile-page profile-page--loading">
         <Navbar />
         <div className="loading-spinner">
-          <Loader2 size={32} className="animate-spin" />
+          <Loader2 size={36} className="animate-spin text-[#007570]" />
           <span>Memuat profil...</span>
         </div>
       </div>
@@ -211,90 +225,138 @@ export default function Profile() {
     <div className="profile-page">
       <Navbar />
 
-      {/* Profile Header */}
-      <section className="profile-header">
-        <div className="profile-header__inner">
-          <div className="profile-header__cover">
-            {seller.banner ? (
-              <img
-                src={getMediaUrl(seller.banner, DEFAULT_BANNER)}
-                alt="Banner"
-                className="profile-header__cover-bg"
-                style={{ backgroundImage: 'none' }}
-                onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling.style.display = 'block'; }}
-              />
-            ) : null}
-            <div className="profile-header__cover-bg" style={{ display: seller.banner ? 'none' : 'block' }} />
-          </div>
-
-          <div className="profile-header__content">
-            <div className="profile-header__avatar-wrapper">
+      {/* Main Profile Container with proper navbar offset */}
+      <div className="profile-container">
+        {/* Profile Card Header */}
+        <section className="profile-card-header">
+          <div className="profile-card-header__top">
+            {/* Avatar */}
+            <div className="profile-avatar-box">
               <img
                 src={getMediaUrl(seller.avatar)}
-                alt={seller.name}
-                className="profile-header__avatar"
+                alt={seller.name || "User"}
+                className="profile-avatar-img"
                 onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
               />
+              <span className="profile-avatar-badge" title="Pengguna Terverifikasi">
+                <CheckCircle2 size={16} />
+              </span>
             </div>
 
-            <div className="profile-header__info">
-              <h1 className="profile-header__name">{seller.username || seller.name || "User"}</h1>
-              {seller.name && seller.username !== seller.name && (
-                <p className="profile-header__username" style={{ color: "#64748b", fontSize: "0.95rem", marginTop: "-4px", marginBottom: "8px", fontWeight: 500 }}>
-                  {seller.name}
-                </p>
-              )}
-              {seller.bio && <p className="profile-header__bio">{seller.bio}</p>}
-
-              <div className="profile-header__meta">
-                <div className="profile-header__meta-item">
-                  <MapPin size={16} />
-                  <span>{seller.location || "Lokasi tidak diatur"}</span>
-                </div>
-                <div className="profile-header__meta-item">
-                  <Calendar size={16} />
-                  <span>Bergabung {seller.joined}</span>
-                </div>
-                {seller.rating > 0 && (
-                  <div className="profile-header__meta-item">
-                    <Star size={16} fill="#fbbf24" stroke="#fbbf24" />
-                    <span>{seller.rating} ({seller.reviews} ulasan)</span>
-                  </div>
+            {/* User Main Details */}
+            <div className="profile-details">
+              <div className="profile-details__role-row">
+                <span className="profile-role-badge">
+                  {userBusinesses.length > 0 ? "Verified Business Owner" : "Pengguna Terverifikasi"}
+                </span>
+                {seller.username && (
+                  <span className="profile-username-pill">
+                    @{seller.username}
+                  </span>
                 )}
               </div>
 
-              <div className="profile-header__stats">
-                <div className="profile-header__stat">
-                  <span className="profile-header__stat-value">{userBusinesses.length}</span>
-                  <span className="profile-header__stat-label">Usaha</span>
-                </div>
-                <div className="profile-header__stat">
-                  <span className="profile-header__stat-value">{userBlogs.length}</span>
-                  <span className="profile-header__stat-label">Blog</span>
-                </div>
-                <div className="profile-header__stat">
-                  <span className="profile-header__stat-value">{userBusinesses.reduce((acc, biz) => acc + (biz.views || 0), 0).toLocaleString()}</span>
-                  <span className="profile-header__stat-label">Total Views</span>
-                </div>
-              </div>
+              <h1 className="profile-display-name">
+                {seller.name || seller.username || "Pengguna Info.co.id"}
+              </h1>
 
-              <div className="profile-header__actions">
-                <button
-                  className={`profile-header__btn profile-header__btn--primary ${saved ? "saved" : ""}`}
-                  onClick={() => requireAuth(() => setSaved(!saved))}
-                >
-                  <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
-                  {saved ? "Disimpan" : "Simpan"}
-                </button>
-                <button className="profile-header__btn profile-header__btn--secondary">
-                  <Share2 size={18} />
-                  Bagikan
-                </button>
+              {seller.name && seller.username && seller.name !== seller.username && (
+                <p className="profile-alias-name">
+                  {seller.username}
+                </p>
+              )}
+
+              {seller.bio && (
+                <p className="profile-bio-text">
+                  "{seller.bio}"
+                </p>
+              )}
+
+              {/* Meta Chips */}
+              <div className="profile-meta-chips">
+                <div className="profile-meta-chip">
+                  <MapPin size={14} className="text-[#007570]" />
+                  <span>{seller.location || "Indonesia"}</span>
+                </div>
+
+                <div className="profile-meta-chip">
+                  <Calendar size={14} className="text-[#007570]" />
+                  <span>Bergabung {seller.joined || "Baru saja"}</span>
+                </div>
+
+                {seller.rating > 0 && (
+                  <div className="profile-meta-chip profile-meta-chip--rating">
+                    <Star size={14} fill="#fbbf24" stroke="#fbbf24" />
+                    <span className="font-bold text-slate-800">{seller.rating}</span>
+                    <span className="text-slate-400">({seller.reviews} ulasan)</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
-      </section>
+
+          <div className="profile-card-header__divider" />
+
+          {/* Stats and Action Buttons Row */}
+          <div className="profile-card-header__bottom">
+            {/* Stats Cards */}
+            <div className="profile-stats-grid">
+              <div className="profile-stat-card">
+                <div className="profile-stat-icon profile-stat-icon--teal">
+                  <Store size={18} />
+                </div>
+                <div className="profile-stat-info">
+                  <span className="profile-stat-number">{userBusinesses.length}</span>
+                  <span className="profile-stat-label">Usaha Aktif</span>
+                </div>
+              </div>
+
+              <div className="profile-stat-card">
+                <div className="profile-stat-icon profile-stat-icon--purple">
+                  <FileText size={18} />
+                </div>
+                <div className="profile-stat-info">
+                  <span className="profile-stat-number">{userBlogs.length}</span>
+                  <span className="profile-stat-label">Blog & Event</span>
+                </div>
+              </div>
+
+              <div className="profile-stat-card">
+                <div className="profile-stat-icon profile-stat-icon--amber">
+                  <Eye size={18} />
+                </div>
+                <div className="profile-stat-info">
+                  <span className="profile-stat-number">
+                    {userBusinesses.reduce((acc, biz) => acc + (biz.views || 0), 0).toLocaleString("id-ID")}
+                  </span>
+                  <span className="profile-stat-label">Total Pengunjung</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="profile-actions-row">
+              <button
+                type="button"
+                className={`profile-action-btn profile-action-btn--save ${saved ? "is-saved" : ""}`}
+                onClick={() => requireAuth(() => setSaved(!saved))}
+              >
+                <Bookmark size={16} fill={saved ? "currentColor" : "none"} />
+                <span>{saved ? "Disimpan" : "Simpan Profil"}</span>
+              </button>
+
+              <button
+                type="button"
+                className="profile-action-btn profile-action-btn--share"
+                onClick={handleShare}
+                title="Bagikan Tautan Profil"
+              >
+                <Share2 size={16} />
+                <span>{copied ? "Link Disalin!" : "Bagikan"}</span>
+              </button>
+            </div>
+          </div>
+        </section>
 
       {/* Content Tabs */}
       <section className="profile-content">
@@ -412,17 +474,20 @@ export default function Profile() {
               ) : (
                 <div className="empty-state">
                   <FileText size={48} />
-                  <p>Belum ada blog yang ditulis</p>
-                  <Link to="/add-blog" className="btn-primary">
-                    <Plus size={16} />
-                    Tulis Blog
-                  </Link>
+                  <p>Belum ada artikel atau event yang ditulis.</p>
+                  {isOwnProfile && (
+                    <Link to="/add-blog" className="btn-primary">
+                      <Plus size={16} />
+                      Tulis Blog
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
           )}
-        </div>
-      </section>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

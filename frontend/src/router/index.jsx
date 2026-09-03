@@ -89,6 +89,8 @@ function AppRouter() {
         <Route path="/" element={<Home />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:id" element={<BlogDetail />} />
+        <Route path="/event/:id" element={<BlogDetail />} />
+        <Route path="/events/:id" element={<BlogDetail />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/about" element={<About />} />
         <Route path="/vision-mission" element={<VisionMission />} />

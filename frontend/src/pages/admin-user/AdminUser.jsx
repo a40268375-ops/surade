@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, useParams, Link } from "react-router-dom";
+import PackageSelectionModal from "../../components/PackageSelectionModal";
+import PackageCheckoutModal from "../../components/PackageCheckoutModal";
+import ContentPaymentModal from "../../components/ContentPaymentModal";
 import {
   LayoutDashboard,
   Briefcase,
@@ -64,25 +67,9 @@ import {
 import logoImg from "../../assets/logo.png";
 
 import api from "../../services/api";
-import { DEFAULT_AVATAR, DEFAULT_BANNER, getStorageUrl } from "../../utils/constants";
+import { DEFAULT_AVATAR, DEFAULT_BANNER, getStorageUrl, OFFICIAL_ACCOUNT_HOLDER, OFFICIAL_PAYMENT_METHODS } from "../../utils/constants";
 
-const UPGRADE_PAYMENT_METHODS = [
-  {
-    category: "E-Wallet",
-    items: [
-      { id: "DANA", name: "DANA", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#008cff] text-white" },
-      { id: "GoPay", name: "GoPay", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#00a5cf] text-white" },
-      { id: "OVO", name: "OVO", accountName: "Info.co.id", accountNumber: "0812-3456-7890", badgeColor: "bg-[#4c2a86] text-white" },
-    ]
-  },
-  {
-    category: "Virtual Account / Transfer Bank",
-    items: [
-      { id: "BCA VA", name: "BCA Virtual Account", accountName: "PT Info Media", accountNumber: "8830-1234-5678", badgeColor: "bg-[#00529c] text-white" },
-      { id: "Mandiri VA", name: "Mandiri Virtual Account", accountName: "PT Info Media", accountNumber: "137-00-1234-5678", badgeColor: "bg-[#003d79] text-white" },
-    ]
-  }
-];
+const UPGRADE_PAYMENT_METHODS = OFFICIAL_PAYMENT_METHODS;
 
 const getCategoryDisplayName = (cat) => {
   if (!cat) return "Usaha";
@@ -207,6 +194,35 @@ export default function AdminUser() {
   const [filterTab, setFilterTab] = useState("Semua");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  // Content pay-per-post & package modal states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedBlogForPayment, setSelectedBlogForPayment] = useState(null);
+  const [contentSubs, setContentSubs] = useState(null);
+  const [showContentPkgModal, setShowContentPkgModal] = useState(false);
+  const [contentPkgModalType, setContentPkgModalType] = useState("blog");
+  const [selectedContentPkg, setSelectedContentPkg] = useState(null);
+  const [showContentCheckoutModal, setShowContentCheckoutModal] = useState(false);
+
+  const [contentPricing, setContentPricing] = useState({ blog: 10000, event: 15000 });
+
+  const fetchContentPricing = async () => {
+    try {
+      const res = await api.get("/content-pricing");
+      if (res.data) {
+        setContentPricing({
+          blog: Number(res.data.blog || 10000),
+          event: Number(res.data.event || 15000),
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch content pricing in AdminUser:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchContentPricing();
+  }, []);
   const [advertisements, setAdvertisements] = useState([]);
   const [loadingAdvertisements, setLoadingAdvertisements] = useState(false);
   const [adStats, setAdStats] = useState({
@@ -237,18 +253,28 @@ export default function AdminUser() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('Transfer Bank BCA');
   const [adPaymentProofFile, setAdPaymentProofFile] = useState(null);
   const [adPaymentProofPreview, setAdPaymentProofPreview] = useState(null);
+  const [resubmittingAd, setResubmittingAd] = useState(null);
+  const [existingProofList, setExistingProofList] = useState([]);
+  const [newProofFiles, setNewProofFiles] = useState([]);
+  const [newProofPreviews, setNewProofPreviews] = useState([]);
+  const [resubmitPaymentMethod, setResubmitPaymentMethod] = useState('Transfer Bank BCA');
+  const [resubmitNotes, setResubmitNotes] = useState('');
+  const [submittingResubmit, setSubmittingResubmit] = useState(false);
   const [payModalAd, setPayModalAd] = useState(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [copyToast, setCopyToast] = useState(false);
 
   const getPaymentNumber = (method) => {
-    if (!method) return '8830-1234-5678';
-    if (method.includes('DANA')) return '0812-3456-7890';
-    if (method.includes('GoPay')) return '0812-3456-7890';
-    if (method.includes('OVO')) return '0812-3456-7890';
-    if (method.includes('Mandiri')) return '137-00-1234567-8';
-    if (method.includes('BRI')) return '0012-01-000123-53-0';
-    return '8830-1234-5678';
+    if (!method) return '0954152045';
+    const m = String(method).toLowerCase();
+    if (m.includes('mandiri')) return '133-0011-409-331';
+    if (m.includes('bni')) return '0973607008';
+    if (m.includes('bca')) return '0954152045';
+    if (m.includes('maybank')) return '2097000009';
+    if (m.includes('bjb')) return '0119213282001';
+    if (m.includes('ovo')) return '0811-1919-711';
+    if (m.includes('dana') || m.includes('gopay') || m.includes('shopee')) return 'XXX (Belum Terdaftar)';
+    return '0954152045';
   };
 
   const getSelectedPackageObj = () => {
@@ -259,6 +285,43 @@ export default function AdminUser() {
   const getSelectedBusinessObj = () => {
     if (!selectedBusinessForAd) return null;
     return businesses.find(b => b.id === Number(selectedBusinessForAd) || b.id === selectedBusinessForAd || String(b.id) === String(selectedBusinessForAd)) || null;
+  };
+
+  const getBusinessPhoto = (biz) => {
+    if (!biz) return "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
+    const rawPath =
+      biz.banner ||
+      biz.logo ||
+      biz.image ||
+      biz.thumbnail ||
+      (biz.media && biz.media.length > 0 ? biz.media[0].file_path : null) ||
+      biz.raw?.banner ||
+      biz.raw?.logo ||
+      biz.raw?.image ||
+      (biz.raw?.media && biz.raw.media.length > 0 ? biz.raw.media[0].file_path : null);
+
+    if (!rawPath) return "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
+    if (typeof rawPath === "string" && (rawPath.startsWith("http://") || rawPath.startsWith("https://") || rawPath.startsWith("blob:") || rawPath.startsWith("data:"))) {
+      return rawPath;
+    }
+    return getStorageUrl(rawPath) || rawPath;
+  };
+
+  const getBusinessCategoryName = (biz) => {
+    if (!biz) return "Kategori Usaha";
+    if (typeof biz.category === "string" && biz.category.trim() && biz.category !== "Kategori Usaha") {
+      return biz.category;
+    }
+    if (biz.category?.name) return biz.category.name;
+    if (biz.raw?.category?.name) return biz.raw.category.name;
+    if (biz.raw?.category?.parent?.name) return biz.raw.category.parent.name;
+    if (biz.subCategory) return biz.subCategory;
+    return "Kategori Usaha";
+  };
+
+  const getBusinessCityName = (biz) => {
+    if (!biz) return "Indonesia";
+    return biz.city || biz.address || biz.raw?.city || biz.raw?.address || "Indonesia";
   };
 
   const getSelectedPackagePrice = () => {
@@ -310,37 +373,99 @@ export default function AdminUser() {
   });
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
   const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState("");
+  const [withdrawErrorMsg, setWithdrawErrorMsg] = useState("");
   const [selectedReferralTx, setSelectedReferralTx] = useState(null);
 
-  // Real Referral State from Backend API
-  const [referralStats, setReferralStats] = useState({
-    referral_code: user?.referral_code || "",
-    total_usages: 0,
-    successful_referrals: 0,
-    earned_commission: 0,
-    pending_commission: 0,
-    paid_commission: 0,
+  // Real Referral State from Backend API with Instant Caching
+  const [referralStats, setReferralStats] = useState(() => {
+    try {
+      const currentId = user?.id;
+      if (currentId) {
+        const cached = localStorage.getItem(`cached_referral_stats_${currentId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.referral_code) {
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Instant deterministic code for current logged-in user so it renders in 0ms
+    const cleanUsername = (user?.username || user?.name || "USER").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    const instantCode = user?.referral_code || (user?.id ? `INFO-${cleanUsername}-${user.id}` : "");
+
+    return {
+      referral_code: instantCode,
+      total_usages: 0,
+      successful_referrals: 0,
+      earned_commission: 0,
+      available_balance: 0,
+      pending_commission: 0,
+      paid_commission: 0,
+    };
   });
-  const [referralTransactions, setReferralTransactions] = useState([]);
+  const [referralTransactions, setReferralTransactions] = useState(() => {
+    try {
+      if (user?.id) {
+        const cached = localStorage.getItem(`cached_referral_tx_${user.id}`);
+        if (cached) return JSON.parse(cached);
+      }
+    } catch (e) {}
+    return [];
+  });
+  const [referralWithdrawals, setReferralWithdrawals] = useState(() => {
+    try {
+      if (user?.id) {
+        const cached = localStorage.getItem(`cached_referral_wd_${user.id}`);
+        if (cached) return JSON.parse(cached);
+      }
+    } catch (e) {}
+    return [];
+  });
   const [loadingReferrals, setLoadingReferrals] = useState(false);
   const [referralError, setReferralError] = useState("");
 
   const fetchReferralStats = async () => {
-    setLoadingReferrals(true);
+    // If we don't have cached data, show loader, otherwise fetch silently in background
+    if (!referralStats.referral_code) {
+      setLoadingReferrals(true);
+    }
     setReferralError("");
     try {
       const res = await api.get("/referrals/my-stats");
       if (res.data && res.data.success) {
         const data = res.data.data;
-        setReferralStats({
-          referral_code: data.referral_code || user?.referral_code || "",
+        const cleanName = (user?.username || user?.name || "USER").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        const finalCode = data.referral_code || user?.referral_code || (user?.id ? `INFO-${cleanName}-${user.id}` : "");
+
+        const newStats = {
+          referral_code: finalCode,
           total_usages: data.total_usages || 0,
           successful_referrals: data.successful_referrals || 0,
           earned_commission: data.earned_commission || 0,
+          available_balance: data.available_balance !== undefined ? data.available_balance : (data.earned_commission - data.paid_commission),
           pending_commission: data.pending_commission || 0,
           paid_commission: data.paid_commission || 0,
-        });
+        };
+
+        setReferralStats(newStats);
         setReferralTransactions(data.transactions || []);
+        setReferralWithdrawals(data.withdrawals || []);
+
+        // Cache instantly per user ID
+        if (user?.id) {
+          localStorage.setItem(`cached_referral_stats_${user.id}`, JSON.stringify(newStats));
+          localStorage.setItem(`cached_referral_tx_${user.id}`, JSON.stringify(data.transactions || []));
+          localStorage.setItem(`cached_referral_wd_${user.id}`, JSON.stringify(data.withdrawals || []));
+
+          // Sync into user object in localStorage if referral_code was missing
+          if (finalCode && user.referral_code !== finalCode) {
+            const updatedUser = { ...user, referral_code: finalCode };
+            setUser(updatedUser);
+            localStorage.setItem("user", JSON.stringify(updatedUser));
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to fetch referral stats:", err);
@@ -350,14 +475,18 @@ export default function AdminUser() {
     }
   };
 
+  // Eager prefetch when component mounts OR when switching to referral tab
   useEffect(() => {
-    if (activeTab === "referral" || activeTab === "reseller") {
+    if (user?.id) {
       fetchReferralStats();
     }
-  }, [activeTab]);
+  }, [activeTab, user?.id]);
 
-  const referralCode = referralStats.referral_code || user?.referral_code || "INFO-REF";
+  const cleanCurrentName = (user?.username || user?.name || "USER").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const currentFallbackCode = user?.id ? `INFO-${cleanCurrentName}-${user.id}` : "INFO-REF";
+  const referralCode = referralStats.referral_code || user?.referral_code || currentFallbackCode;
   const totalReferralEarnings = referralStats.earned_commission;
+  const availableReferralBalance = referralStats.available_balance !== undefined ? referralStats.available_balance : Math.max(0, totalReferralEarnings - referralStats.paid_commission);
   const pendingReferralEarnings = referralStats.pending_commission;
   const paidReferralEarnings = referralStats.paid_commission;
   const totalReferralUsage = referralStats.total_usages;
@@ -770,6 +899,9 @@ export default function AdminUser() {
   const [upgradePaymentMethod, setUpgradePaymentMethod] = useState("DANA");
   const [upgradeProofFile, setUpgradeProofFile] = useState(null);
   const [upgradeProofPreview, setUpgradeProofPreview] = useState(null);
+  const [existingUpgradeProof, setExistingUpgradeProof] = useState(null);
+  const [isUpgradeResubmit, setIsUpgradeResubmit] = useState(false);
+  const [upgradeRejectionReason, setUpgradeRejectionReason] = useState("");
   const [copiedUpgradeAccount, setCopiedUpgradeAccount] = useState(false);
   const [submittingUpgrade, setSubmittingUpgrade] = useState(false);
   const [upgradeError, setUpgradeError] = useState("");
@@ -832,7 +964,7 @@ export default function AdminUser() {
       });
       if (res.data?.valid) {
         setAppliedUpgradeReferral(res.data);
-        setUpgradeReferralSuccessMsg(res.data.message || "Kode referral valid! Diskon 5% berhasil diterapkan.");
+        setUpgradeReferralSuccessMsg(res.data.message || "Kode referral valid! Diskon Rp 5.000 berhasil diterapkan.");
       } else {
         setAppliedUpgradeReferral(null);
         setUpgradeReferralError(res.data?.message || "Kode referral tidak valid.");
@@ -914,7 +1046,7 @@ export default function AdminUser() {
       setUpgradeError("Silakan pilih paket premium terlebih dahulu.");
       return;
     }
-    if (!upgradeProofFile) {
+    if (!isUpgradeResubmit && !upgradeProofFile) {
       setUpgradeError("Wajib mengunggah bukti pembayaran sebelum mengirim permohonan.");
       return;
     }
@@ -926,14 +1058,19 @@ export default function AdminUser() {
       const formData = new FormData();
       formData.append("business_id", targetBizId);
       formData.append("plan_id", selectedUpgradePlan.id);
-      if (appliedUpgradeCoupon?.code) {
+      if (isUpgradeResubmit) {
+        formData.append("resubmit", "1");
+      }
+      if (appliedUpgradeCoupon?.code && !isUpgradeResubmit) {
         formData.append("coupon_code", appliedUpgradeCoupon.code);
       }
-      if (appliedUpgradeReferral?.referral_code) {
+      if (appliedUpgradeReferral?.referral_code && !isUpgradeResubmit) {
         formData.append("referral_code", appliedUpgradeReferral.referral_code);
       }
-      formData.append("payment_method", upgradePaymentMethod);
-      formData.append("proof", upgradeProofFile);
+      formData.append("payment_method", isUpgradeResubmit ? "Revisi Bukti Pembayaran" : upgradePaymentMethod);
+      if (upgradeProofFile) {
+        formData.append("proof", upgradeProofFile);
+      }
 
       const res = await api.post("/subscriptions", formData, {
         headers: { "Content-Type": "multipart/form-data" }
@@ -943,12 +1080,13 @@ export default function AdminUser() {
       setUpgradeSuccessData({
         businessName: bizObj?.name || "Usaha Anda",
         planName: selectedUpgradePlan.name,
-        finalPrice: calculateUpgradePrice().finalPrice,
-        paymentMethod: upgradePaymentMethod,
+        finalPrice: isUpgradeResubmit ? 0 : calculateUpgradePrice().finalPrice,
+        paymentMethod: isUpgradeResubmit ? "Revisi Bukti Pembayaran" : upgradePaymentMethod,
         submittedAt: new Date().toLocaleString("id-ID"),
-        message: res.data?.message || "Permohonan upgrade premium berhasil diajukan!"
+        message: res.data?.message || (isUpgradeResubmit ? "Revisi bukti pembayaran premium berhasil diajukan ulang!" : "Permohonan upgrade premium berhasil diajukan!")
       });
       setPremiumStep(5);
+      setIsUpgradeResubmit(false);
       fetchBusinesses();
     } catch (err) {
       console.error("Failed to submit upgrade:", err);
@@ -960,6 +1098,9 @@ export default function AdminUser() {
 
   const handleResetUpgrade = () => {
     setPremiumStep(1);
+    setIsUpgradeResubmit(false);
+    setExistingUpgradeProof(null);
+    setUpgradeRejectionReason("");
     setSelectedUpgradePlan(null);
     setUpgradeCouponInput("");
     setAppliedUpgradeCoupon(null);
@@ -1232,6 +1373,9 @@ export default function AdminUser() {
             city: b.city || b.address || "Indonesia",
             owner: b.user?.name || b.owner?.name || b.author || displayName || profileData?.name || "Saya",
             status: b.status || "active",
+            is_premium: Boolean(b.is_premium),
+            rejection_reason: b.rejection_reason,
+            subscriptions: b.subscriptions || [],
             image: imageUrl,
             created_at: b.created_at,
             date: b.created_at ? new Date(b.created_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }) : "-",
@@ -1421,7 +1565,8 @@ export default function AdminUser() {
           category: b.blog_category || "Umum",
           author: b.user?.name || b.author || "Admin",
           date: b.created_at ? new Date(b.created_at).toLocaleDateString("id-ID") : "-",
-          status: b.status === "published" ? "published" : "draft",
+          status: b.status || "draft",
+          rejection_reason: b.rejection_reason || null,
           thumbnail: b.thumbnail ? getStorageUrl(b.thumbnail) : null
         }));
         setBlogs(mapped);
@@ -1448,7 +1593,8 @@ export default function AdminUser() {
           location: e.event_location || "Indonesia",
           category: e.blog_category || "Umum",
           author: e.user?.name || e.author || "Admin",
-          status: e.status === "published" ? "upcoming" : "past",
+          status: e.status || "draft",
+          rejection_reason: e.rejection_reason || null,
           thumbnail: e.thumbnail ? getStorageUrl(e.thumbnail) : null
         }));
         setEvents(mapped);
@@ -1530,10 +1676,96 @@ export default function AdminUser() {
     };
   }, [activeTab]);
 
-  // Submit advertisement request
+  const handleOpenCreateAdModal = () => {
+    setSelectedBusinessForAd(businesses.length > 0 ? businesses[0].id : null);
+    setSelectedPackage(adPackages.length > 0 ? (adPackages[0].name || adPackages[0].id) : null);
+    setAdNotes('');
+    setCouponCodeInput('');
+    setAppliedCouponInfo(null);
+    setCouponMsg('');
+    setSelectedPaymentMethod('Transfer Bank BCA');
+    setAdPaymentProofFile(null);
+    setAdPaymentProofPreview(null);
+    setCreateAdStep(1);
+    setShowCreateAdModal(true);
+  };
+
+  const handleOpenResubmitAdModal = (ad) => {
+    setResubmittingAd(ad);
+    let proofs = [];
+    if (ad.payment_proof_list && Array.isArray(ad.payment_proof_list)) {
+      proofs = [...ad.payment_proof_list];
+    } else if (ad.payment_proof) {
+      if (typeof ad.payment_proof === 'string' && ad.payment_proof.startsWith('[')) {
+        try { proofs = JSON.parse(ad.payment_proof); } catch (e) { proofs = [ad.payment_proof]; }
+      } else {
+        proofs = [ad.payment_proof];
+      }
+    }
+    setExistingProofList(proofs.filter(Boolean));
+    setNewProofFiles([]);
+    setNewProofPreviews([]);
+    setResubmitNotes(ad.notes || '');
+    setResubmitPaymentMethod(ad.payment_method || 'Transfer Bank BCA');
+  };
+
+  const handleConfirmResubmitAd = async (e) => {
+    if (e) e.preventDefault();
+    if (!resubmittingAd) return;
+
+    setSubmittingResubmit(true);
+    try {
+      const formData = new FormData();
+      formData.append('resubmit', '1');
+      formData.append('advertisement_id', resubmittingAd.id);
+      formData.append('business_id', resubmittingAd.business_id);
+      if (resubmittingAd.ad_package_id) {
+        formData.append('ad_package_id', resubmittingAd.ad_package_id);
+      }
+      formData.append('package_name', resubmittingAd.package_name || 'Standard Ads');
+      formData.append('payment_method', resubmitPaymentMethod);
+      if (resubmitNotes) {
+        formData.append('notes', resubmitNotes);
+      }
+
+      // Send existing proof list that user chose to keep
+      formData.append('existing_payment_proofs', JSON.stringify(existingProofList));
+      if (existingProofList.length === 0 && newProofFiles.length === 0) {
+        formData.append('remove_payment_proof', '1');
+      }
+
+      // Append newly uploaded proof files (multi-upload support)
+      newProofFiles.forEach((file) => {
+        formData.append('payment_proofs[]', file);
+      });
+
+      await api.post('/advertisements', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert('Pengajuan ulang iklan #' + resubmittingAd.id + ' berhasil dikirim! Menunggu konfirmasi admin.');
+      setResubmittingAd(null);
+      setExistingProofList([]);
+      setNewProofFiles([]);
+      setNewProofPreviews([]);
+      setAdFilterTab('all');
+      await fetchAdvertisements();
+    } catch (err) {
+      console.error('Failed to resubmit advertisement:', err);
+      alert(err.response?.data?.message || 'Gagal mengajukan ulang iklan. Silakan coba lagi.');
+    } finally {
+      setSubmittingResubmit(false);
+    }
+  };
+
+  // Submit new advertisement creation
   const handleAdSubmit = async () => {
-    if (!selectedBusinessForAd || !selectedPackage) {
-      alert('Pilih bisnis dan paket terlebih dahulu');
+    if (!selectedBusinessForAd) {
+      alert('Pilih bisnis yang ingin diiklankan');
+      return;
+    }
+    if (!selectedPackage) {
+      alert('Pilih paket iklan');
       return;
     }
 
@@ -1541,15 +1773,27 @@ export default function AdminUser() {
     try {
       const formData = new FormData();
       formData.append('business_id', selectedBusinessForAd);
-      formData.append('package_name', selectedPackage);
-      if (selectedPaymentMethod) formData.append('payment_method', selectedPaymentMethod);
-      if (adNotes) formData.append('notes', adNotes);
 
-      const coupon = appliedCouponInfo ? appliedCouponInfo.code : couponCodeInput.trim();
-      if (coupon) formData.append('coupon_code', coupon);
+      const pkgObj = getSelectedPackageObj();
+      if (pkgObj && pkgObj.id) {
+        formData.append('ad_package_id', pkgObj.id);
+        formData.append('package_name', pkgObj.name);
+      } else {
+        formData.append('package_name', typeof selectedPackage === 'string' ? selectedPackage : 'Standard Iklan');
+      }
+
+      if (appliedCouponInfo && appliedCouponInfo.code) {
+        formData.append('coupon_code', appliedCouponInfo.code);
+      }
+
+      formData.append('payment_method', selectedPaymentMethod);
 
       if (adPaymentProofFile) {
         formData.append('payment_proof', adPaymentProofFile);
+      }
+
+      if (adNotes) {
+        formData.append('notes', adNotes);
       }
 
       await api.post('/advertisements', formData, {
@@ -1557,6 +1801,8 @@ export default function AdminUser() {
       });
 
       alert('Iklan berhasil diajukan! ' + (adPaymentProofFile ? 'Bukti pembayaran telah dikirim dan menunggu konfirmasi admin.' : 'Silakan lakukan pembayaran.'));
+      setShowCreateAdModal(false);
+      setCreateAdStep(1);
       setSelectedBusinessForAd(null);
       setSelectedPackage(null);
       setAdNotes('');
@@ -1566,7 +1812,8 @@ export default function AdminUser() {
       setSelectedPaymentMethod('Transfer Bank BCA');
       setAdPaymentProofFile(null);
       setAdPaymentProofPreview(null);
-      fetchAdvertisements();
+      setAdFilterTab('all');
+      await fetchAdvertisements();
     } catch (err) {
       console.error('Failed to submit advertisement:', err);
       alert(err.response?.data?.message || 'Gagal mengajukan iklan. Silakan coba lagi.');
@@ -2659,8 +2906,9 @@ export default function AdminUser() {
                         className="w-full appearance-none h-[40px] px-[12px] pr-[30px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] text-[12.5px] font-semibold text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#007570] cursor-pointer"
                       >
                         <option value="Semua">Semua Status</option>
-                        <option value="active">Aktif</option>
-                        <option value="pending">Menunggu</option>
+                        <option value="active">Aktif / Disetujui</option>
+                        <option value="pending">Menunggu Persetujuan</option>
+                        <option value="rejected">Ditolak / Perlu Revisi</option>
                         <option value="inactive">Nonaktif</option>
                       </select>
                       <ChevronRight size={14} className="absolute right-[10px] top-1/2 -translate-y-1/2 text-[#94a3b8] rotate-90 pointer-events-none" />
@@ -2715,8 +2963,9 @@ export default function AdminUser() {
                     // Status filter
                     if (businessStatusFilter !== "Semua") {
                       const st = (b.status || "").toLowerCase();
-                      if (businessStatusFilter === "active" && st !== "active" && st !== "aktif") return false;
+                      if (businessStatusFilter === "active" && st !== "active" && st !== "aktif" && st !== "approved" && st !== "published") return false;
                       if (businessStatusFilter === "pending" && st !== "pending" && st !== "menunggu") return false;
+                      if (businessStatusFilter === "rejected" && st !== "rejected" && st !== "ditolak") return false;
                       if (businessStatusFilter === "inactive" && st !== "inactive" && st !== "nonaktif") return false;
                     }
                     // Search query filter
@@ -2742,15 +2991,15 @@ export default function AdminUser() {
                   return totalItems > 0 ? (
                     <div className="flex flex-col gap-[14px]">
                       {/* Table Area */}
-                      <div className="w-full overflow-hidden border border-[#e2e8f0] rounded-[12px] shadow-sm bg-white">
-                        <table className="w-full text-left border-collapse table-fixed">
+                      <div className="w-full overflow-x-auto border border-[#e2e8f0] rounded-[12px] shadow-sm bg-white">
+                        <table className="w-full text-left border-collapse min-w-[740px]">
                           <thead>
                             <tr className="bg-[#f8fafc] border-b border-[#e2e8f0]">
-                              <th className="px-3.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[38%]">Bisnis & Kategori</th>
-                              <th className="px-3 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[26%]">Lokasi & Jam Buka</th>
+                              <th className="px-3.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[35%]">Bisnis &amp; Kategori</th>
+                              <th className="px-3 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[25%]">Lokasi &amp; Jam Buka</th>
                               <th className="px-2 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center w-[10%]">Produk</th>
-                              <th className="px-2.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center w-[12%]">Status</th>
-                              <th className="px-3 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-right w-[14%]">Aksi</th>
+                              <th className="px-2.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center w-[14%]">Status</th>
+                              <th className="px-3 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-right w-[16%]">Aksi</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[#f1f5f9]">
@@ -2759,6 +3008,10 @@ export default function AdminUser() {
                               const isApproved = st === "approved" || st === "published" || st === "active" || st === "aktif" || st === "disetujui";
                               const isPending = st === "pending" || st === "menunggu";
                               const isRejected = st === "rejected" || st === "ditolak";
+                              const isPrem = Boolean(biz.is_premium || biz.raw?.is_premium || biz.raw?.features?.is_premium);
+                              const subs = biz.subscriptions || biz.raw?.subscriptions || [];
+                              const latestSub = subs[0];
+                              const isPendingSub = biz.has_pending_subscription || (latestSub?.status === "pending" && latestSub?.payment?.status === "pending");
 
                               return (
                                 <tr key={biz.id} className="hover:bg-[#f8fafc] transition-colors">
@@ -2787,16 +3040,17 @@ export default function AdminUser() {
                                         </div>
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <span className="font-bold text-[13px] text-[#0f172a] truncate max-w-[160px] sm:max-w-[200px]" title={biz.name}>
+                                        <div className="flex items-center gap-1.5 flex-nowrap">
+                                          <span className="font-bold text-[13px] text-[#0f172a] truncate max-w-[160px] sm:max-w-[210px]" title={biz.name}>
                                             {biz.name}
                                           </span>
-                                          {Boolean(biz.is_premium || biz.raw?.is_premium || biz.raw?.features?.is_premium) ? (
-                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
-                                              ⭐ Premium
+                                          {isPrem ? (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300 shrink-0">
+                                              <Crown size={10} className="text-amber-600 shrink-0" />
+                                              <span>Premium</span>
                                             </span>
                                           ) : (
-                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
                                               Free
                                             </span>
                                           )}
@@ -2812,8 +3066,24 @@ export default function AdminUser() {
                                           )}
                                         </div>
                                         {isRejected && (
-                                          <div className="mt-1 p-1.5 bg-[#fef2f2] border border-[#fca5a5] rounded-md text-[10.5px] text-[#b91c1c]">
-                                            <strong>Alasan Ditolak:</strong> {biz.rejection_reason || biz.raw?.rejection_reason || "Periksa data usaha."}
+                                          <div className="mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 space-y-1">
+                                            <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                                              <AlertCircle size={13} className="text-rose-600 shrink-0" />
+                                              <span>Alasan Ditolak Admin:</span>
+                                            </div>
+                                            <p className="text-[11.5px] text-rose-700 leading-snug pl-4">
+                                              {biz.rejection_reason || biz.raw?.rejection_reason || "Data usaha belum memenuhi ketentuan."}
+                                            </p>
+                                            <div className="pt-1 pl-4">
+                                              <button
+                                                type="button"
+                                                onClick={() => navigate(`/add-business/${biz.id}`)}
+                                                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold transition-colors cursor-pointer inline-flex items-center gap-1"
+                                              >
+                                                <Edit size={11} />
+                                                <span>Perbaiki &amp; Ajukan Ulang</span>
+                                              </button>
+                                            </div>
                                           </div>
                                         )}
                                       </div>
@@ -2861,7 +3131,7 @@ export default function AdminUser() {
 
                                   {/* Status & Tanggal */}
                                   <td className="px-2.5 py-2.5 text-center">
-                                    <div className="flex flex-col items-center gap-0.5">
+                                    <div className="flex flex-col items-center gap-1">
                                       <span
                                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
                                           isApproved
@@ -2880,6 +3150,11 @@ export default function AdminUser() {
                                         />
                                         {isApproved ? "Disetujui" : isPending ? "Menunggu" : isRejected ? "Ditolak" : "Nonaktif"}
                                       </span>
+                                      {isPendingSub && (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                          <Clock size={10} /> Diproses
+                                        </span>
+                                      )}
                                       <span className="text-[10px] text-[#94a3b8] font-medium">
                                         {biz.date}
                                       </span>
@@ -2888,7 +3163,17 @@ export default function AdminUser() {
 
                                   {/* Action Buttons */}
                                   <td className="px-3 py-2.5 text-right">
-                                    <div className="flex items-center justify-end gap-1">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      {/* Upgrade button only for Free businesses without pending subscription */}
+                                      {!isPrem && !isPendingSub && (
+                                        <button
+                                          onClick={() => navigate(`/add-business/${biz.id}?upgrade=true`)}
+                                          className="w-[30px] h-[30px] rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 flex items-center justify-center transition-all shadow-xs cursor-pointer border-0"
+                                          title="Upgrade ke Paket Premium"
+                                        >
+                                          <Crown size={15} className="shrink-0 text-slate-950" />
+                                        </button>
+                                      )}
                                       {/* View */}
                                       <button
                                         onClick={() => navigate(`/business/${biz.raw?.slug || biz.id}`)}
@@ -2897,11 +3182,15 @@ export default function AdminUser() {
                                       >
                                         <Eye size={14} />
                                       </button>
-                                      {/* Edit */}
+                                      {/* Edit / Perbaiki */}
                                       <button
                                         onClick={() => navigate(`/add-business/${biz.id}`)}
-                                        className="w-[30px] h-[30px] rounded-lg bg-[#fefce8] text-[#ca8a04] hover:bg-[#ca8a04] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                        title="Edit Profil Bisnis"
+                                        className={`w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                                          isRejected
+                                            ? "bg-rose-100 text-rose-700 hover:bg-rose-600 hover:text-white"
+                                            : "bg-[#fefce8] text-[#ca8a04] hover:bg-[#ca8a04] hover:text-white"
+                                        }`}
+                                        title={isRejected ? "Perbaiki Bisnis (Ditolak)" : "Edit Profil Bisnis"}
                                       >
                                         <Edit size={14} />
                                       </button>
@@ -3050,6 +3339,81 @@ export default function AdminUser() {
                 </div>
               </div>
 
+              {/* 1.5 PRICING CARDS SHOWCASE (PAY PER POST) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Blog Card */}
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-white to-teal-50/40 border border-teal-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-teal-100 text-[#007570] flex items-center justify-center font-bold">
+                          <FileText size={16} />
+                        </div>
+                        <h3 className="font-extrabold text-slate-900 text-sm">Publikasi Artikel Blog</h3>
+                      </div>
+                      <span className="bg-teal-100 text-[#007570] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Aktif 1 Tahun
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Publikasikan artikel promosi, edukasi, atau cerita bisnis Anda. Tayang selama 365 hari penuh dengan optimasi SEO.
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-teal-100 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Tarif Upload</span>
+                      <span className="text-lg font-black text-[#007570]">
+                        Rp {contentPricing.blog.toLocaleString("id-ID")} <span className="text-[11px] font-medium text-slate-500">/ posting</span>
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => navigate("/add-blog?type=blog")}
+                      className="px-4 py-2 rounded-xl bg-[#007570] hover:bg-[#005f5b] text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Plus size={14} strokeWidth={2.5} />
+                      <span>Buat Blog Baru</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Event Card */}
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-white to-purple-50/40 border border-purple-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                          <Calendar size={16} />
+                        </div>
+                        <h3 className="font-extrabold text-slate-900 text-sm">Publikasi Agenda Event</h3>
+                      </div>
+                      <span className="bg-purple-100 text-purple-700 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Aktif 1 Tahun
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Promosikan acara festival, webinar, workshop, atau konser Anda ke ribuan pengguna platform Info.co.id.
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-purple-100 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Tarif Upload</span>
+                      <span className="text-lg font-black text-purple-700">
+                        Rp {contentPricing.event.toLocaleString("id-ID")} <span className="text-[11px] font-medium text-slate-500">/ posting</span>
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => navigate("/add-blog?type=event")}
+                      className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Plus size={14} strokeWidth={2.5} />
+                      <span>Buat Event Baru</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* 2. MAIN CONTENT CARD (SEARCH, BUTTON, TABS, TABLE & PAGINATION) */}
               <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 space-y-6 w-full">
                 {/* SEARCH BAR & BUAT BLOG BARU BUTTON IN ONE FULL-WIDTH ROW */}
@@ -3059,7 +3423,7 @@ export default function AdminUser() {
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                       type="text"
-                      placeholder="Cari artikel blog..."
+                      placeholder="Cari judul artikel atau event..."
                       value={blogSearch}
                       onChange={(e) => {
                         setBlogSearch(e.target.value);
@@ -3069,19 +3433,29 @@ export default function AdminUser() {
                     />
                   </div>
 
-                  {/* Buat Blog Baru Button - exact h-11 height matching search bar */}
-                  <button
-                    onClick={() => navigate("/add-blog?type=blog")}
-                    className="w-full sm:w-auto h-11 flex items-center justify-center gap-2 bg-[#007570] hover:bg-[#005f5b] active:bg-[#004e4a] text-white px-6 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm shrink-0 cursor-pointer"
-                  >
-                    <Plus size={18} strokeWidth={2.5} />
-                    <span>Buat Blog Baru</span>
-                  </button>
+                  {/* Buat Blog & Buat Event Action Buttons */}
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={() => navigate("/add-blog?type=blog")}
+                      className="flex-1 sm:flex-none h-11 flex items-center justify-center gap-2 bg-[#007570] hover:bg-[#005f5b] active:bg-[#004e4b] text-white px-5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm shrink-0 cursor-pointer"
+                    >
+                      <Plus size={18} strokeWidth={2.5} />
+                      <span>Buat Blog Baru</span>
+                    </button>
+
+                    <button
+                      onClick={() => navigate("/add-blog?type=event")}
+                      className="flex-1 sm:flex-none h-11 flex items-center justify-center gap-2 bg-[#7c3aed] hover:bg-[#6d28d9] active:bg-[#5b21b6] text-white px-5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm shrink-0 cursor-pointer"
+                    >
+                      <Calendar size={18} strokeWidth={2} />
+                      <span>Buat Event Baru</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* FILTER TABS */}
                 <div className="flex items-center gap-6 border-b border-slate-100 pb-0 overflow-x-auto text-xs sm:text-sm font-semibold">
-                  {["Semua", "Blog", "Event", "Terbit", "Draft"].map((tab) => {
+                  {["Semua", "Blog", "Event", "Published", "Menunggu Persetujuan", "Ditolak", "Draft"].map((tab) => {
                     const isActive = filterTab === tab;
                     return (
                       <button
@@ -3116,11 +3490,14 @@ export default function AdminUser() {
 
                   // Filter based on tab and search keyword
                   const filtered = combinedList.filter((item) => {
+                    const st = (item.status || "").toLowerCase();
                     // Tab filter
                     if (filterTab === "Blog" && item.itemType !== "blog") return false;
                     if (filterTab === "Event" && item.itemType !== "event") return false;
-                    if (filterTab === "Terbit" && item.status !== "published" && item.status !== "upcoming") return false;
-                    if (filterTab === "Draft" && item.status !== "draft" && item.status !== "past") return false;
+                    if (filterTab === "Published" && !(st === "published" || st === "approved" || st === "terbit")) return false;
+                    if (filterTab === "Menunggu Persetujuan" && !(st === "waiting_payment" || st === "pending" || st === "menunggu")) return false;
+                    if (filterTab === "Ditolak" && !(st === "rejected" || st === "failed" || st === "ditolak")) return false;
+                    if (filterTab === "Draft" && st !== "draft") return false;
 
                     // Search filter
                     if (blogSearch) {
@@ -3155,18 +3532,19 @@ export default function AdminUser() {
                         <table className="w-full text-left border-collapse table-fixed">
                           <thead>
                             <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                              <th className="py-2.5 px-3.5 w-[44%] font-semibold">Artikel & Event</th>
-                              <th className="py-2.5 px-3 w-[24%] font-semibold">Kategori & Tanggal</th>
-                              <th className="py-2.5 px-2.5 w-[16%] text-center font-semibold">Status</th>
-                              <th className="py-2.5 px-3 w-[16%] text-right font-semibold">Aksi</th>
+                              <th className="py-2.5 px-3.5 w-[42%] font-semibold">Artikel & Event</th>
+                              <th className="py-2.5 px-3 w-[22%] font-semibold">Kategori & Tanggal</th>
+                              <th className="py-2.5 px-2.5 w-[18%] text-center font-semibold">Status</th>
+                              <th className="py-2.5 px-3 w-[18%] text-right font-semibold">Aksi</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {currentData.map((item) => {
                               const st = (item.status || "").toLowerCase();
-                              const isApproved = st === "approved" || st === "published" || st === "terbit";
-                              const isPending = st === "pending" || st === "menunggu";
-                              const isRejected = st === "rejected" || st === "ditolak";
+                              const isPublished = st === "approved" || st === "published" || st === "terbit";
+                              const isWaitingPayment = st === "waiting_payment" || st === "pending" || st === "menunggu";
+                              const isDraft = st === "draft";
+                              const isRejected = st === "rejected" || st === "failed" || st === "ditolak";
 
                               return (
                                 <tr key={`${item.itemType}-${item.id}`} className="hover:bg-slate-50/60 transition-colors">
@@ -3212,8 +3590,14 @@ export default function AdminUser() {
                                         </div>
 
                                         {isRejected && (
-                                          <div className="mt-1 p-1.5 bg-red-50 border border-red-200 rounded-md text-[10.5px] text-red-700">
-                                            <strong>Alasan Ditolak:</strong> {item.rejection_reason || "Periksa kembali artikel/event Anda."}
+                                          <div className="mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-800 space-y-0.5">
+                                            <div className="flex items-center gap-1 font-bold text-rose-900">
+                                              <AlertCircle size={13} className="text-rose-600 shrink-0" />
+                                              <span>Alasan Penolakan dari Admin:</span>
+                                            </div>
+                                            <p className="text-[10.5px] leading-relaxed text-rose-700 pl-4">
+                                              {item.rejection_reason || "Konten belum memenuhi syarat. Silakan klik 'Perbaiki' untuk memperbarui dan mengajukan kembali."}
+                                            </p>
                                           </div>
                                         )}
                                       </div>
@@ -3239,28 +3623,67 @@ export default function AdminUser() {
                                   {/* Status */}
                                   <td className="py-2.5 px-2.5 text-center align-middle">
                                     <span
-                                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
-                                        isApproved
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold ${
+                                        isPublished
                                           ? "bg-[#e6f4ea] text-[#137333] border border-[#bbf7d0]"
-                                          : isPending
-                                          ? "bg-[#fef7e0] text-[#b06000] border border-[#fef08a]"
+                                          : isWaitingPayment
+                                          ? "bg-amber-50 text-amber-800 border border-amber-200"
                                           : isRejected
-                                          ? "bg-[#fce8e6] text-[#c5221f] border border-[#fecaca]"
+                                          ? "bg-rose-50 text-rose-700 border border-rose-200"
                                           : "bg-slate-100 text-slate-600 border border-slate-200"
                                       }`}
                                     >
                                       <span
                                         className={`w-1.5 h-1.5 rounded-full ${
-                                          isApproved ? "bg-[#16a34a]" : isPending ? "bg-[#ca8a04]" : "bg-[#dc2626]"
+                                          isPublished
+                                            ? "bg-[#16a34a]"
+                                            : isWaitingPayment
+                                            ? "bg-amber-500 animate-pulse"
+                                            : isRejected
+                                            ? "bg-rose-600"
+                                            : "bg-slate-400"
                                         }`}
                                       />
-                                      {isApproved ? "Disetujui" : isPending ? "Menunggu" : isRejected ? "Ditolak" : "Draft"}
+                                      {isPublished
+                                        ? "Published"
+                                        : isWaitingPayment
+                                        ? "Menunggu Persetujuan"
+                                        : isRejected
+                                        ? "Ditolak / Revisi"
+                                        : "Draft"}
                                     </span>
                                   </td>
 
                                   {/* Action Buttons */}
                                   <td className="py-2.5 px-3 text-right align-middle">
-                                    <div className="flex items-center justify-end gap-1">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      {/* Bayar Draft Button */}
+                                      {isDraft && (
+                                        <button
+                                          onClick={() => {
+                                            setSelectedBlogForPayment(item);
+                                            setShowPaymentModal(true);
+                                          }}
+                                          title="Lanjutkan Pembayaran"
+                                          className="h-[30px] px-2.5 rounded-lg bg-[#007570] hover:bg-[#005f5b] text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs shrink-0"
+                                        >
+                                          <CreditCard size={13} />
+                                          <span className="hidden sm:inline">Bayar</span>
+                                        </button>
+                                      )}
+
+                                      {/* Perbaiki / Ajukan Ulang jika ditolak */}
+                                      {isRejected && (
+                                        <button
+                                          onClick={() => navigate(`/add-blog/${item.id}?type=${item.itemType}`)}
+                                          title="Perbaiki & Ajukan Ulang"
+                                          className="h-[30px] px-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs shrink-0"
+                                        >
+                                          <Edit size={13} />
+                                          <span className="hidden sm:inline">Perbaiki</span>
+                                        </button>
+                                      )}
+
                                       {/* View Button */}
                                       <button
                                         onClick={() => navigate(`/blog/${item.id}`)}
@@ -3638,10 +4061,10 @@ export default function AdminUser() {
                       <Gift size={14} /> Program Kemitraan & Referral
                     </div>
                     <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
-                      Dapatkan Komisi 10% Dari Setiap Referral!
+                      Dapatkan Komisi Rp 10.000 Dari Setiap Referral!
                     </h2>
                     <p className="text-sm text-slate-300 leading-relaxed font-normal">
-                      Bagikan kode unik Anda kepada rekan usaha atau kerabat. Teman Anda mendapat potongan harga saat bertransaksi, dan Anda otomatis menerima komisi tunai sebesar 10%.
+                      Bagikan kode unik Anda kepada rekan usaha atau kerabat. Teman Anda mendapat potongan harga Rp 5.000 saat bertransaksi, dan Anda otomatis menerima komisi tunai sebesar Rp 10.000.
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto shrink-0">
@@ -3659,73 +4082,117 @@ export default function AdminUser() {
               {/* 4 Stat Overview Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                 {/* Card 1: Kode Referral Saya */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 relative overflow-hidden">
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 relative overflow-hidden flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Kode Referral Saya</span>
-                    <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#007570] flex items-center justify-center font-bold">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Kode Referral Saya</span>
+                      <span className="text-[10px] font-medium text-slate-400">Bagikan untuk dapat komisi</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#007570] flex items-center justify-center font-bold shrink-0">
                       <Gift size={20} />
                     </div>
                   </div>
-                  <div className="p-3 bg-slate-900 rounded-xl flex items-center justify-between gap-2 border border-slate-800">
-                    <span className="font-mono text-base md:text-lg font-black text-teal-400 tracking-wider">
-                      {referralCode}
-                    </span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(referralCode);
-                        setReferralCopyToast(true);
-                        setTimeout(() => setReferralCopyToast(false), 2500);
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                      title="Salin Kode Referral"
-                    >
-                      {referralCopyToast ? <Check size={14} /> : <Copy size={14} />}
-                      <span>{referralCopyToast ? "Tersalin!" : "Salin"}</span>
-                    </button>
+
+                  {/* Referral Code Display Box */}
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2.5 shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">KODE KEMITRAAN</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+                        Aktif
+                      </span>
+                    </div>
+
+                    {/* Dedicated Full-Width Code Box - Never Truncated */}
+                    <div className="bg-slate-900/90 py-2.5 px-3 rounded-lg border border-slate-800 text-center flex items-center justify-center">
+                      <span
+                        className="font-mono text-xs sm:text-sm font-black text-teal-300 tracking-wider select-all whitespace-nowrap leading-none"
+                        title={referralCode}
+                      >
+                        {referralCode}
+                      </span>
+                    </div>
+
+                    {/* Action Buttons: Salin Kode & Bagi Link */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(referralCode);
+                          setReferralCopyToast(true);
+                          setTimeout(() => setReferralCopyToast(false), 2500);
+                        }}
+                        className="w-full py-1.5 px-2 rounded-md bg-teal-600 hover:bg-teal-500 active:scale-95 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
+                        title="Salin Kode Referral"
+                      >
+                        {referralCopyToast ? <Check size={12} /> : <Copy size={12} />}
+                        <span>{referralCopyToast ? "Tersalin!" : "Salin Kode"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          const link = `${window.location.origin}/register?ref=${referralCode}`;
+                          navigator.clipboard.writeText(link);
+                          setReferralLinkCopyToast(true);
+                          setTimeout(() => setReferralLinkCopyToast(false), 2500);
+                        }}
+                        className="w-full py-1.5 px-2 rounded-md bg-slate-900 hover:bg-slate-800 active:scale-95 text-teal-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer border border-slate-800"
+                        title="Salin Link Pendaftaran"
+                      >
+                        <Share2 size={12} />
+                        <span>{referralLinkCopyToast ? "Tersalin!" : "Bagi Link"}</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                    <span className="text-slate-500">Bonus Teman: <strong className="text-slate-800">Diskon 5%</strong></span>
-                    <button
-                      onClick={() => {
-                        const link = `${window.location.origin}/register?ref=${referralCode}`;
-                        navigator.clipboard.writeText(link);
-                        setReferralLinkCopyToast(true);
-                        setTimeout(() => setReferralLinkCopyToast(false), 2500);
-                      }}
-                      className="text-[#007570] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-                    >
-                      <Share2 size={12} />
-                      <span>{referralLinkCopyToast ? "Link Tersalin!" : "Bagikan Link"}</span>
-                    </button>
+
+                  {/* Bonus Teman Footer */}
+                  <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                    <span className="text-slate-500 text-[11px]">Bonus Teman:</span>
+                    <span className="text-emerald-700 font-extrabold text-[11px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                      Diskon Rp 5.000
+                    </span>
                   </div>
                 </div>
 
-                {/* Card 2: Total Pendapatan */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                {/* Card 2: Total Pendapatan & Saldo Komisi */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Pendapatan (Komisi)</span>
-                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                      <TrendingUp size={20} />
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Saldo Komisi Tersedia</span>
+                      <span className="text-[10px] font-medium text-slate-400">Siap diajukan pencairan</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                      <Wallet size={20} />
                     </div>
                   </div>
                   <div>
-                    <div className="text-2xl font-black text-slate-900 tracking-tight">
-                      Rp {totalReferralEarnings.toLocaleString("id-ID")}
+                    <div className="text-2xl font-black text-[#007570] tracking-tight">
+                      Rp {availableReferralBalance.toLocaleString("id-ID")}
                     </div>
-                    <p className="text-xs text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-                      <CheckCircle2 size={13} /> komisi terverifikasi
+                    <p className="text-xs text-slate-500 font-medium mt-1 flex items-center justify-between">
+                      <span>Total Diperoleh:</span>
+                      <strong className="text-slate-800">Rp {totalReferralEarnings.toLocaleString("id-ID")}</strong>
                     </p>
                   </div>
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span>Minimal penarikan: Rp 50.000</span>
+                    <span>Minimal: Rp 50.000</span>
+                    {availableReferralBalance >= 50000 ? (
+                      <span className="text-emerald-600 font-bold flex items-center gap-1">
+                        <CheckCircle2 size={12} /> Siap Ditarik
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">Belum Cukup</span>
+                    )}
                   </div>
                 </div>
 
                 {/* Card 3: Berapa Kali Kode Dipakai */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Penggunaan Kode</span>
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Penggunaan Kode</span>
+                      <span className="text-[10px] font-medium text-slate-400">Statistik rekan bisnis</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
                       <Users size={20} />
                     </div>
                   </div>
@@ -3743,10 +4210,13 @@ export default function AdminUser() {
                 </div>
 
                 {/* Card 4: Estimasi Pending Earning */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3">
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Komisi Pending</span>
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Komisi Pending</span>
+                      <span className="text-[10px] font-medium text-slate-400">Dalam proses verifikasi</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
                       <Clock size={20} />
                     </div>
                   </div>
@@ -3789,7 +4259,7 @@ export default function AdminUser() {
                     <div className="space-y-1">
                       <h4 className="text-sm font-bold text-slate-900">Teman Mendaftar & Transaksi</h4>
                       <p className="text-xs text-slate-600 leading-relaxed">
-                        Pengguna mendaftar dengan kode Anda dan membeli Paket Premium dengan potongan diskon 5%.
+                        Pengguna mendaftar dengan kode Anda dan membeli Paket Premium dengan potongan diskon Rp 5.000.
                       </p>
                     </div>
                   </div>
@@ -3798,9 +4268,9 @@ export default function AdminUser() {
                       3
                     </div>
                     <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-slate-900">Nikmati Komisi 10%</h4>
+                      <h4 className="text-sm font-bold text-slate-900">Nikmati Komisi Rp 10.000</h4>
                       <p className="text-xs text-slate-600 leading-relaxed">
-                        Komisi tunai 10% otomatis masuk setelah pembayaran diverifikasi admin dan dapat ditarik kapan saja.
+                        Komisi tunai Rp 10.000 otomatis masuk setelah pembayaran diverifikasi admin dan dapat ditarik kapan saja.
                       </p>
                     </div>
                   </div>
@@ -3855,7 +4325,7 @@ export default function AdminUser() {
                         <th className="py-3 px-4">Layanan & Bisnis</th>
                         <th className="py-3 px-4">Tanggal</th>
                         <th className="py-3 px-4 text-right">Total Transaksi</th>
-                        <th className="py-3 px-4 text-right">Komisi Anda (10%)</th>
+                        <th className="py-3 px-4 text-right">Komisi Anda (Rp 10.000)</th>
                         <th className="py-3 px-4 text-center">Status</th>
                         <th className="py-3 px-4 text-center">Aksi</th>
                       </tr>
@@ -3937,7 +4407,159 @@ export default function AdminUser() {
                             <Share2 size={36} className="mx-auto text-slate-300" />
                             <p className="font-bold text-sm text-slate-800">Belum ada referral yang berhasil.</p>
                             <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                              Bagikan kode referral Anda ({referralCode}) ke rekan bisnis untuk mulai mendapatkan komisi 10% dari setiap pembelian Paket Premium.
+                              Bagikan kode referral Anda ({referralCode}) ke rekan bisnis untuk mulai mendapatkan komisi Rp 10.000 dari setiap pembelian Paket Premium.
+                            </p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Riwayat Penarikan Saldo Komisi */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Wallet size={18} className="text-[#007570]" />
+                      Riwayat Penarikan Saldo Komisi
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Status dan histori pengajuan pencairan dana tunai komisi referral Anda ke rekening bank / e-wallet.
+                    </p>
+                  </div>
+                  {availableReferralBalance >= 50000 && (
+                    <button
+                      onClick={() => {
+                        setWithdrawSuccessMsg("");
+                        setWithdrawErrorMsg("");
+                        setShowWithdrawModal(true);
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                    >
+                      <ArrowUpRight size={14} />
+                      <span>Ajukan Penarikan Baru</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Banner Peringatan jika ada penarikan yang ditolak */}
+                {referralWithdrawals.some((w) => w.status === "rejected") && (
+                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-sm text-rose-700">
+                      <AlertTriangle size={18} className="shrink-0" />
+                      <span>Pemberitahuan Penolakan Penarikan Dana</span>
+                    </div>
+                    {referralWithdrawals
+                      .filter((w) => w.status === "rejected")
+                      .slice(0, 1)
+                      .map((rej) => (
+                        <div key={rej.id} className="text-xs space-y-1.5 pl-6">
+                          <p className="text-rose-800 leading-relaxed">
+                            Pengajuan penarikan sebesar <strong>Rp {rej.amount.toLocaleString("id-ID")}</strong> ({rej.bank} - {rej.account_number}) telah ditolak oleh Admin.
+                          </p>
+                          <div className="p-2.5 bg-white/80 rounded-lg border border-rose-200 font-medium text-rose-950">
+                            <strong>Alasan Penolakan dari Admin:</strong>
+                            <p className="mt-0.5 text-slate-800 italic">"{rej.rejection_reason || "Tidak ada alasan spesifik."}"</p>
+                          </div>
+                          <p className="text-slate-600 text-[11px]">
+                            Saldo Anda telah dikembalikan ke Saldo Tersedia. Anda dapat memperbaiki data atau mengajukan permohonan penarikan kembali.
+                          </p>
+                          <button
+                            onClick={() => {
+                              setWithdrawForm({
+                                bank: rej.bank || "BCA",
+                                accountNumber: rej.account_number || "",
+                                accountHolder: rej.account_holder || user?.name || "",
+                                amount: String(Math.min(rej.amount, availableReferralBalance || rej.amount)),
+                              });
+                              setWithdrawSuccessMsg("");
+                              setWithdrawErrorMsg("");
+                              setShowWithdrawModal(true);
+                            }}
+                            className="mt-1 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+                          >
+                            <RefreshCw size={12} />
+                            <span>Ajukan Penarikan Ulang</span>
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {/* Table Riwayat Penarikan */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-4">Kode &amp; Waktu</th>
+                        <th className="py-3 px-4">Tujuan Rekening</th>
+                        <th className="py-3 px-4 text-right">Nominal (Rp)</th>
+                        <th className="py-3 px-4 text-center">Status</th>
+                        <th className="py-3 px-4">Catatan / Alasan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {referralWithdrawals.length > 0 ? (
+                        referralWithdrawals.map((w) => (
+                          <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
+                              <span className="text-[#007570] block">{w.code}</span>
+                              <span className="text-[11px] text-slate-400 font-normal font-sans block">{w.date}</span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-slate-900">{w.bank}</div>
+                              <div className="text-[11.5px] text-slate-600 font-mono">{w.account_number}</div>
+                              <div className="text-[11px] text-slate-500">an {w.account_holder}</div>
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-extrabold text-base text-slate-900 whitespace-nowrap">
+                              Rp {w.amount.toLocaleString("id-ID")}
+                            </td>
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              {w.status === "paid" && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
+                                  <CheckCircle size={12} /> Dana Ditransfer (Lunas)
+                                </span>
+                              )}
+                              {w.status === "approved" && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
+                                  <CheckCircle2 size={12} /> Disetujui (Siap Kirim)
+                                </span>
+                              )}
+                              {w.status === "pending" && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200">
+                                  <Clock size={12} /> Menunggu Verifikasi
+                                </span>
+                              )}
+                              {w.status === "rejected" && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200">
+                                  <X size={12} /> Ditolak
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 max-w-xs">
+                              {w.status === "rejected" && w.rejection_reason ? (
+                                <div className="text-xs text-rose-700 bg-rose-50/60 p-2 rounded-lg border border-rose-200">
+                                  <span className="font-bold block text-[10.5px] uppercase">Alasan Penolakan:</span>
+                                  <span className="leading-relaxed">{w.rejection_reason}</span>
+                                </div>
+                              ) : w.status === "paid" && w.processed_at ? (
+                                <span className="text-slate-500 text-[11px]">
+                                  Ditransfer pada: <strong>{w.processed_at}</strong>
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-500 space-y-1">
+                            <p className="font-semibold text-xs text-slate-700">Belum ada riwayat penarikan saldo.</p>
+                            <p className="text-[11px] text-slate-400">
+                              Ketika Anda melakukan penarikan komisi referral, status dan bukti pemrosesan akan tampil di sini.
                             </p>
                           </td>
                         </tr>
@@ -4551,94 +5173,101 @@ export default function AdminUser() {
                 <Crown size={32} className="text-[#f59e0b] shrink-0" />
                 <div>
                   <h2 className="text-[18px] font-bold text-[#0f172a]">Upgrade Usaha ke Premium</h2>
-                  <p className="text-[13px] text-[#64748b]">Tingkatkan visibilitas, jangkauan pelanggan, dan nikmati fitur eksklusif untuk usaha Anda</p>
+                  <p className="text-[13px] text-[#64748b]">Pilih profil usaha Anda dan paket premium untuk membuka fitur peta lokasi, galeri, dan badge prioritas.</p>
                 </div>
               </div>
 
-              {/* Multi-Step Indicator (Step 1 to 4) */}
-              {premiumStep < 5 && (
-                <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[16px_20px] shadow-sm overflow-x-auto">
-                  <div className="flex items-center justify-between min-w-[560px] gap-[10px]">
-                    {[
-                      { stepNum: 1, label: "1. Pilih Paket & Usaha", icon: Crown },
-                      { stepNum: 2, label: "2. Ringkasan & Promo", icon: FileText },
-                      { stepNum: 3, label: "3. Metode Bayar", icon: CreditCard },
-                      { stepNum: 4, label: "4. Upload Bukti", icon: Upload },
-                    ].map((s, idx) => {
-                      const Icon = s.icon;
-                      const isActive = premiumStep === s.stepNum;
-                      const isCompleted = premiumStep > s.stepNum;
-                      return (
-                        <div key={s.stepNum} className="flex items-center gap-[10px] flex-1 last:flex-initial">
-                          <div className="flex items-center gap-[8px]">
-                            <div
-                              className={`w-[32px] h-[32px] rounded-full flex items-center justify-center text-[13px] font-bold transition-all ${
-                                isCompleted
-                                  ? "bg-[#10b981] text-white"
-                                  : isActive
-                                  ? "bg-[#007570] text-white shadow-[0_0_0_3px_rgba(0,117,112,0.2)]"
-                                  : "bg-[#f1f5f9] text-[#94a3b8]"
-                              }`}
-                            >
-                              {isCompleted ? <Check size={16} /> : <Icon size={16} />}
+              <div className="flex flex-col gap-[20px]">
+                {/* Rejection Alert Banner for Selected Business */}
+                {(() => {
+                  const currentBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
+                  const currentBiz = (businesses || []).find(b => String(b.id) === String(currentBizId)) || businesses?.[0];
+                  const subs = currentBiz?.subscriptions || currentBiz?.raw?.subscriptions || [];
+                  const latestSub = subs[0];
+                  const latestPayment = latestSub?.payment;
+                  const isRejected = latestSub?.status === "rejected" || latestPayment?.status === "failed" || !!latestSub?.rejection_reason || !!latestPayment?.rejection_reason;
+                  const rejectionReason = latestSub?.rejection_reason || latestPayment?.rejection_reason;
+
+                  if (isRejected && rejectionReason) {
+                    return (
+                      <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle size={22} className="text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-200 text-rose-800 uppercase tracking-wider">
+                                Ditolak / Perlu Revisi
+                              </span>
+                              <span className="text-xs font-bold text-rose-900">
+                                Pengajuan Paket {latestSub?.plan?.name || "Premium"} Ditolak
+                              </span>
                             </div>
-                            <span
-                              className={`text-[12.5px] font-semibold whitespace-nowrap ${
-                                isActive ? "text-[#007570]" : isCompleted ? "text-[#0f172a]" : "text-[#94a3b8]"
-                              }`}
-                            >
-                              {s.label}
-                            </span>
+                            <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+                              <strong>Alasan Admin:</strong> {rejectionReason}
+                            </p>
                           </div>
-                          {idx < 3 && (
-                            <div
-                              className={`flex-1 h-[2px] mx-[6px] rounded-full transition-all ${
-                                isCompleted ? "bg-[#10b981]" : "bg-[#e2e8f0]"
-                              }`}
-                            />
-                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 1: PILIH USAHA & PAKET PREMIUM ── */}
-              {premiumStep === 1 && (
-                <div className="flex flex-col gap-[20px]">
-                  {/* Business Selector Card */}
-                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[16px]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-[13px] font-bold text-[#0f172a] uppercase tracking-[0.4px]">
-                          1. Pilih Usaha Yang Ingin Di-Upgrade *
-                        </label>
-                        <p className="text-[12px] text-[#64748b] mt-[2px]">Pilih salah satu profil usaha terdaftar milik Anda yang ingin ditingkatkan statusnya</p>
-                      </div>
-                    </div>
-
-                    {businesses && businesses.length > 0 ? (
-                      <div className="flex flex-col gap-[12px]">
-                        <select
-                          value={selectedUpgradeBusiness || (businesses[0]?.id || "")}
-                          onChange={(e) => setSelectedUpgradeBusiness(e.target.value)}
-                          className="w-full px-[16px] py-[12px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[12px] text-[14px] font-semibold text-[#0f172a] outline-none focus:border-[#007570] focus:bg-white transition-all cursor-pointer"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigate(`/add-business/${currentBizId}?upgrade=true`);
+                          }}
+                          className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-sm cursor-pointer flex items-center gap-1.5 border-0"
                         >
-                          {(businesses || []).map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {b.name} ({getCategoryDisplayName(b.category)}) — {b.city || "Lokasi"} {b.is_premium ? "⭐ [Sudah Premium]" : ""}
-                            </option>
-                          ))}
-                        </select>
+                          <span>Perbaiki di Form Upgrade</span>
+                          <ChevronRight size={15} />
+                        </button>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
-                        {/* Selected Business Preview Card */}
-                        {(() => {
-                          const currentBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
-                          const currentBiz = (businesses || []).find(b => String(b.id) === String(currentBizId)) || businesses?.[0];
-                          if (!currentBiz) return null;
+                {/* Business Selector Card */}
+                <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[16px]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-[13px] font-bold text-[#0f172a] uppercase tracking-[0.4px]">
+                        1. Pilih Usaha Yang Ingin Di-Upgrade *
+                      </label>
+                      <p className="text-[12px] text-[#64748b] mt-[2px]">Pilih salah satu profil usaha terdaftar milik Anda yang ingin ditingkatkan statusnya</p>
+                    </div>
+                  </div>
+
+                  {businesses && businesses.length > 0 ? (
+                    <div className="flex flex-col gap-[12px]">
+                      <select
+                        value={selectedUpgradeBusiness || (businesses[0]?.id || "")}
+                        onChange={(e) => setSelectedUpgradeBusiness(e.target.value)}
+                        className="w-full px-[16px] py-[12px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[12px] text-[14px] font-semibold text-[#0f172a] outline-none focus:border-[#007570] focus:bg-white transition-all cursor-pointer"
+                      >
+                        {(businesses || []).map((b) => {
+                          const subs = b.subscriptions || b.raw?.subscriptions || [];
+                          const latestSub = subs[0];
+                          const isPending = b.has_pending_subscription || (latestSub?.status === "pending" && latestSub?.payment?.status === "pending");
+                          const isPrem = b.is_premium;
 
                           return (
+                            <option key={b.id} value={b.id}>
+                              {b.name} ({getCategoryDisplayName(b.category)}) — {b.city || "Lokasi"} {isPrem ? "⭐ [Sudah Premium Aktif]" : isPending ? "⏳ [Sedang Diproses Admin]" : "[Paket Free / Reguler]"}
+                            </option>
+                          );
+                        })}
+                      </select>
+
+                      {/* Selected Business Status & Notification Banner */}
+                      {(() => {
+                        const currentBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
+                        const currentBiz = (businesses || []).find(b => String(b.id) === String(currentBizId)) || businesses?.[0];
+                        if (!currentBiz) return null;
+
+                        const subs = currentBiz?.subscriptions || currentBiz?.raw?.subscriptions || [];
+                        const latestSub = subs[0];
+                        const isPendingSub = currentBiz.has_pending_subscription || (latestSub?.status === "pending" && latestSub?.payment?.status === "pending");
+                        const isPrem = currentBiz.is_premium;
+
+                        return (
+                          <div className="flex flex-col gap-3">
                             <div className="flex items-center justify-between p-[14px_16px] rounded-[12px] bg-[#f8fafc] border border-[#e2e8f0]">
                               <div className="flex items-center gap-[12px]">
                                 <img
@@ -4657,9 +5286,13 @@ export default function AdminUser() {
                                 </div>
                               </div>
                               <div>
-                                {currentBiz.is_premium ? (
+                                {isPrem ? (
                                   <span className="px-[10px] py-[4px] bg-[#fef3c7] text-[#b45309] rounded-full text-[11.5px] font-bold flex items-center gap-[4px]">
                                     ⭐ Premium Aktif
+                                  </span>
+                                ) : isPendingSub ? (
+                                  <span className="px-[10px] py-[4px] bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-[11.5px] font-bold flex items-center gap-[4px]">
+                                    ⏳ Verifikasi Sedang Diproses
                                   </span>
                                 ) : (
                                   <span className="px-[10px] py-[4px] bg-[#f1f5f9] text-[#64748b] rounded-full text-[11.5px] font-semibold">
@@ -4668,823 +5301,312 @@ export default function AdminUser() {
                                 )}
                               </div>
                             </div>
-                          );
-                        })()}
-                      </div>
-                    ) : (
-                      <div className="p-[16px] bg-[#fffbeb] border border-[#fef3c7] text-[#b45309] text-[13px] font-medium rounded-[12px] flex items-center gap-[10px]">
-                        <AlertCircle size={20} className="shrink-0" />
-                        <div>
-                          Anda belum memiliki usaha terdaftar. Silakan{" "}
-                          <button
-                            onClick={() => navigate("/add-business")}
-                            className="font-bold underline cursor-pointer text-[#b45309] hover:text-[#92400e]"
-                          >
-                            Daftarkan Usaha Baru
-                          </button>{" "}
-                          terlebih dahulu sebelum melakukan upgrade ke paket Premium.
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Dynamic Premium Plans Grid */}
-                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[16px]">
-                    <div>
-                      <label className="text-[13px] font-bold text-[#0f172a] uppercase tracking-[0.4px]">
-                        2. Pilih Paket Premium *
-                      </label>
-                      <p className="text-[12px] text-[#64748b] mt-[2px]">Pilih durasi dan fasilitas paket yang paling sesuai dengan kebutuhan usaha Anda</p>
-                    </div>
-
-                    {loadingPremiumPlans ? (
-                      <div className="flex flex-col items-center justify-center py-[48px] gap-[12px] text-[#64748b]">
-                        <Loader2 size={36} className="animate-spin text-[#007570]" />
-                        <p className="text-[13px] font-medium">Memuat paket premium terbaru...</p>
-                      </div>
-                    ) : premiumPlans.length > 0 ? (
-                      <div className={`grid grid-cols-1 ${premiumPlans.length === 1 ? 'max-w-[480px] mx-auto w-full' : premiumPlans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-[20px]`}>
-                        {premiumPlans.map((plan) => {
-                          const isFree = Number(plan.price) === 0;
-                          const isPopular = plan.priority_listing || plan.name.toLowerCase().includes("premium");
-                          const isSelected = selectedUpgradePlan?.id === plan.id;
-                          const formattedDuration = plan.formatted_duration || (
-                            plan.duration_value
-                              ? `${plan.duration_value} ${plan.duration_unit === 'day' || plan.duration_unit === 'hari' ? 'Hari' : plan.duration_unit === 'year' || plan.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`
-                              : "1 Bulan"
-                          );
-
-                          return (
-                            <div
-                              key={plan.id}
-                              onClick={() => {
-                                if (!isFree) setSelectedUpgradePlan(plan);
-                              }}
-                              className={`rounded-[20px] p-[24px] flex flex-col justify-between relative border-2 transition-all cursor-pointer overflow-hidden ${
-                                isFree
-                                  ? "bg-slate-50 border-slate-200"
-                                  : isSelected
-                                  ? "bg-gradient-to-b from-[#0c2b27] via-[#053733] to-[#021f1d] text-white border-amber-400 shadow-[0_12px_32px_rgba(0,117,112,0.35),0_0_24px_rgba(251,191,36,0.25)] -translate-y-1 ring-4 ring-amber-400/20"
-                                  : "bg-gradient-to-b from-[#0e3530] via-[#082e29] to-[#041d1a] text-white border-[#009990]/40 hover:border-amber-400/70 hover:shadow-[0_8px_24px_rgba(0,117,112,0.25)]"
-                              }`}
-                            >
-                              {!isFree && (
-                                <div className="absolute -top-16 -right-16 w-36 h-36 bg-gradient-to-br from-amber-400/20 to-[#00c48c]/30 rounded-full blur-2xl pointer-events-none" />
-                              )}
-
-                              <div>
-                                <div className="flex items-center justify-between gap-2 mb-3">
-                                  {isFree ? (
-                                    <span className="px-2.5 py-0.5 bg-slate-200 text-slate-700 font-bold text-[10.5px] rounded-full uppercase tracking-wider">
-                                      REGULER
+                            {/* Alert if already premium */}
+                            {isPrem && (
+                              <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl flex items-start gap-3 animate-fadeIn">
+                                <Crown size={22} className="text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-200 text-amber-900 uppercase tracking-wider">
+                                      Sudah Premium
                                     </span>
-                                  ) : (
-                                    <div className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-sm">
-                                      <span>REKOMENDASI</span>
-                                    </div>
-                                  )}
-
-                                  <div
-                                    className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all ${
-                                      isSelected
-                                        ? "border-amber-400 bg-amber-400 text-slate-950 font-bold"
-                                        : isFree
-                                        ? "border-slate-300 bg-white"
-                                        : "border-emerald-400/50 bg-emerald-950/40 text-emerald-300"
-                                    }`}
-                                  >
-                                    {isSelected && <Check size={13} strokeWidth={3} />}
+                                    <h4 className="text-xs font-bold text-amber-950">
+                                      Usaha "{currentBiz.name}" Sudah Memiliki Paket Premium Aktif
+                                    </h4>
                                   </div>
+                                  <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                                    Profil usaha ini sudah berstatus <strong>Premium Aktif</strong> dengan seluruh fitur lengkap. Anda tidak dapat melakukan upgrade ganda pada usaha yang sama. Silakan pilih usaha Anda yang lain di atas untuk di-upgrade.
+                                  </p>
                                 </div>
-
-                                <h3 className={`text-[17px] font-extrabold mb-1 ${isFree ? "text-[#0f172a]" : "text-white"}`}>{plan.name}</h3>
-
-                                <div className="flex items-baseline gap-1 my-2">
-                                  <span className={`text-[24px] font-black ${isFree ? "text-slate-700" : "text-white"}`}>
-                                    {isFree ? "Rp 0" : `Rp ${Number(plan.price).toLocaleString("id-ID")}`}
-                                  </span>
-                                  <span className={`text-[11.5px] font-semibold ${isFree ? "text-slate-400" : "text-emerald-200/80"}`}>
-                                    {isFree ? "selamanya" : `/ ${formattedDuration}`}
-                                  </span>
-                                </div>
-
-                                {plan.description && (
-                                  <p className={`text-[11.5px] mb-3 leading-relaxed ${isFree ? "text-slate-500" : "text-slate-300"}`}>{plan.description}</p>
-                                )}
-
-                                <ul className={`flex flex-col gap-[9px] my-[16px] pt-[14px] border-t ${isFree ? "border-slate-200 text-slate-700" : "border-white/15 text-slate-100"}`}>
-                                  <li className="flex items-center gap-[9px] text-[12px]">
-                                    {plan.can_add_map ? (
-                                      <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
-                                    ) : (
-                                      <X size={14} className="text-slate-400 shrink-0" />
-                                    )}
-                                    <span className={plan.can_add_map ? "font-medium" : "line-through opacity-60"}>Integrasi Google Maps</span>
-                                  </li>
-                                  <li className="flex items-center gap-[9px] text-[12px]">
-                                    {plan.can_add_gallery ? (
-                                      <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
-                                    ) : (
-                                      <X size={14} className="text-slate-400 shrink-0" />
-                                    )}
-                                    <span className={plan.can_add_gallery ? "font-medium" : "line-through opacity-60"}>Galeri Foto &amp; Video</span>
-                                  </li>
-                                  <li className="flex items-center gap-[9px] text-[12px]">
-                                    {plan.can_add_products !== false ? (
-                                      <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
-                                    ) : (
-                                      <X size={14} className="text-slate-400 shrink-0" />
-                                    )}
-                                    <span className={plan.can_add_products !== false ? "font-medium" : "line-through opacity-60"}>Katalog Produk &amp; Harga</span>
-                                  </li>
-                                  <li className="flex items-center gap-[9px] text-[12px]">
-                                    {plan.can_chat !== false ? (
-                                      <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
-                                    ) : (
-                                      <X size={14} className="text-slate-400 shrink-0" />
-                                    )}
-                                    <span className={plan.can_chat !== false ? "font-medium" : "line-through opacity-60"}>Akses Chat Langsung</span>
-                                  </li>
-                                  <li className="flex items-center gap-[9px] text-[12px]">
-                                    {plan.priority_listing ? (
-                                      <Check size={14} className="text-amber-400 shrink-0" />
-                                    ) : (
-                                      <X size={14} className="text-slate-400 shrink-0" />
-                                    )}
-                                    <span className={plan.priority_listing ? "text-amber-300 font-bold" : "line-through opacity-60"}>Badge Bisnis Terverifikasi &amp; Prioritas</span>
-                                  </li>
-                                </ul>
                               </div>
+                            )}
 
-                              {isFree ? (
-                                <button className="w-full py-[10px] rounded-[12px] bg-slate-200 text-slate-500 font-semibold text-[13px] cursor-not-allowed border-0" disabled>
-                                  Paket Reguler
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedUpgradePlan(plan);
-                                  }}
-                                  className={`w-full py-[11px] rounded-[12px] font-bold text-[13.5px] cursor-pointer border-0 transition-all flex items-center justify-center gap-1.5 ${
-                                    isSelected
-                                      ? "bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-md shadow-amber-400/30 font-black"
-                                      : "bg-[#00c48c] text-slate-950 font-extrabold hover:bg-[#00b074] shadow-md"
-                                  }`}
-                                >
-                                  <span>{isSelected ? "✓ Paket Terpilih" : "Pilih Paket Premium"}</span>
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[14px] p-[36px] text-center flex flex-col items-center gap-[10px]">
-                        <Crown size={36} className="text-[#94a3b8]" />
-                        <div className="text-[14px] font-bold text-[#0f172a]">Belum Ada Paket Premium Aktif</div>
-                        <p className="text-[12.5px] text-[#64748b] max-w-[360px]">
-                          Saat ini belum ada paket premium yang diaktifkan oleh admin. Silakan periksa kembali nanti.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Step 1 Action Bar */}
-                  <div className="flex items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm">
-                    <div className="text-[13px] text-[#64748b]">
-                      {selectedUpgradePlan ? (
-                        <span>
-                          Paket terpilih: <strong className="text-[#007570]">{selectedUpgradePlan.name}</strong> (Rp {Number(selectedUpgradePlan.price).toLocaleString("id-ID")})
-                        </span>
-                      ) : (
-                        <span>Pilih salah satu paket premium di atas untuk melanjutkan</span>
-                      )}
+                            {/* Alert if pending verification */}
+                            {isPendingSub && (
+                              <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-xl flex items-start gap-3 animate-fadeIn">
+                                <Clock size={22} className="text-blue-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-200 text-blue-900 uppercase tracking-wider">
+                                      Sedang Diverifikasi
+                                    </span>
+                                    <h4 className="text-xs font-bold text-blue-950">
+                                      Pengajuan Paket Premium untuk "{currentBiz.name}" Sedang Diproses
+                                    </h4>
+                                  </div>
+                                  <p className="text-xs text-blue-800 mt-1 leading-relaxed">
+                                    Bukti pembayaran untuk usaha ini sudah berhasil dikirim dan saat ini sedang menunggu antrean verifikasi Admin. Anda tidak perlu mengirim pembayaran atau upgrade ulang. Silakan pilih usaha Anda yang lain di atas jika ingin meng-upgrade usaha berbeda.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
-                    <button
-                      type="button"
-                      disabled={!selectedUpgradePlan || (businesses?.length || 0) === 0}
-                      onClick={() => {
-                        const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
-                        if (!targetBizId) {
-                          alert("Silakan daftarkan atau pilih usaha Anda terlebih dahulu.");
-                          return;
-                        }
-                        if (!selectedUpgradePlan) {
-                          alert("Silakan pilih salah satu paket premium terlebih dahulu.");
-                          return;
-                        }
-                        setUpgradeError("");
-                        setPremiumStep(2);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="px-[24px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0"
-                    >
-                      <span>Lanjut ke Ringkasan Pesanan</span>
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 2: RINGKASAN PESANAN & PROMO (KUPON / REFERRAL) ── */}
-              {premiumStep === 2 && (
-                <div className="flex flex-col gap-[20px]">
-                  {/* Summary of Chosen Business & Plan */}
-                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[16px]">
-                    <h3 className="text-[15px] font-bold text-[#0f172a] border-b border-[#f1f5f9] pb-[12px]">
-                      Ringkasan Pemesanan Upgrade
-                    </h3>
-
-                    {(() => {
-                      const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
-                      const bizObj = (businesses || []).find(b => String(b.id) === String(targetBizId)) || businesses?.[0];
-                      const formattedDuration = selectedUpgradePlan?.formatted_duration || (
-                        selectedUpgradePlan?.duration_value
-                          ? `${selectedUpgradePlan.duration_value} ${selectedUpgradePlan.duration_unit === 'day' || selectedUpgradePlan.duration_unit === 'hari' ? 'Hari' : selectedUpgradePlan.duration_unit === 'year' || selectedUpgradePlan.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`
-                          : "1 Bulan"
-                      );
-
-                      return (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
-                          <div className="p-[16px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[12px] flex items-center gap-[14px]">
-                            <img
-                              src={bizObj?.logo ? getStorageUrl(bizObj.logo) : DEFAULT_AVATAR}
-                              alt={bizObj?.name || "Bisnis"}
-                              className="w-[48px] h-[48px] rounded-[10px] object-cover border border-[#e2e8f0]"
-                            />
-                            <div>
-                              <span className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Usaha Yang Di-Upgrade</span>
-                              <h4 className="text-[15px] font-bold text-[#0f172a]">{bizObj?.name || "Usaha Anda"}</h4>
-                              <p className="text-[12px] text-[#64748b]">{getCategoryDisplayName(bizObj?.category)} • {bizObj?.city || "Indonesia"}</p>
-                            </div>
-                          </div>
-
-                          <div className="p-[16px] bg-[#f0fdfa] border border-[#ccfbf1] rounded-[12px] flex items-center justify-between">
-                            <div>
-                              <span className="text-[11px] font-bold text-[#007570] uppercase tracking-wider">Paket Premium Pilihan</span>
-                              <h4 className="text-[15px] font-bold text-[#0f172a]">{selectedUpgradePlan?.name}</h4>
-                              <p className="text-[12px] text-[#64748b]">Masa Aktif: {formattedDuration}</p>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[11px] text-[#64748b]">Harga Normal</span>
-                              <div className="text-[16px] font-bold text-[#007570]">
-                                Rp {Number(selectedUpgradePlan?.price || 0).toLocaleString("id-ID")}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Promo & Discounts Section: Coupon & Referral */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[20px]">
-                    {/* Kupon Diskon Card */}
-                    <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[20px] shadow-sm flex flex-col justify-between gap-[12px]">
+                  ) : (
+                    <div className="p-[16px] bg-[#fffbeb] border border-[#fef3c7] text-[#b45309] text-[13px] font-medium rounded-[12px] flex items-center gap-[10px]">
+                      <AlertCircle size={20} className="shrink-0" />
                       <div>
-                        <div className="flex items-center gap-[8px] mb-[4px]">
-                          <Gift size={18} className="text-[#007570]" />
-                          <label className="text-[13px] font-bold text-[#0f172a]">Kupon Diskon (Opsional)</label>
-                        </div>
-                        <p className="text-[12px] text-[#64748b] mb-[12px]">Masukkan kode kupon promosi jika Anda memilikinya</p>
-
-                        {!appliedUpgradeCoupon ? (
-                          <div className="flex gap-[8px]">
-                            <input
-                              type="text"
-                              value={upgradeCouponInput}
-                              onChange={(e) => setUpgradeCouponInput(e.target.value.toUpperCase())}
-                              placeholder="CONTOH: PROMO50"
-                              className="flex-1 px-[14px] py-[10px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] text-[13px] font-bold text-[#0f172a] uppercase outline-none focus:border-[#007570] focus:bg-white transition-all placeholder:font-normal placeholder:normal-case"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleApplyUpgradeCoupon}
-                              disabled={upgradeCouponLoading || !upgradeCouponInput.trim()}
-                              className="px-[16px] py-[10px] bg-[#007570] text-white text-[13px] font-bold rounded-[10px] transition-all hover:bg-[#005a58] disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0 cursor-pointer flex items-center gap-[6px]"
-                            >
-                              {upgradeCouponLoading ? <Loader2 size={16} className="animate-spin" /> : "Terapkan"}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between p-[10px_14px] bg-[#f0fdf4] border border-[#bbf7d0] rounded-[10px]">
-                            <div className="flex items-center gap-[8px]">
-                              <CheckCircle2 size={18} className="text-[#10b981]" />
-                              <div>
-                                <span className="text-[12px] font-bold text-[#15803d]">Kupon: {appliedUpgradeCoupon.code}</span>
-                                <p className="text-[11px] text-[#16a34a]">
-                                  Potongan: Rp {Number(appliedUpgradeCoupon.discount_amount || 0).toLocaleString("id-ID")}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleRemoveUpgradeCoupon}
-                              className="text-[11.5px] font-bold text-[#ef4444] hover:underline cursor-pointer bg-transparent border-0"
-                            >
-                              Hapus
-                            </button>
-                          </div>
-                        )}
-
-                        {upgradeCouponError && (
-                          <p className="text-[11.5px] font-medium text-[#ef4444] mt-[6px] flex items-center gap-[4px]">
-                            <AlertCircle size={14} /> {upgradeCouponError}
-                          </p>
-                        )}
-                        {upgradeCouponSuccessMsg && !appliedUpgradeCoupon && (
-                          <p className="text-[11.5px] font-medium text-[#10b981] mt-[6px] flex items-center gap-[4px]">
-                            <CheckCircle2 size={14} /> {upgradeCouponSuccessMsg}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Kode Referral (Eksklusif Diskon 5%) */}
-                    <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[20px] shadow-sm flex flex-col justify-between gap-[12px]">
-                      <div>
-                        <div className="flex items-center gap-[8px] mb-[4px]">
-                          <Share2 size={18} className="text-[#007570]" />
-                          <label className="text-[13px] font-bold text-[#0f172a]">Kode Referral (Diskon 5%)</label>
-                        </div>
-                        <p className="text-[12px] text-[#64748b] mb-[12px]">Gunakan kode referral rekan bisnis untuk diskon langsung 5%</p>
-
-                        {!appliedUpgradeReferral ? (
-                          <div className="flex gap-[8px]">
-                            <input
-                              type="text"
-                              value={upgradeReferralInput}
-                              onChange={(e) => setUpgradeReferralInput(e.target.value.toUpperCase())}
-                              placeholder="CONTOH: REF12345"
-                              className="flex-1 px-[14px] py-[10px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] text-[13px] font-bold text-[#0f172a] uppercase outline-none focus:border-[#007570] focus:bg-white transition-all placeholder:font-normal placeholder:normal-case"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleApplyUpgradeReferral}
-                              disabled={upgradeReferralLoading || !upgradeReferralInput.trim()}
-                              className="px-[16px] py-[10px] bg-[#007570] text-white text-[13px] font-bold rounded-[10px] transition-all hover:bg-[#005a58] disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0 cursor-pointer flex items-center gap-[6px]"
-                            >
-                              {upgradeReferralLoading ? <Loader2 size={16} className="animate-spin" /> : "Terapkan"}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between p-[10px_14px] bg-[#f0fdf4] border border-[#bbf7d0] rounded-[10px]">
-                            <div className="flex items-center gap-[8px]">
-                              <CheckCircle2 size={18} className="text-[#10b981]" />
-                              <div>
-                                <span className="text-[12px] font-bold text-[#15803d]">Referral: {appliedUpgradeReferral.referral_code}</span>
-                                <p className="text-[11px] text-[#16a34a]">
-                                  Diskon 5%: Rp {Number(appliedUpgradeReferral.discount_amount || Math.round(Number(selectedUpgradePlan?.price || 0) * 0.05)).toLocaleString("id-ID")}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleRemoveUpgradeReferral}
-                              className="text-[11.5px] font-bold text-[#ef4444] hover:underline cursor-pointer bg-transparent border-0"
-                            >
-                              Hapus
-                            </button>
-                          </div>
-                        )}
-
-                        {upgradeReferralError && (
-                          <p className="text-[11.5px] font-medium text-[#ef4444] mt-[6px] flex items-center gap-[4px]">
-                            <AlertCircle size={14} /> {upgradeReferralError}
-                          </p>
-                        )}
-                        {upgradeReferralSuccessMsg && !appliedUpgradeReferral && (
-                          <p className="text-[11.5px] font-medium text-[#10b981] mt-[6px] flex items-center gap-[4px]">
-                            <CheckCircle2 size={14} /> {upgradeReferralSuccessMsg}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Breakdown Card */}
-                  {(() => {
-                    const { basePrice, couponDiscount, referralDiscount, finalPrice } = calculateUpgradePrice();
-
-                    return (
-                      <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[14px]">
-                        <h4 className="text-[14px] font-bold text-[#0f172a] border-b border-[#f1f5f9] pb-[10px]">
-                          Rincian Perhitungan Pembayaran
-                        </h4>
-
-                        <div className="flex flex-col gap-[8px] text-[13.5px]">
-                          <div className="flex items-center justify-between text-[#64748b]">
-                            <span>Harga Normal Paket ({selectedUpgradePlan?.name})</span>
-                            <span className="font-semibold text-[#0f172a]">Rp {basePrice.toLocaleString("id-ID")}</span>
-                          </div>
-
-                          {couponDiscount > 0 && (
-                            <div className="flex items-center justify-between text-[#10b981]">
-                              <span>Potongan Kupon ({appliedUpgradeCoupon?.code})</span>
-                              <span className="font-bold">- Rp {couponDiscount.toLocaleString("id-ID")}</span>
-                            </div>
-                          )}
-
-                          {referralDiscount > 0 && (
-                            <div className="flex items-center justify-between text-[#10b981]">
-                              <span>Diskon Referral 5% ({appliedUpgradeReferral?.referral_code})</span>
-                              <span className="font-bold">- Rp {referralDiscount.toLocaleString("id-ID")}</span>
-                            </div>
-                          )}
-
-                          <div className="h-[1px] bg-[#e2e8f0] my-[6px]" />
-
-                          <div className="flex items-center justify-between text-[16px]">
-                            <span className="font-bold text-[#0f172a]">Total Tagihan Akhir</span>
-                            <span className="text-[22px] font-extrabold text-[#007570]">
-                              Rp {finalPrice.toLocaleString("id-ID")}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Step 2 Actions */}
-                  <div className="flex items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPremiumStep(1);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="px-[20px] py-[12px] rounded-[12px] border border-[#cbd5e1] bg-white text-[#0f172a] font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#f8fafc]"
-                    >
-                      <ChevronLeft size={18} />
-                      <span>Kembali</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPremiumStep(3);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="px-[24px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md border-0"
-                    >
-                      <span>Lanjut ke Metode Pembayaran</span>
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 3: METODE PEMBAYARAN & REKENING TUJUAN ── */}
-              {premiumStep === 3 && (
-                <div className="flex flex-col gap-[20px]">
-                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[18px]">
-                    <div>
-                      <h3 className="text-[16px] font-bold text-[#0f172a]">Pilih Metode Pembayaran</h3>
-                      <p className="text-[12.5px] text-[#64748b] mt-[2px]">Silakan pilih saluran transfer bank atau e-wallet tujuan transfer pembayaran Anda</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[24px]">
-                      {UPGRADE_PAYMENT_METHODS.map((cat) => (
-                        <div key={cat.category} className="flex flex-col gap-[12px]">
-                          <span className="text-[12px] font-bold text-[#64748b] uppercase tracking-wider">
-                            {cat.category}
-                          </span>
-                          <div className="flex flex-col gap-[10px]">
-                            {cat.items.map((item) => {
-                              const isSelected = upgradePaymentMethod === item.id;
-                              return (
-                                <div
-                                  key={item.id}
-                                  onClick={() => setUpgradePaymentMethod(item.id)}
-                                  className={`p-[14px_16px] rounded-[12px] border-2 cursor-pointer transition-all flex items-center justify-between ${
-                                    isSelected
-                                      ? "border-[#007570] bg-[#f0fdfa] shadow-sm"
-                                      : "border-[#e2e8f0] bg-white hover:border-[#cbd5e1]"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-[12px]">
-                                    <div className={`px-[10px] py-[4px] rounded-[6px] font-bold text-[12px] ${item.badgeColor}`}>
-                                      {item.name}
-                                    </div>
-                                    <span className="text-[13px] font-semibold text-[#0f172a]">{item.accountName}</span>
-                                  </div>
-                                  <div
-                                    className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center ${
-                                      isSelected
-                                        ? "border-[#007570] bg-[#007570] text-white"
-                                        : "border-[#cbd5e1] bg-white"
-                                    }`}
-                                  >
-                                    {isSelected && <Check size={12} strokeWidth={3} />}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Destination Account Details Box */}
-                  {(() => {
-                    let selectedAcc = null;
-                    for (const cat of UPGRADE_PAYMENT_METHODS) {
-                      const found = cat.items.find(i => i.id === upgradePaymentMethod);
-                      if (found) {
-                        selectedAcc = found;
-                        break;
-                      }
-                    }
-                    if (!selectedAcc) selectedAcc = UPGRADE_PAYMENT_METHODS[0].items[0];
-
-                    const { finalPrice } = calculateUpgradePrice();
-
-                    return (
-                      <div className="bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white rounded-[16px] p-[24px] shadow-md flex flex-col gap-[16px]">
-                        <div className="flex items-center justify-between border-b border-slate-700 pb-[12px]">
-                          <div className="flex items-center gap-[10px]">
-                            <CreditCard size={22} className="text-[#5eead4]" />
-                            <span className="text-[14px] font-bold">Rekening / E-Wallet Tujuan Transfer</span>
-                          </div>
-                          <span className="px-[10px] py-[3px] rounded-full text-[11px] font-bold bg-[#007570] text-white">
-                            {selectedAcc.name}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
-                          <div>
-                            <span className="text-[12px] text-slate-400">Nomor Rekening / No VA:</span>
-                            <div className="text-[20px] font-mono font-bold tracking-wider text-[#5eead4] mt-[4px]">
-                              {selectedAcc.accountNumber}
-                            </div>
-                            <span className="text-[12px] text-slate-400 mt-[2px] block">
-                              Atas Nama: <strong className="text-white">{selectedAcc.accountName}</strong>
-                            </span>
-                          </div>
-
-                          <div className="sm:text-right flex flex-col sm:items-end justify-center">
-                            <span className="text-[12px] text-slate-400">Total Yang Harus Ditransfer:</span>
-                            <div className="text-[24px] font-extrabold text-white mt-[2px]">
-                              Rp {finalPrice.toLocaleString("id-ID")}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-[10px] border-t border-slate-700/80">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(selectedAcc.accountNumber.replace(/-/g, ''));
-                              setCopiedUpgradeAccount(true);
-                              setTimeout(() => setCopiedUpgradeAccount(false), 3000);
-                            }}
-                            className="px-[16px] py-[8px] rounded-[8px] bg-slate-800 hover:bg-slate-700 text-[#5eead4] text-[12.5px] font-bold flex items-center gap-[6px] border border-slate-600 transition-all cursor-pointer"
-                          >
-                            {copiedUpgradeAccount ? <Check size={14} /> : <Copy size={14} />}
-                            <span>{copiedUpgradeAccount ? "Nomor Tersalin!" : "Salin No Rekening"}</span>
-                          </button>
-
-                          <span className="text-[11.5px] text-slate-400">
-                            Simpan bukti transfer untuk di-upload di langkah berikutnya
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Step 3 Actions */}
-                  <div className="flex items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPremiumStep(2);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="px-[20px] py-[12px] rounded-[12px] border border-[#cbd5e1] bg-white text-[#0f172a] font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#f8fafc]"
-                    >
-                      <ChevronLeft size={18} />
-                      <span>Kembali ke Ringkasan</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPremiumStep(4);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="px-[24px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md border-0"
-                    >
-                      <span>Lanjut Upload Bukti Transfer</span>
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 4: UPLOAD BUKTI PEMBAYARAN & KONFIRMASI ── */}
-              {premiumStep === 4 && (
-                <div className="flex flex-col gap-[20px]">
-                  <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[18px]">
-                    <div>
-                      <h3 className="text-[16px] font-bold text-[#0f172a]">Unggah Bukti Pembayaran</h3>
-                      <p className="text-[12.5px] text-[#64748b] mt-[2px]">
-                        Unggah struk / tangkapan layar bukti transfer pembayaran Anda untuk diverifikasi oleh admin
-                      </p>
-                    </div>
-
-                    {/* Upload Box */}
-                    <div className="flex flex-col gap-[12px]">
-                      <input
-                        type="file"
-                        ref={upgradeProofInputRef}
-                        onChange={handleUpgradeProofChange}
-                        accept="image/jpeg,image/png,image/jpg,image/webp"
-                        className="hidden"
-                      />
-
-                      {!upgradeProofPreview ? (
-                        <div
-                          onClick={() => upgradeProofInputRef.current?.click()}
-                          className="border-2 border-dashed border-[#cbd5e1] hover:border-[#007570] bg-[#f8fafc] hover:bg-[#f0fdfa]/30 rounded-[14px] p-[36px] text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-[10px]"
+                        Anda belum memiliki usaha terdaftar. Silakan{" "}
+                        <button
+                          onClick={() => navigate("/add-business")}
+                          className="font-bold underline cursor-pointer text-[#b45309] hover:text-[#92400e]"
                         >
-                          <div className="w-[48px] h-[48px] rounded-full bg-[#f0fdfa] text-[#007570] flex items-center justify-center">
-                            <Upload size={24} />
-                          </div>
-                          <div>
-                            <span className="text-[14px] font-bold text-[#0f172a]">Klik untuk memilih file bukti transfer</span>
-                            <p className="text-[12px] text-[#64748b] mt-[2px]">Format: JPG, PNG, WEBP (Maksimal 10MB)</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-[16px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[14px] flex items-center justify-between gap-[16px]">
-                          <div className="flex items-center gap-[14px] overflow-hidden">
-                            <img
-                              src={upgradeProofPreview}
-                              alt="Bukti Transfer"
-                              className="w-[72px] h-[72px] rounded-[10px] object-cover border border-[#cbd5e1] shrink-0"
-                            />
-                            <div className="overflow-hidden">
-                              <span className="text-[13px] font-bold text-[#0f172a] block truncate">
-                                {upgradeProofFile?.name || "Bukti Transfer Terpilih"}
-                              </span>
-                              <span className="text-[11.5px] text-[#10b981] font-semibold flex items-center gap-[4px] mt-[2px]">
-                                <CheckCircle2 size={13} /> Siap diunggah ({(upgradeProofFile?.size / 1024).toFixed(1)} KB)
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-[8px] shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => upgradeProofInputRef.current?.click()}
-                              className="px-[12px] py-[8px] bg-white border border-[#cbd5e1] text-[#0f172a] rounded-[8px] text-[12px] font-bold hover:bg-[#f1f5f9] cursor-pointer"
-                            >
-                              Ganti
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleRemoveUpgradeProof}
-                              className="px-[12px] py-[8px] bg-[#fee2e2] text-[#ef4444] rounded-[8px] text-[12px] font-bold hover:bg-[#fecaca] cursor-pointer border-0"
-                            >
-                              Hapus
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {upgradeError && (
-                        <div className="p-[12px_16px] bg-[#fef2f2] border border-[#fecaca] text-[#dc2626] rounded-[10px] text-[12.5px] font-medium flex items-center gap-[8px]">
-                          <AlertCircle size={16} className="shrink-0" />
-                          <span>{upgradeError}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Final Recap Box */}
-                    {(() => {
-                      const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
-                      const bizObj = (businesses || []).find(b => String(b.id) === String(targetBizId)) || businesses?.[0];
-                      const { finalPrice } = calculateUpgradePrice();
-
-                      return (
-                        <div className="p-[16px] bg-[#f0fdfa] border border-[#ccfbf1] rounded-[12px] flex items-center justify-between text-[13.5px]">
-                          <div>
-                            <span className="text-[11px] font-bold text-[#007570] uppercase tracking-wider">Ringkasan Pengajuan</span>
-                            <div className="font-bold text-[#0f172a] mt-[2px]">
-                              {bizObj?.name} ➔ Paket {selectedUpgradePlan?.name} ({upgradePaymentMethod})
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[11px] text-[#64748b]">Total Pembayaran</span>
-                            <div className="text-[18px] font-extrabold text-[#007570]">
-                              Rp {finalPrice.toLocaleString("id-ID")}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Step 4 Actions */}
-                  <div className="flex items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm">
-                    <button
-                      type="button"
-                      disabled={submittingUpgrade}
-                      onClick={() => {
-                        setPremiumStep(3);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="px-[20px] py-[12px] rounded-[12px] border border-[#cbd5e1] bg-white text-[#0f172a] font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#f8fafc] disabled:opacity-50"
-                    >
-                      <ChevronLeft size={18} />
-                      <span>Kembali ke Metode Bayar</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={submittingUpgrade || !upgradeProofFile}
-                      onClick={handleSubmitUpgrade}
-                      className="px-[28px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0"
-                    >
-                      {submittingUpgrade ? (
-                        <>
-                          <Loader2 size={18} className="animate-spin" />
-                          <span>Mengirim Bukti...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck size={18} />
-                          <span>Kirim Bukti Pembayaran & Selesaikan</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 5: KONFIRMASI BERHASIL DIAJUKAN ── */}
-              {premiumStep === 5 && (
-                <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[36px_24px] shadow-sm text-center flex flex-col items-center gap-[20px]">
-                  <div className="w-[72px] h-[72px] rounded-full bg-[#f0fdf4] text-[#10b981] flex items-center justify-center shadow-inner">
-                    <CheckCircle2 size={44} />
-                  </div>
-
-                  <div className="max-w-[500px]">
-                    <h3 className="text-[20px] font-bold text-[#0f172a]">Permohonan Upgrade Berhasil Diajukan!</h3>
-                    <p className="text-[13px] text-[#64748b] mt-[6px] leading-relaxed">
-                      Bukti pembayaran paket Premium untuk usaha <strong>"{upgradeSuccessData?.businessName}"</strong> telah kami terima. Admin kami akan memverifikasi pembayaran Anda dalam waktu 1x24 jam.
-                    </p>
-                  </div>
-
-                  {upgradeSuccessData && (
-                    <div className="w-full max-w-[460px] p-[18px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[12px] text-left flex flex-col gap-[8px] text-[13px]">
-                      <div className="flex justify-between text-[#64748b]">
-                        <span>Nama Usaha:</span>
-                        <strong className="text-[#0f172a]">{upgradeSuccessData.businessName}</strong>
-                      </div>
-                      <div className="flex justify-between text-[#64748b]">
-                        <span>Paket Dipilih:</span>
-                        <strong className="text-[#007570]">{upgradeSuccessData.planName}</strong>
-                      </div>
-                      <div className="flex justify-between text-[#64748b]">
-                        <span>Metode Pembayaran:</span>
-                        <strong className="text-[#0f172a]">{upgradeSuccessData.paymentMethod}</strong>
-                      </div>
-                      <div className="flex justify-between text-[#64748b]">
-                        <span>Total Pembayaran:</span>
-                        <strong className="text-[#007570] font-bold">Rp {Number(upgradeSuccessData.finalPrice).toLocaleString("id-ID")}</strong>
-                      </div>
-                      <div className="flex justify-between text-[#64748b] pt-[6px] border-t border-[#e2e8f0]">
-                        <span>Waktu Pengajuan:</span>
-                        <span>{upgradeSuccessData.submittedAt}</span>
+                          Daftarkan Usaha Baru
+                        </button>{" "}
+                        terlebih dahulu sebelum melakukan upgrade ke paket Premium.
                       </div>
                     </div>
                   )}
-
-                  <div className="flex items-center gap-[12px] flex-wrap justify-center mt-[8px]">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab("bisnis");
-                        handleResetUpgrade();
-                      }}
-                      className="px-[20px] py-[11px] rounded-[10px] bg-[#007570] text-white font-bold text-[13.5px] cursor-pointer hover:bg-[#005a58] transition-all border-0"
-                    >
-                      Lihat Daftar Usaha Saya
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetUpgrade}
-                      className="px-[20px] py-[11px] rounded-[10px] bg-[#f1f5f9] text-[#0f172a] font-bold text-[13.5px] cursor-pointer hover:bg-[#e2e8f0] transition-all border-0"
-                    >
-                      Upgrade Usaha Lainnya
-                    </button>
-                  </div>
                 </div>
-              )}
+
+                {/* Dynamic Premium Plans Grid */}
+                <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[24px] shadow-sm flex flex-col gap-[16px]">
+                  <div>
+                    <label className="text-[13px] font-bold text-[#0f172a] uppercase tracking-[0.4px]">
+                      2. Pilih Paket Premium *
+                    </label>
+                    <p className="text-[12px] text-[#64748b] mt-[2px]">Pilih durasi dan fasilitas paket yang paling sesuai dengan kebutuhan usaha Anda</p>
+                  </div>
+
+                  {loadingPremiumPlans ? (
+                    <div className="flex flex-col items-center justify-center py-[48px] gap-[12px] text-[#64748b]">
+                      <Loader2 size={36} className="animate-spin text-[#007570]" />
+                      <p className="text-[13px] font-medium">Memuat paket premium terbaru...</p>
+                    </div>
+                  ) : premiumPlans.length > 0 ? (
+                    <div className={`grid grid-cols-1 ${premiumPlans.length === 1 ? 'max-w-[480px] mx-auto w-full' : premiumPlans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-[20px]`}>
+                      {premiumPlans.map((plan) => {
+                        const isFree = Number(plan.price) === 0;
+                        const isSelected = selectedUpgradePlan?.id === plan.id;
+                        const formattedDuration = plan.formatted_duration || (
+                          plan.duration_value
+                            ? `${plan.duration_value} ${plan.duration_unit === 'day' || plan.duration_unit === 'hari' ? 'Hari' : plan.duration_unit === 'year' || plan.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`
+                            : "1 Bulan"
+                        );
+
+                        const currentBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
+                        const currentBiz = (businesses || []).find(b => String(b.id) === String(currentBizId)) || businesses?.[0];
+                        const subs = currentBiz?.subscriptions || currentBiz?.raw?.subscriptions || [];
+                        const latestSub = subs[0];
+                        const isCurrentBizPending = currentBiz?.has_pending_subscription || (latestSub?.status === "pending" && latestSub?.payment?.status === "pending");
+                        const isCurrentBizPrem = Boolean(currentBiz?.is_premium);
+                        const isBlocked = isCurrentBizPrem || isCurrentBizPending;
+
+                        return (
+                          <div
+                            key={plan.id}
+                            onClick={() => {
+                              if (!isFree) setSelectedUpgradePlan(plan);
+                            }}
+                            className={`rounded-[20px] p-[24px] flex flex-col justify-between relative border-2 transition-all cursor-pointer overflow-hidden ${
+                              isFree
+                                ? "bg-slate-50 border-slate-200"
+                                : isSelected
+                                ? "bg-gradient-to-b from-[#0c2b27] via-[#053733] to-[#021f1d] text-white border-amber-400 shadow-[0_12px_32px_rgba(0,117,112,0.35),0_0_24px_rgba(251,191,36,0.25)] -translate-y-1 ring-4 ring-amber-400/20"
+                                : "bg-gradient-to-b from-[#0e3530] via-[#082e29] to-[#041d1a] text-white border-[#009990]/40 hover:border-amber-400/70 hover:shadow-[0_8px_24px_rgba(0,117,112,0.25)]"
+                            }`}
+                          >
+                            {!isFree && (
+                              <div className="absolute -top-16 -right-16 w-36 h-36 bg-gradient-to-br from-amber-400/20 to-[#00c48c]/30 rounded-full blur-2xl pointer-events-none" />
+                            )}
+
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-3">
+                                {isFree ? (
+                                  <span className="px-2.5 py-0.5 bg-slate-200 text-slate-700 font-bold text-[10.5px] rounded-full uppercase tracking-wider">
+                                    REGULER
+                                  </span>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-sm">
+                                    <span>REKOMENDASI</span>
+                                  </div>
+                                )}
+
+                                <div
+                                  className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all ${
+                                    isSelected
+                                      ? "border-amber-400 bg-amber-400 text-slate-950 font-bold"
+                                      : isFree
+                                      ? "border-slate-300 bg-white"
+                                      : "border-emerald-400/50 bg-emerald-950/40 text-emerald-300"
+                                  }`}
+                                >
+                                  {isSelected && <Check size={13} strokeWidth={3} />}
+                                </div>
+                              </div>
+
+                              <h3 className={`text-[17px] font-extrabold mb-1 ${isFree ? "text-[#0f172a]" : "text-white"}`}>{plan.name}</h3>
+
+                              <div className="flex items-baseline gap-1 my-2">
+                                <span className={`text-[24px] font-black ${isFree ? "text-slate-700" : "text-white"}`}>
+                                  {isFree ? "Rp 0" : `Rp ${Number(plan.price).toLocaleString("id-ID")}`}
+                                </span>
+                                <span className={`text-[11.5px] font-semibold ${isFree ? "text-slate-400" : "text-emerald-200/80"}`}>
+                                  {isFree ? "selamanya" : `/ ${formattedDuration}`}
+                                </span>
+                              </div>
+
+                              {plan.description && (
+                                <p className={`text-[11.5px] mb-3 leading-relaxed ${isFree ? "text-slate-500" : "text-slate-300"}`}>{plan.description}</p>
+                              )}
+
+                              <ul className={`flex flex-col gap-[9px] my-[16px] pt-[14px] border-t ${isFree ? "border-slate-200 text-slate-700" : "border-white/15 text-slate-100"}`}>
+                                <li className="flex items-center gap-[9px] text-[12px]">
+                                  {plan.can_add_map ? (
+                                    <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
+                                  ) : (
+                                    <X size={14} className="text-slate-400 shrink-0" />
+                                  )}
+                                  <span className={plan.can_add_map ? "font-medium" : "line-through opacity-60"}>Integrasi Google Maps</span>
+                                </li>
+                                <li className="flex items-center gap-[9px] text-[12px]">
+                                  {plan.can_add_gallery ? (
+                                    <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
+                                  ) : (
+                                    <X size={14} className="text-slate-400 shrink-0" />
+                                  )}
+                                  <span className={plan.can_add_gallery ? "font-medium" : "line-through opacity-60"}>Galeri Foto &amp; Video</span>
+                                </li>
+                                <li className="flex items-center gap-[9px] text-[12px]">
+                                  {plan.can_add_products !== false ? (
+                                    <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
+                                  ) : (
+                                    <X size={14} className="text-slate-400 shrink-0" />
+                                  )}
+                                  <span className={plan.can_add_products !== false ? "font-medium" : "line-through opacity-60"}>Katalog Produk &amp; Harga</span>
+                                </li>
+                                <li className="flex items-center gap-[9px] text-[12px]">
+                                  {plan.can_chat !== false ? (
+                                    <Check size={14} className={isFree ? "text-emerald-600 shrink-0" : "text-emerald-300 shrink-0"} />
+                                  ) : (
+                                    <X size={14} className="text-slate-400 shrink-0" />
+                                  )}
+                                  <span className={plan.can_chat !== false ? "font-medium" : "line-through opacity-60"}>Akses Chat Langsung</span>
+                                </li>
+                                <li className="flex items-center gap-[9px] text-[12px]">
+                                  {plan.priority_listing ? (
+                                    <Check size={14} className={isFree ? "text-amber-400 shrink-0" : "text-amber-300 shrink-0"} />
+                                  ) : (
+                                    <X size={14} className="text-slate-400 shrink-0" />
+                                  )}
+                                  <span className={plan.priority_listing ? "text-amber-300 font-bold" : "line-through opacity-60"}>Badge Bisnis Terverifikasi &amp; Prioritas</span>
+                                </li>
+                              </ul>
+                            </div>
+
+                            {isFree ? (
+                              <button className="w-full py-[10px] rounded-[12px] bg-slate-200 text-slate-500 font-semibold text-[13px] cursor-not-allowed border-0" disabled>
+                                Paket Reguler
+                              </button>
+                            ) : isCurrentBizPrem ? (
+                              <button
+                                type="button"
+                                disabled
+                                className="w-full py-[11px] rounded-[12px] font-bold text-[13px] bg-amber-500/30 text-amber-200 border border-amber-400/40 cursor-not-allowed flex items-center justify-center gap-1.5"
+                              >
+                                <Crown size={15} />
+                                <span>Usaha Sudah Premium</span>
+                              </button>
+                            ) : isCurrentBizPending ? (
+                              <button
+                                type="button"
+                                disabled
+                                className="w-full py-[11px] rounded-[12px] font-bold text-[13px] bg-blue-500/30 text-blue-200 border border-blue-400/40 cursor-not-allowed flex items-center justify-center gap-1.5"
+                              >
+                                <Clock size={15} />
+                                <span>Menunggu Verifikasi Admin</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
+                                  if (!targetBizId) {
+                                    alert("Silakan daftarkan atau pilih usaha Anda terlebih dahulu.");
+                                    return;
+                                  }
+                                  navigate(`/add-business/${targetBizId}?upgrade=true`);
+                                }}
+                                className={`w-full py-[11px] rounded-[12px] font-bold text-[13.5px] cursor-pointer border-0 transition-all flex items-center justify-center gap-1.5 ${
+                                  isSelected
+                                    ? "bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-md shadow-amber-400/30 font-black"
+                                    : "bg-[#00c48c] text-slate-950 font-extrabold hover:bg-[#00b074] shadow-md"
+                                }`}
+                              >
+                                <span>Upgrade Usaha ke Paket Ini</span>
+                                <ChevronRight size={16} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[14px] p-[36px] text-center flex flex-col items-center gap-[10px]">
+                      <Crown size={36} className="text-[#94a3b8]" />
+                      <div className="text-[14px] font-bold text-[#0f172a]">Belum Ada Paket Premium Aktif</div>
+                      <p className="text-[12.5px] text-[#64748b] max-w-[360px]">
+                        Saat ini belum ada paket premium yang diaktifkan oleh admin. Silakan periksa kembali nanti.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bottom Action Bar */}
+                {(() => {
+                  const currentBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
+                  const currentBiz = (businesses || []).find(b => String(b.id) === String(currentBizId)) || businesses?.[0];
+                  const subs = currentBiz?.subscriptions || currentBiz?.raw?.subscriptions || [];
+                  const latestSub = subs[0];
+                  const isCurrentBizPending = currentBiz?.has_pending_subscription || (latestSub?.status === "pending" && latestSub?.payment?.status === "pending");
+                  const isCurrentBizPrem = Boolean(currentBiz?.is_premium);
+                  const isBlocked = isCurrentBizPrem || isCurrentBizPending;
+
+                  return (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-[16px_24px] bg-white border border-[#e2e8f0] rounded-[16px] shadow-sm gap-3">
+                      <div className="text-[13px] text-[#64748b]">
+                        {isCurrentBizPrem ? (
+                          <span className="text-amber-800 font-semibold flex items-center gap-1.5">
+                            <Crown size={15} className="text-amber-600" />
+                            Usaha ini sudah memiliki paket Premium aktif. Silakan pilih usaha lain.
+                          </span>
+                        ) : isCurrentBizPending ? (
+                          <span className="text-blue-800 font-semibold flex items-center gap-1.5">
+                            <Clock size={15} className="text-blue-600" />
+                            Pengajuan upgrade usaha ini sedang menunggu verifikasi admin.
+                          </span>
+                        ) : selectedUpgradePlan ? (
+                          <span>
+                            Paket terpilih: <strong className="text-[#007570]">{selectedUpgradePlan.name}</strong> (Rp {Number(selectedUpgradePlan.price).toLocaleString("id-ID")})
+                          </span>
+                        ) : (
+                          <span>Pilih salah satu paket premium di atas untuk melanjutkan</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!selectedUpgradePlan || (businesses?.length || 0) === 0 || isBlocked}
+                        onClick={() => {
+                          const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
+                          if (!targetBizId) {
+                            alert("Silakan daftarkan atau pilih usaha Anda terlebih dahulu.");
+                            return;
+                          }
+                          navigate(`/add-business/${targetBizId}?upgrade=true`);
+                        }}
+                        className="w-full sm:w-auto px-[24px] py-[12px] rounded-[12px] bg-[#007570] text-white font-bold text-[14px] flex items-center justify-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0"
+                      >
+                        <span>{isCurrentBizPrem ? "Usaha Sudah Premium" : isCurrentBizPending ? "Sedang Diverifikasi Admin" : "Lanjut ke Formulir Upgrade & Pembayaran"}</span>
+                        {!isBlocked && <ChevronRight size={18} />}
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
 
               {/* Keuntungan Premium Info */}
               <div className="bg-white border border-[#e2e8f0] rounded-[16px] p-[28px] shadow-sm">
@@ -5556,16 +5678,7 @@ export default function AdminUser() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setCreateAdStep(1);
-                      if (!selectedBusinessForAd && businesses.length > 0) {
-                        setSelectedBusinessForAd(businesses[0].id);
-                      }
-                      if (!selectedPackage && adPackages.length > 0) {
-                        setSelectedPackage(adPackages[0].name || adPackages[0].id);
-                      }
-                      setShowCreateAdModal(true);
-                    }}
+                    onClick={handleOpenCreateAdModal}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs sm:text-sm shadow-[0_4px_14px_rgba(0,117,112,0.39)] transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] border-0"
                   >
                     <Plus size={16} strokeWidth={2.5} />
@@ -5772,7 +5885,7 @@ export default function AdminUser() {
                         const status = ad.computed_status || ad.status;
                         const isPremium = ad.placement_type === "premium" || /premium/i.test(ad.package_name || "");
                         const biz = ad.business || {};
-                        const bizPhoto = biz.banner || biz.logo || (biz.media && biz.media.length > 0 ? biz.media[0].file_path : null) || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
+                        const bizPhoto = getBusinessPhoto(biz);
 
                         return (
                           <div
@@ -5904,6 +6017,17 @@ export default function AdminUser() {
 
                                 {/* Action buttons */}
                                 <div className="flex items-center gap-2 flex-wrap">
+                                  {status === "rejected" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenResubmitAdModal(ad)}
+                                      className="px-3.5 py-1.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      <RefreshCw size={14} />
+                                      Ajukan Ulang Iklan
+                                    </button>
+                                  )}
+
                                   <button
                                     type="button"
                                     onClick={() => setViewingAdDetail(ad)}
@@ -6032,15 +6156,20 @@ export default function AdminUser() {
                             LANGKAH {createAdStep} DARI 3
                           </span>
                           <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
-                            {createAdStep === 1 && "Pilih Bisnis untuk Diiklankan"}
-                            {createAdStep === 2 && "Pilih Paket Iklan (Placement)"}
-                            {createAdStep === 3 && "Live Preview & Checkout Pembayaran"}
+                            {resubmittingAdId ? "Ajukan Ulang Iklan (Revisi) #" + resubmittingAdId : (
+                              createAdStep === 1 ? "Pilih Bisnis untuk Diiklankan" :
+                              createAdStep === 2 ? "Pilih Paket Iklan (Placement)" :
+                              "Live Preview & Checkout Pembayaran"
+                            )}
                           </h3>
                         </div>
                         <p className="text-xs text-slate-500 mt-1">
-                          {createAdStep === 1 && "Tentukan salah satu bisnis terdaftar Anda yang ingin dipromosikan."}
-                          {createAdStep === 2 && "Pilih antara Premium Hero Carousel atau Standard Running Ticker."}
-                          {createAdStep === 3 && "Periksa tampilan live iklan Anda, masukkan kupon, dan selesaikan pembayaran."}
+                          {resubmittingAdId
+                            ? "Perbaiki data atau bukti pembayaran iklan Anda yang ditolak untuk diverifikasi kembali oleh admin."
+                            : (createAdStep === 1 ? "Tentukan salah satu bisnis terdaftar Anda yang ingin dipromosikan." :
+                              createAdStep === 2 ? "Pilih antara Premium Hero Carousel atau Standard Running Ticker." :
+                              "Periksa tampilan live iklan Anda, masukkan kupon, dan selesaikan pembayaran.")
+                          }
                         </p>
                       </div>
                       <button
@@ -6093,7 +6222,9 @@ export default function AdminUser() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[360px] overflow-y-auto p-1">
                             {businesses.map((biz) => {
                               const isSelected = String(selectedBusinessForAd) === String(biz.id);
-                              const photo = biz.banner || biz.logo || (biz.media && biz.media.length > 0 ? biz.media[0].file_path : null) || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
+                              const photo = getBusinessPhoto(biz);
+                              const categoryName = getBusinessCategoryName(biz);
+                              const cityName = getBusinessCityName(biz);
 
                               return (
                                 <div
@@ -6106,14 +6237,22 @@ export default function AdminUser() {
                                   }`}
                                 >
                                   <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                                    <img src={photo} alt={biz.name} className="w-full h-full object-cover" />
+                                    <img
+                                      src={photo}
+                                      alt={biz.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.onerror = null;
+                                        e.currentTarget.src = "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
+                                      }}
+                                    />
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <h4 className="text-sm font-bold text-slate-900 truncate">{biz.name}</h4>
-                                    <p className="text-xs text-slate-500 truncate">{biz.category?.name || "Kategori Usaha"}</p>
+                                    <p className="text-xs text-[#007570] font-semibold truncate">{categoryName}</p>
                                     <p className="text-[11px] text-slate-400 truncate flex items-center gap-1 mt-0.5">
                                       <MapPin size={11} />
-                                      {biz.city || "Indonesia"}
+                                      {cityName}
                                     </p>
                                   </div>
                                   {isSelected && (
@@ -6279,7 +6418,9 @@ export default function AdminUser() {
                       const selBiz = getSelectedBusinessObj();
                       const selPkg = getSelectedPackageObj();
                       const isPrem = selPkg?.placement_type === "premium" || (typeof selectedPackage === "string" && /premium/i.test(selectedPackage));
-                      const photo = selBiz?.banner || selBiz?.logo || (selBiz?.media && selBiz?.media.length > 0 ? selBiz?.media[0].file_path : null) || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1000&auto=format&fit=crop&q=80";
+                      const photo = getBusinessPhoto(selBiz);
+                      const categoryName = getBusinessCategoryName(selBiz);
+                      const cityName = getBusinessCityName(selBiz);
 
                       return (
                         <div className="space-y-6">
@@ -6304,6 +6445,10 @@ export default function AdminUser() {
                                     src={photo}
                                     alt={selBiz?.name}
                                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                    onError={(e) => {
+                                      e.currentTarget.onerror = null;
+                                      e.currentTarget.src = "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1000&auto=format&fit=crop&q=80";
+                                    }}
                                   />
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
 
@@ -6319,12 +6464,12 @@ export default function AdminUser() {
                                     </h4>
                                     <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-200">
                                       <span className="flex items-center gap-1 text-amber-400 font-bold">
-                                        ★ 4.8 <span className="text-slate-300 font-normal">(Ulasan Konsumen)</span>
+                                        ★ 4.8 <span className="text-slate-300 font-normal">({categoryName})</span>
                                       </span>
                                       <span>•</span>
                                       <span className="flex items-center gap-1">
                                         <MapPin size={13} className="text-teal-400" />
-                                        {selBiz?.city || "Indonesia"}
+                                        {cityName}
                                       </span>
                                     </div>
                                   </div>
@@ -6334,7 +6479,15 @@ export default function AdminUser() {
                                 <div className="flex items-center justify-center p-4">
                                   <div className="w-full max-w-[340px] bg-white rounded-2xl border border-slate-200 p-3.5 shadow-md flex items-center gap-3.5">
                                     <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
-                                      <img src={photo} alt={selBiz?.name} className="w-full h-full object-cover" />
+                                      <img
+                                        src={photo}
+                                        alt={selBiz?.name}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.onerror = null;
+                                          e.currentTarget.src = "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
+                                        }}
+                                      />
                                     </div>
                                     <div className="min-w-0 flex-1 space-y-1">
                                       <div className="flex items-center justify-between">
@@ -6348,7 +6501,7 @@ export default function AdminUser() {
                                       </h5>
                                       <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
                                         <MapPin size={10} />
-                                        {selBiz?.city || "Indonesia"}
+                                        {cityName}
                                       </p>
                                     </div>
                                   </div>
@@ -6389,21 +6542,23 @@ export default function AdminUser() {
                             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                               Pilih Metode Pembayaran
                             </label>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                               {[
-                                { id: "BCA Virtual Account", name: "BCA Virtual Account", tag: "BCA", color: "bg-[#005caa]" },
-                                { id: "Mandiri Virtual Account", name: "Mandiri VA", tag: "Mandiri", color: "bg-[#003865]" },
-                                { id: "BRI Virtual Account", name: "BRI Virtual Account", tag: "BRI", color: "bg-[#00529c]" },
-                                { id: "DANA", name: "DANA E-Wallet", tag: "DANA", color: "bg-[#008ce5]" },
-                                { id: "GoPay", name: "GoPay E-Wallet", tag: "GoPay", color: "bg-[#00a5cf]" },
-                                { id: "OVO", name: "OVO E-Wallet", tag: "OVO", color: "bg-[#4c2a86]" },
+                                { id: "Transfer Bank Mandiri", name: "Mandiri", tag: "Mandiri", color: "bg-[#003d79]" },
+                                { id: "Transfer Bank BNI", name: "BNI", tag: "BNI", color: "bg-[#f15a24]" },
+                                { id: "Transfer Bank BCA", name: "BCA", tag: "BCA", color: "bg-[#00529c]" },
+                                { id: "Transfer Bank Maybank", name: "Maybank", tag: "Maybank", color: "bg-[#ffc800] !text-slate-900" },
+                                { id: "Transfer Bank BJB", name: "BJB", tag: "BJB", color: "bg-[#0072bc]" },
+                                { id: "OVO", name: "OVO (0811-1919-711)", tag: "OVO", color: "bg-[#4c2a86]" },
+                                { id: "DANA", name: "DANA (XXX)", tag: "DANA", color: "bg-[#008ce5]" },
+                                { id: "GoPay", name: "GoPay (XXX)", tag: "GoPay", color: "bg-[#00a5cf]" },
                               ].map((pm) => {
-                                const isSelected = selectedPaymentMethod === pm.id;
+                                const isSelected = selectedPaymentMethod === pm.id || selectedPaymentMethod === pm.name;
                                 return (
                                   <div
                                     key={pm.id}
                                     onClick={() => setSelectedPaymentMethod(pm.id)}
-                                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                                       isSelected
                                         ? "border-[#007570] bg-teal-50/50 shadow-xs ring-1 ring-[#007570]"
                                         : "border-slate-200 bg-white hover:border-slate-300"
@@ -6424,11 +6579,11 @@ export default function AdminUser() {
                             {/* Account instruction */}
                             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                               <div>
-                                <span className="text-slate-500">Nomor Rekening / Virtual Account ({selectedPaymentMethod}):</span>
+                                <span className="text-slate-500">Nomor Rekening / E-Wallet ({selectedPaymentMethod}):</span>
                                 <div className="text-base font-black text-slate-900 tracking-wider">
                                   {getPaymentNumber(selectedPaymentMethod)}
                                 </div>
-                                <span className="text-[11px] text-slate-400">a.n PT Info Media Indonesia</span>
+                                <span className="text-[11px] text-slate-500 font-medium">a.n {OFFICIAL_ACCOUNT_HOLDER}</span>
                               </div>
                               <button
                                 type="button"
@@ -6445,36 +6600,85 @@ export default function AdminUser() {
                             </div>
                           </div>
 
-                          {/* Upload Bukti Transfer (Opsional saat submit awal) */}
+                          {/* Upload Bukti Transfer (Opsional saat submit / resubmit) */}
                           <div className="space-y-2">
-                            <label className="block text-xs font-bold text-slate-700">
-                              Upload Bukti Pembayaran (Opsional jika sudah transfer sekarang)
+                            <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
+                              <span>Upload Bukti Pembayaran (Opsional)</span>
+                              {adPaymentProofPreview && (
+                                <span className="text-[11px] text-[#007570] font-semibold">
+                                  {adPaymentProofFile ? "Foto baru dipilih" : "Bukti pembayaran tersimpan"}
+                                </span>
+                              )}
                             </label>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  setAdPaymentProofFile(file);
-                                  setAdPaymentProofPreview(URL.createObjectURL(file));
-                                }
-                              }}
-                              className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-[#007570] hover:file:bg-teal-100 cursor-pointer"
-                            />
-                            {adPaymentProofPreview && (
-                              <div className="relative mt-2 w-24 h-24 rounded-xl overflow-hidden border border-slate-300">
-                                <img src={adPaymentProofPreview} alt="Preview Bukti" className="w-full h-full object-cover" />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setAdPaymentProofFile(null);
-                                    setAdPaymentProofPreview(null);
+
+                            {adPaymentProofPreview ? (
+                              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-300 shrink-0 bg-white">
+                                    <img src={adPaymentProofPreview} alt="Preview Bukti" className="w-full h-full object-cover" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="text-xs font-bold text-slate-900 block truncate">
+                                      {adPaymentProofFile ? adPaymentProofFile.name : "Foto Bukti Transfer Sebelumnya"}
+                                    </span>
+                                    <span className="text-[11px] text-slate-500 block">
+                                      {adPaymentProofFile
+                                        ? `${(adPaymentProofFile.size / 1024).toFixed(1)} KB`
+                                        : "Tersimpan di server (dapat digunakan kembali atau diganti)"}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <label className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer transition-colors shadow-2xs">
+                                    Ganti Foto
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                          setAdPaymentProofFile(file);
+                                          setAdPaymentProofPreview(URL.createObjectURL(file));
+                                          setRemoveExistingProof(false);
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAdPaymentProofFile(null);
+                                      setAdPaymentProofPreview(null);
+                                      setRemoveExistingProof(true);
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 text-xs font-bold cursor-pointer transition-colors"
+                                    title="Hapus foto bukti"
+                                  >
+                                    Hapus
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      setAdPaymentProofFile(file);
+                                      setAdPaymentProofPreview(URL.createObjectURL(file));
+                                      setRemoveExistingProof(false);
+                                    }
                                   }}
-                                  className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-1 border-0 cursor-pointer"
-                                >
-                                  <X size={12} />
-                                </button>
+                                  className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-[#007570] hover:file:bg-teal-100 cursor-pointer"
+                                />
+                                {resubmittingAdId && removeExistingProof && (
+                                  <span className="text-[11px] text-amber-600 font-medium block mt-1">
+                                    * Foto bukti sebelumnya telah dihapus. Anda dapat mengunggah foto bukti baru atau menyimpannya tanpa bukti.
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -6537,13 +6741,298 @@ export default function AdminUser() {
               )}
 
               {/* ========================================================================= */}
+              {/* MODAL 3: AJUKAN ULANG IKLAN DITOLAK (DIRECT PAYMENT & MULTI-PROOF MODAL) */}
+              {/* ========================================================================= */}
+              {resubmittingAd && (() => {
+                const ad = resubmittingAd;
+                const biz = ad.business || businesses.find(b => b.id === ad.business_id) || {};
+                const isPremium = ad.placement_type === "premium" || /premium/i.test(ad.package_name || "");
+                const photo = getBusinessPhoto(biz);
+
+                return (
+                  <div
+                    className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 overflow-y-auto"
+                    onClick={() => setResubmittingAd(null)}
+                  >
+                    <div
+                      className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl border border-slate-200 space-y-5 my-8 text-left relative max-h-[90vh] overflow-y-auto"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Modal Header */}
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-amber-50 text-amber-800 border border-amber-200">
+                              Pengajuan Ulang
+                            </span>
+                            <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                              Ajukan Ulang Iklan #{ad.id}
+                            </h3>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Perbaiki pembayaran atau unggah bukti transfer tambahan untuk diverifikasi kembali oleh admin.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setResubmittingAd(null)}
+                          className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer border-0"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      {/* Business & Package Summary Card */}
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3.5">
+                        <div className="w-14 h-14 rounded-xl overflow-hidden bg-white border border-slate-200 shrink-0">
+                          <img src={photo} alt={biz.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm font-bold text-slate-900 truncate">{biz.name || "Nama Bisnis"}</h4>
+                            <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                              isPremium ? "bg-amber-100 text-amber-800" : "bg-teal-50 text-[#007570]"
+                            }`}>
+                              {isPremium ? "Premium Hero Ads" : "Standard Ticker Ads"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap">
+                            <span>Paket: <strong>{ad.package_name || "Iklan"}</strong></span>
+                            <span>•</span>
+                            <span>Durasi: <strong>{ad.duration_days || 7} Hari</strong></span>
+                            <span>•</span>
+                            <span className="font-black text-[#007570]">Rp {Number(ad.price || 0).toLocaleString("id-ID")}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Alasan Penolakan Admin */}
+                      <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2.5">
+                        <AlertTriangle size={17} className="text-rose-600 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <span className="font-bold block">Alasan Penolakan Admin Sebelumnya:</span>
+                          <p className="leading-relaxed">{ad.rejection_reason || ad.notes || "Bukti transfer belum valid atau nominal tidak sesuai."}</p>
+                        </div>
+                      </div>
+
+                      {/* Payment Account Instruction */}
+                      <div className="space-y-3">
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          1. Metode Pembayaran & Rekening Tujuan
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {[
+                            { name: "Transfer Bank Mandiri", tag: "Mandiri", color: "bg-[#003d79]" },
+                            { name: "Transfer Bank BNI", tag: "BNI", color: "bg-[#f15a24]" },
+                            { name: "Transfer Bank BCA", tag: "BCA", color: "bg-[#00529c]" },
+                            { name: "Transfer Bank Maybank", tag: "Maybank", color: "bg-[#ffc800] !text-slate-900" },
+                            { name: "Transfer Bank BJB", tag: "BJB", color: "bg-[#0072bc]" },
+                            { name: "OVO", tag: "OVO", color: "bg-[#4c2a86]" },
+                            { name: "DANA", tag: "DANA", color: "bg-[#008ce5]" },
+                            { name: "GoPay", tag: "GoPay", color: "bg-[#00a5cf]" },
+                          ].map((pm) => {
+                            const isSelected = resubmitPaymentMethod === pm.name;
+                            return (
+                              <div
+                                key={pm.name}
+                                onClick={() => setResubmitPaymentMethod(pm.name)}
+                                className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                                  isSelected
+                                    ? "border-[#007570] bg-teal-50/50 text-[#007570] font-bold shadow-2xs"
+                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
+                              >
+                                <span className={`inline-block px-1.5 py-0.2 rounded text-[9.5px] font-black text-white ${pm.color} mb-1`}>
+                                  {pm.tag}
+                                </span>
+                                <span className="block truncate text-[11px] font-semibold">{pm.name}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-xs">
+                          <div>
+                            <span className="text-slate-500">Nomor Rekening / E-Wallet ({resubmitPaymentMethod}):</span>
+                            <div className="text-base font-black text-slate-900 tracking-wider">
+                              {getPaymentNumber(resubmitPaymentMethod)}
+                            </div>
+                            <span className="text-[11px] text-slate-500 font-medium">a.n {OFFICIAL_ACCOUNT_HOLDER}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(getPaymentNumber(resubmitPaymentMethod));
+                              setCopyToast(true);
+                              setTimeout(() => setCopyToast(false), 2000);
+                            }}
+                            className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs"
+                          >
+                            <Copy size={13} />
+                            {copyToast ? "Tersalin!" : "Salin No"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Multi-Proof Management */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                            2. Bukti Pembayaran ({existingProofList.length + newProofFiles.length} Foto Terlampir)
+                          </label>
+                          <span className="text-[11px] text-[#007570] font-semibold">
+                            Bisa lampirkan &gt; 1 bukti transfer
+                          </span>
+                        </div>
+
+                        {/* Grid of Existing Proofs + New Proofs */}
+                        {(existingProofList.length > 0 || newProofPreviews.length > 0) && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {/* Existing Proofs */}
+                            {existingProofList.map((proofPath, idx) => (
+                              <div key={`existing-${idx}`} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl gap-2.5">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div
+                                    className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0 cursor-pointer"
+                                    onClick={() => window.open(getStorageUrl(proofPath), '_blank')}
+                                    title="Buka foto"
+                                  >
+                                    <img src={getStorageUrl(proofPath)} alt="Struk Tersimpan" className="w-full h-full object-cover" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-teal-100 text-[#007570] uppercase">
+                                      Struk #{idx + 1}
+                                    </span>
+                                    <p className="text-[11px] font-semibold text-slate-800 truncate mt-0.5">Tersimpan dari sebelumnya</p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExistingProofList(existingProofList.filter((_, i) => i !== idx));
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200 transition-colors cursor-pointer shrink-0"
+                                  title="Hapus foto ini"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            ))}
+
+                            {/* Newly Uploaded Proofs */}
+                            {newProofPreviews.map((previewUrl, idx) => (
+                              <div key={`new-${idx}`} className="flex items-center justify-between p-2.5 bg-emerald-50/50 border border-emerald-200 rounded-xl gap-2.5">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div
+                                    className="w-14 h-14 rounded-lg overflow-hidden border border-emerald-200 bg-white shrink-0 cursor-pointer"
+                                    onClick={() => window.open(previewUrl, '_blank')}
+                                    title="Buka foto"
+                                  >
+                                    <img src={previewUrl} alt="Struk Baru" className="w-full h-full object-cover" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-800 uppercase">
+                                      Struk Baru #{idx + 1}
+                                    </span>
+                                    <p className="text-[11px] font-semibold text-slate-800 truncate mt-0.5">
+                                      {newProofFiles[idx]?.name || "File baru"}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewProofFiles(newProofFiles.filter((_, i) => i !== idx));
+                                    setNewProofPreviews(newProofPreviews.filter((_, i) => i !== idx));
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200 transition-colors cursor-pointer shrink-0"
+                                  title="Hapus foto ini"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add More Proof Upload Button */}
+                        <label className="flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/40 hover:bg-teal-50 text-[#007570] font-bold text-xs cursor-pointer transition-all">
+                          <Plus size={16} />
+                          <span>+ Upload Bukti Transfer Tambahan / Baru (Bisa Banyak Foto)</span>
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length > 0) {
+                                setNewProofFiles((prev) => [...prev, ...files]);
+                                const previews = files.map((f) => URL.createObjectURL(f));
+                                setNewProofPreviews((prev) => [...prev, ...previews]);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Catatan Tambahan (Opsional) */}
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          3. Catatan Revisi ke Admin (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          value={resubmitNotes}
+                          onChange={(e) => setResubmitNotes(e.target.value)}
+                          placeholder="Contoh: Sudah saya transfer kekurangan Rp 20.000, struk 1 dan struk 2 terlampir."
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#007570]"
+                        />
+                      </div>
+
+                      {/* Modal Actions */}
+                      <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setResubmittingAd(null)}
+                          className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border-0"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleConfirmResubmitAd}
+                          disabled={submittingResubmit}
+                          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-extrabold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer border-0"
+                        >
+                          {submittingResubmit ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              Mengirim Revisi...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 size={16} />
+                              Kirim Pengajuan Ulang Sekarang
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ========================================================================= */}
               {/* MODAL 2: DETAIL IKLAN & LIVE PREVIEW (viewingAdDetail) */}
               {/* ========================================================================= */}
               {viewingAdDetail && (() => {
                 const ad = viewingAdDetail;
                 const isPremium = ad.placement_type === "premium" || /premium/i.test(ad.package_name || "");
                 const biz = ad.business || {};
-                const photo = biz.banner || biz.logo || (biz.media && biz.media.length > 0 ? biz.media[0].file_path : null) || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1000&auto=format&fit=crop&q=80";
+                const photo = getBusinessPhoto(biz);
+                const categoryName = getBusinessCategoryName(biz);
+                const cityName = getBusinessCityName(biz);
 
                 return (
                   <div
@@ -6661,8 +7150,23 @@ export default function AdminUser() {
                       {ad.payment_proof && (
                         <div className="space-y-2">
                           <span className="text-xs font-bold text-slate-700 block">Bukti Pembayaran Terunggah:</span>
-                          <div className="w-36 h-36 rounded-xl overflow-hidden border border-slate-200 cursor-pointer" onClick={() => window.open(ad.payment_proof, "_blank")}>
-                            <img src={ad.payment_proof} alt="Bukti Transfer" className="w-full h-full object-cover" />
+                          <div
+                            className="w-36 h-36 rounded-xl overflow-hidden border border-slate-200 cursor-pointer group relative bg-slate-50"
+                            onClick={() => window.open(getStorageUrl(ad.payment_proof), "_blank")}
+                            title="Klik untuk membuka gambar ukuran penuh"
+                          >
+                            <img
+                              src={getStorageUrl(ad.payment_proof)}
+                              alt="Bukti Transfer"
+                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400&auto=format&fit=crop&q=80";
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 text-white text-xs font-bold">
+                              Buka Gambar
+                            </div>
                           </div>
                         </div>
                       )}
@@ -6722,7 +7226,16 @@ export default function AdminUser() {
                     <div className="space-y-3">
                       <label className="text-xs font-bold text-slate-700 block">Pilih Rekening / E-Wallet</label>
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        {["BCA Virtual Account", "Mandiri Virtual Account", "DANA", "GoPay"].map((pm) => (
+                        {[
+                          "Transfer Bank Mandiri",
+                          "Transfer Bank BNI",
+                          "Transfer Bank BCA",
+                          "Transfer Bank Maybank",
+                          "Transfer Bank BJB",
+                          "OVO",
+                          "DANA",
+                          "GoPay"
+                        ].map((pm) => (
                           <div
                             key={pm}
                             onClick={() => setSelectedPaymentMethod(pm)}
@@ -6738,8 +7251,9 @@ export default function AdminUser() {
 
                       <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex justify-between items-center">
                         <div>
-                          <span className="text-slate-400 text-[11px] block">No Rekening / VA:</span>
+                          <span className="text-slate-400 text-[11px] block">No Rekening / E-Wallet ({selectedPaymentMethod}):</span>
                           <span className="font-black text-slate-900 text-sm">{getPaymentNumber(selectedPaymentMethod)}</span>
+                          <span className="text-[11px] text-slate-500 font-medium block mt-0.5">a.n {OFFICIAL_ACCOUNT_HOLDER}</span>
                         </div>
                         <button
                           type="button"
@@ -7046,88 +7560,79 @@ export default function AdminUser() {
                   <p>Memuat data profil...</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-[24px]">
-                  {/* Banner & Avatar Header Card */}
-                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-visible relative">
-                    {/* Banner Image / Gradient Container */}
-                    <div className="relative w-full h-[200px] max-md:h-[160px] max-sm:h-[130px] rounded-t-2xl bg-gradient-to-r from-[#007570] via-[#00a8a2] to-[#0f766e] overflow-hidden">
-                      {bannerPreview ? (
-                        <img
-                          src={bannerPreview}
-                          alt="Banner Profil"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                            if (e.currentTarget.nextElementSibling) {
-                              e.currentTarget.nextElementSibling.style.display = "flex";
-                            }
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className="w-full h-full flex flex-col items-center justify-center text-white/70 gap-2 text-sm font-medium"
-                        style={{ display: bannerPreview ? "none" : "flex" }}
-                      >
-                        <ImageIcon size={32} />
-                        <span>Belum Ada Banner</span>
-                      </div>
+                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
+                  <div className="mb-6 pb-4 border-b border-slate-100">
+                    <h3 className="text-lg font-extrabold text-slate-900 mb-1">Edit Profil & Informasi Diri</h3>
+                    <p className="text-xs sm:text-sm text-slate-500">Perbarui foto profil, data informasi akun, dan kontak Anda secara berkala</p>
+                  </div>
 
-                      {/* Banner Action Button (Direct File Trigger) */}
-                      <div className="absolute top-3.5 right-3.5 z-10 flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/70 backdrop-blur-md text-white border border-white/30 text-xs font-semibold cursor-pointer transition-all duration-200 hover:bg-slate-900/90 hover:border-white/60 hover:-translate-y-0.5 shadow-sm"
-                          onClick={() => document.getElementById("admin-banner-input").click()}
-                          title="Ubah Banner"
-                        >
-                          <Camera size={15} />
-                          <span>Ubah Banner</span>
-                        </button>
-                        {bannerPreview && bannerPreview !== DEFAULT_BANNER && (
+                    {/* Integrated Photo Upload Section */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 p-5 sm:p-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 mb-8">
+                      <div className="flex items-center gap-5">
+                        {/* Avatar */}
+                        <div className="relative shrink-0">
+                          <img
+                            src={photoPreview || DEFAULT_AVATAR}
+                            alt="Avatar"
+                            className="w-20 h-20 sm:w-22 sm:h-22 rounded-full object-cover border-4 border-white shadow-md bg-white ring-2 ring-slate-200"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_AVATAR;
+                            }}
+                          />
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/80 backdrop-blur-md text-white border border-rose-400/40 text-xs font-semibold cursor-pointer transition-all hover:bg-rose-700 shadow-sm"
-                            onClick={handleRemoveBanner}
-                            title="Hapus Banner"
+                            className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#007570] hover:bg-[#005f5b] text-white border-2 border-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105"
+                            onClick={() => setShowPhotoModal(true)}
+                            title="Ganti Foto Profil"
                           >
-                            <Trash2 size={14} />
+                            <Camera size={13} />
                           </button>
-                        )}
-                        <input
-                          id="admin-banner-input"
-                          type="file"
-                          accept="image/jpeg,image/png,image/jpg,image/webp"
-                          hidden
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              handleBannerUpload(e.target.files[0]);
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
+                        </div>
 
-                    {/* Avatar & User Details Row */}
-                    <div className="flex items-end gap-6 max-md:gap-4 max-sm:flex-col max-sm:items-start px-7 max-md:px-5 pb-6 max-md:pb-5 -mt-12 max-md:-mt-10 relative z-10">
-                      {/* Avatar Thumbnail */}
-                      <div className="relative shrink-0 group">
-                        <img
-                          src={photoPreview || DEFAULT_AVATAR}
-                          alt="Avatar"
-                          className="w-[115px] h-[115px] max-md:w-[95px] max-md:h-[95px] rounded-full object-cover border-4 border-white shadow-md bg-white"
-                          onError={(e) => {
-                            e.currentTarget.src = DEFAULT_AVATAR;
-                          }}
-                        />
-                        {/* Trigger Photo Modal */}
+                        {/* User Details */}
+                        <div className="flex flex-col gap-1.5 min-w-0">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <h4 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate">
+                              {profileData.name || "Nama Pengguna"}
+                            </h4>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-teal-50 text-[#007570] border border-teal-200">
+                              {profileData.role || "user"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                              @{profileData.username || "user"}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] sm:text-xs text-slate-400 font-normal leading-tight">
+                            Format JPG, PNG, atau WEBP. Maksimal 2MB.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto w-full md:w-auto justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-200/60">
                         <button
                           type="button"
-                          className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-[#007570] text-white border-2 border-white flex items-center justify-center cursor-pointer transition-all duration-200 shadow-md hover:bg-[#005a58] hover:scale-105 active:scale-95"
+                          className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005f5b] text-white font-bold text-xs transition-all cursor-pointer shadow-xs"
                           onClick={() => setShowPhotoModal(true)}
-                          title="Ganti Foto Profil"
                         >
-                          <Camera size={16} />
+                          <Camera size={14} />
+                          <span>Ganti Foto</span>
                         </button>
+                        {photoPreview && photoPreview !== DEFAULT_AVATAR && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border border-rose-200 font-bold text-xs transition-all cursor-pointer shadow-xs"
+                            onClick={handleRemovePhoto}
+                            title="Hapus Foto"
+                          >
+                            <Trash2 size={14} />
+                            <span>Hapus</span>
+                          </button>
+                        )}
                         <input
                           id="admin-photo-input"
                           type="file"
@@ -7140,54 +7645,6 @@ export default function AdminUser() {
                           }}
                         />
                       </div>
-
-                      {/* User Info & Action Buttons */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between flex-1 gap-3 w-full mb-1">
-                        <div className="flex flex-col gap-1">
-                          <h2 className="text-xl max-md:text-lg font-extrabold text-slate-900 leading-tight">
-                            {profileData.name || "Nama Pengguna"}
-                          </h2>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                              @{profileData.username || "username"}
-                            </span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-[#007570] border border-teal-100">
-                              {profileData.role || "User"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Quick Photo Upload & Delete Actions */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-50 text-[#007570] hover:bg-[#007570] hover:text-white border border-teal-200/80 font-bold text-xs transition-all cursor-pointer shadow-2xs"
-                            onClick={() => setShowPhotoModal(true)}
-                          >
-                            <Camera size={14} />
-                            <span>Ganti Foto</span>
-                          </button>
-                          {photoPreview && photoPreview !== DEFAULT_AVATAR && (
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border border-rose-200/80 font-bold text-xs transition-all cursor-pointer shadow-2xs"
-                              onClick={handleRemovePhoto}
-                              title="Hapus Foto"
-                            >
-                              <Trash2 size={14} />
-                              <span>Hapus</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Edit Profile Form Card */}
-                  <div className="bg-white rounded-[16px] border border-[#e2e8f0] shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-[28px] max-md:p-[20px]">
-                    <div className="mb-[24px] pb-[16px] border-b border-[#e2e8f0]">
-                      <h3 className="text-[17px] font-bold text-[#0f172a] mb-[4px]">Edit Profil & Informasi Diri</h3>
-                      <p className="text-[13px] text-[#64748b]">Perbarui data informasi akun dan kontak Anda secara berkala</p>
                     </div>
 
                     {/* Backend Success/Error Alerts */}
@@ -7387,9 +7844,8 @@ export default function AdminUser() {
                       </div>
                     </form>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
           )}
         </section>
       </main>
@@ -8077,24 +8533,45 @@ export default function AdminUser() {
               </div>
             ) : (
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
+                  setWithdrawErrorMsg("");
                   setSubmittingWithdraw(true);
-                  setTimeout(() => {
+                  try {
+                    const res = await api.post("/referrals/withdraw", {
+                      bank: withdrawForm.bank,
+                      account_number: withdrawForm.accountNumber,
+                      account_holder: withdrawForm.accountHolder,
+                      amount: Number(withdrawForm.amount),
+                    });
+                    if (res.data?.success) {
+                      setWithdrawSuccessMsg(
+                        res.data.message ||
+                        `Permohonan penarikan Rp ${Number(withdrawForm.amount).toLocaleString("id-ID")} ke ${withdrawForm.bank} (${withdrawForm.accountNumber}) atas nama ${withdrawForm.accountHolder} telah diterima dan sedang diproses admin.`
+                      );
+                      fetchReferralStats();
+                    }
+                  } catch (err) {
+                    setWithdrawErrorMsg(err.response?.data?.message || "Gagal mengajukan penarikan saldo. Pastikan saldo mencukupi dan data benar.");
+                  } finally {
                     setSubmittingWithdraw(false);
-                    setWithdrawSuccessMsg(
-                      `Permohonan penarikan Rp ${Number(withdrawForm.amount).toLocaleString("id-ID")} ke ${withdrawForm.bank} (${withdrawForm.accountNumber}) atas nama ${withdrawForm.accountHolder} telah diterima dan sedang diproses admin.`
-                    );
-                  }, 1200);
+                  }
                 }}
                 className="space-y-4"
               >
                 <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl flex items-center justify-between">
                   <span className="text-xs font-semibold text-teal-800">Saldo Komisi Tersedia:</span>
                   <span className="text-base font-black text-[#007570]">
-                    Rp {totalReferralEarnings.toLocaleString("id-ID")}
+                    Rp {availableReferralBalance.toLocaleString("id-ID")}
                   </span>
                 </div>
+
+                {withdrawErrorMsg && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
+                    <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+                    <span>{withdrawErrorMsg}</span>
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">Metode Penarikan (Bank / E-Wallet)</label>
@@ -8143,7 +8620,7 @@ export default function AdminUser() {
                     type="number"
                     required
                     min={50000}
-                    max={totalReferralEarnings || 50000}
+                    max={availableReferralBalance || 50000}
                     value={withdrawForm.amount}
                     onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007570]"
@@ -8154,14 +8631,17 @@ export default function AdminUser() {
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setShowWithdrawModal(false)}
+                    onClick={() => {
+                      setWithdrawErrorMsg("");
+                      setShowWithdrawModal(false);
+                    }}
                     className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200 transition-colors cursor-pointer"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    disabled={submittingWithdraw}
+                    disabled={submittingWithdraw || availableReferralBalance < 50000}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
                   >
                     {submittingWithdraw ? (
@@ -8239,16 +8719,16 @@ export default function AdminUser() {
                   <span className="font-bold text-slate-900">Rp {(selectedReferralTx.original_amount || selectedReferralTx.amount || 0).toLocaleString("id-ID")}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600">Diskon Kode Referral (5%):</span>
-                  <span className="font-semibold text-rose-600">- Rp {(selectedReferralTx.discount_amount || selectedReferralTx.discount || 0).toLocaleString("id-ID")}</span>
+                  <span className="text-slate-600">Diskon Kode Referral (Rp 5.000):</span>
+                  <span className="font-semibold text-rose-600">- Rp {(selectedReferralTx.discount_amount || selectedReferralTx.discount || 5000).toLocaleString("id-ID")}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600">Total Dibayar Pembeli:</span>
                   <span className="font-bold text-slate-900">Rp {(selectedReferralTx.final_price || selectedReferralTx.amount || 0).toLocaleString("id-ID")}</span>
                 </div>
                 <div className="pt-2 border-t border-emerald-200 flex items-center justify-between text-sm">
-                  <span className="font-extrabold text-emerald-900">Komisi Hak Anda (10%):</span>
-                  <span className="font-black text-emerald-700 text-base">+ Rp {(selectedReferralTx.commission_amount || selectedReferralTx.commission || 0).toLocaleString("id-ID")}</span>
+                  <span className="font-extrabold text-emerald-900">Komisi Hak Anda (Rp 10.000):</span>
+                  <span className="font-black text-emerald-700 text-base">+ Rp {(selectedReferralTx.commission_amount || selectedReferralTx.commission || 10000).toLocaleString("id-ID")}</span>
                 </div>
               </div>
 
@@ -8269,6 +8749,22 @@ export default function AdminUser() {
           </div>
         </div>
       )}
+
+      {/* ── Content Pay-Per-Post Payment Modal ── */}
+      <ContentPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedBlogForPayment(null);
+        }}
+        blog={selectedBlogForPayment}
+        onSuccess={() => {
+          setShowPaymentModal(false);
+          setSelectedBlogForPayment(null);
+          fetchBlogs();
+          fetchEvents();
+        }}
+      />
     </div>
   );
 }

@@ -73,7 +73,7 @@ export default function Login() {
     setError("");
 
     if (!email.trim() || !password.trim()) {
-      setError("Email dan kata sandi wajib diisi.");
+      setError("Email atau Username dan kata sandi wajib diisi.");
       return;
     }
 
@@ -95,7 +95,18 @@ export default function Login() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data?.message || "Email atau kata sandi salah. Silakan coba lagi.");
+        let errorMsg = "Email/Username atau kata sandi salah. Silakan coba lagi.";
+        if (data?.errors) {
+          const firstKey = Object.keys(data.errors)[0];
+          if (firstKey && Array.isArray(data.errors[firstKey]) && data.errors[firstKey].length > 0) {
+            errorMsg = data.errors[firstKey][0];
+          } else if (typeof data.errors === "string") {
+            errorMsg = data.errors;
+          }
+        } else if (data?.message) {
+          errorMsg = data.message;
+        }
+        setError(errorMsg);
         return;
       }
 
@@ -359,15 +370,15 @@ export default function Login() {
                 </div>
               )}
 
-              {/* Email */}
+              {/* Email or Username */}
               <input
                 id="login-email"
-                type="email"
+                type="text"
                 className={`login-input ${error ? "login-input--error" : ""}`}
-                placeholder="Email"
+                placeholder="Email atau Username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
+                autoComplete="username"
               />
 
               {/* Password */}

@@ -9,6 +9,14 @@ import PremiumAdsSection from "../components/home/PremiumAdsSection";
 import StandardAdsSection from "../components/home/StandardAdsSection";
 import useScrollReveal from "../hooks/useScrollReveal";
 import logoImg from "../assets/logo.png";
+import irmanImg from "../assets/team/irman.jpg";
+import sriImg from "../assets/team/sri.jpg";
+import rajaImg from "../assets/team/raja.jpg";
+import farhanImg from "../assets/team/farhan.jpg";
+import yogaImg from "../assets/team/yoga.jpg";
+import naufalImg from "../assets/team/naufal.jpg";
+import husnulImg from "../assets/team/husnul.jpg";
+import diniImg from "../assets/team/dini.jpg";
 import { getBusinesses } from "../services/businessService";
 import { InlineSpinner } from "../components/LoadingScreen";
 import { getStorageUrl } from "../utils/constants";
@@ -84,58 +92,58 @@ const SMART_CITIES = [];
 const TESTIMONIALS_DATA = [
   {
     id: 1,
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&crop=face",
-    name: "Nindi Afrilia",
-    role: "Marketing Executive",
+    avatar: irmanImg,
+    name: "Irman Firmansyah",
+    role: "Direktur Triwala",
     text: "Dengan adanya Info.co.id, masyarakat jadi lebih mudah menemukan berbagai informasi dan layanan yang ada di daerah mereka.",
   },
   {
     id: 2,
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop&crop=face",
-    name: "Putri Indah Lestari",
-    role: "Research and Development",
+    avatar: sriImg,
+    name: "Sri Budiati",
+    role: "Staff Ahli Lingkungan",
     text: "Info.co.id membantu menyajikan informasi daerah dalam satu platform yang lebih mudah diakses dan dipahami oleh semua kalangan.",
   },
   {
     id: 3,
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face",
-    name: "Algi Triana",
-    role: "UI/UX Designer",
+    avatar: rajaImg,
+    name: "M. Raja Fakhri",
+    role: "Programer",
     text: "Platform ini punya potensi besar untuk membuat informasi lokal lebih mudah ditemukan. Tampilannya pun cukup bersih dan nyaman dipakai.",
   },
   {
     id: 4,
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&crop=face",
-    name: "Fajar Septiawan",
-    role: "Business Development",
+    avatar: farhanImg,
+    name: "Farhan M",
+    role: "Perencanaan Wilayah",
     text: "Info.co.id jadi salah satu platform yang membantu menghubungkan masyarakat dengan berbagai informasi dan potensi bisnis di daerahnya.",
   },
   {
     id: 5,
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face",
-    name: "Risa Permata",
-    role: "Digital Development",
+    avatar: yogaImg,
+    name: "Yoga Hepta G",
+    role: "Pemetaan Wilayah",
     text: "Saya senang ada platform seperti ini. Digitalisasi informasi daerah itu penting banget, terutama untuk mendukung program Smart Village.",
   },
   {
     id: 6,
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face",
-    name: "Bagas Nugroho",
-    role: "Web Developer",
+    avatar: naufalImg,
+    name: "Naufal Handoko",
+    role: "Analis",
     text: "Dari sisi teknis, Info.co.id sudah cukup solid. Integrasi data bisnis lokal dengan sistem pencariannya terasa responsif dan mudah digunakan.",
   },
   {
     id: 7,
-    avatar: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=80&h=80&fit=crop&crop=face",
-    name: "Laras Diningrum",
-    role: "Project Manager",
+    avatar: husnulImg,
+    name: "Husnul Hotimah",
+    role: "Staff Admin",
     text: "Koordinasi antar tim dalam pengembangan platform ini cukup terstruktur. Roadmap-nya jelas dan fokus pada kebutuhan pengguna di daerah.",
   },
   {
     id: 8,
-    avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=80&h=80&fit=crop&crop=face",
-    name: "Dito Firmansyah",
-    role: "Product Team",
+    avatar: diniImg,
+    name: "Dini Hawariw",
+    role: "Direktur Envitech",
     text: "Info.co.id membantu UMKM di daerah untuk lebih mudah ditemukan. Ini langkah nyata menuju ekosistem digital yang lebih merata di Indonesia.",
   },
 ];
@@ -169,83 +177,74 @@ export default function Home() {
   const [selectedKota, setSelectedKota] = useState("Semua");
   const [activeCategory, setActiveCategory] = useState("all");
   const [savedBiz, setSavedBiz] = useState({});
+  // Helper to read initial cache safely
+  const getInitialCache = (key, fallback) => {
+    try {
+      const item = sessionStorage.getItem(key);
+      return item ? JSON.parse(item) : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  };
+
+  const cachedBisnis = getInitialCache("cached_home_businesses", []);
+  const cachedAds = getInitialCache("cached_home_ads_obj", null);
+  const cachedBlogs = getInitialCache("cached_home_blogs", []);
+  const cachedCities = getInitialCache("cached_smart_cities", []);
+  const cachedRawCats = getInitialCache("cached_public_categories_raw", []);
+
   const [savedBlogs, setSavedBlogs] = useState({});
   const [selectedCity, setSelectedCity] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedSearchCategory, setSelectedSearchCategory] = useState("all");
   const [searchHistory, setSearchHistory] = useState([]);
   const [businesses, setBusinesses] = useState([]);
-  const [categories, setCategories] = useState([{ id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> }]);
-  const [bisnisData, setBisnisData] = useState([]);
-  const [temukanData, setTemukanData] = useState([]);
-  const [premiumAds, setPremiumAds] = useState([]);
-  const [standardAds, setStandardAds] = useState([]);
-  const [adsData, setAdsData] = useState([]);
-  const [loadingAds, setLoadingAds] = useState(true);
-  const [loadingData, setLoadingData] = useState(true);
-  const [blogsData, setBlogsData] = useState([]);
+  const [categories, setCategories] = useState(
+    Array.isArray(cachedRawCats) && cachedRawCats.length > 0
+      ? [
+          { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
+          ...cachedRawCats.map(c => ({ id: c.slug || String(c.id), label: c.name, icon: getCategoryIcon(c.icon) }))
+        ]
+      : [{ id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> }]
+  );
+  const [bisnisData, setBisnisData] = useState(cachedBisnis);
+  const [temukanData, setTemukanData] = useState(cachedBisnis);
+  const [premiumAds, setPremiumAds] = useState(cachedAds?.premium || []);
+  const [standardAds, setStandardAds] = useState(cachedAds?.standard || []);
+  const [adsData, setAdsData] = useState(cachedAds?.all || []);
+  const [loadingAds, setLoadingAds] = useState(!cachedAds);
+  const [loadingData, setLoadingData] = useState(cachedBisnis.length === 0);
+  const [blogsData, setBlogsData] = useState(cachedBlogs);
   const [testimonialsData, setTestimonialsData] = useState(TESTIMONIALS_DATA);
-  const [smartCitiesData, setSmartCitiesData] = useState([]);
+  const [smartCitiesData, setSmartCitiesData] = useState(cachedCities);
   const categoryScrollRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Categories with Client Cache
+      // 1. Try Ultra-Fast Single /home-summary Endpoint
       try {
-        sessionStorage.removeItem("cached_public_categories");
-      } catch (e) {}
+        const summaryRes = await fetch(`${import.meta.env.VITE_API_URL}/home-summary`);
+        if (summaryRes.ok) {
+          const summary = await summaryRes.json();
 
-      const cachedCategories = sessionStorage.getItem("cached_public_categories_raw");
-      if (cachedCategories) {
-        try {
-          const rawList = JSON.parse(cachedCategories);
-          if (Array.isArray(rawList) && rawList.length > 0) {
+          // Categories
+          if (Array.isArray(summary.categories) && summary.categories.length > 0) {
+            try {
+              sessionStorage.setItem("cached_public_categories_raw", JSON.stringify(summary.categories));
+            } catch (e) {}
             setCategories([
               { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
-              ...rawList.map(c => ({
+              ...summary.categories.map(c => ({
                 id: c.slug || String(c.id),
                 label: c.name,
                 icon: getCategoryIcon(c.icon)
               }))
             ]);
           }
-        } catch (e) {}
-      }
 
-      const fetchCategories = fetch(`${import.meta.env.VITE_API_URL}/categories`)
-        .then(res => res.json())
-        .then(catData => {
-          const list = Array.isArray(catData) ? catData : (Array.isArray(catData?.data) ? catData.data : []);
-          if (list.length > 0) {
-            try {
-              sessionStorage.setItem("cached_public_categories_raw", JSON.stringify(list));
-            } catch (e) {}
-            const mappedCategories = [
-              { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
-              ...list.map(c => ({
-                id: c.slug || String(c.id),
-                label: c.name,
-                icon: getCategoryIcon(c.icon)
-              }))
-            ];
-            setCategories(mappedCategories);
-          }
-        }).catch(err => console.error("Failed to fetch categories:", err));
-
-      // 2. Smart Cities with Client Cache
-      const cachedSmartCities = sessionStorage.getItem("cached_smart_cities");
-      if (cachedSmartCities) {
-        try {
-          setSmartCitiesData(JSON.parse(cachedSmartCities));
-        } catch (e) {}
-      }
-
-      const fetchSmartCities = fetch(`${import.meta.env.VITE_API_URL}/smart-cities`)
-        .then(res => res.json())
-        .then(scJson => {
-          const scData = scJson?.data || scJson || [];
-          if (Array.isArray(scData)) {
-            const mappedSc = scData.map(c => ({
+          // Smart Cities
+          if (Array.isArray(summary.smart_cities)) {
+            const mappedSc = summary.smart_cities.map(c => ({
               id: c.id,
               slug: c.slug,
               name: c.name,
@@ -258,15 +257,10 @@ export default function Home() {
               sessionStorage.setItem("cached_smart_cities", JSON.stringify(mappedSc));
             } catch (e) {}
           }
-        }).catch(err => console.error("Failed to fetch smart cities:", err));
 
-      // 3. Featured & Latest Businesses for Home (up to 24 businesses for 4 pages)
-      const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?limit=24`)
-        .then(res => res.json())
-        .then(bizJson => {
-          const bizData = bizJson?.data || bizJson || [];
-          if (Array.isArray(bizData)) {
-            const mapped = bizData.map(b => {
+          // Businesses
+          if (Array.isArray(summary.businesses)) {
+            const mappedBiz = summary.businesses.map(b => {
               const mainCategory = b.category?.parent || b.category;
               const subCategory = b.category?.parent ? b.category : null;
               const categoryName = mainCategory?.name || b.category?.name || "Umum";
@@ -292,89 +286,122 @@ export default function Home() {
                 is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
               };
             });
-            setBisnisData(mapped);
-            setTemukanData(mapped);
+            setBisnisData(mappedBiz);
+            setTemukanData(mappedBiz);
+            try {
+              sessionStorage.setItem("cached_home_businesses", JSON.stringify(mappedBiz));
+            } catch (e) {}
           }
-        }).catch(err => console.error("Failed to fetch businesses:", err));
 
-      const fetchAds = fetch(`${import.meta.env.VITE_API_URL}/advertisements`)
-        .then(res => res.json())
-        .then(adsJson => {
-          const rawList = adsJson?.data || adsJson || [];
-          if (Array.isArray(rawList) && rawList.length > 0) {
-            const mappedAds = rawList.map(ad => {
-              const biz = ad.business || {};
-              const pkgType = ad.package_type || (ad.price >= 250000 || (ad.package_name && /premium|utama|slider|unggulan/i.test(ad.package_name)) ? "premium" : "standard");
-              const ratingVal = ad.rating || (biz.ratings_avg_rating ? Number(biz.ratings_avg_rating).toFixed(1) : "4.8");
-              const ratingCount = ad.rating_count || biz.ratings_count || 0;
-              const locationStr = ad.location || (ad.city ? (ad.province ? `${ad.city}, ${ad.province}` : ad.city) : (biz.city ? (biz.province ? `${biz.city}, ${biz.province}` : biz.city) : "Indonesia"));
-
-              return {
-                id: ad.id,
-                businessId: ad.business_id || biz.id,
-                name: ad.name || biz.name || "Bisnis Pilihan",
-                package_type: pkgType,
-                rating: ratingVal,
-                rating_count: ratingCount,
-                city: ad.city || biz.city || "Indonesia",
-                province: ad.province || biz.province || "",
-                location: locationStr,
-                image: ad.image || ad.banner || ad.logo || biz.banner || biz.logo,
-                banner: ad.banner || biz.banner,
-                logo: ad.logo || biz.logo,
-              };
-            });
+          // Advertisements
+          if (Array.isArray(summary.advertisements) && summary.advertisements.length > 0) {
+            const mappedAds = summary.advertisements.map(ad => ({
+              id: ad.id,
+              businessId: ad.business_id,
+              name: ad.name || "Bisnis Pilihan",
+              package_type: ad.package_type || "standard",
+              rating: ad.rating || "4.9",
+              rating_count: ad.rating_count || 12,
+              city: ad.city || "Indonesia",
+              province: ad.province || "",
+              location: ad.location || "Indonesia",
+              image: getStorageUrl(ad.image || ad.banner || ad.logo),
+              banner: getStorageUrl(ad.banner),
+              logo: getStorageUrl(ad.logo),
+            }));
 
             const premium = mappedAds.filter(a => a.package_type === "premium");
             const standard = mappedAds.filter(a => a.package_type === "standard");
 
-            if (premium.length > 0 && standard.length > 0) {
-              setPremiumAds(premium);
-              setStandardAds(standard);
-            } else if (premium.length > 0) {
-              setPremiumAds(premium.slice(0, 4));
-              setStandardAds(premium.length > 4 ? premium.slice(4) : premium);
-            } else {
-              setPremiumAds(standard.slice(0, 3));
-              setStandardAds(standard);
-            }
+            setPremiumAds(premium.length > 0 ? premium : standard.slice(0, 4));
+            setStandardAds(standard.length > 0 ? standard : premium);
             setAdsData(mappedAds);
-          }
-        })
-        .catch(err => console.error("Failed to fetch advertisements:", err))
-        .finally(() => setLoadingAds(false));
+            setLoadingAds(false);
 
-      const fetchBlogs = fetch(`${import.meta.env.VITE_API_URL}/blogs?status=published&all=true`)
-        .then(res => res.json())
-        .then(blogsJson => {
-          const list = Array.isArray(blogsJson) ? blogsJson : (blogsJson?.data || []);
-          if (Array.isArray(list)) {
-            const mappedBlogs = list.map(b => ({
+            try {
+              sessionStorage.setItem("cached_home_ads_obj", JSON.stringify({
+                premium: premium.length > 0 ? premium : standard.slice(0, 4),
+                standard: standard.length > 0 ? standard : premium,
+                all: mappedAds,
+              }));
+            } catch (e) {}
+          }
+
+          // Blogs & Events
+          if (Array.isArray(summary.blogs)) {
+            const mappedBlogs = summary.blogs.map(b => ({
               id: b.id,
               slug: b.slug,
               title: b.title,
-              category: b.blog_category || b.category?.name || b.category || (b.type === "event" ? "Event" : "Artikel"),
+              category: b.blog_category || b.category?.name || (b.type === "event" ? "Event" : "Artikel"),
               author: b.user?.name || "Admin Info.co.id",
               date: b.published_at
                 ? new Date(b.published_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
-                : (b.created_at
-                    ? new Date(b.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
-                    : "Terbaru"),
+                : "Terbaru",
               thumbnail: b.thumbnail,
               img: getStorageUrl(b.thumbnail) || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop",
               type: b.type || "blog",
             }));
             setBlogsData(mappedBlogs);
+            try {
+              sessionStorage.setItem("cached_home_blogs", JSON.stringify(mappedBlogs));
+            } catch (e) {}
           }
-        }).catch(err => console.error("Failed to fetch blogs:", err));
 
-      // Primary data for hero & business grid
-      await Promise.allSettled([fetchCategories, fetchBusinesses, fetchSmartCities]);
+          setLoadingData(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Fast home-summary fallback:", err);
+      }
+
+      // Fallback: Individual requests
+      const fetchCategories = fetch(`${import.meta.env.VITE_API_URL}/categories`)
+        .then(res => res.json())
+        .then(catData => {
+          const list = Array.isArray(catData) ? catData : (Array.isArray(catData?.data) ? catData.data : []);
+          if (list.length > 0) {
+            setCategories([
+              { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
+              ...list.map(c => ({ id: c.slug || String(c.id), label: c.name, icon: getCategoryIcon(c.icon) }))
+            ]);
+          }
+        }).catch(err => console.error(err));
+
+      const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?limit=24`)
+        .then(res => res.json())
+        .then(bizJson => {
+          const bizData = bizJson?.data || bizJson || [];
+          if (Array.isArray(bizData)) {
+            const mapped = bizData.map(b => ({
+              id: b.id,
+              name: b.name,
+              category: b.category?.name || "Umum",
+              subCategory: null,
+              categoryColor: "#007570",
+              tags: Array.isArray(b.tags) ? b.tags : [b.name],
+              location: b.city || "Indonesia",
+              address: b.address || "Indonesia",
+              city: b.city || "Indonesia",
+              province: b.province || "",
+              views: b.views || 0,
+              status: "Buka Sekarang",
+              img: getStorageUrl(b.logo || b.banner),
+              open: true,
+              featured: b.featured,
+              description: b.description,
+              is_premium: Boolean(b.is_premium),
+            }));
+            setBisnisData(mapped);
+            setTemukanData(mapped);
+          }
+        }).catch(err => console.error(err));
+
+      await Promise.allSettled([fetchCategories, fetchBusinesses]);
       setLoadingData(false);
-
-      // Non-blocking secondary data
-      Promise.allSettled([fetchAds, fetchBlogs]);
+      setLoadingAds(false);
     };
+
     fetchData();
   }, []);
 
@@ -942,7 +969,12 @@ export default function Home() {
       {/* ── TESTIMONIALS SECTION ── */}
       <section className="testi-section reveal-on-scroll">
         <div className="testi-inner">
-          <h2 className="testi-title reveal-on-scroll">Apa Yang Mereka Katakan</h2>
+          <div className="testi-header reveal-on-scroll">
+            <h2 className="testi-title">Apa Yang Mereka Katakan</h2>
+            <p className="testi-subtitle">
+              Pengalaman dan cerita nyata dari mereka yang telah tumbuh dan berkembang bersama Info.co.id
+            </p>
+          </div>
 
           <div className="testi-grid reveal-stagger">
             {testimonialsData.length > 0 ? (

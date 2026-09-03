@@ -201,7 +201,13 @@ export default function AddProduct() {
             </div>
             <button
               type="button"
-              onClick={() => navigate("/admin-user?tab=premium")}
+              onClick={() => {
+                if (selectedBiz?.id) {
+                  navigate(`/add-business/${selectedBiz.id}?upgrade=true`);
+                } else {
+                  navigate("/admin-user?tab=bisnis");
+                }
+              }}
               style={{
                 background: "#007570",
                 color: "#ffffff",
