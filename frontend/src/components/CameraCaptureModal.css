@@ -1,0 +1,131 @@
+.camera-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.camera-modal {
+  background: #0f172a;
+  border-radius: 16px;
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.5);
+}
+
+.camera-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+.camera-modal__header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.camera-modal__close {
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+}
+
+.camera-modal__close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.camera-modal__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-modal__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-modal__video.is-mirrored {
+  transform: scaleX(-1);
+}
+
+.camera-modal__error {
+  color: #fca5a5;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 2rem;
+  line-height: 1.5;
+}
+
+.camera-modal__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 1rem;
+}
+
+.camera-modal__btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  border: none;
+}
+
+.camera-modal__btn--ghost {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.camera-modal__btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.camera-modal__btn--primary {
+  background: #007570;
+  color: #fff;
+}
+
+.camera-modal__btn--primary:hover {
+  background: #005f5b;
+}
+
+.camera-modal__btn--icon-only {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 44px;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.camera-modal__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

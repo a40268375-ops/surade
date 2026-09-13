@@ -1,0 +1,228 @@
+/* Search bar (Kata Kunci + Lokasi + tombol cari) yang dipakai bersama oleh
+   Home.jsx, Category.jsx, dan SmartCity.jsx - dipindah ke sini (dari yang
+   tadinya cuma ada di Home.css) supaya satu perubahan style otomatis
+   konsisten di semua halaman yang memakainya. */
+
+.home-search {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.28);
+  padding: 0 8px 0 20px;
+  height: 52px;
+  position: relative;
+  overflow: visible;
+}
+
+.home-search__group {
+  flex: 1;
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+}
+
+.home-search__group--keyword { position: relative; overflow: visible; }
+.home-search__group--lokasi { flex: 0 0 auto; position: relative; gap: 0; overflow: visible; }
+
+.home-search__label {
+  color: #0f172a; font-weight: 700; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0;
+}
+
+.home-search__input {
+  flex: 1; min-width: 0;
+  border: none; outline: none;
+  font-family: 'Poppins', sans-serif; font-size: 0.82rem; color: #334155;
+  background: transparent;
+}
+.home-search__input::placeholder { color: #94a3b8; }
+
+.home-search__divider {
+  width: 1px; height: 26px;
+  background: rgba(15,23,42,0.14);
+  flex-shrink: 0; margin: 0 10px;
+}
+
+.home-search__kota-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 10px;
+  background: transparent; border: none; cursor: pointer;
+  font-family: 'Poppins', sans-serif; font-size: 0.82rem; font-weight: 500; color: #334155;
+  white-space: nowrap;
+}
+.home-search__kota-btn:hover { color: #10b981; }
+
+.home-search__kota-caret { color: #64748b; transition: transform 0.2s; flex-shrink: 0; }
+.home-search__kota-caret.open { transform: rotate(180deg); }
+
+/* Kota Dropdown */
+.home-kota-dropdown {
+  position: absolute;
+  top: calc(100% + 10px); right: 0;
+  width: 220px;
+  z-index: 1100;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.16);
+  border: 1px solid rgba(15,23,42,0.08);
+  overflow: hidden;
+  animation: dropFade 0.14s ease;
+}
+@keyframes dropFade {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.home-kota-dropdown__search {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 13px;
+  border-bottom: 1px solid rgba(15,23,42,0.07);
+}
+.home-kota-dropdown__icon { color: #94a3b8; flex-shrink: 0; }
+.home-kota-dropdown__input {
+  flex: 1; border: none; outline: none;
+  font-family: 'Poppins', sans-serif; font-size: 0.78rem; color: #334155;
+  background: transparent;
+}
+.home-kota-dropdown__input::placeholder { color: #94a3b8; }
+
+.home-kota-dropdown__list {
+  list-style: none; max-height: 180px;
+  overflow-y: auto; padding: 5px 0;
+  scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
+}
+.home-kota-dropdown__list::-webkit-scrollbar { width: 4px; }
+.home-kota-dropdown__list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+.home-kota-dropdown__item {
+  padding: 7px 14px;
+  font-size: 0.8rem; color: #334155; cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.home-kota-dropdown__item:hover { background: #f1f5f9; color: #10b981; }
+.home-kota-dropdown__item.selected { background: #f0fffe; color: #10b981; font-weight: 600; }
+.home-kota-dropdown__empty { padding: 11px 14px; font-size: 0.78rem; color: #94a3b8; text-align: center; }
+.home-keyword-dropdown__empty { padding: 11px 14px; font-size: 0.78rem; color: #94a3b8; text-align: center; }
+
+/* Keyword / History & Categories Dropdown */
+.home-keyword-dropdown {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 0;
+  z-index: 1100;
+  width: 320px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 16px 50px rgba(0,0,0,0.28);
+  border: 1px solid rgba(15,23,42,0.12);
+  overflow-y: auto;
+  max-height: min(420px, 70vh);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+  animation: dropFade 0.14s ease;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.home-keyword-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.home-keyword-dropdown::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.home-keyword-dropdown__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.home-keyword-dropdown__section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+  padding-left: 6px;
+}
+
+.home-keyword-dropdown__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-keyword-dropdown__item {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.home-keyword-dropdown__item:hover {
+  background: #f1f5f9;
+  color: #10b981;
+}
+
+/* History items styling */
+.home-keyword-dropdown__item--history {
+  justify-content: space-between;
+  gap: 8px;
+}
+.home-keyword-dropdown__history-text {
+  font-weight: 500;
+}
+.home-keyword-dropdown__history-cat {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+/* Category items styling */
+.home-keyword-dropdown__item--category {
+  gap: 10px;
+}
+.home-keyword-dropdown__cat-icon {
+  display: flex;
+  align-items: center;
+  color: #64748b;
+}
+.home-keyword-dropdown__item--category:hover .home-keyword-dropdown__cat-icon {
+  color: #10b981;
+}
+.home-keyword-dropdown__cat-label {
+  font-weight: 500;
+}
+
+/* Search button */
+.home-search__button {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  border-radius: 50%; border: none;
+  background: #111827; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; margin-left: 4px;
+  transition: background 0.18s, transform 0.18s;
+}
+.home-search__button:hover { background: #10b981; transform: scale(1.06); }
+
+@media (max-width: 640px) {
+  .home-search { flex-direction: column; border-radius: 16px; height: auto; padding: 14px; gap: 10px; align-items: stretch; }
+  .home-search__group { padding: 0; }
+  .home-search__group--lokasi { flex: unset; }
+  .home-search__divider { width: 100%; height: 1px; margin: 0; }
+  .home-search__button { width: 100%; border-radius: 8px; height: 40px; margin-left: 0; }
+  .home-kota-dropdown,
+  .home-keyword-dropdown { left: 0; right: 0; width: auto; }
+}

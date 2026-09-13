@@ -1,0 +1,89 @@
+/* RichTextEditor.css */
+
+.rich-text-editor {
+  width: 100%;
+}
+
+.editor-content {
+  min-height: 120px;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  color: #374151;
+  background: white;
+}
+
+.editor-content:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.editor-content[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Basic styling for rich text content */
+.editor-content p {
+  margin: 0 0 8px 0;
+}
+
+.editor-content h1, 
+.editor-content h2, 
+.editor-content h3, 
+.editor-content h4, 
+.editor-content h5, 
+.editor-content h6 {
+  margin: 16px 0 8px 0;
+  font-weight: 600;
+}
+
+.editor-content ul, 
+.editor-content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.editor-content li {
+  margin-bottom: 4px;
+}
+
+.editor-content blockquote {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 4px solid #e5e7eb;
+  background: #f9fafb;
+  font-style: italic;
+}
+
+.editor-content a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.editor-content code {
+  background: #f3f4f6;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875em;
+}
+
+.editor-content pre {
+  background: #f3f4f6;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.editor-content pre code {
+  background: none;
+  padding: 0;
+}

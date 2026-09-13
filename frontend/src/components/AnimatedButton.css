@@ -1,0 +1,314 @@
+/* ====================================
+   ANIMATED BUTTON COMPONENT STYLES
+   ==================================== */
+
+.animated-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  user-select: none;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   SIZES
+   ========================================================================== */
+
+.animated-btn--sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  gap: 6px;
+}
+
+.animated-btn--md {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.animated-btn--lg {
+  height: 48px;
+  padding: 0 20px;
+  font-size: 16px;
+  gap: 10px;
+}
+
+.animated-btn--icon-only.animated-btn--sm {
+  width: 32px;
+  padding: 0;
+}
+
+.animated-btn--icon-only.animated-btn--md {
+  width: 40px;
+  padding: 0;
+}
+
+.animated-btn--icon-only.animated-btn--lg {
+  width: 48px;
+  padding: 0;
+}
+
+/* ==========================================================================
+   VARIANTS
+   ========================================================================== */
+
+/* Primary */
+.animated-btn--primary {
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(13, 148, 136, 0.2);
+}
+
+.animated-btn--primary:hover:not(.animated-btn--disabled) {
+  background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+}
+
+.animated-btn--primary:focus-visible {
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.3);
+}
+
+/* Secondary */
+.animated-btn--secondary {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(100, 116, 139, 0.2);
+}
+
+.animated-btn--secondary:hover:not(.animated-btn--disabled) {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+}
+
+/* Outline */
+.animated-btn--outline {
+  background: #ffffff;
+  color: #0d9488;
+  border: 1.5px solid #0d9488;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.animated-btn--outline:hover:not(.animated-btn--disabled) {
+  background: #f0fdfa;
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+/* Ghost */
+.animated-btn--ghost {
+  background: transparent;
+  color: #64748b;
+}
+
+.animated-btn--ghost:hover:not(.animated-btn--disabled) {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+/* Danger */
+.animated-btn--danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.animated-btn--danger:hover:not(.animated-btn--disabled) {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* ==========================================================================
+   HOVER EFFECTS
+   ========================================================================== */
+
+.animated-btn--hover-lift:hover:not(.animated-btn--disabled) {
+  transform: translateY(-2px);
+}
+
+.animated-btn--hover-scale:hover:not(.animated-btn--disabled) {
+  transform: scale(1.02);
+}
+
+.animated-btn--hover-glow:hover:not(.animated-btn--disabled) {
+  box-shadow: 0 0 20px rgba(13, 148, 136, 0.4);
+}
+
+/* ==========================================================================
+   STATES
+   ========================================================================== */
+
+/* Disabled */
+.animated-btn--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Loading */
+.animated-btn--loading {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Active/Press Effect */
+.animated-btn:active:not(.animated-btn--disabled) {
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
+   CONTENT ELEMENTS
+   ========================================================================== */
+
+.animated-btn__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+  transition: opacity 0.2s ease;
+}
+
+.animated-btn__content--hidden {
+  opacity: 0;
+}
+
+.animated-btn__text {
+  line-height: 1;
+}
+
+.animated-btn__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.animated-btn__icon--left {
+  margin-right: -2px;
+}
+
+.animated-btn__icon--right {
+  margin-left: -2px;
+}
+
+/* ==========================================================================
+   LOADING SPINNER
+   ========================================================================== */
+
+.animated-btn__spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.animated-btn__spinner svg {
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+}
+
+/* ==========================================================================
+   RIPPLE EFFECT
+   ========================================================================== */
+
+.animated-btn--ripple {
+  overflow: hidden;
+}
+
+.animated-btn__ripples {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.animated-btn__ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  transform: translate(-50%, -50%);
+  animation: ripple 0.6s ease-out;
+  pointer-events: none;
+}
+
+@keyframes ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .animated-btn--lg {
+    height: 44px;
+    padding: 0 18px;
+    font-size: 15px;
+  }
+  
+  .animated-btn--md {
+    height: 38px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+  
+  .animated-btn--sm {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .animated-btn {
+    min-height: 44px; /* Minimum touch target */
+  }
+  
+  .animated-btn--hover-lift:hover,
+  .animated-btn--hover-scale:hover,
+  .animated-btn--hover-glow:hover {
+    transform: none;
+    box-shadow: inherit;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animated-btn {
+    transition: none;
+  }
+  
+  .animated-btn__ripple {
+    display: none;
+  }
+  
+  .animated-btn:active {
+    transform: none;
+  }
+}

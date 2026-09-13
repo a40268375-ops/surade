@@ -1,0 +1,137 @@
+.avatar-cropper-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.avatar-cropper {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+}
+
+.avatar-cropper__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.avatar-cropper__header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.avatar-cropper__close {
+  border: none;
+  background: #f1f5f9;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #475569;
+}
+
+.avatar-cropper__close:hover {
+  background: #e2e8f0;
+}
+
+.avatar-cropper__hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0 0 1rem;
+}
+
+.avatar-cropper__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0f172a;
+  touch-action: none;
+  cursor: grab;
+}
+
+.avatar-cropper__canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.avatar-cropper__canvas.is-dragging {
+  cursor: grabbing;
+}
+
+/* Bingkai bulat transparan di atas canvas, cuma buat kasih tahu area
+   yang bakal jadi avatar bulat nantinya (bagian luar lingkaran gelap) */
+.avatar-cropper__circle-mask {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 999px rgba(15, 23, 42, 0.45);
+  pointer-events: none;
+}
+
+.avatar-cropper__zoom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 1rem 0 1.25rem;
+  color: #64748b;
+}
+
+.avatar-cropper__zoom input[type="range"] {
+  flex: 1;
+  accent-color: #007570;
+}
+
+.avatar-cropper__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.avatar-cropper__btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  border: none;
+}
+
+.avatar-cropper__btn--ghost {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.avatar-cropper__btn--ghost:hover {
+  background: #e2e8f0;
+}
+
+.avatar-cropper__btn--primary {
+  background: #007570;
+  color: #fff;
+}
+
+.avatar-cropper__btn--primary:hover {
+  background: #005f5b;
+}

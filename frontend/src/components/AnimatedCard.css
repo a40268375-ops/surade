@@ -1,0 +1,328 @@
+/* ====================================
+   ANIMATED CARD COMPONENT STYLES
+   ==================================== */
+
+.animated-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   VARIANTS
+   ========================================================================== */
+
+/* Default */
+.animated-card--default {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Elevated */
+.animated-card--elevated {
+  border: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 
+              0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Outlined */
+.animated-card--outlined {
+  border: 2px solid #e2e8f0;
+  box-shadow: none;
+}
+
+/* Ghost */
+.animated-card--ghost {
+  border: 1px solid transparent;
+  box-shadow: none;
+  background: rgba(248, 250, 252, 0.5);
+}
+
+/* ==========================================================================
+   HOVER EFFECTS
+   ========================================================================== */
+
+.animated-card--hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12), 
+              0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.animated-card--hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.animated-card--hover-glow:hover {
+  box-shadow: 0 0 20px rgba(13, 148, 136, 0.2),
+              0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+/* ==========================================================================
+   CLICKABLE STATE
+   ========================================================================== */
+
+.animated-card--clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.animated-card--clickable:active {
+  transform: scale(0.98);
+}
+
+.animated-card--clickable:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.3);
+}
+
+/* ==========================================================================
+   ENTRANCE ANIMATIONS
+   ========================================================================== */
+
+.animated-card--slideUp {
+  animation: cardSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.animated-card--slideLeft {
+  animation: cardSlideLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.animated-card--slideRight {
+  animation: cardSlideRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.animated-card--fadeIn {
+  animation: cardFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+}
+
+.animated-card--scaleIn {
+  animation: cardScaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+@keyframes cardSlideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cardSlideLeft {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cardSlideRight {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cardFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cardScaleIn {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ==========================================================================
+   CONTENT STRUCTURE
+   ========================================================================== */
+
+.animated-card__content {
+  position: relative;
+  z-index: 1;
+}
+
+.animated-card__header {
+  padding: 20px 20px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.animated-card__body {
+  padding: 20px;
+}
+
+.animated-card__footer {
+  padding: 0 20px 20px;
+  border-top: 1px solid #f1f5f9;
+  margin-top: auto;
+}
+
+/* Header without border */
+.animated-card__header:only-child,
+.animated-card__header + .animated-card__body:last-child {
+  border-bottom: none;
+}
+
+.animated-card__header + .animated-card__body {
+  padding-top: 16px;
+}
+
+/* Footer without border */
+.animated-card__footer:first-child,
+.animated-card__body + .animated-card__footer:last-child {
+  border-top: none;
+}
+
+.animated-card__body + .animated-card__footer {
+  padding-top: 16px;
+}
+
+/* Single content area */
+.animated-card__content > :only-child {
+  padding: 20px;
+}
+
+/* ==========================================================================
+   LOADING STATE
+   ========================================================================== */
+
+.animated-card--loading {
+  pointer-events: none;
+}
+
+.animated-card--loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(2px);
+  z-index: 10;
+}
+
+/* ==========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .animated-card__header,
+  .animated-card__body,
+  .animated-card__footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
+  .animated-card__content > :only-child {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .animated-card {
+    border-radius: 8px;
+  }
+  
+  .animated-card__header,
+  .animated-card__body,
+  .animated-card__footer {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  
+  .animated-card__header {
+    padding-top: 16px;
+  }
+  
+  .animated-card__body {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  
+  .animated-card__footer {
+    padding-bottom: 16px;
+  }
+  
+  .animated-card__content > :only-child {
+    padding: 12px;
+  }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY & REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-card {
+    transition: none;
+  }
+  
+  .animated-card--slideUp,
+  .animated-card--slideLeft,
+  .animated-card--slideRight,
+  .animated-card--fadeIn,
+  .animated-card--scaleIn {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  
+  .animated-card--hover-lift:hover,
+  .animated-card--hover-scale:hover {
+    transform: none;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .animated-card--hover-lift:hover,
+  .animated-card--hover-scale:hover,
+  .animated-card--hover-glow:hover {
+    transform: none;
+    box-shadow: inherit;
+  }
+  
+  .animated-card--clickable:active {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   SPECIAL VARIANTS
+   ========================================================================== */
+
+/* Success card */
+.animated-card--success {
+  border-left: 4px solid #22c55e;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+/* Warning card */
+.animated-card--warning {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+/* Error card */
+.animated-card--error {
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+}
+
+/* Info card */
+.animated-card--info {
+  border-left: 4px solid #3b82f6;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}

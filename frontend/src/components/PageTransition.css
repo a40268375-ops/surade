@@ -1,0 +1,190 @@
+/* ====================================
+   PAGE TRANSITION COMPONENT STYLES
+   ==================================== */
+
+.page-transition {
+  width: 100%;
+}
+
+/* ==========================================================================
+   FADE TRANSITIONS
+   ========================================================================== */
+
+.page-transition--fade-in {
+  animation: pageTransitionFadeIn var(--duration-normal) var(--ease-out-smooth) forwards;
+}
+
+.page-transition--fade-out {
+  animation: pageTransitionFadeOut var(--duration-normal) var(--ease-in-smooth) forwards;
+}
+
+@keyframes pageTransitionFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pageTransitionFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   SLIDE TRANSITIONS
+   ========================================================================== */
+
+.page-transition--slideLeft-in {
+  animation: pageTransitionSlideLeftIn var(--duration-normal) var(--ease-out-smooth) forwards;
+}
+
+.page-transition--slideLeft-out {
+  animation: pageTransitionSlideLeftOut var(--duration-normal) var(--ease-in-smooth) forwards;
+}
+
+.page-transition--slideRight-in {
+  animation: pageTransitionSlideRightIn var(--duration-normal) var(--ease-out-smooth) forwards;
+}
+
+.page-transition--slideRight-out {
+  animation: pageTransitionSlideRightOut var(--duration-normal) var(--ease-in-smooth) forwards;
+}
+
+.page-transition--slideUp-in {
+  animation: pageTransitionSlideUpIn var(--duration-normal) var(--ease-out-smooth) forwards;
+}
+
+.page-transition--slideUp-out {
+  animation: pageTransitionSlideUpOut var(--duration-normal) var(--ease-in-smooth) forwards;
+}
+
+.page-transition--slideDown-in {
+  animation: pageTransitionSlideDownIn var(--duration-normal) var(--ease-out-smooth) forwards;
+}
+
+.page-transition--slideDown-out {
+  animation: pageTransitionSlideDownOut var(--duration-normal) var(--ease-in-smooth) forwards;
+}
+
+@keyframes pageTransitionSlideLeftIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pageTransitionSlideLeftOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes pageTransitionSlideRightIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pageTransitionSlideRightOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+@keyframes pageTransitionSlideUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageTransitionSlideUpOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+@keyframes pageTransitionSlideDownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageTransitionSlideDownOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* ==========================================================================
+   TAB TRANSITIONS
+   ========================================================================== */
+
+.tab-transition {
+  min-height: 200px; /* Prevent layout shift during transitions */
+}
+
+/* ==========================================================================
+   ACCESSIBILITY
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition--fade-in,
+  .page-transition--fade-out,
+  .page-transition--slideLeft-in,
+  .page-transition--slideLeft-out,
+  .page-transition--slideRight-in,
+  .page-transition--slideRight-out,
+  .page-transition--slideUp-in,
+  .page-transition--slideUp-out,
+  .page-transition--slideDown-in,
+  .page-transition--slideDown-out {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

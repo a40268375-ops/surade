@@ -1,0 +1,1172 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+
+/* ─────────────────────────────────────────────
+   PRICING PAGE
+───────────────────────────────────────────── */
+.pricing-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ─────────────────────────────────────────────
+   HERO SECTION
+───────────────────────────────────────────── */
+.pricing-hero {
+  padding: 120px 20px 60px;
+  text-align: center;
+  background: linear-gradient(135deg, #007570 0%, #005a58 100%);
+  color: #fff;
+}
+
+.pricing-hero__content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.pricing-hero__title {
+  font-size: clamp(2rem, 5vw, 2.5rem);
+  font-weight: 800;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+
+.pricing-hero__subtitle {
+  font-size: 1.1rem;
+  opacity: 0.95;
+  font-weight: 400;
+}
+
+/* ─────────────────────────────────────────────
+   PRICING PLANS SECTION
+───────────────────────────────────────────── */
+.pricing-plans {
+  padding: 60px 20px 80px;
+}
+
+.pricing-plans__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+@media (max-width: 900px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   PRICING CARD
+───────────────────────────────────────────── */
+.pricing-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 2.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s, box-shadow 0.3s;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pricing-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.pricing-card--free {
+  border: 2px solid #cbd5e1;
+}
+
+.pricing-card--premium {
+  border: 3px solid #159c60;
+  background: linear-gradient(135deg, #ffffff 0%, #eefdf5 100%);
+}
+
+.pricing-card__hot-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+}
+
+/* ─────────────────────────────────────────────
+   CARD HEADER
+───────────────────────────────────────────── */
+.pricing-card__header {
+  text-align: center;
+  padding-bottom: 2rem;
+  border-bottom: 2px solid #f1f5f9;
+  margin-bottom: 2rem;
+}
+
+.pricing-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 30px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+}
+
+.pricing-card__badge--premium {
+  background: linear-gradient(135deg, #159c60, #0f7f4d);
+  color: #fff;
+}
+
+.pricing-card__title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+}
+
+.pricing-card--premium .pricing-card__title {
+  background: linear-gradient(135deg, #159c60, #0f7f4d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.pricing-card__subtitle {
+  font-size: 0.95rem;
+  color: #64748b;
+  margin: 0 0 20px 0;
+}
+
+.pricing-card__price {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.pricing-card__currency {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.pricing-card__amount {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.pricing-card__note {
+  font-size: 0.85rem;
+  color: #0f7f4d;
+  text-align: center;
+  display: block;
+  font-weight: 600;
+  line-height: 1.4;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+/* ─────────────────────────────────────────────
+   FEATURES LIST
+───────────────────────────────────────────── */
+.pricing-card__features {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 2rem;
+  flex: 1;
+}
+
+.pricing-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pricing-feature__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pricing-feature__icon--available {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.pricing-feature__icon--unavailable {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.pricing-feature__text {
+  font-size: 0.9rem;
+  color: #334155;
+  font-weight: 500;
+}
+
+.pricing-feature__text--unavailable {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+/* ─────────────────────────────────────────────
+   BUTTON
+───────────────────────────────────────────── */
+.pricing-card__button {
+  width: 100%;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  font-family: 'Poppins', sans-serif;
+}
+
+.pricing-card__button--free {
+  background: #f1f5f9;
+  color: #475569;
+  border: 2px solid #cbd5e1;
+}
+
+.pricing-card__button--free:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  transform: translateY(-2px);
+}
+
+.pricing-card__button--premium {
+  background: linear-gradient(135deg, #159c60, #0f7f4d);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(21, 156, 96, 0.3);
+}
+
+.pricing-card__button--premium:hover {
+  background: linear-gradient(135deg, #0f7f4d, #0c6b41);
+  box-shadow: 0 12px 32px rgba(21, 156, 96, 0.4);
+  transform: translateY(-2px);
+}
+
+/* ─────────────────────────────────────────────
+   INFO SECTION
+───────────────────────────────────────────── */
+.pricing-info {
+  background: #fff;
+  border-left: 4px solid #159c60;
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.pricing-info__text {
+  font-size: 0.95rem;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.pricing-info__text strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+/* === PRICING PAGE BACK BUTTON === */
+.pricing-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 1.5rem;
+}
+
+.pricing-back-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(-2px);
+}
+
+/* Update button disabled state */
+.pricing-card__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.pricing-card__button:disabled:hover {
+  transform: none !important;
+}
+
+/* === MULTI-STEP PRICING STYLES === */
+
+/* Step Indicator */
+.pricing-steps-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 2rem 0 1rem;
+}
+
+.pricing-step-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.pricing-step-dot.active {
+  background: #159c60;
+  box-shadow: 0 0 0 4px rgba(21, 156, 96, 0.3);
+}
+
+.pricing-step-line {
+  width: 60px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.pricing-steps-labels {
+  display: flex;
+  justify-content: center;
+  gap: 6rem;
+  margin-bottom: 2rem;
+}
+
+.pricing-steps-labels span {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.pricing-steps-labels span.active {
+  color: white;
+  font-weight: 600;
+}
+
+/* Step Content */
+.pricing-step {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.pricing-step__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+/* Form Styles */
+.pricing-form-container {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.pricing-form-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  max-width: 600px;
+  width: 100%;
+}
+
+.pricing-form-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.pricing-form-header h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.pricing-form-header p {
+  color: #6b7280;
+  margin: 0;
+}
+
+.pricing-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.pricing-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pricing-form-group label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.pricing-form-group select,
+.pricing-form-group textarea {
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.3s ease;
+}
+
+.pricing-form-group select:focus,
+.pricing-form-group textarea:focus {
+  outline: none;
+  border-color: #159c60;
+}
+
+.pricing-form-hint {
+  font-size: 0.85rem;
+  color: #f59e0b;
+  margin: 0;
+}
+
+.pricing-form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* Payment Styles */
+.pricing-payment-container {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.pricing-payment-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  max-width: 600px;
+  width: 100%;
+}
+
+.pricing-payment-summary {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.pricing-payment-summary h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 1rem;
+}
+
+.pricing-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.pricing-summary-item:last-child {
+  border-bottom: none;
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+  border-top: 2px solid #e5e7eb;
+}
+
+.pricing-total {
+  color: #159c60;
+  font-size: 1.1rem;
+}
+
+.pricing-summary-notes {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.pricing-summary-notes span {
+  font-weight: 600;
+  color: #374151;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.pricing-summary-notes p {
+  color: #6b7280;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.pricing-payment-method h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.pricing-payment-method p {
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+/* BARU: pemilihan paket asli (harga dari backend), pengganti dropdown
+   "Bulanan/Tahunan - Rp0 (Donasi)" yang lama dan tidak nyambung ke server. */
+.pricing-plan-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+
+.pricing-plan-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.pricing-plan-option:hover {
+  border-color: #007570;
+}
+
+.pricing-plan-option--active {
+  border-color: #007570;
+  background: #f0fdfa;
+}
+
+.pricing-plan-option input {
+  accent-color: #007570;
+}
+
+.pricing-plan-option__label {
+  flex: 1;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.pricing-plan-option__price {
+  font-weight: 700;
+  color: #007570;
+}
+
+/* BARU: pilihan metode pembayaran + nomor tujuan transfer, dan kotak
+   upload bukti transfer - keduanya WAJIB diisi oleh backend
+   (SubscriptionController) tapi sebelumnya tidak ada di form sama sekali. */
+.pricing-method-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.pricing-method-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #475569;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.pricing-method-option:hover {
+  border-color: #007570;
+}
+
+.pricing-method-option--active {
+  border-color: #007570;
+  background: #f0fdfa;
+  color: #007570;
+}
+
+.pricing-method-option input {
+  accent-color: #007570;
+}
+
+.pricing-method-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.pricing-method-details strong {
+  color: #007570;
+}
+
+.pricing-copy-btn {
+  margin-left: auto;
+  border: none;
+  background: #e2e8f0;
+  color: #475569;
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+}
+
+.pricing-copy-btn:hover {
+  background: #007570;
+  color: #fff;
+}
+
+.pricing-upload-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 28px;
+  cursor: pointer;
+  color: #64748b;
+  margin-bottom: 1rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.pricing-upload-box:hover {
+  border-color: #007570;
+  background: #f0fdfa;
+}
+
+.pricing-upload-preview {
+  max-height: 160px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.pricing-form-error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.pricing-payment-note {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.pricing-payment-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+/* Button Styles */
+.pricing-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  flex: 1;
+  justify-content: center;
+}
+
+.pricing-btn--primary {
+  background: #159c60;
+  color: white;
+}
+
+.pricing-btn--primary:hover {
+  background: #0f7f4d;
+  transform: translateY(-1px);
+}
+
+.pricing-btn--secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.pricing-btn--secondary:hover {
+  background: #e5e7eb;
+}
+
+.pricing-btn--success {
+  background: linear-gradient(135deg, #159c60 0%, #0f7f4d 100%);
+  color: white;
+}
+
+.pricing-btn--success:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(21, 156, 96, 0.3);
+}
+
+.pricing-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pricing-steps-labels {
+    gap: 2rem;
+  }
+  
+  .pricing-form-actions,
+  .pricing-payment-actions {
+    flex-direction: column;
+  }
+  
+  .pricing-btn {
+    flex: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   FIX + REDESIGN — konsisten dengan tema hijau Dashboard
+   yang baru (blok ini ditaruh di akhir supaya override
+   rule di atas tanpa menghapus apa pun).
+═══════════════════════════════════════════════════ */
+
+/* FIX UTAMA: .pricing-content dipakai di Pricing.jsx tapi
+   sebelumnya tidak pernah didefinisikan sama sekali di CSS
+   ini — itulah sebabnya konten wizard di gambar 2 kelihatan
+   mepet/tidak berjarak dari hero. */
+.pricing-content {
+  padding: 3rem 20px 5rem;
+}
+
+.pricing-content__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Hero: rapikan jarak supaya tombol "Kembali" & step indicator
+   tidak terlalu mepet ke tepi atas di layar pendek/scroll awal. */
+.pricing-hero {
+  padding: 100px 20px 50px;
+}
+
+.pricing-back-btn {
+  margin-bottom: 2rem;
+}
+
+/* Step dot & garis dibikin lebih jelas kontennya sudah di
+   step mana (warna hijau solid utk yg belum aktif juga,
+   bukan transparan putih yg susah dibaca di layar terang). */
+.pricing-step-dot {
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.pricing-step-dot.active {
+  background: #fff;
+  color: #0f7f4d;
+  border-color: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.25);
+}
+
+.pricing-step-line {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Form & payment card diberi border tipis + shadow lebih halus,
+   selaras dengan gaya kartu putih di Dashboard. */
+.pricing-form-card,
+.pricing-payment-card {
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.pricing-form-group select:focus,
+.pricing-form-group textarea:focus {
+  box-shadow: 0 0 0 3px rgba(21, 156, 96, 0.15);
+}
+
+/* Ringkasan pesanan diberi aksen kartu hijau muda supaya
+   "Total Biaya" lebih menonjol, senada dengan db-referral-box
+   / db-info-banner di Dashboard. */
+.pricing-payment-summary {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  border-bottom: none;
+}
+
+.pricing-summary-item {
+  padding: 0.6rem 0;
+}
+
+.pricing-summary-item:last-child {
+  background: #eefdf5;
+  margin: 0.5rem -1.5rem -1.25rem;
+  padding: 1rem 1.5rem;
+  border-radius: 0 0 12px 12px;
+  border-top: 1px dashed #a7f3d0;
+}
+/* Payment Method Modal Styles V2 - Same as Dashboard */
+.payment-method-modal-v2 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.payment-method-modal__backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.payment-method-modal__content-v2 {
+  position: relative;
+  background: #2C3E50;
+  border-radius: 16px;
+  width: 95%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  color: white;
+}
+
+.payment-method-modal__header-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: #34495E;
+  border-bottom: 1px solid #4A5568;
+}
+
+.payment-method-modal__header-v2 h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+}
+
+.payment-method-modal__close {
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #BDC3C7;
+  transition: all 0.2s;
+}
+
+.payment-method-modal__close:hover {
+  background: #4A5568;
+  color: white;
+}
+
+.payment-method-modal__body-v2 {
+  display: flex;
+  height: 500px;
+}
+
+/* Sidebar Categories */
+.payment-categories-sidebar {
+  width: 250px;
+  background: #34495E;
+  padding: 0;
+  border-right: 1px solid #4A5568;
+}
+
+.payment-category-btn {
+  display: block;
+  width: 100%;
+  padding: 18px 24px;
+  background: none;
+  border: none;
+  color: #BDC3C7;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 1px solid #4A5568;
+}
+
+.payment-category-btn:hover {
+  background: #4A5568;
+  color: white;
+}
+
+.payment-category-btn.active {
+  background: #E67E22;
+  color: white;
+  border-left: 4px solid #D35400;
+}
+
+/* Main Payment Methods Area */
+.payment-methods-main {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.payment-methods-grid-v2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.payment-method-card-v2 {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #3F5570;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.payment-method-card-v2:hover {
+  background: #4A6380;
+  border-color: #5DADE2;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(93, 173, 226, 0.3);
+}
+
+.payment-method-card-v2.selected {
+  background: #2E86AB;
+  border-color: #5DADE2;
+  box-shadow: 0 0 20px rgba(93, 173, 226, 0.4);
+}
+
+.payment-method-icon-v2 {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.payment-method-name-v2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  flex: 1;
+}
+
+/* Footer with inline payment summary */
+.payment-method-modal__footer-v2 {
+  background: #34495E;
+  border-top: 1px solid #4A5568;
+  padding: 20px 24px;
+}
+
+.payment-summary-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.payment-summary-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.payment-summary-business {
+  font-weight: 600;
+  color: #ECF0F1;
+  font-size: 1rem;
+}
+
+.payment-summary-package {
+  color: #BDC3C7;
+  font-size: 0.875rem;
+}
+
+.payment-summary-amount {
+  font-weight: 700;
+  color: #2ECC71;
+  font-size: 1.125rem;
+  margin-left: auto;
+}
+
+.payment-confirm-btn {
+  background: #27AE60;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.payment-confirm-btn:hover:not(:disabled) {
+  background: #229954;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+}
+
+.payment-confirm-btn:disabled {
+  background: #7F8C8D;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Pricing Page Specific Styles */
+.pricing-payment-action {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.pricing-btn--large {
+  padding: 16px 32px;
+  font-size: 1.125rem;
+  min-width: 250px;
+}
+
+.selected-payment-info {
+  margin-top: 1rem;
+  padding: 16px;
+  background: #f0f9ff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.selected-payment-info p {
+  margin: 0 0 12px 0;
+  color: #374151;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .payment-method-modal__content-v2 {
+    width: 98%;
+    height: 95vh;
+  }
+  
+  .payment-method-modal__body-v2 {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .payment-categories-sidebar {
+    width: 100%;
+    display: flex;
+    overflow-x: auto;
+    padding: 0;
+  }
+  
+  .payment-category-btn {
+    min-width: 150px;
+    white-space: nowrap;
+    border-bottom: none;
+    border-right: 1px solid #4A5568;
+  }
+  
+  .payment-methods-grid-v2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .payment-summary-inline {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .payment-summary-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .payment-confirm-btn {
+    width: 100%;
+  }
+}
