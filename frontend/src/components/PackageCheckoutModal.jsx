@@ -319,7 +319,7 @@ export default function PackageCheckoutModal({
               }}>
                 <h5 style={{ margin: "0 0 0.75rem", fontSize: "0.875rem", fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <Building2 size={16} color="#0b4f8a" />
-                  Rekening Resmi Info.co.id (a.n Triwala Mitra Bestari)
+                  Rekening Resmi Surade.co.id (a.n Triwala Mitra Bestari)
                 </h5>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>

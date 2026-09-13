@@ -7,7 +7,13 @@ const api = axios.create({
     },
 });
 
+let activeRequests = 0;
+
 api.interceptors.request.use((config) => {
+    activeRequests++;
+    if (activeRequests === 1 && typeof window !== "undefined") {
+        window.dispatchEvent(new Event("app:loading-start"));
+    }
 
     const token = localStorage.getItem("token");
 
@@ -19,8 +25,18 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        activeRequests = Math.max(0, activeRequests - 1);
+        if (activeRequests === 0 && typeof window !== "undefined") {
+            window.dispatchEvent(new Event("app:loading-stop"));
+        }
+        return response;
+    },
     (error) => {
+        activeRequests = Math.max(0, activeRequests - 1);
+        if (activeRequests === 0 && typeof window !== "undefined") {
+            window.dispatchEvent(new Event("app:loading-stop"));
+        }
         if (error.response && error.response.status === 401) {
             const token = localStorage.getItem("token");
             if (token) {

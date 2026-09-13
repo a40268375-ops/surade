@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import "./Blog.css";
 import { DEFAULT_AVATAR } from "../utils/constants";
+import blogHeroBg from "../assets/blog-hero-bg.jpg";
 
 export default function Blog() {
   const navigate = useNavigate();
@@ -58,7 +59,16 @@ export default function Blog() {
       (Array.isArray(localBlogs) ? localBlogs : []).forEach(id => { blogSavedMap[id] = true; });
     } catch (e) {}
 
-    if (token) {
+    // PERBAIKAN: /my-blog-favorites dibatasi backend cuma buat role
+    // "user" - dulu dipanggil untuk semua akun login termasuk admin,
+    // jadi admin selalu dapat error 403 di sini. Sekarang dilewati kalau
+    // bukan role "user".
+    let isRegularUser = false;
+    try {
+      isRegularUser = JSON.parse(localStorage.getItem("user") || "null")?.role === "user";
+    } catch (e) {}
+
+    if (token && isRegularUser) {
       try {
         const resBlog = await api.get("/my-blog-favorites");
         const blogData = resBlog.data?.data || resBlog.data || [];
@@ -202,7 +212,7 @@ export default function Blog() {
 
       {/* ── BLOG HERO ── */}
       <section className="blog-hero">
-        <div className="blog-hero__bg" />
+        <div className="blog-hero__bg" style={{ backgroundImage: `url(${blogHeroBg})` }} />
         <div className="blog-hero__overlay" />
         <div className="blog-hero__content">
           <div className="blog-hero__breadcrumb">
@@ -222,7 +232,7 @@ export default function Blog() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.5rem",
-                background: "#0b4f8a",
+                background: "linear-gradient(135deg, #007570 0%, #00a896 100%)",
                 color: "#ffffff",
                 padding: "0.625rem 1.25rem",
                 borderRadius: "9999px",
@@ -230,7 +240,7 @@ export default function Blog() {
                 fontSize: "0.875rem",
                 fontWeight: 700,
                 cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+                boxShadow: "0 4px 14px rgba(0,117,112,0.4)",
                 transition: "all 0.2s",
               }}
             >
@@ -245,7 +255,7 @@ export default function Blog() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.5rem",
-                background: "#0284c7",
+                background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
                 color: "#ffffff",
                 padding: "0.625rem 1.25rem",
                 borderRadius: "9999px",
@@ -253,7 +263,7 @@ export default function Blog() {
                 fontSize: "0.875rem",
                 fontWeight: 700,
                 cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+                boxShadow: "0 4px 14px rgba(5,150,105,0.4)",
                 transition: "all 0.2s",
               }}
             >
@@ -417,7 +427,7 @@ export default function Blog() {
                       <div className="blog-card__meta">
                         <span className="blog-card__meta-item">
                           <User size={14} />
-                          {post.user?.name || post.author || "Info.co.id"}
+                          {post.user?.name || post.author || "Surade.co.id"}
                         </span>
                         <span className="blog-card__meta-item">
                           <Calendar size={14} />

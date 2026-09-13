@@ -16,11 +16,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'phone',
+        'gender',
         'avatar',
         'bio',
         'location',
         'banner',
         'role',
+        'account_type',
         'password',
         'referral_code',
         'referral_code_status',
@@ -44,13 +46,12 @@ class User extends Authenticatable implements MustVerifyEmail
             return strtoupper($value);
         }
 
-        $cleanUsername = preg_replace('/[^A-Za-z0-9]/', '', $this->username ?: $this->name);
-        if (empty($cleanUsername)) {
-            $cleanUsername = 'USER';
+        $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $this->name ?: 'USER');
+        if (empty($cleanName)) {
+            $cleanName = 'USER';
         }
-        $generated = strtoupper("INFO-{$cleanUsername}-{$this->id}");
+        $generated = strtoupper("INFO-{$cleanName}-{$this->id}");
 
-        // Save generated code lazily
         try {
             $this->attributes['referral_code'] = $generated;
             \Illuminate\Support\Facades\DB::table('users')
@@ -64,6 +65,28 @@ class User extends Authenticatable implements MustVerifyEmail
         return $generated;
     }
 
+    /**
+     * Pastikan `avatar` yang dikirim ke frontend selalu berupa URL utuh.
+     * Sebelumnya kolom ini kadang berisi path relatif hasil upload
+     * (mis. "avatars/xxx.jpg") yang tidak bisa dibuka langsung oleh
+     * browser karena bukan alamat lengkap ke server backend — makanya
+     * muncul ikon foto rusak untuk user yang pernah upload avatar.
+     */
+    public function getAvatarAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        // Sudah berupa URL lengkap (http/https) atau data URI, biarkan.
+        if (preg_match('/^(https?:\/\/|data:)/i', $value)) {
+            return $value;
+        }
+
+        // Path relatif hasil Storage::disk('public')->store(...)
+        return \Illuminate\Support\Facades\Storage::disk('public')->url(ltrim($value, '/'));
+    }
+
     public function referralsGiven()
     {
         return $this->hasMany(Referral::class, 'referrer_id');
@@ -74,95 +97,45 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Referral::class, 'user_id');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Business
-    |--------------------------------------------------------------------------
-    */
-
     public function businesses()
     {
         return $this->hasMany(Business::class);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Subscription
-    |--------------------------------------------------------------------------
-    */
 
     public function subscription()
     {
         return $this->hasOne(Subscription::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Ratings
-    |--------------------------------------------------------------------------
-    */
-
     public function ratings()
     {
         return $this->hasMany(Rating::class);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Favorites
-    |--------------------------------------------------------------------------
-    */
 
     public function favorites()
     {
         return $this->hasMany(Favorite::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Advertisements
-    |--------------------------------------------------------------------------
-    */
-
     public function advertisements()
     {
         return $this->hasMany(Advertisement::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Conversations
-    |--------------------------------------------------------------------------
-    */
-
-    // Sebagai customer
     public function customerConversations()
     {
         return $this->hasMany(Conversation::class, 'customer_id');
     }
 
-    // Sebagai pemilik business
     public function ownerConversations()
     {
         return $this->hasMany(Conversation::class, 'owner_id');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Messages
-    |--------------------------------------------------------------------------
-    */
-
     public function messages()
     {
         return $this->hasMany(Message::class, 'sender_id');
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Helpers
-    |--------------------------------------------------------------------------
-    */
 
     public function userPackages()
     {

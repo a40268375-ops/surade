@@ -8,11 +8,11 @@ export default {
     extend: {
       colors: {
         brand: {
-          DEFAULT: "#007570",
-          hover:   "#008f89",
-          light:   "#00B4A9",
-          50:      "#f0fdfa",
-          100:     "#ccfbf1",
+          DEFAULT: "#10B981",
+          hover:   "#059669",
+          light:   "#34D399",
+          50:      "#f0fdf4",
+          100:     "#dcfce7",
         },
       },
       fontFamily: {
@@ -32,8 +32,8 @@ export default {
         "navbar-scroll":"0 2px 32px rgba(0,0,0,0.28)",
         dropdown:       "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
         "user-menu":    "0 16px 48px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.06)",
-        "btn-brand":    "0 4px 14px rgba(0,117,112,0.35)",
-        "btn-brand-hover": "0 6px 22px rgba(0,180,169,0.45)",
+        "btn-brand":    "0 4px 14px rgba(16,185,129,0.35)",
+        "btn-brand-hover": "0 6px 22px rgba(52,211,153,0.45)",
       },
       keyframes: {
         userMenuIn: {

@@ -38,7 +38,7 @@ export default function Terms() {
           </div>
           <h1 className="terms-hero__title">Syarat &amp; Ketentuan</h1>
           <p className="terms-hero__subtitle">
-            Panduan dan ketentuan resmi penggunaan seluruh layanan dan platform Info.co.id
+            Panduan dan ketentuan resmi penggunaan seluruh layanan dan platform Surade.co.id
           </p>
         </div>
       </section>
@@ -49,7 +49,7 @@ export default function Terms() {
           {/* STICKY SIDEBAR TABLE OF CONTENTS */}
           <aside className="terms-sidebar">
             <div className="terms-sidebar__title">
-              <BookOpen size={18} className="text-[#007570]" />
+              <BookOpen size={18} className="text-[#059669]" />
               <span>Daftar Isi</span>
             </div>
             <nav className="terms-nav-list">
@@ -79,13 +79,13 @@ export default function Terms() {
               </div>
               <div className="terms-section__text">
                 <p>
-                  Selamat datang di <strong>Info.co.id</strong>. Syarat dan Ketentuan Penggunaan ini mengatur akses serta penggunaan Anda terhadap situs web, aplikasi, direktori bisnis, layanan iklan, dan seluruh fitur yang kami sediakan.
+                  Selamat datang di <strong>Surade.co.id</strong>. Syarat dan Ketentuan Penggunaan ini mengatur akses serta penggunaan Anda terhadap situs web, aplikasi, direktori bisnis, layanan iklan, dan seluruh fitur yang kami sediakan.
                 </p>
                 <div className="terms-callout">
-                  Dengan mendaftar, mengakses, atau menggunakan Info.co.id, Anda menyatakan telah membaca, memahami, dan menyetujui untuk terikat oleh seluruh Syarat dan Ketentuan ini serta Kebijakan Privasi kami.
+                  Dengan mendaftar, mengakses, atau menggunakan Surade.co.id, Anda menyatakan telah membaca, memahami, dan menyetujui untuk terikat oleh seluruh Syarat dan Ketentuan ini serta Kebijakan Privasi kami.
                 </div>
                 <p>
-                  Info.co.id berfungsi sebagai sarana media direktori informasi untuk mempromosikan kegiatan, tempat, dan bisnis lokal di seluruh Indonesia guna mendukung ekosistem Smart City dan Smart Village yang aman, transparan, dan berdaya saing.
+                  Surade.co.id berfungsi sebagai sarana media direktori informasi untuk mempromosikan kegiatan, tempat, dan bisnis lokal di seluruh Indonesia guna mendukung ekosistem Smart City dan Smart Village yang aman, transparan, dan berdaya saing.
                 </p>
               </div>
             </section>
@@ -100,12 +100,12 @@ export default function Terms() {
               </div>
               <div className="terms-section__text">
                 <ol className="terms-list-numbered">
-                  <li>Info.co.id merupakan platform media direktori informasi digital untuk menyampaikan info kegiatan, tempat wisata, kuliner, jasa, dan profil bisnis di Indonesia.</li>
-                  <li>Pada direktori produk dan bisnis, Info.co.id bukan merupakan pemilik atau penjual langsung, melainkan media informasi yang memfasilitasi etalase digital bagi pelaku usaha.</li>
+                  <li>Surade.co.id merupakan platform media direktori informasi digital untuk menyampaikan info kegiatan, tempat wisata, kuliner, jasa, dan profil bisnis di Indonesia.</li>
+                  <li>Pada direktori produk dan bisnis, Surade.co.id bukan merupakan pemilik atau penjual langsung, melainkan media informasi yang memfasilitasi etalase digital bagi pelaku usaha.</li>
                   <li>Segala bentuk biaya tambahan, pajak, perizinan, dan kesepakatan transaksi jual beli menjadi tanggung jawab pihak penjual dan pembeli sesuai peraturan perundang-undangan di Republik Indonesia.</li>
                   <li>Barang, jasa, dan info yang dipasang wajib merupakan konten yang legal dan tidak tercantum pada daftar "Barang Terlarang".</li>
-                  <li>Info.co.id memiliki kewenangan penuh untuk memoderasi, menyunting, membatasi, atau menonaktifkan akun dan konten yang terindikasi melanggar Aturan Penggunaan tanpa pemberitahuan sebelumnya.</li>
-                  <li>Aturan Penggunaan Info.co.id dapat diperbarui sewaktu-waktu. Perubahan akan berlaku seketika setelah dipublikasikan pada halaman ini.</li>
+                  <li>Surade.co.id memiliki kewenangan penuh untuk memoderasi, menyunting, membatasi, atau menonaktifkan akun dan konten yang terindikasi melanggar Aturan Penggunaan tanpa pemberitahuan sebelumnya.</li>
+                  <li>Aturan Penggunaan Surade.co.id dapat diperbarui sewaktu-waktu. Perubahan akan berlaku seketika setelah dipublikasikan pada halaman ini.</li>
                 </ol>
               </div>
             </section>
@@ -123,9 +123,9 @@ export default function Terms() {
                   <li>Pengguna wajib memberikan data yang akurat, lengkap, dan benar saat melakukan pendaftaran akun serta verifikasi OTP.</li>
                   <li>Pengguna bertanggung jawab penuh atas keamanan akun, kata sandi, dan setiap aktivitas yang terjadi dalam akun miliknya.</li>
                   <li>Pengguna dilarang keras mempublikasikan konten yang mengandung unsur fitnah, kebencian SARA, pornografi, penipuan, pelanggaran hak cipta, atau merugikan pihak manapun.</li>
-                  <li>Pengguna dilarang mengirimkan pesan spam, melakukan scraping data tanpa izin, atau merusak infrastruktur keamanan sistem Info.co.id.</li>
+                  <li>Pengguna dilarang mengirimkan pesan spam, melakukan scraping data tanpa izin, atau merusak infrastruktur keamanan sistem Surade.co.id.</li>
                   <li>Pengguna wajib menghormati privasi dan hak-hak pengguna lain serta dilarang menyebarluaskan data pribadi pihak lain tanpa persetujuan resmi.</li>
-                  <li>Pengguna dilarang memperjualbelikan atau memindahtangankan akun Info.co.id kepada pihak lain tanpa persetujuan tertulis dari manajemen Info.co.id.</li>
+                  <li>Pengguna dilarang memperjualbelikan atau memindahtangankan akun Surade.co.id kepada pihak lain tanpa persetujuan tertulis dari manajemen Surade.co.id.</li>
                 </ol>
               </div>
             </section>
@@ -160,8 +160,8 @@ export default function Terms() {
               <div className="terms-section__text">
                 <ol className="terms-list-numbered">
                   <li>Transaksi antar pengguna berlangsung secara langsung (direct communication) antara pembeli dan penjual. Pengguna diimbau selalu berhati-hati dan memeriksa keaslian barang sebelum melakukan pembayaran.</li>
-                  <li>Untuk pembayaran paket iklan, banner promosi, atau langganan premium Info.co.id, pembayaran hanya dilakukan melalui metode resmi yang tertera pada sistem Info.co.id.</li>
-                  <li>Info.co.id berhak membekukan layanan dan berkoordinasi dengan pihak berwenang jika ditemukan indikasi tindak penipuan atau pencucian uang.</li>
+                  <li>Untuk pembayaran paket iklan, banner promosi, atau langganan premium Surade.co.id, pembayaran hanya dilakukan melalui metode resmi yang tertera pada sistem Surade.co.id.</li>
+                  <li>Surade.co.id berhak membekukan layanan dan berkoordinasi dengan pihak berwenang jika ditemukan indikasi tindak penipuan atau pencucian uang.</li>
                 </ol>
               </div>
             </section>
@@ -175,7 +175,7 @@ export default function Terms() {
                 <h2 className="terms-section__title">6. Barang &amp; Konten Terlarang</h2>
               </div>
               <div className="terms-section__text">
-                <p>Berikut adalah beberapa jenis barang dan konten yang DILARANG KERAS di Info.co.id:</p>
+                <p>Berikut adalah beberapa jenis barang dan konten yang DILARANG KERAS di Surade.co.id:</p>
                 <ol className="terms-list-numbered">
                   <li>Narkotika, psikotropika, obat-obatan terlarang, dan zat adiktif tanpa izin medis resmi.</li>
                   <li>Senjata api, bahan peledak, senjata tajam ilegal, dan amunisi.</li>
@@ -234,8 +234,8 @@ export default function Terms() {
               </div>
               <div className="terms-section__text">
                 <ol className="terms-list-numbered">
-                  <li>Info.co.id tidak bertanggung jawab atas segala kerugian materiil maupun immateriil yang timbul akibat transaksi langsung antara pengguna di luar pengawasan sistem resmi.</li>
-                  <li>Info.co.id tidak bertanggung jawab atas isi informasi pihak ketiga, tautan eksternal, atau kegagalan koneksi akibat gangguan jaringan internet pihak penyedia layanan.</li>
+                  <li>Surade.co.id tidak bertanggung jawab atas segala kerugian materiil maupun immateriil yang timbul akibat transaksi langsung antara pengguna di luar pengawasan sistem resmi.</li>
+                  <li>Surade.co.id tidak bertanggung jawab atas isi informasi pihak ketiga, tautan eksternal, atau kegagalan koneksi akibat gangguan jaringan internet pihak penyedia layanan.</li>
                 </ol>
               </div>
             </section>
@@ -265,13 +265,12 @@ export default function Terms() {
               </div>
               <div className="terms-section__text">
                 <p>
-                  Jika Anda memiliki pertanyaan, saran, atau ingin melaporkan indikasi pelanggaran aturan penggunaan di platform Info.co.id, silakan hubungi tim kami:
+                  Jika Anda memiliki pertanyaan, saran, atau ingin melaporkan indikasi pelanggaran aturan penggunaan di platform Surade.co.id, silakan hubungi tim kami:
                 </p>
                 <div className="terms-contact">
                   <p><strong>Call Center:</strong> <a href="tel:08071001500">0807 - 100 - 1500</a></p>
                   <p><strong>WhatsApp:</strong> <a href="https://wa.me/628111919711" target="_blank" rel="noopener noreferrer">+62 811-1919-711</a></p>
                   <p><strong>Email Dukungan:</strong> <a href="mailto:support@info.co.id">support@info.co.id</a></p>
-                  <p><strong>Alamat Kantor:</strong> Jl. Saturnus No.13 Blk. F, RT.2/RW.5, Ciherang, Kec. Dramaga, Kabupaten Bogor, Jawa Barat 16680</p>
                 </div>
               </div>
             </section>
@@ -281,7 +280,7 @@ export default function Terms() {
               <p className="terms-footer__text">
                 Terakhir diperbarui: 21 Agustus 2026
               </p>
-              <Link to="/faq" className="text-[#007570] font-semibold text-sm flex items-center gap-1.5 hover:underline">
+              <Link to="/faq" className="text-[#059669] font-semibold text-sm flex items-center gap-1.5 hover:underline">
                 <HelpCircle size={16} />
                 <span>Lihat Pertanyaan Umum (FAQ)</span>
               </Link>

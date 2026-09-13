@@ -1,15 +1,11 @@
 import { useParams, Link } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import Navbar from "../components/Navbar";
+import MapView from "../components/MapView";
 import api from "../services/api";
 import { requireAuth } from "../utils/authCheck";
 import { getStorageUrl } from "../utils/constants";
+import { SMART_CITY_IMAGE_BY_SLUG } from "../data/smartVillageData";
 import {
   MapPin,
   Building2,
@@ -33,27 +29,9 @@ import {
   Check,
   Tag,
   Bookmark,
+  Eye,
 } from "lucide-react";
 import "./Category.css";
-
-// Fix default Leaflet icon for Vite
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
-
-// Helper component to recenter Leaflet map when city changes
-function RecenterMap({ center }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center && Array.isArray(center) && center.length === 2) {
-      map.setView(center, 12, { animate: true });
-    }
-  }, [center, map]);
-  return null;
-}
 
 const getCategoryIcon = (iconName, label = "") => {
   const lower = (iconName || label || "").toLowerCase();
@@ -77,6 +55,18 @@ const getCategoryIcon = (iconName, label = "") => {
 
 const CITY_COORDS = {
   surade: [-7.3444, 106.5866],
+  "kelurahan-surade": [-7.3444, 106.5866],
+  "desa-jagamukti": [-7.3520, 106.5790],
+  "desa-citanglar": [-7.3610, 106.5700],
+  "desa-wanasari": [-7.3380, 106.5950],
+  "desa-sirnasari": [-7.3290, 106.6020],
+  "desa-kadaleman": [-7.3200, 106.5880],
+  "desa-gunungsungging": [-7.3670, 106.6050],
+  "desa-cipeundeuy": [-7.3480, 106.6120],
+  "desa-pasiripis": [-7.3560, 106.5620],
+  "desa-buniwangi": [-7.3350, 106.5680],
+  "desa-sukatani": [-7.3250, 106.5760],
+  "desa-kademangan": [-7.3150, 106.5990],
   sukabumi: [-6.9277, 106.9300],
   jakarta: [-6.2088, 106.8456],
   bogor: [-6.5971, 106.8060],
@@ -168,7 +158,16 @@ export default function SmartCity() {
       (Array.isArray(localBiz) ? localBiz : []).forEach(id => { bizSavedMap[id] = true; });
     } catch (e) {}
 
-    if (token) {
+    // PERBAIKAN: /my-favorites dibatasi backend cuma buat role "user" -
+    // dulu dipanggil untuk semua akun login termasuk admin, jadi admin
+    // selalu dapat error 403 di sini. Sekarang dilewati kalau bukan
+    // role "user".
+    let isRegularUser = false;
+    try {
+      isRegularUser = JSON.parse(localStorage.getItem("user") || "null")?.role === "user";
+    } catch (e) {}
+
+    if (token && isRegularUser) {
       try {
         const resBiz = await api.get("/my-favorites");
         const bizData = resBiz.data?.data || resBiz.data || [];
@@ -243,14 +242,16 @@ export default function SmartCity() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch Smart City by id/slug
+  // Fetch Smart Village by id/slug
   useEffect(() => {
     const fetchSmartCityData = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/smart-cities`);
+        // Fetch from /home-summary instead
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/home-summary`);
         if (!res.ok) throw new Error("Failed to fetch smart cities");
         const data = await res.json();
-        const citiesData = data?.data || data || [];
+        const citiesData = data?.smart_cities || [];
+        
         if (Array.isArray(citiesData)) {
           let current = citiesData.find(
             (c) =>
@@ -261,36 +262,46 @@ export default function SmartCity() {
           );
 
           if (!current) {
-            const cityName = cityKey ? (cityKey.charAt(0).toUpperCase() + cityKey.slice(1).replace(/-/g, " ")) : "Bogor";
+            const cityName = cityKey ? (cityKey.charAt(0).toUpperCase() + cityKey.slice(1).replace(/-/g, " ")) : "Kelurahan Surade";
             current = {
-              id: cityKey || "bogor",
-              slug: cityKey || "bogor",
-              name: cityName.includes("Kota") ? cityName : `Kota ${cityName}`,
-              type: "smart_city",
+              id: cityKey || "kelurahan-surade",
+              slug: cityKey || "kelurahan-surade",
+              name: cityName.includes("Desa") || cityName.includes("Kelurahan") ? cityName : `Desa ${cityName}`,
+              type: "smart_village",
               description:
-                "Pusat aktivitas bisnis, kuliner, dan teknologi terdepan yang mendukung pertumbuhan ekonomi digital dan UMKM terintegrasi.",
-              image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=900&fit=crop",
-              img: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=900&fit=crop",
-              population: "1.043.000 Jiwa",
-              area: "118,50 km²",
+                "Desa/Kelurahan dengan potensi UMKM dan ekonomi lokal yang terintegrasi dalam program Smart Village.",
+              image: "https://picsum.photos/seed/surade-default/800/600",
+              img: "https://picsum.photos/seed/surade-default/800/600",
+              population: 0,
+              area: 0,
               bisnis: 0,
             };
           }
+
+          // Selalu pakai foto asli lokal berdasarkan slug (kalau tersedia),
+          // supaya background halaman detail ini SAMA dengan foto di grid
+          // Smart Village halaman utama — tidak tergantung field image/img
+          // dari API yang kadang kosong.
+          const realPhoto = SMART_CITY_IMAGE_BY_SLUG[current.slug];
+          if (realPhoto) {
+            current = { ...current, image: realPhoto, img: realPhoto };
+          }
+
           setCity(current);
         }
       } catch (err) {
         console.error("Error fetching smart cities:", err);
         setCity({
-          id: cityKey || "bogor",
-          slug: cityKey || "bogor",
-          name: "Kota Bogor",
-          type: "smart_city",
+          id: cityKey || "kelurahan-surade",
+          slug: cityKey || "kelurahan-surade",
+          name: "Kelurahan Surade",
+          type: "smart_village",
           description:
-            "Pusat aktivitas bisnis, kuliner, dan teknologi terdepan yang mendukung pertumbuhan ekonomi digital dan UMKM terintegrasi.",
-          image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=900&fit=crop",
-          img: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&h=900&fit=crop",
-          population: "1.043.000 Jiwa",
-          area: "118,50 km²",
+            "Pusat pemerintahan dan ekonomi Kecamatan Surade.",
+          image: "https://picsum.photos/seed/surade-default/800/600",
+          img: "https://picsum.photos/seed/surade-default/800/600",
+          population: 0,
+          area: 0,
           bisnis: 0,
         });
       } finally {
@@ -316,6 +327,7 @@ export default function SmartCity() {
               id: c.slug || String(c.id),
               label: c.name,
               icon: getCategoryIcon(c.icon, c.name),
+              children: c.children || [],
             })),
           ];
           setCategories(mapped);
@@ -333,10 +345,15 @@ export default function SmartCity() {
     const fetchCityBusinesses = async () => {
       setLoadingBusinesses(true);
       try {
-        const cityName = (city.name || "").replace(/^(Kelurahan|Desa|Kota|Kabupaten)\s*/i, "").trim();
-        const queryParam = cityName || city.slug;
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/businesses?location=${encodeURIComponent(queryParam)}&all=true`);
+        // Gunakan nama city yang EXACT sama dengan database
+        // city.name sudah dalam format "Kelurahan Surade", "Desa Jagamukti", dll
+        const locationParam = city.name;
+        console.log('Fetching businesses for location:', locationParam);
+        
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/businesses?location=${encodeURIComponent(locationParam)}&all=true`);
         const data = await res.json();
+        console.log('API Response for', locationParam, ':', data);
+        
         const list = Array.isArray(data) ? data : (data?.data || []);
         const mapped = list.map((b) => {
           const avgPrice = b.products_avg_price ? Number(b.products_avg_price) : 0;
@@ -352,6 +369,8 @@ export default function SmartCity() {
             products_count: productsCount,
           };
         });
+        
+        console.log('Filtered businesses count:', mapped.length);
         setBusinesses(mapped);
       } catch (err) {
         console.error("Error fetching city businesses:", err);
@@ -374,10 +393,22 @@ export default function SmartCity() {
     .filter((b) => {
       const categoryName = (b.category?.name || b.category || "").toLowerCase();
       const categorySlug = (b.category?.slug || "").toLowerCase();
+      const parentName = (b.category?.parent?.name || "").toLowerCase();
+      const parentSlug = (b.category?.parent?.slug || "").toLowerCase();
+      
+      const currentCat = categories.find((c) => c.id === selectedCategory);
+      const isChildMatch = currentCat?.children?.some(child => 
+        (child.slug || "").toLowerCase() === categorySlug || 
+        (child.name || "").toLowerCase() === categoryName
+      );
+
       const matchesCategory =
         selectedCategory === "all" ||
         categoryName.includes(selectedCategory.toLowerCase()) ||
-        categorySlug === selectedCategory.toLowerCase();
+        categorySlug === selectedCategory.toLowerCase() ||
+        parentName.includes(selectedCategory.toLowerCase()) ||
+        parentSlug === selectedCategory.toLowerCase() ||
+        isChildMatch;
 
       const matchesSearch =
         !searchQuery ||
@@ -461,7 +492,7 @@ export default function SmartCity() {
         <Navbar />
         <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
           <Loader2 className="w-10 h-10 text-[#00b074] animate-spin" />
-          <p className="text-slate-600 font-medium text-sm">Memuat Data Smart City...</p>
+          <p className="text-slate-600 font-medium text-sm">Memuat Data Smart Village...</p>
         </div>
       </div>
     );
@@ -476,7 +507,7 @@ export default function SmartCity() {
             <Building2 size={32} />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Kota Tidak Ditemukan</h2>
-          <p className="text-slate-500 text-sm mb-6">Kota yang Anda cari tidak tersedia dalam program Smart City &amp; Village.</p>
+          <p className="text-slate-500 text-sm mb-6">Desa yang Anda cari tidak tersedia dalam program Smart Village.</p>
           <Link to="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00b074] text-white text-sm font-semibold hover:bg-[#009663] transition-colors">
             <ArrowLeft size={16} /> Kembali ke Beranda
           </Link>
@@ -506,16 +537,22 @@ export default function SmartCity() {
           <nav className="flex items-center gap-2 text-xs sm:text-sm text-white/90 font-normal mb-5 flex-wrap justify-center">
             <Link to="/" className="hover:text-white transition-colors">Home</Link>
             <span className="text-white/70">&rarr;</span>
-            <span className="text-white/90">Smart City</span>
+            <span className="text-white/90">Smart Village</span>
             <span className="text-white/70">&rarr;</span>
             <span className="text-white font-medium">{city.name}</span>
           </nav>
 
-          {/* Title: [Nama Kota] Smart City */}
+          {/* Title: [Nama Desa] Smart Village */}
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4 leading-tight">
-            {city.name}{" "}
+            {city.name.split(/(Surade)/gi).map((part, i) =>
+              part.toLowerCase() === "surade" ? (
+                <span key={i} className="text-[#34d399]">{part}</span>
+              ) : (
+                <span key={i}>{part}</span>
+              )
+            )}{" "}
             <span className="text-[#38bdf8]">
-              {city.type === "smart_village" ? "Smart Village" : "Smart City"}
+              Smart Village
             </span>
           </h1>
 
@@ -547,7 +584,7 @@ export default function SmartCity() {
               </div>
               <div>
                 <div className="text-xl sm:text-2xl font-bold text-white leading-tight">
-                  {city.population || "1.043.000 Jiwa"}
+                  {city.population ? city.population.toLocaleString('id-ID') : '0'} Jiwa
                 </div>
                 <div className="text-xs text-slate-300 font-normal mt-0.5">Penduduk</div>
               </div>
@@ -560,7 +597,7 @@ export default function SmartCity() {
               </div>
               <div>
                 <div className="text-xl sm:text-2xl font-bold text-white leading-tight truncate">
-                  {city.area || "118,50 km²"}
+                  {city.area ? `${city.area} km²` : '0 km²'}
                 </div>
                 <div className="text-xs text-slate-300 font-normal mt-0.5">Luas Wilayah</div>
               </div>
@@ -569,51 +606,33 @@ export default function SmartCity() {
         </div>
       </section>
 
-      {/* ── CATEGORY FILTER BAR ── */}
+      {/* ── CATEGORY HORIZONTAL PILLS ── */}
       <section className="bg-white border-b border-slate-100 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden">
+          <div className="flex items-center gap-3 overflow-x-auto overflow-y-hidden whitespace-nowrap pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden">
             {categories.map((cat) => {
               const isActive = selectedCategory === cat.id;
-
-              const renderLabel = () => {
-                if (cat.label === "Semua") return <span>Semua</span>;
-                if (cat.label.includes(" & ")) {
-                  const parts = cat.label.split(" & ");
-                  return (
-                    <div className="flex flex-col text-left leading-tight">
-                      <span>{parts[0]} &amp;</span>
-                      <span>{parts[1]}</span>
-                    </div>
-                  );
-                }
-                const words = cat.label.split(" ");
-                if (words.length === 2) {
-                  return (
-                    <div className="flex flex-col text-left leading-tight">
-                      <span>{words[0]}</span>
-                      <span>{words[1]}</span>
-                    </div>
-                  );
-                }
-                return <span>{cat.label}</span>;
-              };
 
               return (
                 <button
                   key={cat.id}
                   type="button"
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`shrink-0 flex items-center gap-3 px-6 py-3.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer shadow-sm ${
+                  className={`shrink-0 inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer shadow-sm min-w-fit ${
                     isActive
-                      ? "bg-[#007570] text-white font-bold text-sm"
-                      : "bg-white border border-slate-200/90 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      ? "bg-[#059669] text-white font-bold text-sm border-[#059669]"
+                      : "bg-white border border-slate-200 text-slate-700 hover:border-[#059669] hover:bg-[#f0fdf4] hover:text-[#059669]"
                   }`}
+                  style={{
+                    boxShadow: isActive ? '0 2px 8px rgba(5, 150, 105, 0.2)' : '0 1px 3px rgba(0, 0, 0, 0.05)'
+                  }}
                 >
-                  <span className={isActive ? "text-white" : "text-slate-500"}>
+                  <span className={`inline-flex items-center justify-center ${isActive ? "text-white" : "text-slate-500"}`}>
                     {cat.icon}
                   </span>
-                  {renderLabel()}
+                  <span className={`${isActive ? "text-white" : ""}`} style={{ lineHeight: '1.3', maxWidth: '140px', textAlign: 'left' }}>
+                    {cat.label}
+                  </span>
                 </button>
               );
             })}
@@ -638,7 +657,7 @@ export default function SmartCity() {
               <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                 <span className="text-xs text-slate-500 font-medium">Filter Aktif:</span>
                 {selectedCategory !== "all" && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-[#007570] border border-teal-200">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-[#059669] border border-teal-200">
                     Kategori: {categories.find((c) => c.id === selectedCategory)?.label || selectedCategory}
                     <button
                       type="button"
@@ -651,7 +670,7 @@ export default function SmartCity() {
                   </span>
                 )}
                 {selectedPriceRange !== "all" && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-[#007570] border border-teal-200">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-[#059669] border border-teal-200">
                     Harga: {PRICE_RANGES.find((p) => p.id === selectedPriceRange)?.label}
                     <button
                       type="button"
@@ -664,7 +683,7 @@ export default function SmartCity() {
                   </span>
                 )}
                 {searchQuery && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-[#007570] border border-teal-200">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-[#059669] border border-teal-200">
                     Kata Kunci: "{searchQuery}"
                     <button
                       type="button"
@@ -690,7 +709,7 @@ export default function SmartCity() {
                 placeholder="Cari bisnis..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-10 pl-9 pr-8 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570] transition-all"
+                className="w-full h-10 pl-9 pr-8 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#059669] transition-all"
               />
               {searchQuery && (
                 <button
@@ -726,7 +745,7 @@ export default function SmartCity() {
                 type="button"
                 className={`h-10 px-3.5 rounded-xl text-xs font-semibold border flex items-center gap-2 transition-all cursor-pointer ${
                   selectedPriceRange !== "all"
-                    ? "bg-teal-50 border-[#007570] text-[#007570] font-bold shadow-sm"
+                    ? "bg-teal-50 border-[#059669] text-[#059669] font-bold shadow-sm"
                     : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                 }`}
                 onClick={() => setPriceDropdownOpen(!priceDropdownOpen)}
@@ -750,7 +769,7 @@ export default function SmartCity() {
                         key={range.id}
                         className={`px-3 py-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-colors ${
                           selectedPriceRange === range.id
-                            ? "bg-teal-50 text-[#007570] font-bold"
+                            ? "bg-teal-50 text-[#059669] font-bold"
                             : "hover:bg-slate-50 text-slate-700"
                         }`}
                         onClick={() => {
@@ -762,7 +781,7 @@ export default function SmartCity() {
                           <div>{range.label}</div>
                           {range.desc && <div className="text-[10px] text-slate-400 font-normal">{range.desc}</div>}
                         </div>
-                        {selectedPriceRange === range.id && <Check size={14} className="text-[#007570]" />}
+                        {selectedPriceRange === range.id && <Check size={14} className="text-[#059669]" />}
                       </li>
                     ))}
                   </ul>
@@ -790,7 +809,7 @@ export default function SmartCity() {
                         key={opt.id}
                         className={`px-3 py-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-colors ${
                           sortOption === opt.id
-                            ? "bg-teal-50 text-[#007570] font-bold"
+                            ? "bg-teal-50 text-[#059669] font-bold"
                             : "hover:bg-slate-50 text-slate-700"
                         }`}
                         onClick={() => {
@@ -799,7 +818,7 @@ export default function SmartCity() {
                         }}
                       >
                         <span>{opt.label}</span>
-                        {sortOption === opt.id && <Check size={14} className="text-[#007570]" />}
+                        {sortOption === opt.id && <Check size={14} className="text-[#059669]" />}
                       </li>
                     ))}
                   </ul>
@@ -830,13 +849,13 @@ export default function SmartCity() {
                     const imgUrl = getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600&h=400&fit=crop";
                     const categoryName = typeof b.category === "object" ? b.category?.name : (b.category || "Umum");
                     const rating = b.rating || b.average_rating || 5.0;
-                    const isPremium = Boolean(b.is_premium || b.features?.is_premium);
+                    const isPremium = Boolean(b.is_premium || b.is_verified || b.features?.is_premium);
 
                     return (
                       <Link
                         key={b.id || index}
                         to={`/business/${b.slug || b.id}`}
-                        className="group bg-white border border-slate-200/80 hover:border-[#007570]/50 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col relative"
+                        className="group bg-white border border-slate-200/80 hover:border-[#059669]/50 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col relative"
                       >
                         {/* Image Cover */}
                         <div className="relative h-44 w-full overflow-hidden bg-slate-100">
@@ -846,7 +865,7 @@ export default function SmartCity() {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                           />
-                          <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#007570] text-white shadow-xs">
+                          <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#059669] text-white shadow-xs">
                             Buka
                           </span>
 
@@ -880,17 +899,17 @@ export default function SmartCity() {
 
                         {/* Card Body */}
                         <div className="p-5 flex flex-col flex-1">
-                          <span className="text-xs font-semibold text-[#007570] uppercase tracking-wider mb-1">
+                          <span className="text-xs font-semibold text-[#059669] uppercase tracking-wider mb-1">
                             {categoryName}
                           </span>
-                          <h4 className="text-base font-bold text-slate-900 group-hover:text-[#007570] transition-colors line-clamp-1 mb-1.5">
+                          <h4 className="text-base font-bold text-slate-900 group-hover:text-[#059669] transition-colors line-clamp-1 mb-1.5">
                             {b.name}
                           </h4>
 
                           {/* Average Product Price Badge */}
                           {b.avg_price > 0 && (
                             <div className="mb-2">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-50 text-[#007570] text-xs font-bold border border-teal-100">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-50 text-[#059669] text-xs font-bold border border-teal-100">
                                 Rp {Math.round(b.avg_price).toLocaleString("id-ID")}{" "}
                                 <span className="text-[10px] font-normal text-slate-500">(rata-rata)</span>
                               </span>
@@ -898,18 +917,24 @@ export default function SmartCity() {
                           )}
 
                           <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
-                            {b.description || "Informasi bisnis resmi terdaftar di direktori Smart City."}
+                            {b.description || "Informasi bisnis resmi terdaftar di direktori Smart Village."}
                           </p>
 
                           <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                             <span className="flex items-center gap-1 truncate max-w-[150px]">
-                              <MapPin size={13} className="text-[#007570] shrink-0" />
+                              <MapPin size={13} className="text-[#059669] shrink-0" />
                               <span className="truncate">{b.city || city.name}</span>
                             </span>
-                            <span className="flex items-center gap-1 font-semibold text-amber-500 shrink-0">
-                              <Star size={13} fill="currentColor" />
-                              <span>{rating}</span>
-                            </span>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="flex items-center gap-1 text-slate-400">
+                                <Eye size={13} />
+                                <span>{b.views || 0}</span>
+                              </span>
+                              <span className="flex items-center gap-1 font-semibold text-amber-500">
+                                <Star size={13} fill="currentColor" />
+                                <span>{rating}</span>
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </Link>
@@ -988,39 +1013,12 @@ export default function SmartCity() {
             )}
           </div>
 
-          {/* Right Column: Leaflet Map */}
-          <div className="sticky top-24 w-full h-[480px] lg:h-[520px] rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-100">
-            <MapContainer
-              center={cityCenterCoords}
-              zoom={12}
-              style={{ height: "100%", width: "100%" }}
-              scrollWheelZoom={true}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <RecenterMap center={cityCenterCoords} />
-              {filteredBusinesses.map((b, idx) => {
-                const pos = getBusinessCoords(b, cityCenterCoords, idx);
-                return (
-                  <Marker key={b.id || idx} position={pos}>
-                    <Popup>
-                      <div className="p-1 text-slate-800">
-                        <strong className="text-sm font-bold block mb-1">{b.name}</strong>
-                        <p className="text-xs text-slate-500 mb-2">{b.city || city.name}</p>
-                        <Link
-                          to={`/business/${b.slug || b.id}`}
-                          className="inline-block text-xs font-semibold text-[#007570] hover:underline"
-                        >
-                          Lihat Detail &rarr;
-                        </Link>
-                      </div>
-                    </Popup>
-                  </Marker>
-                );
-              })}
-            </MapContainer>
+          {/* Right Column: Interactive Map */}
+          <div className="sticky top-24 w-full">
+            <MapView 
+              businesses={filteredBusinesses} 
+              height="480px"
+            />
           </div>
         </div>
       </section>

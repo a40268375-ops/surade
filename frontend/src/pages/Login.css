@@ -40,13 +40,18 @@
 .login-branding {
   max-width: 480px;
   flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .login-branding__logo {
   height: 64px;
   width: auto;
   margin-bottom: 8px;
-  margin-left: -8px;
+  margin-left: 0;
 }
 
 .login-branding__tagline {
@@ -55,10 +60,11 @@
   color: #1c1e21;
   line-height: 1.45;
   letter-spacing: -0.2px;
+  text-align: center;
 }
 
 .login-branding__tagline strong {
-  color: #007570;
+  color: #059669;
   font-weight: 700;
 }
 
@@ -102,8 +108,8 @@
 }
 
 .login-input:focus {
-  border-color: #007570;
-  box-shadow: 0 0 0 2px rgba(0, 117, 112, 0.15);
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
 }
 
 .login-input--error {
@@ -138,7 +144,7 @@
 }
 
 .login-password-toggle:hover {
-  color: #007570;
+  color: #059669;
 }
 
 /* ── Error message ── */
@@ -176,7 +182,7 @@
   font-weight: 700;
   font-family: 'Poppins', sans-serif;
   color: #fff;
-  background: linear-gradient(135deg, #007570 0%, #009e96 100%);
+  background: linear-gradient(135deg, #059669 0%, #10B981 100%);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -201,9 +207,9 @@
 }
 
 .login-btn:hover {
-  background: linear-gradient(135deg, #005a58 0%, #007570 100%);
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(0, 117, 112, 0.35);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
 }
 
 .login-btn:hover::before {
@@ -251,7 +257,7 @@
 .login-forgot a {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #007570;
+  color: #059669;
   text-decoration: none;
   transition: color 0.2s;
 }
@@ -323,13 +329,335 @@
 }
 
 .login-info a {
-  color: #007570;
+  color: #059669;
   font-weight: 600;
   text-decoration: none;
 }
 
 .login-info a:hover {
   text-decoration: underline;
+}
+
+/* ═════════════════════════════════════════════
+   DESAIN BARU: SPLIT-SCREEN (kiri ilustrasi, kanan form)
+   Class "--split" ditambahkan supaya tidak menabrak/menghapus
+   class lama (login-page, login-branding, dst) yang masih
+   dipakai untuk struktur dasar - cuma menimpa tampilannya.
+═════════════════════════════════════════════ */
+.login-page--split {
+  background: #fff;
+}
+
+.login-main--split {
+  padding: 0;
+  align-items: stretch;
+}
+
+.login-container--split {
+  max-width: none;
+  gap: 0;
+  align-items: stretch;
+  min-height: calc(100vh - 64px);
+}
+
+/* ── Panel kiri: ilustrasi & ajakan ── */
+.login-branding--split {
+  flex: 1 1 46%;
+  max-width: none;
+  text-align: left;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: linear-gradient(155deg, #0b6b45 0%, #0f7a52 45%, #0a5c3c 100%);
+  padding: clamp(28px, 5vh, 56px) 56px;
+  gap: 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 100%;
+}
+
+/* Pola gelembung mengambang, dekoratif */
+.login-branding__wavepattern {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+  background-image:
+    url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='500' height='500'%3e%3ccircle cx='60' cy='430' r='22' fill='none' stroke='%23ffffff' stroke-opacity='0.22' stroke-width='2'/%3e%3ccircle cx='140' cy='330' r='10' fill='%23ffffff' fill-opacity='0.16'/%3e%3ccircle cx='230' cy='460' r='14' fill='none' stroke='%23ffffff' stroke-opacity='0.18' stroke-width='2'/%3e%3ccircle cx='320' cy='300' r='7' fill='%23ffffff' fill-opacity='0.14'/%3e%3ccircle cx='390' cy='420' r='26' fill='none' stroke='%23ffffff' stroke-opacity='0.15' stroke-width='2'/%3e%3ccircle cx='460' cy='340' r='9' fill='%23ffffff' fill-opacity='0.18'/%3e%3ccircle cx='90' cy='180' r='16' fill='none' stroke='%23ffffff' stroke-opacity='0.16' stroke-width='2'/%3e%3ccircle cx='190' cy='120' r='8' fill='%23ffffff' fill-opacity='0.14'/%3e%3ccircle cx='280' cy='200' r='20' fill='none' stroke='%23ffffff' stroke-opacity='0.14' stroke-width='2'/%3e%3ccircle cx='370' cy='90' r='11' fill='%23ffffff' fill-opacity='0.16'/%3e%3ccircle cx='450' cy='150' r='6' fill='%23ffffff' fill-opacity='0.2'/%3e%3ccircle cx='30' cy='60' r='13' fill='none' stroke='%23ffffff' stroke-opacity='0.15' stroke-width='2'/%3e%3c/svg%3e");
+  background-size: 700px 700px;
+  background-repeat: repeat;
+  animation: loginBubbleFloat 22s linear infinite;
+}
+
+@keyframes loginBubbleFloat {
+  from { background-position: 0 0; }
+  to   { background-position: 0 -700px; }
+}
+
+.login-branding__top {
+  position: relative;
+  z-index: 1;
+  max-width: 460px;
+}
+
+.login-branding__header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 34px;
+}
+
+.login-branding__logo-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  padding: 2px;
+}
+
+.login-branding__brand-name--dark {
+  display: inline-block;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 0;
+}
+.login-branding__brand-name--dark span { color: #a7f3d0; }
+
+/* ── Ikan kecil "berenang" sambil meniup gelembung ── */
+.login-branding__boat-track {
+  position: absolute;
+  z-index: 1;
+  right: 8%;
+  bottom: 85px;
+  width: 140px;
+  height: 60px;
+  animation: loginFishSwim 9s ease-in-out infinite alternate;
+}
+
+.login-branding__boat {
+  width: 90px;
+  height: auto;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.15));
+  animation: loginFishBob 2.6s ease-in-out infinite;
+}
+
+@keyframes loginFishSwim {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-90px); }
+}
+
+@keyframes loginFishBob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-7px) rotate(2deg); }
+}
+
+/* Gelembung yang ditiup ikan, naik lalu menghilang */
+.login-branding__fish-bubble {
+  animation: loginFishBubbleRise 2.4s ease-in infinite;
+}
+.login-branding__fish-bubble--1 { animation-delay: 0s; }
+.login-branding__fish-bubble--2 { animation-delay: 0.5s; }
+.login-branding__fish-bubble--3 { animation-delay: 1s; }
+
+@keyframes loginFishBubbleRise {
+  0%   { transform: translate(0, 0); opacity: 0.9; }
+  80%  { opacity: 0.4; }
+  100% { transform: translate(4px, -22px); opacity: 0; }
+}
+
+@media (max-width: 900px) {
+  .login-branding__boat-track { display: none; }
+}
+
+.login-branding__heading--dark {
+  font-size: clamp(1.5rem, 2.6vw, 2.05rem);
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin-bottom: 14px;
+}
+
+.login-branding__subtext--dark {
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.82);
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.login-branding__points {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-branding__points li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255,255,255,0.92);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.login-branding__points li svg {
+  color: #a7f3d0;
+  flex-shrink: 0;
+}
+
+.login-branding__copy {
+  position: relative;
+  z-index: 1;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.55);
+}
+
+/* ── Panel kanan: form login ── */
+.login-card--split {
+  flex: 1 1 48%;
+  width: auto;
+  max-width: 480px;
+  margin: auto 80px;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  max-height: none;
+  overflow: hidden;
+}
+
+.login-back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f6e46;
+  text-decoration: none;
+  margin-bottom: 22px;
+}
+
+.login-back-home:hover {
+  text-decoration: underline;
+}
+
+.login-card__title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #14171a;
+  margin-bottom: 4px;
+}
+
+.login-card__subtitle {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 18px;
+}
+
+/* ── Input dengan ikon di kiri ── */
+.login-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.login-input-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.login-input--icon {
+  padding-left: 46px;
+}
+
+.login-password-wrapper .login-input-icon {
+  z-index: 1;
+}
+
+/* ── Label di atas input, gaya "EMAIL" / "KATA SANDI" ── */
+.login-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.login-field-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #334155;
+  text-transform: uppercase;
+}
+
+.login-input--plain {
+  padding-left: 16px;
+}
+
+/* ── "Lupa kata sandi?" rata kanan, di atas tombol Masuk ── */
+.login-forgot--right {
+  text-align: right;
+  margin-top: -6px;
+}
+
+/* ── Tombol Masuk versi split (hijau tua solid, bukan gradient terang) ── */
+.login-btn--split {
+  background: #0f6e46;
+}
+
+.login-btn--split:hover {
+  background: #0b5536;
+}
+
+/* ── Tombol "Buat Akun Baru" versi outline (bukan gradient penuh) ── */
+.login-create-btn--outline {
+  background: #fff;
+  color: #0f6e46;
+  border: 1.5px solid #0f6e46;
+}
+
+.login-create-btn--outline:hover {
+  background: #f0faf5;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ── Teks syarat & kebijakan privasi di bawah form ── */
+.login-info--terms {
+  text-align: left;
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .login-container--split {
+    flex-direction: column;
+    min-height: auto;
+  }
+  .login-branding--split {
+    padding: 40px 28px;
+    align-items: center;
+    text-align: center;
+  }
+  .login-branding__heading--dark,
+  .login-branding__subtext--dark {
+    max-width: 100%;
+    text-align: center;
+  }
+  .login-branding__points {
+    align-items: center;
+  }
+  .login-branding__points li {
+    text-align: left;
+  }
+  .login-card--split {
+    margin: 40px 28px;
+    max-width: none;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -361,7 +689,7 @@
 }
 
 .login-footer__links a:hover {
-  color: #007570;
+  color: #059669;
   text-decoration: underline;
 }
 
@@ -489,11 +817,11 @@
 }
 
 .login-gender-option:hover {
-  border-color: #007570;
+  border-color: #059669;
 }
 
 .login-gender-option input[type="radio"] {
-  accent-color: #007570;
+  accent-color: #059669;
   width: 18px;
   height: 18px;
   cursor: pointer;
@@ -508,7 +836,7 @@
 }
 
 .login-modal__terms a {
-  color: #007570;
+  color: #059669;
   text-decoration: none;
 }
 
@@ -567,6 +895,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    text-align: center;
   }
 
   .login-branding__logo {
@@ -575,6 +904,7 @@
 
   .login-branding__tagline {
     font-size: 1.3rem;
+    text-align: center;
   }
 
   .login-card {
@@ -594,6 +924,7 @@
 
   .login-branding__tagline {
     font-size: 1.1rem;
+    text-align: center;
   }
 
   .login-branding__logo {
@@ -617,3 +948,107 @@
     width: 100%;
   }
 }
+
+/* ── Account Type Selector (Personal vs Business) ── */
+.login-account-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.login-type-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.login-type-card:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.login-type-card--active {
+  border-color: #059669 !important;
+  background: #ecfdf5 !important;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.12);
+}
+
+.login-type-icon-wrapper {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+
+.login-type-card--active .login-type-icon-wrapper {
+  background: #059669;
+  color: #ffffff;
+}
+
+.login-type-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.login-type-card--active .login-type-name {
+  color: #065f46;
+}
+
+.login-type-desc {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.login-type-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #059669;
+}
+
+/* ── Business Name Field ── */
+.login-business-field {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: loginSlideUp 0.25s ease;
+}
+
+.login-business-field-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #065f46;
+}
+
+.login-business-hint {
+  font-size: 0.73rem;
+  color: #047857;
+  line-height: 1.4;
+  margin: 0;
+}

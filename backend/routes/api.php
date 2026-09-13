@@ -8,10 +8,12 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\BlogController;
 use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\RatingController;
+use App\Models\Category;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\AdvertisementController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\ReferralController;
@@ -23,13 +25,41 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\ContentPricingController;
 use App\Http\Controllers\Api\ContentTransactionController;
+use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\NavbarCategoryController;
 
 // OTP-based registration (3-step flow)
 Route::post('/register/send-otp',     [AuthController::class, 'sendOtp']);
 Route::post('/register/verify-otp',   [AuthController::class, 'verifyOtpAndRegister']);
 Route::post('/register/resend-otp',   [AuthController::class, 'resendOtp']);
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->name('login');
+
+// Handle OPTIONS preflight for login
+Route::options('/login', function() {
+    return response()->json(['status' => 'ok'], 200);
+});
+
+// Debug endpoint untuk test request dari browser
+Route::post('/debug-login', function (Request $request) {
+    return response()->json([
+        'received' => [
+            'all' => $request->all(),
+            'json' => $request->json()->all(),
+            'input' => $request->input(),
+            'method' => $request->method(),
+            'content_type' => $request->header('Content-Type'),
+            'accept' => $request->header('Accept'),
+            'origin' => $request->header('Origin'),
+        ],
+        'checks' => [
+            'has_email' => $request->has('email'),
+            'has_password' => $request->has('password'),
+            'email_value' => $request->input('email'),
+            'password_exists' => $request->has('password'),
+        ]
+    ]);
+});
 
 // Password reset (4-step flow)
 Route::post('/forgot-password',      [PasswordResetController::class, 'sendResetOtp']);
@@ -43,29 +73,29 @@ Route::get('/smart-cities/counts', [LocationController::class, 'cityCounts']);
 Route::get('/locations/{slug}', [LocationController::class, 'showLocation']);
 
 Route::get('/home-summary', [BusinessController::class, 'homeSummary']);
+Route::get('/search', [BusinessController::class, 'search']);
+Route::get('/search-suggestions', [BusinessController::class, 'searchSuggestions']);
+Route::get('/search/popular', [BusinessController::class, 'popularSearches']);
 Route::get('/businesses', [BusinessController::class, 'index']);
 Route::get('/businesses/{business}', [BusinessController::class, 'show']);
+Route::post('/businesses/{business}/view', [BusinessController::class, 'trackView']);
+Route::post('/businesses/{business}/click', [BusinessController::class, 'trackClick']);
 Route::get('/businesses/{business}/ratings', [RatingController::class, 'index']);
 Route::get('/categories', function () {
     return response()->json(Illuminate\Support\Facades\Cache::remember('categories_public_v1', 300, function () {
-        return App\Models\Category::with('children')->whereNull('parent_id')->orderBy('name')->get();
+        return Category::with('children')->whereNull('parent_id')->where('is_active', true)->orderBy('order')->orderBy('name')->get();
     }));
 });
+Route::get('/navbar-categories', [NavbarCategoryController::class, 'index']);
 Route::get('/blogs', [BlogController::class, 'index']);
 Route::get('/blogs/{blog}', [BlogController::class, 'show']);
 Route::get('/blog-categories', function () {
-    return response()->json([
-        ['id' => 1, 'name' => 'Bisnis & UMKM', 'slug' => 'bisnis-umkm'],
-        ['id' => 2, 'name' => 'Kuliner & Kafe', 'slug' => 'kuliner-kafe'],
-        ['id' => 3, 'name' => 'Teknologi & Digital', 'slug' => 'teknologi-digital'],
-        ['id' => 4, 'name' => 'Kesehatan & Gaya Hidup', 'slug' => 'kesehatan-gaya-hidup'],
-        ['id' => 5, 'name' => 'Event & Festival', 'slug' => 'event-festival'],
-        ['id' => 6, 'name' => 'Pendidikan & Edukasi', 'slug' => 'pendidikan-edukasi'],
-        ['id' => 7, 'name' => 'Travel & Wisata', 'slug' => 'travel-wisata'],
-        ['id' => 8, 'name' => 'Promo & Diskon', 'slug' => 'promo-diskon'],
-        ['id' => 9, 'name' => 'Tips & Tutorial', 'slug' => 'tips-tutorial'],
-        ['id' => 10, 'name' => 'Berita & Informasi', 'slug' => 'berita-informasi'],
-    ]);
+    return response()->json(
+        DB::table('blog_categories')
+            ->where('is_active', true)
+            ->orderBy('order')
+            ->get(['id', 'name', 'slug', 'description', 'icon'])
+    );
 });
 Route::get('/events', [BlogController::class, 'events']);
 Route::get('/events/{event}', [BlogController::class, 'show']);
@@ -73,16 +103,27 @@ Route::get('/advertisements', [AdvertisementController::class, 'index']);
 Route::get('/ad-packages', [AdPackageController::class, 'publicIndex']);
 Route::get('/packages', [PackageController::class, 'publicIndex']);
 Route::get('/content-pricing', [ContentPricingController::class, 'getPricing']);
+Route::post('/contact', [ContactController::class, 'submit']);
 Route::get('/users', [AdminController::class, 'users']);
 Route::get('/users/{id}', [ProfileController::class, 'showUser']);
 Route::get('/businesses/{business}/products', [ProductController::class, 'getByBusiness']);
 Route::get('/plans', [AdminController::class, 'publicPlans']);
 
+// Public WhatsApp fee settings (no auth needed)
+Route::get('/whatsapp-settings', [SettingController::class, 'getWhatsAppSettings']);
+
+// Public Coupon routes (can be accessed by users & guests)
+Route::get('/coupons/public-codes', [CouponController::class, 'publicCodes']);
+Route::post('/coupons/validate', [CouponController::class, 'validateCoupon']);
+
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'destroy']);
     Route::get('/user', function (Request $request) { return $request->user(); });
-    Route::put('/users/profile', [ProfileController::class, 'update']);
+    Route::match(['put', 'post'], '/users/profile', [ProfileController::class, 'update']);
     Route::get('/user/profile', [ProfileController::class, 'show']);
+    Route::get('/users/profile', [ProfileController::class, 'show']); // Alias untuk frontend
+    Route::match(['put', 'post'], '/user/profile', [ProfileController::class, 'update']);
     Route::get('/user/dashboard-stats', [ProfileController::class, 'dashboardStats']);
     Route::get('/user/analytics-stats', [ProfileController::class, 'analyticsStats']);
     Route::get('/my-subscriptions', [PackageController::class, 'mySubscriptions']);
@@ -92,13 +133,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/blogs/{id}/transaction', [ContentTransactionController::class, 'getTransactionForBlog']);
     Route::get('/my-content-transactions', [ContentTransactionController::class, 'myTransactions']);
     Route::post('/reports', [ReportController::class, 'store']);
+    Route::post('/whatsapp-access-log', [SettingController::class, 'logWhatsAppAccess']);
+    Route::get('/whatsapp-access-status', [SettingController::class, 'checkWhatsAppAccessStatus']);
     Route::post('/products', [ProductController::class, 'store']);
-    Route::put('/products/{id}', [ProductController::class, 'update']);
+    Route::get('/my-products', [ProductController::class, 'myProducts']);
+    Route::match(['put', 'post'], '/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 
     Route::middleware('role:user')->group(function () {
         Route::post('/businesses', [BusinessController::class, 'store']);
-        Route::put('/businesses/{business}', [BusinessController::class, 'update']);
+        Route::match(['put', 'post'], '/businesses/{business}', [BusinessController::class, 'update']);
         Route::delete('/businesses/{business}', [BusinessController::class, 'destroy']);
         Route::get('/my-businesses', [BusinessController::class, 'myBusinesses']);
         Route::post('/businesses/{business}/logo', [BusinessController::class, 'uploadLogo']);
@@ -109,8 +153,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/businesses/{business}/products', [ProductController::class, 'storeForBusiness']);
         Route::get('/my-blogs', [BlogController::class, 'myBlogs']);
         Route::post('/blogs', [BlogController::class, 'store']);
-        Route::put('/blogs/{blog}', [BlogController::class, 'update']);
+        Route::match(['put', 'post'], '/blogs/{blog}', [BlogController::class, 'update']);
         Route::delete('/blogs/{blog}', [BlogController::class, 'destroy']);
+        Route::delete('/events/{blog}', [BlogController::class, 'destroy']);
         Route::post('/blogs/{blog}/thumbnail', [BlogController::class, 'uploadThumbnail']);
         Route::post('/blogs/{blog}/images', [BlogController::class, 'uploadImages']);
         Route::get('/my-favorites', [FavoriteController::class, 'index']);
@@ -123,6 +168,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/my-ratings', [RatingController::class, 'myRatings']);
         Route::put('/ratings/{rating}', [RatingController::class, 'update']);
         Route::delete('/ratings/{rating}', [RatingController::class, 'destroy']);
+        Route::post('/ratings/{rating}/react', [RatingController::class, 'react']);
+        Route::post('/ratings/{rating}/replies', [RatingController::class, 'storeReply']);
+        Route::delete('/rating-replies/{reply}', [RatingController::class, 'destroyReply']);
         Route::post('/businesses/{business}/conversation', [ConversationController::class, 'storeForBusiness']);
         Route::get('/inbox', [ConversationController::class, 'index']);
         Route::get('/inbox/unread-count', [ConversationController::class, 'unreadCount']);
@@ -145,10 +193,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/advertisements/{id}', [AdvertisementController::class, 'update']);
         Route::delete('/advertisements/{id}', [AdvertisementController::class, 'destroy']);
         Route::match(['put', 'post'], '/advertisements/{id}/pay', [AdvertisementController::class, 'pay']);
-        Route::post('/coupons/validate', [CouponController::class, 'validateCoupon']);
         Route::post('/referrals/validate', [ReferralController::class, 'validateCode']);
         Route::get('/referrals/my-stats', [ReferralController::class, 'myStats']);
         Route::post('/referrals/withdraw', [ReferralController::class, 'requestWithdrawal']);
+        // PERBAIKAN: kedua fungsi ini (publicCodes & leaderboard) sudah lengkap
+        // ditulis di ReferralController, tapi rutenya lupa didaftarkan di sini -
+        // itu sebabnya frontend selalu dapat 404 Not Found waktu memanggilnya.
+        Route::get('/referrals/public-codes', [ReferralController::class, 'publicCodes']);
+        Route::get('/referrals/leaderboard', [ReferralController::class, 'leaderboard']);
         Route::post('/subscriptions', [BusinessController::class, 'subscribeBusiness']);
     });
 
@@ -173,12 +225,23 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/categories/{category}', [AdminController::class, 'updateCategory']);
         Route::put('/categories/{category}/toggle-status', [AdminController::class, 'toggleCategoryStatus']);
         Route::delete('/categories/{category}', [AdminController::class, 'destroyCategory']);
+        
+        // Navbar Categories (Informasi dropdown) Management
+        Route::get('/navbar-categories', [NavbarCategoryController::class, 'adminGetAll']);
+        Route::post('/navbar-categories', [NavbarCategoryController::class, 'store']);
+        Route::get('/navbar-categories/{id}', [NavbarCategoryController::class, 'show']);
+        Route::put('/navbar-categories/{id}', [NavbarCategoryController::class, 'update']);
+        Route::delete('/navbar-categories/{id}', [NavbarCategoryController::class, 'destroy']);
+        Route::put('/navbar-categories/{id}/toggle-status', [NavbarCategoryController::class, 'toggleStatus']);
+        Route::post('/navbar-categories/reorder', [NavbarCategoryController::class, 'reorder']);
+        Route::get('/navbar-categories/parents/list', [NavbarCategoryController::class, 'getParents']);
+        
         Route::get('/blogs', [AdminController::class, 'allBlogs']);
-        Route::put('/blogs/{blog}/approve', [AdminController::class, 'approveBlog']);
-        Route::post('/blogs/{blog}/approve', [AdminController::class, 'approveBlog']);
-        Route::put('/blogs/{blog}/reject', [AdminController::class, 'rejectBlog']);
-        Route::post('/blogs/{blog}/reject', [AdminController::class, 'rejectBlog']);
-        Route::delete('/blogs/{blog}', [AdminController::class, 'destroyBlog']);
+        Route::put('/blogs/{id}/approve', [AdminController::class, 'approveBlog']);
+        Route::post('/blogs/{id}/approve', [AdminController::class, 'approveBlog']);
+        Route::put('/blogs/{id}/reject', [AdminController::class, 'rejectBlog']);
+        Route::post('/blogs/{id}/reject', [AdminController::class, 'rejectBlog']);
+        Route::delete('/blogs/{id}', [AdminController::class, 'destroyBlog']);
         Route::get('/reviews', [AdminController::class, 'allReviews']);
         Route::delete('/reviews/{rating}', [AdminController::class, 'destroyReview']);
         Route::get('/subscriptions', [AdminController::class, 'allSubscriptions']);
@@ -198,8 +261,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/coupons/{coupon}', [CouponController::class, 'destroy']);
         Route::put('/coupons/{coupon}/toggle-status', [CouponController::class, 'toggleStatus']);
         Route::patch('/coupons/{coupon}/toggle-status', [CouponController::class, 'toggleStatus']);
-        Route::get('/settings', [AdminController::class, 'allSettings']);
-        Route::post('/settings', [AdminController::class, 'createSetting']);
+        Route::get('/settings', [SettingController::class, 'index']);
+        Route::post('/settings', [SettingController::class, 'update']);
         Route::put('/settings/{setting}', [AdminController::class, 'updateSetting']);
         Route::delete('/settings/{setting}', [AdminController::class, 'destroySetting']);
         Route::put('/profile', [AdminController::class, 'updateProfile']);
@@ -276,5 +339,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/referrals/settings', [AdminReferralController::class, 'getSettings']);
         Route::put('/referrals/settings', [AdminReferralController::class, 'updateSettings']);
         Route::post('/referrals/settings', [AdminReferralController::class, 'updateSettings']);
+
+        // Contact Messages Management
+        Route::get('/contacts', [ContactController::class, 'index']);
+        Route::put('/contacts/{id}/status', [ContactController::class, 'updateStatus']);
+
+        // WhatsApp Payment Wall Management
+        Route::get('/whatsapp-settings', [SettingController::class, 'getWhatsAppSettings']);
+        Route::post('/whatsapp-settings', [SettingController::class, 'updateWhatsAppSettings']);
+        Route::put('/whatsapp-settings', [SettingController::class, 'updateWhatsAppSettings']);
+        Route::get('/whatsapp-logs', [SettingController::class, 'getWhatsAppLogs']);
+        Route::delete('/whatsapp-logs/{id}', [SettingController::class, 'deleteWhatsAppLog']);
+        Route::put('/whatsapp-logs/{id}/approve', [SettingController::class, 'approveWhatsAppAccess']);
+        Route::post('/whatsapp-logs/{id}/approve', [SettingController::class, 'approveWhatsAppAccess']);
+        Route::put('/whatsapp-logs/{id}/reject', [SettingController::class, 'rejectWhatsAppAccess']);
+        Route::post('/whatsapp-logs/{id}/reject', [SettingController::class, 'rejectWhatsAppAccess']);
     });
 });

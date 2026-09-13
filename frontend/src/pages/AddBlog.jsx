@@ -51,8 +51,14 @@ const PAYMENT_METHODS = [
     category: "E-Wallet",
     items: [
       { id: "OVO", name: "OVO", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#4c2a86] text-white" },
-      { id: "DANA", name: "DANA", accountName: "Triwala Mitra Bestari", accountNumber: "XXX (Belum Terdaftar)", badgeColor: "bg-[#008cff] text-white" },
-      { id: "GoPay", name: "GoPay", accountName: "Triwala Mitra Bestari", accountNumber: "XXX (Belum Terdaftar)", badgeColor: "bg-[#00a5cf] text-white" },
+      { id: "DANA", name: "DANA", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#008cff] text-white" },
+      { id: "GoPay", name: "GoPay", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#00a5cf] text-white" },
+    ]
+  },
+  {
+    category: "QRIS",
+    items: [
+      { id: "QRIS", name: "QRIS (Semua E-Wallet & Bank)", accountName: "Triwala Mitra Bestari", accountNumber: "Scan QR Code", badgeColor: "bg-gradient-to-r from-[#00a5cf] to-[#008cff] text-white", isQRIS: true },
     ]
   }
 ];
@@ -328,7 +334,7 @@ export default function AddBlog() {
         itemId = id;
       } else {
         const res = await api.post(endpoint, payload);
-        itemData = res.data?.data;
+        itemData = res.data?.data || res.data;
         itemId = itemData?.id;
         if (!itemId) throw new Error("Gagal membuat konten");
       }
@@ -555,7 +561,7 @@ export default function AddBlog() {
                 <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold block mb-1">Status Publikasi: Pending Verifikasi Admin</span>
-                  Konten kamu telah tersimpan aman. Setelah diverifikasi, artikel/event ini akan otomatis tampil di halaman utama Info.co.id.
+                  Konten kamu telah tersimpan aman. Setelah diverifikasi, artikel/event ini akan otomatis tampil di halaman utama Surade.co.id.
                 </div>
               </div>
             </>
@@ -573,7 +579,7 @@ export default function AddBlog() {
               </h1>
               <p className="text-base text-[#64748b] leading-[1.7] mb-9">
                 {form.status === "published" || isAdmin
-                  ? `Konten "${form.title}" telah terbit dan kini dapat dibaca oleh seluruh pengunjung website Info.co.id.`
+                  ? `Konten "${form.title}" telah terbit dan kini dapat dibaca oleh seluruh pengunjung website Surade.co.id.`
                   : (isEditing && form.status === "rejected"
                     ? `Revisi untuk konten "${form.title}" telah dikirim ke Admin dan kini berstatus Menunggu Persetujuan. Kamu tidak perlu membayar ulang.`
                     : `Draft "${form.title}" telah tersimpan. Kamu dapat melanjutkannya kapan saja melalui Dashboard.`)}
@@ -733,7 +739,7 @@ export default function AddBlog() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 mt-1 max-w-lg leading-relaxed">
-                    Posting Anda akan tayang aktif selama 1 tahun (365 hari) di platform Info.co.id. Dapatkan jangkauan audiens lebih luas, optimasi SEO, dan bebas update konten kapan saja.
+                    Posting Anda akan tayang aktif selama 1 tahun (365 hari) di platform Surade.co.id. Dapatkan jangkauan audiens lebih luas, optimasi SEO, dan bebas update konten kapan saja.
                   </p>
                 </div>
               </div>
@@ -797,7 +803,7 @@ export default function AddBlog() {
                       <input
                         name="event_location"
                         type="text"
-                        placeholder="Contoh: Jakarta International Expo (JIExpo)"
+                        placeholder="Contoh: Lapangan Desa Pasiripis, Aula Kelurahan Surade"
                         value={form.event_location}
                         onChange={handleChange}
                         className="form-input"
@@ -1235,9 +1241,20 @@ export default function AddBlog() {
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className={`px-2.5 py-1 text-xs font-black rounded-md ${item.badgeColor}`}>
-                              {item.id.split(" ")[0]}
-                            </span>
+                            <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-white border border-slate-200 p-1.5 overflow-hidden shrink-0">
+                              <img 
+                                src={`/logos/${item.id.toLowerCase()}.png`}
+                                alt={item.name}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                              <div className={`w-full h-full hidden items-center justify-center ${item.badgeColor} rounded`}>
+                                <span className="text-white text-[10px] font-bold">{item.id}</span>
+                              </div>
+                            </div>
                             <span className="text-sm font-bold text-slate-800">{item.name}</span>
                           </div>
                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#007570] bg-[#007570]" : "border-slate-300"}`}>
@@ -1257,27 +1274,45 @@ export default function AddBlog() {
                 <ShieldCheck size={18} className="text-[#007570]" /> Instruksi Pembayaran {currentAccount.name}
               </h4>
               <p className="text-xs text-slate-600">
-                Silakan lakukan transfer sesuai total tagihan ke nomor rekening / Virtual Account berikut:
+                {currentAccount.isQRIS 
+                  ? "Scan QR Code di bawah menggunakan aplikasi e-wallet atau mobile banking kamu:"
+                  : "Silakan lakukan transfer sesuai total tagihan ke nomor rekening / Virtual Account berikut:"}
               </p>
-              <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-400 font-medium block">Nomor Rekening / Virtual Account</span>
-                  <span className="text-lg font-black text-[#0f172a]">{currentAccount.accountNumber}</span>
-                  <span className="text-xs text-slate-500 block mt-0.5">a.n {currentAccount.accountName}</span>
+
+              {currentAccount.isQRIS ? (
+                <div className="bg-white border-2 border-slate-200 rounded-xl p-6 flex flex-col items-center space-y-4">
+                  <div className="w-56 h-56 bg-white border-4 border-[#007570] rounded-2xl p-3 flex items-center justify-center shadow-md">
+                    <img src="/logos/qris.png" alt="QRIS Code" className="w-full h-full object-contain" onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=QRIS_SURADE_PAYMENT";
+                    }} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-slate-800">QRIS Triwala Mitra Bestari</p>
+                    <p className="text-[11px] text-slate-500">Mendukung BCA, Mandiri, BNI, BRI, DANA, OVO, GoPay, ShopeePay, dsb.</p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(currentAccount.accountNumber.replace(/-/g, ""));
-                    setCopiedAccount(true);
-                    setTimeout(() => setCopiedAccount(false), 2500);
-                  }}
-                  className="px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5"
-                >
-                  {copiedAccount ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                  <span>{copiedAccount ? "Tersalin!" : "Salin No"}</span>
-                </button>
-              </div>
+              ) : (
+                <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-slate-400 font-medium block">Nomor Rekening / Virtual Account</span>
+                    <span className="text-lg font-black text-[#0f172a]">{currentAccount.accountNumber}</span>
+                    <span className="text-xs text-slate-500 block mt-0.5">a.n {currentAccount.accountName}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(currentAccount.accountNumber.replace(/-/g, ""));
+                      setCopiedAccount(true);
+                      setTimeout(() => setCopiedAccount(false), 2500);
+                    }}
+                    className="px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5"
+                  >
+                    {copiedAccount ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                    <span>{copiedAccount ? "Tersalin!" : "Salin No"}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Navigation Buttons (Step 3) */}

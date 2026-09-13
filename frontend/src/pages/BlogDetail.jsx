@@ -4,7 +4,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import api from "../services/api";
 import { requireAuth } from "../utils/authCheck";
-import logoImg from "../assets/logo.png";
+import logoImg from "../assets/logo-surade.png";
 import {
   User,
   Calendar,
@@ -200,7 +200,20 @@ export default function BlogDetail() {
     );
   }
 
-  const images = Array.isArray(blog.images) ? blog.images : [];
+  const parseImages = (imgs) => {
+    if (!imgs) return [];
+    if (Array.isArray(imgs)) return imgs;
+    if (typeof imgs === "string") {
+      try {
+        const parsed = JSON.parse(imgs);
+        return Array.isArray(parsed) ? parsed : [imgs];
+      } catch (e) {
+        return [imgs];
+      }
+    }
+    return [];
+  };
+  const images = parseImages(blog.images);
 
   return (
     <div className="blog-detail-page">
@@ -217,9 +230,15 @@ export default function BlogDetail() {
             <div className="bdg-hero__breadcrumb">
               <Link to="/">Home</Link>
               <span>/</span>
-              <Link to="/blog">Blog</Link>
+              <Link to="/blog">{blog.type === "event" ? "Event" : "Blog"}</Link>
               <span>/</span>
               <span>{blog.title}</span>
+            </div>
+
+            <div style={{ marginBottom: "12px" }}>
+              <span className={`blog-badge-tag ${blog.type === "event" ? "blog-badge-tag--event" : "blog-badge-tag--blog"}`}>
+                {blog.type === "event" ? "ACARA / EVENT" : "ARTIKEL / BLOG"}
+              </span>
             </div>
 
             <h1 className="bdg-hero__title">{blog.title}</h1>
@@ -230,10 +249,23 @@ export default function BlogDetail() {
                 <User size={15} />
                 <span>{blog.user?.name || "Penulis"}</span>
               </span>
-              <span className="bdg-hero__meta-item">
-                <Calendar size={15} />
-                <span>{formatDate(blog.published_at || blog.created_at)}</span>
-              </span>
+              {blog.type === "event" && blog.event_date ? (
+                <span className="bdg-hero__meta-item">
+                  <Calendar size={15} />
+                  <span>Pelaksanaan: {formatDate(blog.event_date)}</span>
+                </span>
+              ) : (
+                <span className="bdg-hero__meta-item">
+                  <Calendar size={15} />
+                  <span>{formatDate(blog.published_at || blog.created_at)}</span>
+                </span>
+              )}
+              {blog.type === "event" && blog.event_location && (
+                <span className="bdg-hero__meta-item">
+                  <MapPin size={15} />
+                  <span>{blog.event_location}</span>
+                </span>
+              )}
               <span className="bdg-hero__meta-item">
                 <Clock size={15} />
                 <span>{getReadTime(blog.content)}</span>
@@ -351,10 +383,32 @@ export default function BlogDetail() {
 
           {/* ── SIDEBAR ── */}
           <aside className="bdg-sidebar">
-            {/* Blog Info Card */}
+            {/* Blog/Event Info Card */}
             <div className="bdg-sidebar-card">
-              <h3 className="bdg-sidebar-card__title">Informasi Blog</h3>
+              <h3 className="bdg-sidebar-card__title">
+                {blog.type === "event" ? "Informasi Event" : "Informasi Blog"}
+              </h3>
               <div className="bdg-info-list">
+                {blog.type === "event" && blog.event_date && (
+                  <div className="bdg-info-item">
+                    <Calendar size={16} />
+                    <div>
+                      <span className="bdg-info-label">Tanggal Pelaksanaan</span>
+                      <span className="bdg-info-value" style={{ color: "#007570", fontWeight: "700" }}>
+                        {formatDate(blog.event_date)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {blog.type === "event" && blog.event_location && (
+                  <div className="bdg-info-item">
+                    <MapPin size={16} />
+                    <div>
+                      <span className="bdg-info-label">Lokasi Event</span>
+                      <span className="bdg-info-value">{blog.event_location}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="bdg-info-item">
                   <Calendar size={16} />
                   <div>
@@ -457,4 +511,3 @@ export default function BlogDetail() {
     </div>
   );
 }
-

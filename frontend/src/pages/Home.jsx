@@ -1,14 +1,13 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Home.css";
-import "./Category.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import HeroSection from "../components/home/HeroSection";
 import PremiumAdsSection from "../components/home/PremiumAdsSection";
 import StandardAdsSection from "../components/home/StandardAdsSection";
 import useScrollReveal from "../hooks/useScrollReveal";
-import logoImg from "../assets/logo.png";
+import logoImg from "../assets/logo-surade.png";
 import irmanImg from "../assets/team/irman.jpg";
 import sriImg from "../assets/team/sri.jpg";
 import rajaImg from "../assets/team/raja.jpg";
@@ -17,10 +16,18 @@ import yogaImg from "../assets/team/yoga.jpg";
 import naufalImg from "../assets/team/naufal.jpg";
 import husnulImg from "../assets/team/husnul.jpg";
 import diniImg from "../assets/team/dini.jpg";
+
+/* ── Foto asli Smart Village (menggantikan placeholder picsum.photos) ── */
+import { SMART_CITIES, SMART_CITY_IMAGE_BY_SLUG } from "../data/smartVillageData";
 import { getBusinesses } from "../services/businessService";
 import { InlineSpinner } from "../components/LoadingScreen";
+import { BusinessGridSkeleton } from "../components/BusinessCardSkeleton";
+import TypewriterText from "../components/TypewriterText";
+import TestimonialsColumn from "../components/TestimonialsColumn";
 import { getStorageUrl } from "../utils/constants";
 import { requireAuth } from "../utils/authCheck";
+import { getBusinessOpenStatus } from "../utils/businessHours";
+import useRepeatReveal from "../hooks/useRepeatReveal";
 import api from "../services/api";
 import {
   Store,
@@ -35,6 +42,7 @@ import {
   ChevronRight,
   Bookmark,
   Eye,
+  Star,
   Tag,
   Pointer,
   Megaphone,
@@ -46,6 +54,13 @@ import {
   Landmark,
   BadgeCheck,
   ArrowRight,
+  Heart,
+  GraduationCap,
+  Camera,
+  Scissors,
+  Leaf,
+  Car,
+  Crown,
 } from "lucide-react";
 
 /* ── Categories loaded dynamically from API ── */
@@ -85,8 +100,13 @@ const FEATURES_DATA = [
   },
 ];
 
-/* ── Smart Cities data (Loaded dynamically from API) ── */
-const SMART_CITIES = [];
+/* SMART_CITIES & SMART_CITY_IMAGE_BY_SLUG sekarang diimpor dari
+   ../data/smartVillageData agar sama persis dengan yang dipakai
+   halaman detail per-desa (SmartCity.jsx). */
+
+function getVillageImage(city) {
+  return SMART_CITY_IMAGE_BY_SLUG[city.slug] || city.img || city.image;
+}
 
 /* ── Testimonials data ── */
 const TESTIMONIALS_DATA = [
@@ -95,14 +115,14 @@ const TESTIMONIALS_DATA = [
     avatar: irmanImg,
     name: "Irman Firmansyah",
     role: "Direktur Triwala",
-    text: "Dengan adanya Info.co.id, masyarakat jadi lebih mudah menemukan berbagai informasi dan layanan yang ada di daerah mereka.",
+    text: "Dengan adanya Surade.co.id, masyarakat jadi lebih mudah menemukan berbagai informasi dan layanan yang ada di daerah mereka.",
   },
   {
     id: 2,
     avatar: sriImg,
     name: "Sri Budiati",
     role: "Staff Ahli Lingkungan",
-    text: "Info.co.id membantu menyajikan informasi daerah dalam satu platform yang lebih mudah diakses dan dipahami oleh semua kalangan.",
+    text: "Surade.co.id membantu menyajikan informasi daerah dalam satu platform yang lebih mudah diakses dan dipahami oleh semua kalangan.",
   },
   {
     id: 3,
@@ -116,7 +136,7 @@ const TESTIMONIALS_DATA = [
     avatar: farhanImg,
     name: "Farhan M",
     role: "Perencanaan Wilayah",
-    text: "Info.co.id jadi salah satu platform yang membantu menghubungkan masyarakat dengan berbagai informasi dan potensi bisnis di daerahnya.",
+    text: "Surade.co.id jadi salah satu platform yang membantu menghubungkan masyarakat dengan berbagai informasi dan potensi bisnis di daerahnya.",
   },
   {
     id: 5,
@@ -130,7 +150,7 @@ const TESTIMONIALS_DATA = [
     avatar: naufalImg,
     name: "Naufal Handoko",
     role: "Analis",
-    text: "Dari sisi teknis, Info.co.id sudah cukup solid. Integrasi data bisnis lokal dengan sistem pencariannya terasa responsif dan mudah digunakan.",
+    text: "Dari sisi teknis, Surade.co.id sudah cukup solid. Integrasi data bisnis lokal dengan sistem pencariannya terasa responsif dan mudah digunakan.",
   },
   {
     id: 7,
@@ -144,12 +164,12 @@ const TESTIMONIALS_DATA = [
     avatar: diniImg,
     name: "Dini Hawariw",
     role: "Direktur Envitech",
-    text: "Info.co.id membantu UMKM di daerah untuk lebih mudah ditemukan. Ini langkah nyata menuju ekosistem digital yang lebih merata di Indonesia.",
+    text: "Surade.co.id membantu UMKM di daerah untuk lebih mudah ditemukan. Ini langkah nyata menuju ekosistem digital yang lebih merata di Indonesia.",
   },
 ];
 
 
-const getCategoryIcon = (iconName) => {
+const getCategoryIcon = (iconName, label = "") => {
   switch (iconName) {
     case "store":
       return <Store size={26} strokeWidth={1.7} />;
@@ -167,9 +187,42 @@ const getCategoryIcon = (iconName) => {
       return <Building2 size={26} strokeWidth={1.7} />;
     case "landmark":
       return <Landmark size={26} strokeWidth={1.7} />;
+    case "heart":
+      return <Heart size={26} strokeWidth={1.7} />;
+    case "graduation":
+      return <GraduationCap size={26} strokeWidth={1.7} />;
+    case "camera":
+      return <Camera size={26} strokeWidth={1.7} />;
+    case "scissors":
+      return <Scissors size={26} strokeWidth={1.7} />;
+    case "leaf":
+      return <Leaf size={26} strokeWidth={1.7} />;
+    case "car":
+      return <Car size={26} strokeWidth={1.7} />;
     default:
-      return <Store size={26} strokeWidth={1.7} />;
+      // Field "icon" dari database kosong / tidak cocok dengan salah satu
+      // di atas -> tebak ikonnya dari NAMA kategori, supaya kategori yang
+      // namanya sudah ada (Hiburan, Jasa, Kesehatan, dst) tetap dapat ikon
+      // yang beda-beda, tidak semuanya jatuh ke ikon toko generik.
+      return getCategoryIconByLabel(label);
   }
+};
+
+const getCategoryIconByLabel = (label) => {
+  const l = (label || "").toLowerCase();
+  if (l.includes("hiburan") || l.includes("rekreasi") || l.includes("wisata")) return <Camera size={26} strokeWidth={1.7} />;
+  if (l.includes("jasa") || l.includes("servis") || l.includes("bengkel")) return <Wrench size={26} strokeWidth={1.7} />;
+  if (l.includes("kesehatan") || l.includes("klinik")) return <Heart size={26} strokeWidth={1.7} />;
+  if (l.includes("kuliner") || l.includes("restoran") || l.includes("makanan") || l.includes("minuman")) return <Coffee size={26} strokeWidth={1.7} />;
+  if (l.includes("otomotif") || l.includes("spare part") || l.includes("bengkel")) return <Car size={26} strokeWidth={1.7} />;
+  if (l.includes("pendidikan") || l.includes("sekolah")) return <GraduationCap size={26} strokeWidth={1.7} />;
+  if (l.includes("properti") || l.includes("bangunan") || l.includes("material") || l.includes("konstruksi")) return <Building2 size={26} strokeWidth={1.7} />;
+  if (l.includes("teknologi") || l.includes("elektronik") || l.includes("gadget")) return <Smartphone size={26} strokeWidth={1.7} />;
+  if (l.includes("fashion") || l.includes("konveksi")) return <Shirt size={26} strokeWidth={1.7} />;
+  if (l.includes("salon") || l.includes("kecantikan") || l.includes("potong")) return <Scissors size={26} strokeWidth={1.7} />;
+  if (l.includes("pertanian") || l.includes("peternakan") || l.includes("kebun")) return <Leaf size={26} strokeWidth={1.7} />;
+  if (l.includes("retail") || l.includes("warung") || l.includes("sembako") || l.includes("umkm")) return <Store size={26} strokeWidth={1.7} />;
+  return <Store size={26} strokeWidth={1.7} />;
 };
 
 export default function Home() {
@@ -190,7 +243,8 @@ export default function Home() {
   const cachedBisnis = getInitialCache("cached_home_businesses", []);
   const cachedAds = getInitialCache("cached_home_ads_obj", null);
   const cachedBlogs = getInitialCache("cached_home_blogs", []);
-  const cachedCities = getInitialCache("cached_smart_cities", []);
+  const cachedCitiesRaw = getInitialCache("cached_smart_cities", []);
+  const cachedCities = cachedCitiesRaw.length > 0 ? cachedCitiesRaw : SMART_CITIES;
   const cachedRawCats = getInitialCache("cached_public_categories_raw", []);
 
   const [savedBlogs, setSavedBlogs] = useState({});
@@ -203,7 +257,7 @@ export default function Home() {
     Array.isArray(cachedRawCats) && cachedRawCats.length > 0
       ? [
           { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
-          ...cachedRawCats.map(c => ({ id: c.slug || String(c.id), label: c.name, icon: getCategoryIcon(c.icon) }))
+          ...cachedRawCats.map(c => ({ id: c.slug || String(c.id), label: c.name, icon: getCategoryIcon(c.icon, c.name) }))
         ]
       : [{ id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> }]
   );
@@ -237,13 +291,27 @@ export default function Home() {
               ...summary.categories.map(c => ({
                 id: c.slug || String(c.id),
                 label: c.name,
-                icon: getCategoryIcon(c.icon)
+                icon: getCategoryIcon(c.icon, c.name)
               }))
             ]);
+          } else {
+            try {
+              const catRes = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
+              if (catRes.ok) {
+                const catData = await catRes.json();
+                const list = Array.isArray(catData) ? catData : (Array.isArray(catData?.data) ? catData.data : []);
+                if (list.length > 0) {
+                  setCategories([
+                    { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
+                    ...list.map(c => ({ id: c.slug || String(c.id), label: c.name, icon: getCategoryIcon(c.icon, c.name) }))
+                  ]);
+                }
+              }
+            } catch (e) {}
           }
 
-          // Smart Cities
-          if (Array.isArray(summary.smart_cities)) {
+          // Smart Village (12 Desa/Kelurahan Kecamatan Surade)
+          if (Array.isArray(summary.smart_cities) && summary.smart_cities.length > 0) {
             const mappedSc = summary.smart_cities.map(c => ({
               id: c.id,
               slug: c.slug,
@@ -256,6 +324,9 @@ export default function Home() {
             try {
               sessionStorage.setItem("cached_smart_cities", JSON.stringify(mappedSc));
             } catch (e) {}
+          } else {
+            // Backend belum mengirim data desa — pakai 12 desa default agar seksi tetap tampil lengkap
+            setSmartCitiesData(SMART_CITIES);
           }
 
           // Businesses
@@ -265,6 +336,7 @@ export default function Home() {
               const subCategory = b.category?.parent ? b.category : null;
               const categoryName = mainCategory?.name || b.category?.name || "Umum";
               const subCategoryName = subCategory?.name || null;
+              const openStatus = getBusinessOpenStatus(b.opening_days);
 
               return {
                 id: b.id,
@@ -278,12 +350,15 @@ export default function Home() {
                 city: b.city || "Indonesia",
                 province: b.province || "",
                 views: b.views || 0,
-                status: "Buka Sekarang",
+                rating: b.rating || "0.0",
+                rating_count: b.rating_count || 0,
+                status: openStatus.label,
                 img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-                open: true,
+                open: openStatus.open,
                 featured: b.featured,
                 description: b.description,
                 is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
+                is_verified: Boolean(b.is_verified),
               };
             });
             setBisnisData(mappedBiz);
@@ -300,8 +375,8 @@ export default function Home() {
               businessId: ad.business_id,
               name: ad.name || "Bisnis Pilihan",
               package_type: ad.package_type || "standard",
-              rating: ad.rating || "4.9",
-              rating_count: ad.rating_count || 12,
+              rating: ad.rating || "0.0",
+              rating_count: ad.rating_count || 0,
               city: ad.city || "Indonesia",
               province: ad.province || "",
               location: ad.location || "Indonesia",
@@ -310,8 +385,14 @@ export default function Home() {
               logo: getStorageUrl(ad.logo),
             }));
 
-            const premium = mappedAds.filter(a => a.package_type === "premium");
-            const standard = mappedAds.filter(a => a.package_type === "standard");
+            console.log('📣 Advertisements loaded:', mappedAds.length, 'total');
+            console.log('📦 Package types:', mappedAds.map(a => a.package_type));
+
+            const premium = mappedAds.filter(a => a.package_type === "premium" || a.package_type === "hero");
+            const standard = mappedAds.filter(a => a.package_type === "standard" || a.package_type === "ticker");
+
+            console.log('🎯 Premium/Hero ads:', premium.length);
+            console.log('🎫 Standard/Ticker ads:', standard.length);
 
             setPremiumAds(premium.length > 0 ? premium : standard.slice(0, 4));
             setStandardAds(standard.length > 0 ? standard : premium);
@@ -334,7 +415,7 @@ export default function Home() {
               slug: b.slug,
               title: b.title,
               category: b.blog_category || b.category?.name || (b.type === "event" ? "Event" : "Artikel"),
-              author: b.user?.name || "Admin Info.co.id",
+              author: b.user?.name || "Admin Surade.co.id",
               date: b.published_at
                 ? new Date(b.published_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
                 : "Terbaru",
@@ -349,6 +430,8 @@ export default function Home() {
           }
 
           setLoadingData(false);
+          setLoadingAds(false); // FIX: sebelumnya cuma di-set false kalau ada iklan,
+          // jadi kalau array iklan kosong, section iklan nyangkut loading selamanya
           return;
         }
       } catch (err) {
@@ -363,7 +446,7 @@ export default function Home() {
           if (list.length > 0) {
             setCategories([
               { id: "all", label: "Semua", icon: <Store size={26} strokeWidth={1.7} /> },
-              ...list.map(c => ({ id: c.slug || String(c.id), label: c.name, icon: getCategoryIcon(c.icon) }))
+              ...list.map(c => ({ id: c.slug || String(c.id), label: c.name, icon: getCategoryIcon(c.icon, c.name) }))
             ]);
           }
         }).catch(err => console.error(err));
@@ -373,25 +456,28 @@ export default function Home() {
         .then(bizJson => {
           const bizData = bizJson?.data || bizJson || [];
           if (Array.isArray(bizData)) {
-            const mapped = bizData.map(b => ({
-              id: b.id,
-              name: b.name,
-              category: b.category?.name || "Umum",
-              subCategory: null,
-              categoryColor: "#007570",
-              tags: Array.isArray(b.tags) ? b.tags : [b.name],
-              location: b.city || "Indonesia",
-              address: b.address || "Indonesia",
-              city: b.city || "Indonesia",
-              province: b.province || "",
-              views: b.views || 0,
-              status: "Buka Sekarang",
-              img: getStorageUrl(b.logo || b.banner),
-              open: true,
-              featured: b.featured,
-              description: b.description,
-              is_premium: Boolean(b.is_premium),
-            }));
+            const mapped = bizData.map(b => {
+              const openStatus = getBusinessOpenStatus(b.opening_days);
+              return {
+                id: b.id,
+                name: b.name,
+                category: b.category?.name || "Umum",
+                subCategory: null,
+                categoryColor: "#007570",
+                tags: Array.isArray(b.tags) ? b.tags : [b.name],
+                location: b.city || "Indonesia",
+                address: b.address || "Indonesia",
+                city: b.city || "Indonesia",
+                province: b.province || "",
+                views: b.views || 0,
+                status: openStatus.label,
+                img: getStorageUrl(b.logo || b.banner),
+                open: openStatus.open,
+                featured: b.featured,
+                description: b.description,
+                is_premium: Boolean(b.is_premium),
+              };
+            });
             setBisnisData(mapped);
             setTemukanData(mapped);
           }
@@ -486,7 +572,18 @@ export default function Home() {
       (Array.isArray(localBlogs) ? localBlogs : []).forEach(id => { blogSavedMap[id] = true; });
     } catch (e) {}
 
-    if (token) {
+    // PERBAIKAN: endpoint /my-favorites & /my-blog-favorites di backend
+    // dibatasi cuma buat role "user" (Route::middleware('role:user')) -
+    // dulu di sini dipanggil untuk SEMUA akun yang login termasuk admin,
+    // jadi kalau yang login admin, 2 request ini selalu gagal 403 (bikin
+    // console penuh error tiap buka halaman ini). Sekarang dilewati kalau
+    // bukan role "user".
+    let isRegularUser = false;
+    try {
+      isRegularUser = JSON.parse(localStorage.getItem("user") || "null")?.role === "user";
+    } catch (e) {}
+
+    if (token && isRegularUser) {
       try {
         const [resBiz, resBlog] = await Promise.allSettled([
           api.get("/my-favorites"),
@@ -672,6 +769,13 @@ export default function Home() {
   // ── Subtle Scroll Reveal Animation Hook ──
   useScrollReveal([categories, smartCitiesData, filteredTemukanData, testimonialsData, homeBlogs]);
 
+  // Animasi berulang untuk section "Cepat dan Memudahkan Pencarian":
+  // teks & gambar akan muncul lagi tiap kali di-scroll lewat (naik/turun).
+  const [quickTextRef, quickTextRevealed] = useRepeatReveal();
+  const [quickImgRef, quickImgRevealed] = useRepeatReveal();
+  // Animasi teks berulang di banner foto sawah (muncul tiap dilewati, naik/turun)
+  const [sawahTextRef, sawahTextRevealed] = useRepeatReveal();
+
   return (
     <div className="home-page">
       {/* ── NAVBAR ── */}
@@ -699,18 +803,21 @@ export default function Home() {
       {/* ── 3. KATEGORI SECTION ── */}
       <section className="category-section reveal-on-scroll">
         <div className="category-inner">
-          {/* Category tabs */}
-          <div className="reko-tabs" ref={categoryScrollRef}>
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                to={`/category/${cat.id}`}
-                className="reko-tab reko-tab--link"
-              >
-                <span className="reko-tab__icon">{cat.icon}</span>
-                <span className="reko-tab__label">{cat.label}</span>
-              </Link>
-            ))}
+          {/* Grid kategori — 6 kolom, tanpa "Semua" (chip "Semua" tidak
+              relevan di grid ini, filter kategori tetap bisa diakses lewat
+              halaman /category). Class CSS "home-cat-*" dibikin khusus milik
+              Home (sebelumnya numpang class "reko-tabs" milik Category.css,
+              makanya stylenya suka ketuker/berubah kalau Category.css ikut
+              berubah). */}
+          <div className="home-cat-grid" ref={categoryScrollRef}>
+            {categories
+              .filter((cat) => cat.id !== "all")
+              .map((cat) => (
+                <Link key={cat.id} to={`/category/${cat.id}`} className="home-cat-card">
+                  <span className="home-cat-card__icon">{cat.icon}</span>
+                  <span className="home-cat-card__label">{cat.label}</span>
+                </Link>
+              ))}
           </div>
         </div>
       </section>
@@ -720,19 +827,19 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12 reveal-on-scroll">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0f172a] tracking-tight mb-2.5">
-              Smart City &amp; Smart Village
+              Smart Village
             </h2>
             <p className="text-xs sm:text-sm md:text-base text-slate-500 font-normal leading-relaxed">
-              Info.Co.Id Mendorong Percepatan Program Pemerintah Smart City &amp; Smart Village
+              Surade.co.id Mendorong Percepatan Program Pemerintah Smart Village
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 reveal-stagger">
             {smartCitiesData.length > 0 ? (
               smartCitiesData.map((city) => {
-                const displayName = /^(Kota|Kabupaten|Kab\.|DKI|Provinsi)/i.test(city.name?.trim() || "")
+                const displayName = /^(Kota|Kabupaten|Kab\.|DKI|Provinsi|Desa|Kelurahan)/i.test(city.name?.trim() || "")
                   ? city.name?.trim()
-                  : `Kota ${city.name?.trim() || ""}`;
+                  : `Desa ${city.name?.trim() || ""}`;
                 const totalBisnis = Number(city.bisnis || 0);
 
                 return (
@@ -742,7 +849,7 @@ export default function Home() {
                     className="group relative block aspect-[4/3] rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-slate-900 reveal-card"
                   >
                     <img
-                      src={city.img || city.image}
+                      src={getVillageImage(city)}
                       alt={city.name}
                       className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500 ease-out"
                       loading="lazy"
@@ -773,16 +880,51 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── WAVE DIVIDER: Foto Sawah dengan tepi bergelombang beranimasi ── */}
+      <section className="sawah-wave-divider" aria-hidden="false">
+        <div className="sawah-wave-divider__img" />
+        <div className="sawah-wave-divider__dim" />
+
+        <div className="sawah-wave-edge sawah-wave-edge--top">
+          <svg className="sawah-wave-edge__loop" viewBox="0 0 2400 200" preserveAspectRatio="none">
+            <path d="M0,90 C150,150 300,30 600,90 C900,150 1050,30 1200,90 C1350,150 1500,30 1800,90 C2100,150 2250,30 2400,90 L2400,0 L0,0 Z" />
+          </svg>
+        </div>
+
+        <div className="sawah-wave-edge sawah-wave-edge--bottom">
+          <svg className="sawah-wave-edge__loop" viewBox="0 0 2400 200" preserveAspectRatio="none">
+            <path d="M0,90 C150,150 300,30 600,90 C900,150 1050,30 1200,90 C1350,150 1500,30 1800,90 C2100,150 2250,30 2400,90 L2400,0 L0,0 Z" />
+          </svg>
+        </div>
+
+        <div
+          ref={sawahTextRef}
+          className={`sawah-wave-divider__text repeat-reveal repeat-reveal--up ${sawahTextRevealed ? "is-revealed" : ""}`}
+        >
+          <span className="sawah-wave-divider__eyebrow">Jelajahi Surade</span>
+          <h2 className="sawah-wave-divider__heading">
+            Temukan apa yang Anda cari<br className="sawah-wave-divider__br" /> di sekitar <span className="sawah-wave-divider__accent">Surade</span>, di sini.
+          </h2>
+          <span className="sawah-wave-divider__underline" aria-hidden="true" />
+        </div>
+      </section>
+
       {/* ── CEPAT PENCARIAN SECTION ── */}
       <section className="quick-section reveal-on-scroll">
         <div className="quick-inner">
-          <div className="quick-text reveal-from-left">
-            <h2 className="quick-title">Cepat dan Memudahkan Pencarian</h2>
+          <div
+            ref={quickTextRef}
+            className={`quick-text repeat-reveal repeat-reveal--left ${quickTextRevealed ? "is-revealed" : ""}`}
+          >
+            <span className="quick-eyebrow">CARA KERJA</span>
+            <h2 className="quick-title">
+              <TypewriterText text="Cepat dan Memudahkan Pencarian" as="span" repeat />
+            </h2>
             <p className="quick-subtitle">Mudah Menemukan Pelaku Usaha Skala Terkecil</p>
             <div className="quick-steps">
               {QUICK_STEPS.map((step) => (
                 <div key={step.num} className="quick-step">
-                  <div className="quick-step__num">{step.num}-</div>
+                  <div className="quick-step__num">{step.num}</div>
                   <div>
                     <p className="quick-step__title">{step.title}</p>
                     <p className="quick-step__desc">{step.desc}</p>
@@ -791,12 +933,21 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="quick-img-wrap reveal-from-right">
-            <img
-              src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=700&h=500&fit=crop"
-              alt="Ilustrasi pencarian bisnis"
-              className="quick-img"
-            />
+          <div
+            ref={quickImgRef}
+            className={`quick-img-wrap repeat-reveal repeat-reveal--right ${quickImgRevealed ? "is-revealed" : ""}`}
+          >
+            <div className="quick-img-frame">
+              <video
+                className="quick-img"
+                src="/videos/surade-aerial.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+              <div className="quick-img-glow" aria-hidden="true" />
+            </div>
           </div>
         </div>
       </section>
@@ -808,14 +959,14 @@ export default function Home() {
       >
         <div className="temukan-inner">
           <div className="text-center reveal-on-scroll">
-            <h2 className="temukan-title">Temukan Tempat Baru</h2>
+            <h2 className="temukan-title">Usaha Populer di Surade</h2>
             <p className="temukan-subtitle">
               Temukan Dihalaman Kami Untuk Dapat Membantu Dalam Menemukan Pelaku Usaha Hingga Skala Terkecil
             </p>
           </div>
 
           {loadingData ? (
-            <InlineSpinner text="Memuat data bisnis..." />
+            <BusinessGridSkeleton count={6} />
           ) : (
             <>
               {/* Carousel Slider Wrapper */}
@@ -838,7 +989,7 @@ export default function Home() {
                       {/* Image */}
                       <div className="biz-card__img-wrap">
                         <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
-                        {bisnis.is_premium && (
+                        {(bisnis.is_premium || bisnis.is_verified) && (
                           <div className="biz-card__verified-badge" title="Bisnis Terverifikasi - Pengguna Premium">
                             <BadgeCheck size={14} className="biz-card__verified-icon" />
                             <span>Terverifikasi</span>
@@ -856,14 +1007,22 @@ export default function Home() {
                           </button>
                           <span className="biz-card__views">
                             <Eye size={13} />
-                            <span>Pratinjau</span>
+                            <span>{bisnis.views || 0}</span>
                           </span>
                         </div>
                       </div>
 
                       {/* Body */}
                       <div className="biz-card__body">
-                        <h3 className="biz-card__name">{bisnis.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="biz-card__name flex-1">{bisnis.name}</h3>
+                          {bisnis.has_premium_badge && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-amber-400 to-amber-500 text-white text-[10px] font-bold rounded-full shadow-sm">
+                              <Crown size={10} />
+                              Premium
+                            </span>
+                          )}
+                        </div>
                         <div className="biz-card__categories">
                           <p className="biz-card__category">
                             <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor }} />
@@ -884,6 +1043,11 @@ export default function Home() {
                           ))}
                         </div>
                         <div className="biz-card__footer">
+                          <span className="biz-card__rating">
+                            <Star size={13} className="fill-amber-400 text-amber-400" />
+                            <span>{Number(bisnis.rating || 0).toFixed(1)}</span>
+                            {bisnis.rating_count > 0 && <span className="text-slate-400">({bisnis.rating_count})</span>}
+                          </span>
                           <span className="biz-card__location">
                             <MapPin size={12} />{bisnis.location}
                           </span>
@@ -972,33 +1136,32 @@ export default function Home() {
           <div className="testi-header reveal-on-scroll">
             <h2 className="testi-title">Apa Yang Mereka Katakan</h2>
             <p className="testi-subtitle">
-              Pengalaman dan cerita nyata dari mereka yang telah tumbuh dan berkembang bersama Info.co.id
+              Pengalaman dan cerita nyata dari mereka yang telah tumbuh dan berkembang bersama Surade.co.id
             </p>
           </div>
 
-          <div className="testi-grid reveal-stagger">
-            {testimonialsData.length > 0 ? (
-              testimonialsData.map((testi) => (
-              <div key={testi.id} className="testi-card reveal-card">
-                <div className="testi-card__avatar-wrap">
-                  <img src={testi.avatar} alt={testi.name} className="testi-card__avatar" loading="lazy" />
-                </div>
-                <div className="testi-card__content">
-                  <h3 className="testi-card__name">{testi.name}</h3>
-                  <div className="testi-card__role-container">
-                    <div className="testi-card__role-line" />
-                    <span className="testi-card__role">{testi.role}</span>
-                  </div>
-                  <p className="testi-card__text">{testi.text}</p>
-                </div>
-              </div>
-            ))
-            ) : (
-              <div className="testi-empty">
-                <p>Belum ada testimoni. Jadilah yang pertama memberikan testimoni!</p>
-              </div>
-            )}
-          </div>
+          {testimonialsData.length > 0 ? (
+            <div className="flex justify-center gap-6 mt-6 [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] max-h-[740px] overflow-hidden">
+              <TestimonialsColumn
+                testimonials={testimonialsData.filter((_, i) => i % 3 === 0)}
+                duration={15}
+              />
+              <TestimonialsColumn
+                testimonials={testimonialsData.filter((_, i) => i % 3 === 1)}
+                duration={19}
+                className="hidden md:block"
+              />
+              <TestimonialsColumn
+                testimonials={testimonialsData.filter((_, i) => i % 3 === 2)}
+                duration={17}
+                className="hidden lg:block"
+              />
+            </div>
+          ) : (
+            <div className="testi-empty">
+              <p>Belum ada testimoni. Jadilah yang pertama memberikan testimoni!</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1024,7 +1187,7 @@ export default function Home() {
         <div className="blog-inner">
           <div className="text-center reveal-on-scroll">
             <h2 className="blog-title">Berbagi Pengalaman Mereka</h2>
-            <p className="blog-subtitle">Bagikan Pengalaman Dan Info Anda Di Info.co.id.</p>
+            <p className="blog-subtitle">Bagikan Pengalaman Dan Info Anda Di Surade.co.id.</p>
           </div>
 
           <div className="blog-grid reveal-stagger">

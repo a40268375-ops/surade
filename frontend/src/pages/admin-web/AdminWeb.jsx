@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation, useParams } from "react-router-dom";
+import logoImg from "../../assets/logo-surade.png";
 import {
   LayoutDashboard,
   Users,
   Building2,
   Tag,
+  Info,
   Megaphone,
   Crown,
   Ticket,
@@ -15,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowLeft,
+  Home,
   Search,
   LogOut,
   User,
@@ -25,6 +28,7 @@ import {
   Check,
   X,
   Clock,
+  BadgeCheck,
   DollarSign,
   Download,
   TrendingUp,
@@ -62,6 +66,7 @@ import {
   Wallet,
   Sparkles,
   Loader2,
+  Store,
 } from "lucide-react";
 import api from "../../services/api";
 import { DEFAULT_AVATAR, getStorageUrl } from "../../utils/constants";
@@ -216,14 +221,14 @@ const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} strokeWidth={1.7} /> },
   { id: "users", label: "Kelola User", icon: <Users size={20} strokeWidth={1.7} /> },
   { id: "businesses", label: "Kelola Bisnis", icon: <Building2 size={20} strokeWidth={1.7} /> },
-  { id: "categories", label: "Kelola Kategori", icon: <Tag size={20} strokeWidth={1.7} /> },
+  { id: "navbar-info", label: "Kelola Kategori", icon: <Tag size={20} strokeWidth={1.7} /> },
   { id: "ads", label: "Kelola Iklan", icon: <Megaphone size={20} strokeWidth={1.7} /> },
   { id: "premium", label: "Paket Premium", icon: <Crown size={20} strokeWidth={1.7} /> },
   { id: "coupons", label: "Kupon Diskon", icon: <Ticket size={20} strokeWidth={1.7} /> },
   { id: "referrals", label: "Kelola Referral", icon: <Share2 size={20} strokeWidth={1.7} /> },
   { id: "blogs", label: "Blog & Event", icon: <FileText size={20} strokeWidth={1.7} /> },
   { id: "reports", label: "Laporan Report", icon: <AlertTriangle size={20} strokeWidth={1.7} /> },
-  { id: "settings", label: "Pengaturan", icon: <Settings size={20} strokeWidth={1.7} /> },
+  { id: "whatsapp", label: "Kelola WhatsApp", icon: <MessageSquare size={20} strokeWidth={1.7} /> },
 ];
 
 // Helper for fast localStorage caching in AdminWeb
@@ -343,6 +348,18 @@ export default function AdminWeb() {
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [categoryStatusFilter, setCategoryStatusFilter] = useState("");
 
+  // ── Navbar Category States ──
+  const [navbarCategoryForm, setNavbarCategoryForm] = useState({
+    name: "",
+    slug: "",
+    icon: "",
+    parent_id: "",
+    order: 0,
+    is_active: true,
+  });
+  const [navbarCategorySearchQuery, setNavbarCategorySearchQuery] = useState("");
+  const [navbarCategoryStatusFilter, setNavbarCategoryStatusFilter] = useState("");
+
   const generateCouponCode = () => {
     const prefixes = ["PROMO", "DISCOUNT", "PREMIUM", "IKLAN", "INFO"];
     const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
@@ -370,6 +387,47 @@ export default function AdminWeb() {
   });
   const [packages, setPackages] = useState([]);
   const [adPackages, setAdPackages] = useState(() => getAdminCache("ad_packages", []));
+  // ── Settings States ──
+  const [settings, setSettings] = useState({
+    general: {},
+    contact: {},
+    social: {},
+    seo: {},
+  });
+  const [settingsForm, setSettingsForm] = useState({
+    site_name: "",
+    site_logo: null,
+    site_banner: null,
+    contact_email: "",
+    contact_phone: "",
+    contact_address: "",
+    social_instagram: "",
+    social_facebook: "",
+    social_website: "",
+    seo_meta_title: "",
+    seo_meta_description: "",
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  // ── WhatsApp Payment Wall States ──
+  const [waAdminSettings, setWaAdminSettings] = useState({
+    enabled: true,
+    amount: 2000,
+    bank_name: "BCA / QRIS",
+    account_number: "0954152045",
+    account_holder: "Triwala Mitra Bestari",
+    instruction: "Akses kontak langsung WhatsApp penjual dikenakan biaya administrasi resmi untuk keamanan dan pencegahan spam.",
+    qris_image: null,
+  });
+  const [waAdminSettingsForm, setWaAdminSettingsForm] = useState({ ...waAdminSettings });
+  const [waLogs, setWaLogs] = useState([]);
+  const [waLogStats, setWaLogStats] = useState({ total_access: 0, total_revenue: 0, today_access: 0 });
+  const [waLogPage, setWaLogPage] = useState(1);
+  const [waLogPagination, setWaLogPagination] = useState({ current_page: 1, last_page: 1, total: 0 });
+  const [savingWaSettings, setSavingWaSettings] = useState(false);
+  const [loadingWaLogs, setLoadingWaLogs] = useState(false);
+  const [waQrisFile, setWaQrisFile] = useState(null);
+
   const [adPackageForm, setAdPackageForm] = useState({
     name: "",
     placement_type: "standard",
@@ -424,6 +482,7 @@ export default function AdminWeb() {
   const businessesPerPage = 10;
   const [businessStatusFilter, setBusinessStatusFilter] = useState("all");
   const [categories, setCategories] = useState(() => getAdminCache("categories", []));
+  const [navbarCategories, setNavbarCategories] = useState(() => getAdminCache("navbar_categories", []));
   const [payments, setPayments] = useState(() => getAdminCache("payments", []));
   const [blogs, setBlogs] = useState(() => getAdminCache("blogs", []));
   const [contentPackages, setContentPackages] = useState([]);
@@ -448,8 +507,10 @@ export default function AdminWeb() {
   };
 
   const handleOpenBusinessDetail = (business) => {
-    const sub = subscriptions.find(s => s.business_id === business.id || s.user_id === business.user_id) || business.subscriptions?.[0] || business.latest_subscription;
-    const pay = payments.find(p => p.subscription_id === sub?.id || p.id === sub?.payment_id) || sub?.payment || business.payment;
+    const sub = business.subscriptions?.[0] || business.latest_subscription || subscriptions.find(s => s.business_id === business.id || (business.user_id && s.user_id === business.user_id));
+    const pay = sub?.payment || business.payment || payments.find(p => p.subscription_id === sub?.id || p.id === sub?.payment_id);
+    const rawProof = pay?.proof || sub?.payment?.proof || business.payment_proof;
+    const proofUrl = rawProof ? getStorageUrl(rawProof) : null;
     
     setModal({
       show: true,
@@ -458,7 +519,7 @@ export default function AdminWeb() {
         ...business,
         subscription: sub,
         payment: pay,
-        proof_url: pay?.proof ? getStorageUrl(pay.proof) : (business.payment_proof ? getStorageUrl(business.payment_proof) : null)
+        proof_url: proofUrl
       },
     });
 
@@ -469,6 +530,7 @@ export default function AdminWeb() {
           if (prev.type === "viewBusinessDetail" && prev.data?.id === business.id) {
             const freshSub = freshBiz.subscriptions?.[0] || freshBiz.latest_subscription || sub;
             const freshPay = freshSub?.payment || pay;
+            const freshProof = freshPay?.proof || freshSub?.payment?.proof || freshBiz.payment_proof || rawProof;
             return {
               ...prev,
               data: {
@@ -476,7 +538,7 @@ export default function AdminWeb() {
                 ...freshBiz,
                 subscription: freshSub,
                 payment: freshPay,
-                proof_url: freshPay?.proof ? getStorageUrl(freshPay.proof) : (freshBiz.payment_proof ? getStorageUrl(freshBiz.payment_proof) : prev.data?.proof_url)
+                proof_url: freshProof ? getStorageUrl(freshProof) : prev.data?.proof_url
               }
             };
           }
@@ -831,6 +893,114 @@ export default function AdminWeb() {
     }
   };
 
+  // ── WhatsApp Management Functions ──
+  const fetchWaSettings = async () => {
+    try {
+      const res = await api.get("/admin/whatsapp-settings");
+      const data = res.data?.data;
+      if (data) {
+        setWaAdminSettings(data);
+        setWaAdminSettingsForm({
+          enabled: data.enabled,
+          amount: data.amount,
+          bank_name: data.bank_name,
+          account_number: data.account_number,
+          account_holder: data.account_holder,
+          instruction: data.instruction,
+          selected_bank: data.selected_bank || "BCA",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch WA settings:", err);
+    }
+  };
+
+  const fetchWaLogs = async (page = 1) => {
+    setLoadingWaLogs(true);
+    try {
+      const res = await api.get("/admin/whatsapp-logs", { params: { page } });
+      const data = res.data?.data;
+      if (data) {
+        setWaLogs(data.logs || []);
+        setWaLogPagination(data.pagination || { current_page: 1, last_page: 1, total: 0 });
+        setWaLogStats(data.stats || { total_access: 0, total_revenue: 0, today_access: 0 });
+        setWaLogPage(page);
+      }
+    } catch (err) {
+      console.error("Failed to fetch WA logs:", err);
+    } finally {
+      setLoadingWaLogs(false);
+    }
+  };
+
+  const saveWaSettings = async () => {
+    setSavingWaSettings(true);
+    try {
+      const formData = new FormData();
+      formData.append("enabled", waAdminSettingsForm.enabled ? "1" : "0");
+      formData.append("amount", waAdminSettingsForm.amount);
+      formData.append("bank_name", waAdminSettingsForm.bank_name);
+      formData.append("account_number", waAdminSettingsForm.account_number);
+      formData.append("account_holder", waAdminSettingsForm.account_holder);
+      formData.append("instruction", waAdminSettingsForm.instruction);
+      if (waQrisFile) {
+        formData.append("qris_image", waQrisFile);
+      }
+      const res = await api.post("/admin/whatsapp-settings", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const data = res.data?.data;
+      if (data) {
+        setWaAdminSettings(data);
+        alert("Pengaturan WhatsApp berhasil disimpan!");
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menyimpan pengaturan WhatsApp.");
+    } finally {
+      setSavingWaSettings(false);
+    }
+  };
+  const approveWaLog = async (logId) => {
+    if (!window.confirm("Setujui pembayaran & buka akses WhatsApp ini?")) return;
+    try {
+      const res = await api.put(`/admin/whatsapp-logs/${logId}/approve`);
+      alert("Akses WhatsApp berhasil disetujui!");
+      const waLink = res.data?.notify_whatsapp_link;
+      if (waLink && window.confirm("Buka WhatsApp sekarang untuk kirim notifikasi ke customer?")) {
+        window.open(waLink, "_blank");
+      }
+      fetchWaLogs(waLogPage);
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menyetujui akses.");
+    }
+  };
+
+  const rejectWaLog = async (logId) => {
+    const reason = window.prompt("Masukkan alasan penolakan bukti pembayaran:", "Bukti transfer tidak valid / tidak terbaca");
+    if (reason === null) return;
+    try {
+      const res = await api.put(`/admin/whatsapp-logs/${logId}/reject`, { reason });
+      alert("Akses WhatsApp berhasil ditolak.");
+      const waLink = res.data?.notify_whatsapp_link;
+      if (waLink && window.confirm("Buka WhatsApp sekarang untuk kirim notifikasi ke customer (minta upload ulang)?")) {
+        window.open(waLink, "_blank");
+      }
+      fetchWaLogs(waLogPage);
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menolak akses.");
+    }
+  };
+
+  const deleteWaLog = async (logId) => {
+    if (!window.confirm("Hapus riwayat akses WhatsApp ini secara permanen? Aksi ini tidak bisa dibatalkan.")) return;
+    try {
+      await api.delete(`/admin/whatsapp-logs/${logId}`);
+      fetchWaLogs(waLogPage);
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menghapus riwayat.");
+    }
+  };
+
   // ── Modal state ──
   const [modal, setModal] = useState({ show: false, type: "", data: null });
 
@@ -842,6 +1012,19 @@ export default function AdminWeb() {
       }
     };
 
+    // Force clear stale cache on mount
+    const clearStaleCache = () => {
+      try {
+        const keys = Object.keys(localStorage);
+        const adminKeys = keys.filter(k => k.startsWith('cached_admin_') || k.startsWith('admin_cache_'));
+        adminKeys.forEach(key => localStorage.removeItem(key));
+        console.log('[AdminWeb Mount] Cleared', adminKeys.length, 'cache entries');
+      } catch (e) {
+        console.warn('[AdminWeb Mount] Cache clear failed:', e);
+      }
+    };
+
+    clearStaleCache();
     loadUser();
     fetchAllData();
 
@@ -869,9 +1052,11 @@ export default function AdminWeb() {
     }
     if (activeTab === "referrals") {
       fetchReferralStats();
+      fetchReferralWithdrawals(referralWdPage || 1);
       if (referralSubTab === "codes") fetchReferralCodes(referralCodesPage || 1);
       else if (referralSubTab === "transactions") fetchReferralTransactions(referralTrxPage || 1);
       else if (referralSubTab === "commissions") fetchReferralCommissions(referralComPage || 1);
+      else if (referralSubTab === "withdrawals") fetchReferralWithdrawals(referralWdPage || 1);
       else if (referralSubTab === "settings") fetchReferralSettings();
     }
     if (activeTab === "content_pricing" || activeTab === "content_packages" || activeTab === "packages") {
@@ -880,7 +1065,11 @@ export default function AdminWeb() {
         fetchContentTransactions(contentTxPage || 1);
       }
     }
-  }, [activeTab]);
+    if (activeTab === "whatsapp") {
+      fetchWaSettings();
+      fetchWaLogs(1);
+    }
+  }, [activeTab, referralSubTab]);
 
   const fetchNotificationsAndStats = async () => {
     try {
@@ -926,6 +1115,15 @@ export default function AdminWeb() {
   };
 
   const fetchAllData = async () => {
+    // Force clear ALL cache for fresh data
+    try {
+      const cacheKeys = Object.keys(localStorage).filter(k => k.startsWith('cached_admin_') || k.startsWith('admin_cache_'));
+      cacheKeys.forEach(key => localStorage.removeItem(key));
+      console.log('[AdminWeb] Cleared cache:', cacheKeys.length, 'items');
+    } catch (e) {
+      console.warn('[AdminWeb] Failed to clear cache:', e);
+    }
+
     // Only show full loading screen if we have no cached stats at all
     const hasCache = !!localStorage.getItem("admin_cache_stats");
     if (!hasCache) {
@@ -969,11 +1167,14 @@ export default function AdminWeb() {
             name: u.name,
             email: u.email,
             role: u.role,
-            status: u.status || 'active',
+            status: u.is_active === false || u.status === 'inactive' ? 'inactive' : 'active',
             phone: u.phone || '-',
             joined: u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID') : '-',
-            businesses: u.businesses_count || 0,
-            avatar: u.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${u.name || 'User'}`
+            businesses: Array.isArray(u.businesses) ? u.businesses : [],
+            businesses_count: u.businesses_count !== undefined && u.businesses_count !== null
+              ? Number(u.businesses_count)
+              : (Array.isArray(u.businesses) ? u.businesses.length : 0),
+            avatar: u.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name || 'User')}`
           }));
           setUsers(mappedUsers);
           setAdminCache("users", mappedUsers);
@@ -993,6 +1194,13 @@ export default function AdminWeb() {
           setCategories(list);
           setAdminCache("categories", list);
         }).catch(err => console.error("Failed categories fetch:", err)),
+
+        api.get('/admin/navbar-categories').then(res => {
+          const navbarData = res.data?.data || res.data || [];
+          const list = Array.isArray(navbarData) ? navbarData : (navbarData?.data || []);
+          setNavbarCategories(list);
+          setAdminCache("navbar_categories", list);
+        }).catch(err => console.error("Failed navbar categories fetch:", err)),
 
         api.get('/admin/blogs').then(res => {
           const blogsData = res.data?.data || res.data || [];
@@ -1080,6 +1288,26 @@ export default function AdminWeb() {
             setAdminCache("ad_packages", adPkgData);
           }
         }).catch(err => console.error("Failed ad packages fetch:", err)),
+
+        api.get('/admin/settings').then(res => {
+          const settingsData = res.data || {};
+          setSettings(settingsData);
+          setAdminCache("settings", settingsData);
+          // Populate form with current values
+          setSettingsForm({
+            site_name: settingsData.general?.site_name || "",
+            site_logo: null,
+            site_banner: null,
+            contact_email: settingsData.contact?.contact_email || "",
+            contact_phone: settingsData.contact?.contact_phone || "",
+            contact_address: settingsData.contact?.contact_address || "",
+            social_instagram: settingsData.social?.social_instagram || "",
+            social_facebook: settingsData.social?.social_facebook || "",
+            social_website: settingsData.social?.social_website || "",
+            seo_meta_title: settingsData.seo?.seo_meta_title || "",
+            seo_meta_description: settingsData.seo?.seo_meta_description || "",
+          });
+        }).catch(err => console.error("Failed settings fetch:", err)),
       ];
 
       await Promise.allSettled(fetchers);
@@ -1094,23 +1322,55 @@ export default function AdminWeb() {
   // ── Package & Subscription Handlers ──
   const handleSavePackage = async () => {
     try {
+      // Ubah checkbox (can_add_map, dst) jadi objek `features` yang
+      // sebenarnya dibaca & disimpan backend. Sebelumnya field-field
+      // checkbox ini dikirim mentah dan tidak pernah tersimpan.
+      const features = {
+        "Lokasi Peta Penuh": Boolean(packageForm.can_add_map),
+        "Galeri Foto Profil": Boolean(packageForm.can_add_gallery),
+        "Fitur Katalog Produk": Boolean(packageForm.can_add_products),
+        "Akses Chat & WA Direct": Boolean(packageForm.can_chat),
+        "Prioritas & Badge Premium": Boolean(packageForm.priority_listing),
+      };
+
+      // Backend menyimpan durasi dalam jumlah hari (duration_days),
+      // sedangkan form ini memakai duration_value + duration_unit.
+      const durationDays = packageForm.duration_unit === "year"
+        ? Number(packageForm.duration_value || 1) * 365
+        : packageForm.duration_unit === "day"
+        ? Number(packageForm.duration_value || 1)
+        : Number(packageForm.duration_value || 1) * 30; // default: bulan
+
+      const payload = {
+        name: packageForm.name,
+        description: packageForm.description,
+        price: Number(packageForm.price || 0),
+        duration_days: durationDays,
+        features,
+        is_active: Boolean(packageForm.is_active),
+      };
+
       if (modal.type === "editPackage" && modal.data?.id) {
-        await api.put(`/admin/plans/${modal.data.id}`, packageForm);
+        await api.put(`/admin/plans/${modal.data.id}`, payload);
+        alert("Paket berhasil diupdate!");
       } else {
-        await api.post(`/admin/plans`, packageForm);
+        await api.post(`/admin/plans`, payload);
+        alert("Paket berhasil ditambahkan!");
       }
+      
+      // Re-fetch plans to ensure UI is synced
       const res = await api.get('/admin/plans');
       const plansData = res.data?.data || res.data || [];
-      if (Array.isArray(plansData) && plansData.length > 0) setPlans(plansData);
+      if (Array.isArray(plansData) && plansData.length > 0) {
+        setPlans(plansData);
+        setAdminCache("plans", plansData);
+      }
+      
+      closeModal();
     } catch (err) {
       console.error("Save package error:", err);
-      if (modal.type === "editPackage" && modal.data?.id) {
-        setPlans((prev) => prev.map((p) => (p.id === modal.data.id ? { ...p, ...packageForm } : p)));
-      } else {
-        setPlans((prev) => [...prev, { id: Date.now(), ...packageForm }]);
-      }
+      alert(err.response?.data?.message || "Gagal menyimpan paket. Silakan coba lagi.");
     }
-    closeModal();
   };
 
   const handleDeletePackage = async (id) => {
@@ -1314,6 +1574,24 @@ export default function AdminWeb() {
         parent_id: data.parent_id || "",
         is_active: data.is_active ?? true,
       });
+    } else if (type === "addNavbarCategory") {
+      setNavbarCategoryForm({
+        name: "",
+        slug: "",
+        icon: "",
+        parent_id: "",
+        order: 0,
+        is_active: true,
+      });
+    } else if (type === "editNavbarCategory" && data) {
+      setNavbarCategoryForm({
+        name: data.name || "",
+        slug: data.slug || "",
+        icon: data.icon || "",
+        parent_id: data.parent_id || "",
+        order: data.order || 0,
+        is_active: data.is_active ?? true,
+      });
     } else if (type === "addCoupon") {
       setCouponForm({
         code: "",
@@ -1511,6 +1789,20 @@ export default function AdminWeb() {
     }
   };
 
+  const handleToggleBusinessVerification = async (businessId, currentStatus) => {
+    const action = currentStatus ? 'membatalkan verifikasi' : 'memverifikasi';
+    if (!confirm(`Apakah Anda yakin ingin ${action} bisnis ini?`)) return;
+
+    try {
+      const response = await api.put(`/admin/businesses/${businessId}/toggle-verification`);
+      alert(response.data.message || 'Status verifikasi berhasil diubah');
+      fetchAllData();
+    } catch (err) {
+      console.error('Failed to toggle verification:', err);
+      alert(err.response?.data?.message || 'Gagal mengubah status verifikasi');
+    }
+  };
+
   const handleSuspendBusiness = async (businessId) => {
     if (!confirm('Apakah Anda yakin ingin menangguhkan bisnis ini?')) return;
 
@@ -1528,12 +1820,27 @@ export default function AdminWeb() {
     if (!confirm('Apakah Anda yakin ingin menghapus bisnis ini secara permanen?')) return;
 
     try {
+      // Optimistic UI update - remove immediately from list
+      setBusinesses(prev => prev.filter(b => b.id !== businessId));
+      
+      // Delete from server
       await api.delete(`/admin/businesses/${businessId}`);
-      alert('Bisnis berhasil dihapus.');
+      
+      // Clear cache
+      try {
+        localStorage.removeItem("cached_admin_businesses");
+      } catch (e) {}
+      
+      // Show success toast
+      alert('✓ Bisnis berhasil dihapus!');
+      
+      // Refresh data in background (optional, for sync)
       fetchAllData();
     } catch (err) {
       console.error('Failed to delete business:', err);
       alert(err.response?.data?.message || 'Gagal menghapus bisnis.');
+      // Revert optimistic update on error
+      fetchAllData();
     }
   };
 
@@ -1588,6 +1895,61 @@ export default function AdminWeb() {
     } catch (err) {
       console.error("Gagal mengubah status kategori:", err);
       alert(err.response?.data?.message || 'Gagal mengubah status kategori.');
+    }
+  };
+
+  // ── Navbar Category Handlers ──
+  const handleSaveNavbarCategory = async () => {
+    if (!navbarCategoryForm.name) {
+      alert("Nama kategori informasi wajib diisi.");
+      return;
+    }
+
+    try {
+      const payload = {
+        name: navbarCategoryForm.name,
+        slug: navbarCategoryForm.slug || undefined,
+        icon: navbarCategoryForm.icon || undefined,
+        parent_id: navbarCategoryForm.parent_id || null,
+        order: navbarCategoryForm.order || 0,
+        is_active: navbarCategoryForm.is_active,
+      };
+
+      if (modal.type === "addNavbarCategory") {
+        await api.post('/admin/navbar-categories', payload);
+        alert('Kategori informasi berhasil ditambahkan.');
+      } else if (modal.type === "editNavbarCategory" && modal.data?.id) {
+        await api.put(`/admin/navbar-categories/${modal.data.id}`, payload);
+        alert('Kategori informasi berhasil diperbarui.');
+      }
+
+      closeModal();
+      fetchAllData();
+    } catch (err) {
+      console.error("Gagal menyimpan kategori informasi:", err);
+      alert(err.response?.data?.message || 'Gagal menyimpan kategori informasi.');
+    }
+  };
+
+  const handleDeleteNavbarCategory = async (categoryId) => {
+    try {
+      await api.delete(`/admin/navbar-categories/${categoryId}`);
+      alert('Kategori informasi berhasil dihapus.');
+      closeModal();
+      fetchAllData();
+    } catch (err) {
+      console.error("Gagal menghapus kategori informasi:", err);
+      alert(err.response?.data?.message || 'Gagal menghapus kategori informasi.');
+    }
+  };
+
+  const handleToggleNavbarCategoryStatus = async (category) => {
+    try {
+      await api.put(`/admin/navbar-categories/${category.id}/toggle-status`);
+      fetchAllData();
+    } catch (err) {
+      console.error("Gagal mengubah status kategori informasi:", err);
+      alert(err.response?.data?.message || 'Gagal mengubah status kategori informasi.');
     }
   };
 
@@ -1659,9 +2021,17 @@ export default function AdminWeb() {
     try {
       await api.delete(`/admin/blogs/${blogId}`);
       alert("Konten berhasil dihapus.");
+      setBlogs((prev) => prev.filter((b) => b.id !== blogId));
       closeModal();
       fetchAllData();
     } catch (err) {
+      if (err.response?.status === 404) {
+        setBlogs((prev) => prev.filter((b) => b.id !== blogId));
+        closeModal();
+        fetchAllData();
+        alert("Konten berhasil dihapus dari daftar.");
+        return;
+      }
       console.error("Gagal menghapus blog/event:", err);
       alert(err.response?.data?.message || "Gagal menghapus konten.");
     }
@@ -1726,6 +2096,50 @@ export default function AdminWeb() {
     } catch (err) {
       console.error("Gagal menolak blog/event:", err);
       alert(err.response?.data?.message || "Gagal menolak konten.");
+    }
+  };
+
+  // ── Settings Handlers ──
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const formData = new FormData();
+      
+      // Add text fields
+      if (settingsForm.site_name) formData.append('site_name', settingsForm.site_name);
+      if (settingsForm.contact_email) formData.append('contact_email', settingsForm.contact_email);
+      if (settingsForm.contact_phone) formData.append('contact_phone', settingsForm.contact_phone);
+      if (settingsForm.contact_address) formData.append('contact_address', settingsForm.contact_address);
+      if (settingsForm.social_instagram) formData.append('social_instagram', settingsForm.social_instagram);
+      if (settingsForm.social_facebook) formData.append('social_facebook', settingsForm.social_facebook);
+      if (settingsForm.social_website) formData.append('social_website', settingsForm.social_website);
+      if (settingsForm.seo_meta_title) formData.append('seo_meta_title', settingsForm.seo_meta_title);
+      if (settingsForm.seo_meta_description) formData.append('seo_meta_description', settingsForm.seo_meta_description);
+
+      // Add files if selected
+      if (settingsForm.site_logo instanceof File) {
+        formData.append('site_logo', settingsForm.site_logo);
+      }
+      if (settingsForm.site_banner instanceof File) {
+        formData.append('site_banner', settingsForm.site_banner);
+      }
+
+      await api.post('/admin/settings', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert('Pengaturan berhasil disimpan!');
+      
+      // Re-fetch settings
+      const res = await api.get('/admin/settings');
+      const settingsData = res.data || {};
+      setSettings(settingsData);
+      setAdminCache("settings", settingsData);
+    } catch (err) {
+      console.error('Gagal menyimpan pengaturan:', err);
+      alert(err.response?.data?.message || 'Gagal menyimpan pengaturan.');
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -2773,9 +3187,25 @@ export default function AdminWeb() {
                       <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
                         <div
                           className="flex items-center gap-[10px] cursor-pointer group"
-                          onClick={() => handleModal("viewUserDetail", user)}
+                          onClick={() => {
+                            const userBizList = (Array.isArray(user.businesses) && user.businesses.length > 0)
+                              ? user.businesses
+                              : businesses.filter((b) => b.user_id === user.id || b.user?.id === user.id);
+                            const count = user.businesses_count !== undefined && user.businesses_count !== null
+                              ? Math.max(Number(user.businesses_count), userBizList.length)
+                              : userBizList.length;
+                            handleModal("viewUserDetail", { ...user, businessesList: userBizList, businessesCount: count });
+                          }}
                         >
-                          <img src={user.avatar} alt={user.name} className="w-[32px] h-[32px] rounded-[8px] object-cover border border-[#e2e8f0] shrink-0" />
+                          <img
+                            src={user.avatar}
+                            alt={user.name}
+                            className="w-[32px] h-[32px] rounded-[8px] object-cover border border-[#e2e8f0] shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || "User")}`;
+                            }}
+                          />
                           <span className="group-hover:text-[#007570] group-hover:underline font-semibold">{user.name}</span>
                         </div>
                       </td>
@@ -2793,11 +3223,48 @@ export default function AdminWeb() {
                           {user.status === "active" ? "Aktif" : "Nonaktif"}
                         </button>
                       </td>
-                      <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">{user.businesses_count ?? 0}</td>
+                      <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
+                        {(() => {
+                          const userBizList = (Array.isArray(user.businesses) && user.businesses.length > 0)
+                            ? user.businesses
+                            : businesses.filter((b) => b.user_id === user.id || b.user?.id === user.id);
+                          const count = user.businesses_count !== undefined && user.businesses_count !== null
+                            ? Math.max(Number(user.businesses_count), userBizList.length)
+                            : userBizList.length;
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleModal("viewUserDetail", { ...user, businessesList: userBizList, businessesCount: count })}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold transition-all duration-150 cursor-pointer border ${
+                                count > 0
+                                  ? "bg-teal-50 text-[#007570] border-teal-200 hover:bg-teal-100 hover:border-[#007570]"
+                                  : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+                              }`}
+                              title={count > 0 ? "Klik untuk melihat detail bisnis user ini" : "User belum memiliki bisnis"}
+                            >
+                              <Store size={13} className={count > 0 ? "text-[#007570]" : "text-slate-400"} />
+                              <span>{count}</span>
+                            </button>
+                          );
+                        })()}
+                      </td>
                       <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">{user.joined}</td>
                       <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
                         <div className="flex items-center gap-[5px]">
-                          <button className="w-[30px] h-[30px] bg-[#f1f5f9] border-0 rounded-[7px] cursor-pointer text-[#64748b] transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#007570] hover:text-white hover:-translate-y-[1px] hover:shadow-[0_2px_8px_rgba(0,117,112,0.2)]" onClick={() => handleModal("viewUserDetail", user)} title="Lihat Detail">
+                          <button
+                            className="w-[30px] h-[30px] bg-[#f1f5f9] border-0 rounded-[7px] cursor-pointer text-[#64748b] transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#007570] hover:text-white hover:-translate-y-[1px] hover:shadow-[0_2px_8px_rgba(0,117,112,0.2)]"
+                            onClick={() => {
+                              const userBizList = (Array.isArray(user.businesses) && user.businesses.length > 0)
+                                ? user.businesses
+                                : businesses.filter((b) => b.user_id === user.id || b.user?.id === user.id);
+                              const count = user.businesses_count !== undefined && user.businesses_count !== null
+                                ? Math.max(Number(user.businesses_count), userBizList.length)
+                                : userBizList.length;
+                              handleModal("viewUserDetail", { ...user, businessesList: userBizList, businessesCount: count });
+                            }}
+                            title="Lihat Detail"
+                          >
                             <Eye size={16} strokeWidth={2} />
                           </button>
                           <button className="w-[30px] h-[30px] bg-[#f1f5f9] border-0 rounded-[7px] cursor-pointer text-[#64748b] transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#007570] hover:text-white hover:-translate-y-[1px] hover:shadow-[0_2px_8px_rgba(0,117,112,0.2)]" onClick={() => handleModal("editUser", user)} title="Edit">
@@ -2963,6 +3430,8 @@ export default function AdminWeb() {
                   displayedBusinesses.map((business) => {
                     const isPrem = business.premium_info?.status === "active" || business.is_premium;
                     const isAd = business.ad_info?.status === "active" || business.has_active_ad;
+                    const sub = business.subscriptions?.[0] || business.latest_subscription || subscriptions.find(s => s.business_id === business.id);
+                    const hasPendingPrem = !isPrem && sub && sub.status === "pending" && (Number(sub.plan?.price) > 0 || sub.plan_id);
 
                     return (
                       <tr key={business.id} className="transition-colors duration-150 hover:bg-[#f8fafc]">
@@ -3025,12 +3494,14 @@ export default function AdminWeb() {
                             <span className={
                               isPrem
                                 ? "inline-flex items-center gap-[3px] px-[8px] py-[2px] rounded-[6px] text-[11px] font-bold bg-gradient-to-br from-[#007570] to-[#00b3ab] text-white shadow-2xs"
+                                : hasPendingPrem
+                                ? "inline-flex items-center gap-[3px] px-[8px] py-[2px] rounded-[6px] text-[11px] font-bold bg-[#fef3c7] text-[#b45309] border border-amber-300"
                                 : business.premium_info?.status === "expired"
                                 ? "inline-flex items-center gap-[3px] px-[8px] py-[2px] rounded-[6px] text-[11px] font-bold bg-[#ffedd5] text-[#c2410c] border border-[#fdba74]"
                                 : "inline-flex items-center gap-[3px] px-[8px] py-[2px] rounded-[6px] text-[11px] font-bold bg-[#f1f5f9] text-[#64748b]"
                             }>
-                              {isPrem && <Crown size={12} strokeWidth={2} />}
-                              {business.premium_info?.label || (business.is_premium ? "Aktif" : "Tidak Aktif")}
+                              {(isPrem || hasPendingPrem) && <Crown size={12} strokeWidth={2} />}
+                              {isPrem ? "Aktif" : (hasPendingPrem ? "Menunggu Verifikasi" : (business.premium_info?.label || "Tidak Aktif"))}
                             </span>
                             {isPrem && business.premium_info?.expired_at && (
                               <span className="text-[10px] text-[#64748b] block mt-[1px]">
@@ -3078,6 +3549,17 @@ export default function AdminWeb() {
                                 <Check size={15} strokeWidth={2} />
                               </button>
                             )}
+                            <button
+                              className={`w-[28px] h-[28px] border-0 rounded-[6px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 ${
+                                business.is_verified
+                                  ? 'bg-[#dcfce7] text-[#16a34a] hover:bg-[#16a34a] hover:text-white'
+                                  : 'bg-[#fef3c7] text-[#d97706] hover:bg-[#d97706] hover:text-white'
+                              }`}
+                              onClick={() => handleToggleBusinessVerification(business.id, business.is_verified)}
+                              title={business.is_verified ? "Batalkan Verifikasi" : "Verifikasi Bisnis"}
+                            >
+                              <BadgeCheck size={15} strokeWidth={2} />
+                            </button>
                             {business.status !== "rejected" && (
                               <button
                                 className="w-[28px] h-[28px] bg-[#fee2e2] text-[#dc2626] border-0 rounded-[6px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#dc2626] hover:text-white"
@@ -3251,6 +3733,122 @@ export default function AdminWeb() {
                           <Edit size={16} strokeWidth={2} />
                         </button>
                         <button className="w-[30px] h-[30px] bg-[#fee2e2] text-[#dc2626] border-0 rounded-[7px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#dc2626] hover:text-white" onClick={() => handleModal("deleteCategory", category)} title="Hapus">
+                          <Trash2 size={16} strokeWidth={2} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderNavbarCategories = () => (
+    <div className="mb-[28px]">
+      <div className="flex items-center justify-between mb-[18px]">
+        <h2 className="text-[18px] font-bold text-[#0f172a] relative pl-[14px] before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[20px] before:bg-[#007570] before:rounded-[2px]">Kelola Kategori</h2>
+        <button className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border-0 bg-[#007570] text-white shadow-[0_2px_8px_rgba(0,117,112,0.2)] hover:bg-[#005a58] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,117,112,0.25)]" onClick={() => handleModal("addNavbarCategory")}>
+          <Plus size={18} strokeWidth={2} />
+          <span>Tambah Kategori</span>
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-[10px] mb-[16px]">
+        <div className="flex-1 min-w-[200px] flex items-center gap-[10px] bg-white border-[1.5px] border-[#e2e8f0] rounded-[10px] px-[14px] py-[9px] transition-all duration-220 focus-within:border-[#007570] focus-within:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]">
+          <Search size={18} strokeWidth={2} className="text-[#007570] shrink-0" />
+          <input
+            type="text"
+            placeholder="Cari kategori informasi atau slug..."
+            className="flex-1 border-0 outline-none font-['Poppins','Inter',sans-serif] text-[13.5px] text-[#0f172a] bg-transparent placeholder:text-[#94a3b8]"
+            value={navbarCategorySearchQuery}
+            onChange={(e) => setNavbarCategorySearchQuery(e.target.value)}
+          />
+        </div>
+        <select
+          value={navbarCategoryStatusFilter}
+          onChange={(e) => setNavbarCategoryStatusFilter(e.target.value)}
+          className="px-[14px] py-[9px] bg-white border-[1.5px] border-[#e2e8f0] rounded-[10px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium outline-none focus:border-[#007570]"
+        >
+          <option value="">Semua Status</option>
+          <option value="active">Aktif</option>
+          <option value="inactive">Nonaktif</option>
+        </select>
+      </div>
+
+      <div className="bg-white rounded-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[#e2e8f0] overflow-hidden overflow-x-auto">
+        <table className="w-full border-collapse min-w-[700px]">
+          <thead className="bg-gradient-to-br from-[#007570] to-[#009e98]">
+            <tr>
+              <th className="px-[14px] py-[12px] text-left text-[11px] font-bold text-white/90 uppercase tracking-[0.5px] whitespace-nowrap">Nama Kategori</th>
+              <th className="px-[14px] py-[12px] text-left text-[11px] font-bold text-white/90 uppercase tracking-[0.5px] whitespace-nowrap">Slug</th>
+              <th className="px-[14px] py-[12px] text-left text-[11px] font-bold text-white/90 uppercase tracking-[0.5px] whitespace-nowrap">Parent</th>
+              <th className="px-[14px] py-[12px] text-left text-[11px] font-bold text-white/90 uppercase tracking-[0.5px] whitespace-nowrap">Urutan</th>
+              <th className="px-[14px] py-[12px] text-left text-[11px] font-bold text-white/90 uppercase tracking-[0.5px] whitespace-nowrap">Status</th>
+              <th className="px-[14px] py-[12px] text-left text-[11px] font-bold text-white/90 uppercase tracking-[0.5px] whitespace-nowrap">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {navbarCategories.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="text-center p-[36px]">
+                  <div className="flex flex-col items-center justify-center p-[24px] gap-[12px] text-[#94a3b8]">
+                    <Info size={48} strokeWidth={1} className="opacity-40" />
+                    <p className="text-[14px] text-[#64748b] font-medium">Belum ada data kategori informasi.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              navbarCategories
+                .filter((cat) => {
+                  const query = navbarCategorySearchQuery.toLowerCase();
+                  const matchSearch =
+                    !navbarCategorySearchQuery ||
+                    cat.name?.toLowerCase().includes(query) ||
+                    cat.slug?.toLowerCase().includes(query);
+                  const matchStatus =
+                    !navbarCategoryStatusFilter ||
+                    (navbarCategoryStatusFilter === "active" ? cat.is_active !== false : cat.is_active === false);
+                  return matchSearch && matchStatus;
+                })
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map((category) => (
+                  <tr key={category.id} className="transition-colors duration-150 hover:bg-[#f8fafc]">
+                    <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
+                      <div className="flex items-center gap-[8px]">
+                        <div className="w-[28px] h-[28px] rounded-[7px] bg-[rgba(0,117,112,0.1)] text-[#007570] flex items-center justify-center font-bold text-[12px] shrink-0">
+                          {category.icon || category.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <span className="font-semibold text-[#0f172a]">{category.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#64748b] font-mono align-middle [tr:last-child_&]:border-b-0">
+                      {category.slug}
+                    </td>
+                    <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
+                      {category.parent?.name || "-"}
+                    </td>
+                    <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-semibold align-middle [tr:last-child_&]:border-b-0">
+                      {category.order || 0}
+                    </td>
+                    <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
+                      <button
+                        type="button"
+                        className={`${getBadgeClass(category.is_active !== false ? "active" : "inactive")} cursor-pointer hover:opacity-80 border-0 bg-transparent p-0`}
+                        onClick={() => handleToggleNavbarCategoryStatus(category)}
+                        title="Klik untuk mengubah status (Aktif/Nonaktif)"
+                      >
+                        {category.is_active !== false ? "Aktif" : "Nonaktif"}
+                      </button>
+                    </td>
+                    <td className="px-[14px] py-[11px] border-b border-[#f1f5f9] text-[13px] text-[#0f172a] font-medium align-middle [tr:last-child_&]:border-b-0">
+                      <div className="flex items-center gap-[5px]">
+                        <button className="w-[30px] h-[30px] bg-[#f1f5f9] border-0 rounded-[7px] cursor-pointer text-[#64748b] transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#007570] hover:text-white hover:-translate-y-[1px] hover:shadow-[0_2px_8px_rgba(0,117,112,0.2)]" onClick={() => handleModal("editNavbarCategory", category)} title="Edit">
+                          <Edit size={16} strokeWidth={2} />
+                        </button>
+                        <button className="w-[30px] h-[30px] bg-[#fee2e2] text-[#dc2626] border-0 rounded-[7px] cursor-pointer transition-all duration-200 flex items-center justify-center shrink-0 hover:bg-[#dc2626] hover:text-white" onClick={() => handleModal("deleteNavbarCategory", category)} title="Hapus">
                           <Trash2 size={16} strokeWidth={2} />
                         </button>
                       </div>
@@ -4456,7 +5054,7 @@ export default function AdminWeb() {
                   Tarif Upload Blog (Pay-Per-Post)
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Biaya yang dibayarkan oleh pengguna untuk menerbitkan 1 artikel blog promosi di platform Info.co.id.
+                  Biaya yang dibayarkan oleh pengguna untuk menerbitkan 1 artikel blog promosi di platform Surade.co.id.
                 </p>
               </div>
 
@@ -4515,7 +5113,7 @@ export default function AdminWeb() {
                   Tarif Upload Event (Pay-Per-Post)
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Biaya yang dibayarkan oleh pengguna untuk menerbitkan 1 agenda acara / event di platform Info.co.id.
+                  Biaya yang dibayarkan oleh pengguna untuk menerbitkan 1 agenda acara / event di platform Surade.co.id.
                 </p>
               </div>
 
@@ -5212,15 +5810,48 @@ export default function AdminWeb() {
           <h3 className="text-[14px] font-bold text-[#0f172a] mb-[14px] pl-[12px] relative before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[14px] before:bg-[#007570] before:rounded-[2px]">Informasi Website</h3>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Nama Website</label>
-            <input type="text" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" defaultValue="Info.co.id" />
+            <input 
+              type="text" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              value={settingsForm.site_name} 
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, site_name: e.target.value }))}
+            />
           </div>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Logo</label>
-            <input type="file" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" accept="image/*" />
+            {settings.general?.site_logo && (
+              <div className="mb-[8px]">
+                <img 
+                  src={`http://localhost:8000/storage/${settings.general.site_logo}`} 
+                  alt="Current Logo" 
+                  className="h-[60px] object-contain rounded-[6px] border border-[#e2e8f0]"
+                />
+              </div>
+            )}
+            <input 
+              type="file" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              accept="image/*" 
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, site_logo: e.target.files[0] }))}
+            />
           </div>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Banner</label>
-            <input type="file" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" accept="image/*" multiple />
+            {settings.general?.site_banner && (
+              <div className="mb-[8px]">
+                <img 
+                  src={`http://localhost:8000/storage/${settings.general.site_banner}`} 
+                  alt="Current Banner" 
+                  className="h-[80px] w-full object-cover rounded-[6px] border border-[#e2e8f0]"
+                />
+              </div>
+            )}
+            <input 
+              type="file" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              accept="image/*" 
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, site_banner: e.target.files[0] }))}
+            />
           </div>
         </div>
 
@@ -5228,15 +5859,30 @@ export default function AdminWeb() {
           <h3 className="text-[14px] font-bold text-[#0f172a] mb-[14px] pl-[12px] relative before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[14px] before:bg-[#007570] before:rounded-[2px]">Kontak</h3>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Email</label>
-            <input type="email" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" defaultValue="info@info.co.id" />
+            <input 
+              type="email" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              value={settingsForm.contact_email}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, contact_email: e.target.value }))}
+            />
           </div>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Telepon</label>
-            <input type="tel" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" defaultValue="+62 21 1234 5678" />
+            <input 
+              type="tel" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              value={settingsForm.contact_phone}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, contact_phone: e.target.value }))}
+            />
           </div>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Alamat</label>
-            <textarea className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] resize-y min-h-[70px]" defaultValue="Jakarta, Indonesia" rows={3} />
+            <textarea 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] resize-y min-h-[70px]" 
+              value={settingsForm.contact_address}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, contact_address: e.target.value }))}
+              rows={3} 
+            />
           </div>
         </div>
 
@@ -5244,15 +5890,30 @@ export default function AdminWeb() {
           <h3 className="text-[14px] font-bold text-[#0f172a] mb-[14px] pl-[12px] relative before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[14px] before:bg-[#007570] before:rounded-[2px]">Media Sosial</h3>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">            <Globe size={16} strokeWidth={2} /> Instagram</label>
-            <input type="url" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" defaultValue="https://instagram.com/info.co.id" />
+            <input 
+              type="url" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              value={settingsForm.social_instagram}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, social_instagram: e.target.value }))}
+            />
           </div>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">            <Globe size={16} strokeWidth={2} /> Facebook</label>
-            <input type="url" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" defaultValue="https://facebook.com/info.co.id" />
+            <input 
+              type="url" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              value={settingsForm.social_facebook}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, social_facebook: e.target.value }))}
+            />
           </div>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">            <Globe size={16} strokeWidth={2} /> Website</label>
-            <input type="url" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" defaultValue="https://info.co.id" />
+            <input 
+              type="url" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              value={settingsForm.social_website}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, social_website: e.target.value }))}
+            />
           </div>
         </div>
 
@@ -5260,16 +5921,42 @@ export default function AdminWeb() {
           <h3 className="text-[14px] font-bold text-[#0f172a] mb-[14px] pl-[12px] relative before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[14px] before:bg-[#007570] before:rounded-[2px]">SEO Dasar</h3>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Meta Title</label>
-            <input type="text" className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" defaultValue="Info.co.id - Semua Ada Disini" />
+            <input 
+              type="text" 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)]" 
+              value={settingsForm.seo_meta_title}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, seo_meta_title: e.target.value }))}
+            />
           </div>
           <div className="mb-[14px]">
             <label className="flex items-center gap-[6px] text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Meta Description</label>
-            <textarea className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] resize-y min-h-[70px]" defaultValue="Platform informasi bisnis terlengkap di Indonesia" rows={3} />
+            <textarea 
+              className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] resize-y min-h-[70px]" 
+              value={settingsForm.seo_meta_description}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, seo_meta_description: e.target.value }))}
+              rows={3} 
+            />
           </div>
         </div>
       </div>
 
-      <button className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border-0 bg-[#007570] text-white shadow-[0_2px_8px_rgba(0,117,112,0.2)] hover:bg-[#005a58] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,117,112,0.25)]">Simpan Perubahan</button>
+      <button 
+        className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border-0 bg-[#007570] text-white shadow-[0_2px_8px_rgba(0,117,112,0.2)] hover:bg-[#005a58] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,117,112,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
+        onClick={handleSaveSettings}
+        disabled={savingSettings}
+      >
+        {savingSettings ? (
+          <>
+            <RefreshCw size={16} className="animate-spin" />
+            <span>Menyimpan...</span>
+          </>
+        ) : (
+          <>
+            <Check size={16} />
+            <span>Simpan Perubahan</span>
+          </>
+        )}
+      </button>
     </div>
   );
 
@@ -5847,28 +6534,14 @@ export default function AdminWeb() {
 
                     <div className="h-[1px] bg-[#e2e8f0]" />
 
-                    {/* Features list */}
+                    {/* Features list - dibaca langsung dari plan.features (bukan field statis) */}
                     <div className="flex flex-col gap-[8px] text-[12.5px] font-medium text-[#475569]">
-                      <div className="flex items-center gap-[8px]">
-                        {plan.can_add_map ? <Check size={15} className="text-[#007570] shrink-0" /> : <X size={15} className="text-[#94a3b8] shrink-0" />}
-                        <span className={plan.can_add_map ? "" : "line-through text-[#94a3b8]"}>Lokasi Peta Penuh</span>
-                      </div>
-                      <div className="flex items-center gap-[8px]">
-                        {plan.can_add_gallery ? <Check size={15} className="text-[#007570] shrink-0" /> : <X size={15} className="text-[#94a3b8] shrink-0" />}
-                        <span className={plan.can_add_gallery ? "" : "line-through text-[#94a3b8]"}>Galeri Foto Profil</span>
-                      </div>
-                      <div className="flex items-center gap-[8px]">
-                        {plan.can_add_products !== false ? <Check size={15} className="text-[#007570] shrink-0" /> : <X size={15} className="text-[#94a3b8] shrink-0" />}
-                        <span className={plan.can_add_products !== false ? "" : "line-through text-[#94a3b8]"}>Fitur Katalog Produk</span>
-                      </div>
-                      <div className="flex items-center gap-[8px]">
-                        {plan.can_chat !== false ? <Check size={15} className="text-[#007570] shrink-0" /> : <X size={15} className="text-[#94a3b8] shrink-0" />}
-                        <span className={plan.can_chat !== false ? "" : "line-through text-[#94a3b8]"}>Akses Chat & WA Direct</span>
-                      </div>
-                      <div className="flex items-center gap-[8px]">
-                        {plan.priority_listing ? <Check size={15} className="text-[#007570] shrink-0" /> : <X size={15} className="text-[#94a3b8] shrink-0" />}
-                        <span className={plan.priority_listing ? "" : "line-through text-[#94a3b8]"}>Prioritas & Badge Premium</span>
-                      </div>
+                      {Object.entries(plan.features || {}).map(([featureName, enabled]) => (
+                        <div key={featureName} className="flex items-center gap-[8px]">
+                          {enabled ? <Check size={15} className="text-[#007570] shrink-0" /> : <X size={15} className="text-[#94a3b8] shrink-0" />}
+                          <span className={enabled ? "" : "line-through text-[#94a3b8]"}>{featureName}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -5880,17 +6553,18 @@ export default function AdminWeb() {
                     <div className="flex items-center gap-[8px]">
                       <button
                         onClick={() => {
+                          const f = plan.features || {};
                           setPackageForm({
                             name: plan.name,
                             description: plan.description || "",
                             price: Math.round(Number(plan.price || 0)),
-                            duration_value: plan.duration_value || 1,
-                            duration_unit: plan.duration_unit || "month",
-                            can_add_map: Boolean(plan.can_add_map),
-                            can_add_gallery: Boolean(plan.can_add_gallery),
-                            can_add_products: plan.can_add_products !== false,
-                            can_chat: plan.can_chat !== false,
-                            priority_listing: Boolean(plan.priority_listing),
+                            duration_value: plan.duration_days ? Math.max(1, Math.round(plan.duration_days / 30)) : 1,
+                            duration_unit: "month",
+                            can_add_map: Boolean(f["Lokasi Peta Penuh"]),
+                            can_add_gallery: Boolean(f["Galeri Foto Profil"]),
+                            can_add_products: Boolean(f["Fitur Katalog Produk"]),
+                            can_chat: Boolean(f["Akses Chat & WA Direct"]),
+                            priority_listing: Boolean(f["Prioritas & Badge Premium"]),
                             is_active: Boolean(plan.is_active),
                           });
                           setModal({ show: true, type: "editPackage", data: plan });
@@ -6638,13 +7312,13 @@ export default function AdminWeb() {
                           <span className="text-[10.5px] text-[#64748b] block mt-[1px]">{trx.created_at}</span>
                         </td>
                         <td className="p-[12px_14px]">
-                          <div className="font-bold text-[#0f172a]">{trx.buyer.name}</div>
+                          <div className="font-bold text-[#0f172a]">{trx.buyer?.name || 'N/A'}</div>
                           <div className="text-[11px] text-[#64748b]">{trx.package_name} • {trx.business_name}</div>
                         </td>
                         <td className="p-[12px_14px]">
-                          <div className="font-semibold text-[#0f172a]">{trx.referrer.name}</div>
+                          <div className="font-semibold text-[#0f172a]">{trx.referrer?.name || 'N/A'}</div>
                           <span className="font-mono text-[10.5px] text-[#007570] font-bold bg-[#f0fdfa] px-[6px] py-[1px] rounded border border-[#ccfbf1]">
-                            {trx.referral_code}
+                            {trx.referral_code || '-'}
                           </span>
                         </td>
                         <td className="p-[12px_14px] text-right">
@@ -6864,10 +7538,10 @@ export default function AdminWeb() {
                           <span className="text-[10.5px] text-[#64748b] block mt-[1px]">{com.created_at}</span>
                         </td>
                         <td className="p-[12px_14px]">
-                          <div className="font-bold text-[#0f172a]">{com.referrer.name}</div>
-                          <div className="text-[11px] text-[#64748b]">{com.referrer.email}</div>
+                          <div className="font-bold text-[#0f172a]">{com.referrer?.name || 'N/A'}</div>
+                          <div className="text-[11px] text-[#64748b]">{com.referrer?.email || '-'}</div>
                           <div className="text-[10.5px] text-[#475569] mt-[2px]">
-                            Pembeli: <span className="font-semibold">{com.buyer_name}</span>
+                            Pembeli: <span className="font-semibold">{com.buyer_name || 'N/A'}</span>
                           </div>
                         </td>
                         <td className="p-[12px_14px] text-right">
@@ -7293,7 +7967,7 @@ export default function AdminWeb() {
                       Tarif Upload Blog (Pay-Per-Post)
                     </h3>
                     <p className="text-xs text-slate-500 mt-1">
-                      Biaya yang dibayarkan oleh pengguna untuk menerbitkan 1 artikel blog promosi di platform Info.co.id.
+                      Biaya yang dibayarkan oleh pengguna untuk menerbitkan 1 artikel blog promosi di platform Surade.co.id.
                     </p>
                   </div>
 
@@ -7352,7 +8026,7 @@ export default function AdminWeb() {
                       Tarif Upload Event (Pay-Per-Post)
                     </h3>
                     <p className="text-xs text-slate-500 mt-1">
-                      Biaya yang dibayarkan oleh pengguna untuk menerbitkan 1 agenda acara / event di platform Info.co.id.
+                      Biaya yang dibayarkan oleh pengguna untuk menerbitkan 1 agenda acara / event di platform Surade.co.id.
                     </p>
                   </div>
 
@@ -7620,6 +8294,330 @@ export default function AdminWeb() {
     );
   };
 
+  // ── WhatsApp Management Section ──
+  const renderWhatsApp = () => {
+    return (
+      <div className="space-y-6 mb-8">
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[18px] font-bold text-[#0f172a] relative pl-[14px] before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[20px] before:bg-[#007570] before:rounded-[2px]">
+              Kelola WhatsApp
+            </h2>
+            <p className="text-xs text-slate-500 mt-1 ml-[14px]">Atur biaya akses kontak WhatsApp penjual &amp; pantau log transaksi</p>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007570] flex items-center justify-center mx-auto mb-2">
+              <MessageSquare size={20} />
+            </div>
+            <p className="text-2xl font-black text-[#007570]">{waLogStats.total_access?.toLocaleString("id-ID") || 0}</p>
+            <p className="text-xs text-slate-500 font-semibold mt-1">Total Akses WA</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center mx-auto mb-2">
+              <DollarSign size={20} />
+            </div>
+            <p className="text-2xl font-black text-green-600">
+              Rp {Number(waLogStats.total_revenue || 0).toLocaleString("id-ID")}
+            </p>
+            <p className="text-xs text-slate-500 font-semibold mt-1">Total Pendapatan</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-2">
+              <TrendingUp size={20} />
+            </div>
+            <p className="text-2xl font-black text-blue-600">{waLogStats.today_access || 0}</p>
+            <p className="text-xs text-slate-500 font-semibold mt-1">Akses Hari Ini</p>
+          </div>
+        </div>
+
+        {/* Settings Panel */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Pengaturan Biaya Akses WhatsApp</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Konfigurasi biaya pembayaran untuk setiap metode akses</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={waAdminSettingsForm.enabled}
+                onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, enabled: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#007570]"></div>
+              <span className="ml-2 text-xs font-semibold text-slate-700">{waAdminSettingsForm.enabled ? "Aktif" : "Nonaktif"}</span>
+            </label>
+          </div>
+          
+          {/* General Settings */}
+          <div className="p-6 border-b border-slate-100 space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Biaya Akses Umum (Rp)</label>
+              <input
+                type="number"
+                value={waAdminSettingsForm.amount}
+                onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, amount: e.target.value }))}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
+                placeholder="2000"
+                min="0"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Instruksi Pembayaran</label>
+              <textarea
+                value={waAdminSettingsForm.instruction}
+                onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, instruction: e.target.value }))}
+                rows={2}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20 resize-none"
+                placeholder="Deskripsi alasan kenapa ada biaya..."
+              />
+            </div>
+          </div>
+
+          {/* Bank Settings - Separated */}
+          <div className="p-6 space-y-6 bg-slate-50/50 border-b border-slate-100">
+            <h4 className="text-sm font-bold text-slate-800 mb-4">Pengaturan Rekening Bank</h4>
+            
+            {/* Bank Selection Tabs */}
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { id: "BCA", name: "Bank BCA" },
+                { id: "Mandiri", name: "Bank Mandiri" },
+                { id: "BNI", name: "Bank BNI" },
+                { id: "Maybank", name: "Maybank" },
+                { id: "BJB", name: "Bank BJB" }
+              ].map(bank => (
+                <button
+                  key={bank.id}
+                  type="button"
+                  onClick={() => setWaAdminSettingsForm(prev => ({ ...prev, selected_bank: bank.id }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    (waAdminSettingsForm.selected_bank || "BCA") === bank.id
+                      ? "bg-[#007570] text-white"
+                      : "bg-white border border-slate-200 text-slate-700 hover:border-[#007570]"
+                  }`}
+                >
+                  {bank.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Bank Details Form */}
+            <div className="grid grid-cols-2 gap-4 p-4 bg-white rounded-xl border border-slate-200">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Bank</label>
+                <input
+                  type="text"
+                  value={waAdminSettingsForm.bank_name}
+                  onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, bank_name: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
+                  placeholder="BCA / QRIS"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Nomor Rekening</label>
+                <input
+                  type="text"
+                  value={waAdminSettingsForm.account_number}
+                  onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, account_number: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
+                  placeholder="0123456789"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Pemilik Rekening</label>
+                <input
+                  type="text"
+                  value={waAdminSettingsForm.account_holder}
+                  onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, account_holder: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
+                  placeholder="Triwala Mitra Bestari"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* QRIS Upload */}
+          <div className="p-6">
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Upload Gambar QRIS (opsional)</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setWaQrisFile(e.target.files?.[0] || null)}
+                className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-[#007570] hover:file:bg-teal-100"
+              />
+              {waAdminSettings.qris_image && (
+                <img src={waAdminSettings.qris_image} alt="QRIS" className="w-16 h-16 object-contain rounded-lg border border-slate-200" />
+              )}
+            </div>
+          </div>
+
+          <div className="px-6 pb-5 flex justify-end">
+            <button
+              onClick={saveWaSettings}
+              disabled={savingWaSettings}
+              className="px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-sm cursor-pointer border-0 disabled:opacity-50 flex items-center gap-2 transition-all"
+            >
+              {savingWaSettings ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              {savingWaSettings ? "Menyimpan..." : "Simpan Pengaturan"}
+            </button>
+          </div>
+        </div>
+
+        {/* Access Logs Table */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Log Akses WhatsApp</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Riwayat pengguna yang mengakses kontak WhatsApp penjual</p>
+            </div>
+            <button
+              onClick={() => fetchWaLogs(waLogPage)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+            >
+              <RefreshCw size={12} />
+              Refresh
+            </button>
+          </div>
+          {loadingWaLogs ? (
+            <div className="flex items-center justify-center py-16 text-slate-400">
+              <Loader2 size={24} className="animate-spin mr-2" />
+              <span className="text-sm">Memuat log...</span>
+            </div>
+          ) : waLogs.length === 0 ? (
+            <div className="py-16 text-center text-slate-400">
+              <MessageSquare size={40} strokeWidth={1} className="mx-auto mb-3 opacity-40" />
+              <p className="text-sm font-medium text-slate-500">Belum ada log akses WhatsApp.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Nama Customer</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Bisnis</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Biaya</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Metode</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Bukti Transfer</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Waktu</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {waLogs.map((log, idx) => (
+                      <tr key={log.id || idx} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-sm font-semibold text-slate-800">{log.customer_name || "Pengunjung"}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{log.business_name || "-"}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-[#007570]">
+                          Rp {Number(log.fee_amount || 0).toLocaleString("id-ID")}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600 font-semibold">{log.payment_method || "-"}</td>
+                        <td className="px-4 py-3 text-xs">
+                          {log.proof_url || log.proof_image ? (
+                            <a
+                              href={log.proof_url || getStorageUrlLocal(log.proof_image)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-50 text-[#007570] font-bold hover:bg-teal-100 border border-teal-200 cursor-pointer transition-all no-underline"
+                            >
+                              <Eye size={13} />
+                              <span>Lihat Bukti</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Tanpa Bukti</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-400">
+                          {log.created_at ? new Date(log.created_at).toLocaleString("id-ID") : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={getBadgeClass(log.status === "completed" || log.status === "approved" ? "approved" : log.status === "rejected" ? "rejected" : "pending")}>
+                            {log.status === "completed" || log.status === "approved" ? "Disetujui" : log.status === "rejected" ? "Ditolak" : "Pending"}
+                          </span>
+                          {log.status === "rejected" && log.rejection_reason && (
+                            <p className="text-[10px] text-rose-500 mt-1 max-w-[140px] truncate font-medium" title={log.rejection_reason}>
+                              {log.rejection_reason}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {log.status === "pending" ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => approveWaLog(log.id)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 border-0 cursor-pointer shadow-2xs"
+                                title="Setujui Pembayaran"
+                              >
+                                <Check size={13} />
+                                <span>Setuju</span>
+                              </button>
+                              <button
+                                onClick={() => rejectWaLog(log.id)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1 border-0 cursor-pointer shadow-2xs"
+                                title="Tolak Pembayaran"
+                              >
+                                <X size={13} />
+                                <span>Tolak</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => deleteWaLog(log.id)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-600 hover:text-white text-slate-500 font-bold text-xs flex items-center gap-1 border-0 cursor-pointer transition-colors"
+                              title="Hapus riwayat ini (sudah tidak dipakai)"
+                            >
+                              <Trash2 size={13} />
+                              <span>Hapus</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              {waLogPagination.last_page > 1 && (
+                <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100">
+                  <span className="text-xs text-slate-500">
+                    Total: {waLogPagination.total} log
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => fetchWaLogs(waLogPagination.current_page - 1)}
+                      disabled={waLogPagination.current_page === 1}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                    >
+                      ‹
+                    </button>
+                    <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-[#007570] text-white">
+                      {waLogPagination.current_page} / {waLogPagination.last_page}
+                    </span>
+                    <button
+                      onClick={() => fetchWaLogs(waLogPagination.current_page + 1)}
+                      disabled={waLogPagination.current_page === waLogPagination.last_page}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // ── Modal Component ──
   const renderModal = () => {
     if (!modal.show) return null;
@@ -7754,24 +8752,96 @@ export default function AdminWeb() {
             ) : modal.type === "deleteUser" ? (
               <p className="text-[14px] text-[#0f172a]">Apakah Anda yakin ingin menghapus user <strong>{modal.data?.name}</strong> ({modal.data?.email})?</p>
             ) : modal.type === "viewUserDetail" && modal.data ? (
-              <div className="flex flex-col gap-[14px]">
-                <div className="flex items-center gap-[14px]">
-                  <img src={modal.data.avatar} alt={modal.data.name} className="w-[56px] h-[56px] rounded-full object-cover border border-[#e2e8f0]" />
-                  <div>
-                    <h4 className="text-[15px] font-bold text-[#0f172a]">{modal.data.name}</h4>
-                    <p className="text-[13px] text-[#64748b]">{modal.data.email}</p>
-                    <div className="flex gap-[6px] mt-[4px]">
-                      <span className={getBadgeClass(modal.data.role)}>{modal.data.role}</span>
-                      <span className={getBadgeClass(modal.data.status)}>{modal.data.status === "active" ? "Aktif" : "Nonaktif"}</span>
+              (() => {
+                const userBizList = modal.data.businessesList ||
+                  (Array.isArray(modal.data.businesses) && modal.data.businesses.length > 0 ? modal.data.businesses : []) ||
+                  businesses.filter((b) => b.user_id === modal.data.id || b.user?.id === modal.data.id);
+                const bizCount = modal.data.businessesCount ?? (modal.data.businesses_count !== undefined && modal.data.businesses_count !== null ? Number(modal.data.businesses_count) : userBizList.length);
+
+                return (
+                  <div className="flex flex-col gap-[14px]">
+                    <div className="flex items-center gap-[14px]">
+                      <img
+                        src={modal.data.avatar}
+                        alt={modal.data.name}
+                        className="w-[56px] h-[56px] rounded-full object-cover border border-[#e2e8f0]"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(modal.data.name || "User")}`;
+                        }}
+                      />
+                      <div>
+                        <h4 className="text-[15px] font-bold text-[#0f172a]">{modal.data.name}</h4>
+                        <p className="text-[13px] text-[#64748b]">{modal.data.email}</p>
+                        <div className="flex gap-[6px] mt-[4px]">
+                          <span className={getBadgeClass(modal.data.role)}>{modal.data.role}</span>
+                          <span className={getBadgeClass(modal.data.status)}>{modal.data.status === "active" ? "Aktif" : "Nonaktif"}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-t border-[#e2e8f0] pt-[12px] flex flex-col gap-[6px] text-[13px]">
+                      <div className="flex justify-between"><span className="text-[#64748b]">Telepon:</span><span className="font-semibold">{modal.data.phone || '-'}</span></div>
+                      <div className="flex justify-between">
+                        <span className="text-[#64748b]">Jumlah Bisnis:</span>
+                        <span className="font-bold text-[#007570] bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                          {bizCount} Bisnis
+                        </span>
+                      </div>
+                      <div className="flex justify-between"><span className="text-[#64748b]">Tanggal Bergabung:</span><span className="font-semibold">{modal.data.joined || '-'}</span></div>
+                    </div>
+
+                    {/* Daftar Bisnis Milik User */}
+                    <div className="border-t border-[#e2e8f0] pt-[12px]">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[12px] font-bold text-[#0f172a] uppercase tracking-wider">
+                          Daftar Bisnis ({userBizList.length})
+                        </span>
+                      </div>
+                      {userBizList.length === 0 ? (
+                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-center text-slate-500 text-xs">
+                          Pengguna ini belum memiliki bisnis yang terdaftar di sistem.
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
+                          {userBizList.map((biz) => {
+                            const fullBiz = businesses.find((b) => b.id === biz.id) || biz;
+                            return (
+                              <div key={biz.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-teal-300 transition-colors">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-8 h-8 rounded-lg bg-teal-100/60 text-[#007570] flex items-center justify-center shrink-0">
+                                    <Store size={16} />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[12.5px] font-bold text-[#0f172a] truncate">{biz.name}</p>
+                                    <p className="text-[11px] text-[#64748b] truncate">{biz.category?.name || biz.category || biz.city || "Bisnis UMKM"}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className={`px-2 py-0.5 rounded text-[10.5px] font-bold uppercase ${
+                                    biz.status === "approved" ? "bg-emerald-100 text-emerald-700" :
+                                    biz.status === "pending" ? "bg-amber-100 text-amber-700" :
+                                    "bg-rose-100 text-rose-700"
+                                  }`}>
+                                    {biz.status === "approved" ? "Aktif" : (biz.status === "pending" ? "Pending" : biz.status)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenBusinessDetail(fullBiz)}
+                                    className="p-1 rounded-md text-slate-500 hover:text-[#007570] hover:bg-slate-200 transition-colors cursor-pointer"
+                                    title="Lihat Detail Bisnis"
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-                <div className="border-t border-[#e2e8f0] pt-[12px] flex flex-col gap-[6px] text-[13px]">
-                  <div className="flex justify-between"><span className="text-[#64748b]">Telepon:</span><span className="font-semibold">{modal.data.phone || '-'}</span></div>
-                  <div className="flex justify-between"><span className="text-[#64748b]">Jumlah Bisnis:</span><span className="font-semibold">{modal.data.businesses_count || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-[#64748b]">Tanggal Bergabung:</span><span className="font-semibold">{modal.data.joined || '-'}</span></div>
-                </div>
-              </div>
+                );
+              })()
             ) : modal.type === "addCoupon" || modal.type === "editCoupon" ? (
               <form onSubmit={handleSaveCoupon} className="flex flex-col gap-[14px]">
                 <div>
@@ -8424,6 +9494,85 @@ export default function AdminWeb() {
             ) : modal.type === "deleteCategory" ? (
               <p className="text-[14px] text-[#0f172a]">
                 Apakah Anda yakin ingin menghapus kategori <strong>{modal.data?.name}</strong>?
+              </p>
+            ) : modal.type === "addNavbarCategory" || modal.type === "editNavbarCategory" ? (
+              <form className="flex flex-col gap-[14px]" onSubmit={(e) => { e.preventDefault(); handleSaveNavbarCategory(); }}>
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Nama Kategori Informasi *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Berita Terkini"
+                    value={navbarCategoryForm.name}
+                    onChange={(e) => setNavbarCategoryForm({ ...navbarCategoryForm, name: e.target.value })}
+                    className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Slug (Opsional)</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: berita-terkini (otomatis jika dikosongkan)"
+                    value={navbarCategoryForm.slug}
+                    onChange={(e) => setNavbarCategoryForm({ ...navbarCategoryForm, slug: e.target.value })}
+                    className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-[10px]">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Icon Emoji (Opsional)</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 📰, 🎉, 📢"
+                      value={navbarCategoryForm.icon}
+                      onChange={(e) => setNavbarCategoryForm({ ...navbarCategoryForm, icon: e.target.value })}
+                      className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Urutan (Order)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={navbarCategoryForm.order}
+                      onChange={(e) => setNavbarCategoryForm({ ...navbarCategoryForm, order: parseInt(e.target.value) || 0 })}
+                      className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#64748b] mb-[6px] uppercase tracking-[0.4px]">Kategori Induk (Parent)</label>
+                  <select
+                    value={navbarCategoryForm.parent_id}
+                    onChange={(e) => setNavbarCategoryForm({ ...navbarCategoryForm, parent_id: e.target.value })}
+                    className="w-full px-[12px] py-[9px] border-[1.5px] border-[#e2e8f0] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] text-[#0f172a] font-medium transition-all duration-200 bg-[#f8fafc] focus:outline-none focus:border-[#007570] focus:bg-white"
+                  >
+                    <option value="">-- Tanpa Parent (Kategori Utama) --</option>
+                    {navbarCategories
+                      .filter((c) => (!modal.data || c.id !== modal.data.id) && !c.parent_id)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-[8px] mt-[4px]">
+                  <input
+                    type="checkbox"
+                    id="navbar_cat_is_active"
+                    checked={navbarCategoryForm.is_active}
+                    onChange={(e) => setNavbarCategoryForm({ ...navbarCategoryForm, is_active: e.target.checked })}
+                    className="w-[16px] h-[16px] accent-[#007570] cursor-pointer"
+                  />
+                  <label htmlFor="navbar_cat_is_active" className="text-[13px] text-[#0f172a] font-medium cursor-pointer">
+                    Aktifkan Kategori Ini
+                  </label>
+                </div>
+              </form>
+            ) : modal.type === "deleteNavbarCategory" ? (
+              <p className="text-[14px] text-[#0f172a]">
+                Apakah Anda yakin ingin menghapus kategori informasi <strong>{modal.data?.name}</strong>?
               </p>
             ) : modal.type === "addAdPackage" || modal.type === "editAdPackage" ? (
               <form onSubmit={(e) => { e.preventDefault(); handleSaveAdPackage(); }} className="flex flex-col gap-[14px]">
@@ -9422,6 +10571,11 @@ export default function AdminWeb() {
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-800 flex items-center gap-1">
                           <Crown size={12} /> Bisnis Premium
                         </span>
+                      ) : (modal.data?.subscription?.plan || modal.data?.subscriptions?.[0]?.plan) ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                          <Crown size={12} className="text-amber-700" />
+                          Paket {modal.data?.subscription?.plan?.name || modal.data?.subscriptions?.[0]?.plan?.name} (Menunggu Verifikasi)
+                        </span>
                       ) : (
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700">
                           Paket Reguler
@@ -9470,80 +10624,100 @@ export default function AdminWeb() {
                 )}
 
                 {/* Bukti Transaksi / Pembayaran */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                    <div className="flex items-center gap-2">
-                      <CreditCard size={16} className="text-[#007570]" />
-                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                        Status Transaksi &amp; Bukti Pembayaran
-                      </span>
-                    </div>
-                    {modal.data?.subscription?.plan && (
-                      <span className="px-2 py-0.5 rounded text-[11px] font-extrabold bg-[#007570] text-white">
-                        {modal.data.subscription.plan.name}
-                      </span>
-                    )}
-                  </div>
+                {(() => {
+                  const sub = modal.data?.subscription || modal.data?.subscriptions?.[0] || modal.data?.latest_subscription;
+                  const pay = modal.data?.payment || sub?.payment;
+                  const rawProof = pay?.proof || sub?.payment?.proof || modal.data?.payment_proof;
+                  const proofUrl = modal.data?.proof_url || (rawProof ? getStorageUrl(rawProof) : null);
+                  const planName = sub?.plan?.name || "Premium";
+                  const totalAmount = Number(pay?.amount || sub?.final_price || sub?.price || sub?.plan?.price || 0);
+                  const isPaid = pay?.status === "paid" || pay?.status === "approved" || modal.data?.is_premium;
+                  const isFailed = pay?.status === "failed" || pay?.status === "rejected";
+                  const hasTxInfo = Boolean(sub || pay || proofUrl || totalAmount > 0);
 
-                  {modal.data?.proof_url || modal.data?.payment || modal.data?.subscription ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-slate-400 block">Total Tagihan:</span>
-                          <span className="font-extrabold text-[#007570]">
-                            Rp {Number(modal.data?.payment?.amount || modal.data?.subscription?.plan?.price || 0).toLocaleString("id-ID")}
+                  return (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <div className="flex items-center gap-2">
+                          <CreditCard size={16} className="text-[#007570]" />
+                          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                            Status Transaksi &amp; Bukti Pembayaran
                           </span>
                         </div>
-                        <div>
-                          <span className="text-slate-400 block">Status Pembayaran:</span>
-                          <span className={`font-bold ${
-                            modal.data?.payment?.status === "paid" || modal.data?.is_premium
-                              ? "text-emerald-600"
-                              : modal.data?.payment?.status === "failed"
-                              ? "text-rose-600"
-                              : "text-amber-600"
-                          }`}>
-                            {modal.data?.payment?.status === "paid" || modal.data?.is_premium ? "Lunas" : modal.data?.payment?.status === "failed" ? "Ditolak / Gagal" : "Menunggu Verifikasi"}
+                        {hasTxInfo && sub?.plan && (
+                          <span className="px-2.5 py-0.5 rounded text-[11px] font-extrabold bg-[#007570] text-white">
+                            {planName}
                           </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
-                          <span>Foto Bukti Pembayaran</span>
-                          {modal.data?.proof_url && (
-                            <a
-                              href={modal.data.proof_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[11px] font-bold text-[#007570] hover:underline"
-                            >
-                              Buka Ukuran Penuh ↗
-                            </a>
-                          )}
-                        </label>
-                        {modal.data?.proof_url ? (
-                          <div className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-950 flex items-center justify-center p-1 max-h-[260px]">
-                            <img
-                              src={modal.data.proof_url}
-                              alt="Bukti Transfer"
-                              className="max-h-[240px] w-auto object-contain rounded-lg"
-                            />
-                          </div>
-                        ) : (
-                          <div className="p-4 text-center bg-white border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
-                            Belum ada foto bukti transfer yang diunggah.
-                          </div>
                         )}
                       </div>
+
+                      {hasTxInfo ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <span className="text-slate-400 block">Total Tagihan:</span>
+                              <span className="font-extrabold text-[#007570]">
+                                Rp {totalAmount.toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block">Metode Pembayaran:</span>
+                              <span className="font-bold text-slate-700">
+                                {pay?.payment_method || "Transfer Bank"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block">Status Pembayaran:</span>
+                              <span className={`font-bold ${
+                                isPaid
+                                  ? "text-emerald-600"
+                                  : isFailed
+                                  ? "text-rose-600"
+                                  : "text-amber-600"
+                              }`}>
+                                {isPaid ? "Lunas / Disetujui" : isFailed ? "Ditolak / Gagal" : "Menunggu Verifikasi"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                              <span>Foto Bukti Pembayaran</span>
+                              {proofUrl && (
+                                <a
+                                  href={proofUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] font-bold text-[#007570] hover:underline"
+                                >
+                                  Buka Ukuran Penuh ↗
+                                </a>
+                              )}
+                            </label>
+                            {proofUrl ? (
+                              <div className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-950 flex items-center justify-center p-1 max-h-[260px]">
+                                <img
+                                  src={proofUrl}
+                                  alt="Bukti Transfer"
+                                  className="max-h-[240px] w-auto object-contain rounded-lg"
+                                />
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center bg-white border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
+                                Belum ada foto bukti transfer yang diunggah.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
+                          <CheckCircle2 size={16} className="text-slate-400 shrink-0" />
+                          <span>Usaha terdaftar pada paket Reguler / Free (Tidak memerlukan bukti transfer).</span>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
-                      <CheckCircle2 size={16} className="text-slate-400 shrink-0" />
-                      <span>Usaha terdaftar pada paket Reguler / Free (Tidak memerlukan bukti transfer).</span>
-                    </div>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Rejection Note if exists */}
                 {modal.data?.rejection_reason && (
@@ -9701,34 +10875,36 @@ export default function AdminWeb() {
                     const tx = modal.data?.latest_transaction || modal.data?.latestTransaction || modal.data?.transaction;
                     const rawProof = tx?.payment_proof || modal.data?.payment_proof;
                     const proofUrl = rawProof ? getStorageUrl(rawProof) : null;
+                    const paymentMethod = tx?.payment_method || modal.data?.payment_method || "Transfer Bank";
+                    const paymentStatus = tx?.payment_status || (modal.data?.status === "published" || modal.data?.status === "approved" ? "paid" : modal.data?.status === "pending" ? "pending" : "failed");
 
-                    if (tx || proofUrl) {
+                    if (tx || proofUrl || modal.data?.payment_proof || modal.data?.payment_method) {
                       return (
                         <div className="p-4 bg-teal-50/40 rounded-2xl border border-teal-200/70 space-y-3">
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                             <div>
                               <span className="text-slate-400 block text-[10.5px]">Metode Bayar</span>
-                              <span className="font-bold text-slate-800">{tx?.payment_method || "Transfer Bank"}</span>
+                              <span className="font-bold text-slate-800">{paymentMethod}</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block text-[10.5px]">Total Nominal</span>
                               <span className="font-bold text-[#007570]">
-                                Rp {Number(tx?.amount || 10000).toLocaleString("id-ID")}
+                                Rp {Number(tx?.amount || (modal.data?.type === "event" ? 15000 : 10000)).toLocaleString("id-ID")}
                               </span>
                             </div>
                             <div>
                               <span className="text-slate-400 block text-[10.5px]">Status Transaksi</span>
                               <span className={`font-bold px-2 py-0.5 rounded text-[10px] inline-block ${
-                                tx?.payment_status === "paid" ? "bg-emerald-100 text-emerald-800" :
-                                tx?.payment_status === "pending" ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
+                                paymentStatus === "paid" ? "bg-emerald-100 text-emerald-800" :
+                                paymentStatus === "pending" ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
                               }`}>
-                                {tx?.payment_status === "paid" ? "Lunas" : tx?.payment_status === "pending" ? "Menunggu Verifikasi" : "Gagal/Ditolak"}
+                                {paymentStatus === "paid" ? "Lunas" : paymentStatus === "pending" ? "Menunggu Verifikasi" : "Gagal/Ditolak"}
                               </span>
                             </div>
                             <div>
                               <span className="text-slate-400 block text-[10.5px]">Waktu Bayar</span>
                               <span className="font-medium text-slate-700">
-                                {tx?.created_at ? new Date(tx.created_at).toLocaleDateString("id-ID") : "-"}
+                                {tx?.created_at ? new Date(tx.created_at).toLocaleDateString("id-ID") : (modal.data?.updated_at ? new Date(modal.data.updated_at).toLocaleDateString("id-ID") : "-")}
                               </span>
                             </div>
                           </div>
@@ -10142,56 +11318,72 @@ export default function AdminWeb() {
           </div>
           {!isReferralModal && modal.type !== "editContentPricing" && modal.type !== "rejectContentTx" && modal.type !== "viewContentTxDetail" && modal.type !== "viewContentProof" && modal.type !== "viewBlogDetail" && modal.type !== "viewPaymentDetail" && modal.type !== "viewBusinessDetail" && modal.type !== "viewAdDetail" && modal.type !== "rejectItem" && (
             <div className="flex justify-end gap-[10px] px-[20px] py-[16px] border-t border-[#e2e8f0]">
-              <button className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border bg-[#f1f5f9] text-[#0f172a] border-[#e2e8f0] hover:bg-[#e2e8f0] hover:-translate-y-[1px]" onClick={closeModal}>
-                Batal
-              </button>
-              <button
-                className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border-0 bg-[#007570] text-white shadow-[0_2px_8px_rgba(0,117,112,0.2)] hover:bg-[#005a58] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,117,112,0.25)]"
-                onClick={() => {
-                  if (modal.type === "addUser" || modal.type === "editUser") {
-                    handleSaveUser();
-                  } else if (modal.type === "deleteUser" && modal.data?.id) {
-                    handleDeleteUser(modal.data.id);
-                  } else if (modal.type === "addCategory" || modal.type === "editCategory") {
-                    handleSaveCategory();
-                  } else if (modal.type === "deleteCategory" && modal.data?.id) {
-                    handleDeleteCategory(modal.data.id);
-                  } else if (modal.type === "addCoupon" || modal.type === "editCoupon") {
-                    handleSaveCoupon();
-                  } else if (modal.type === "deleteCoupon" && modal.data?.id) {
-                    handleDeleteCoupon(modal.data.id);
-                  } else if (modal.type === "addBlog" || modal.type === "editBlog") {
-                    handleSaveBlog();
-                  } else if (modal.type === "deleteBlog" && modal.data?.id) {
-                    handleDeleteBlog(modal.data.id);
-                  } else if (modal.type === "deleteReportedContent" && modal.data?.id) {
-                    handleDeleteReportedContent(modal.data.id);
-                  } else if (modal.type === "addPackage" || modal.type === "editPackage") {
-                    handleSavePackage();
-                  } else if (modal.type === "deletePackage" && modal.data?.id) {
-                    handleDeletePackage(modal.data.id);
-                  } else if (modal.type === "addContentPackage" || modal.type === "editContentPackage") {
-                    handleSaveContentPackage();
-                  } else if (modal.type === "deleteContentPackage" && modal.data?.id) {
-                    handleDeleteContentPackage(modal.data.id);
-                  } else if (modal.type === "addAdPackage" || modal.type === "editAdPackage") {
-                    handleSaveAdPackage();
-                  } else if (modal.type === "deleteAdPackage" && modal.data?.id) {
-                    handleDeleteAdPackage(modal.data.id);
-                  } else if (modal.type === "editAd" && modal.data?.id) {
-                    handleSaveEditAd();
-                  } else if (modal.type === "deleteAd" && modal.data?.id) {
-                    handleDeleteAd(modal.data.id);
-                  } else if (modal.type === "editSubscription" && modal.data?.id) {
-                    handleUpdateSubscriptionStatus(modal.data.id, modal.data.status, modal.data.ends_at);
-                    closeModal();
-                  } else {
-                    closeModal();
-                  }
-                }}
-              >
-                {modal.type.includes("delete") || modal.type.includes("reject") ? "Hapus/Tolak" : "Simpan"}
-              </button>
+              {modal.type === "viewUserDetail" ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-[7px] px-[18px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border-0 bg-[#007570] text-white shadow-[0_2px_8px_rgba(0,117,112,0.2)] hover:bg-[#005a58]"
+                  onClick={closeModal}
+                >
+                  Tutup
+                </button>
+              ) : (
+                <>
+                  <button className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border bg-[#f1f5f9] text-[#0f172a] border-[#e2e8f0] hover:bg-[#e2e8f0] hover:-translate-y-[1px]" onClick={closeModal}>
+                    Batal
+                  </button>
+                  <button
+                    className="inline-flex items-center gap-[7px] px-[16px] py-[8px] rounded-[8px] font-['Poppins','Inter',sans-serif] text-[13px] font-semibold cursor-pointer transition-all duration-220 border-0 bg-[#007570] text-white shadow-[0_2px_8px_rgba(0,117,112,0.2)] hover:bg-[#005a58] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,117,112,0.25)]"
+                    onClick={() => {
+                      if (modal.type === "addUser" || modal.type === "editUser") {
+                        handleSaveUser();
+                      } else if (modal.type === "deleteUser" && modal.data?.id) {
+                        handleDeleteUser(modal.data.id);
+                      } else if (modal.type === "addCategory" || modal.type === "editCategory") {
+                        handleSaveCategory();
+                      } else if (modal.type === "deleteCategory" && modal.data?.id) {
+                        handleDeleteCategory(modal.data.id);
+                      } else if (modal.type === "addNavbarCategory" || modal.type === "editNavbarCategory") {
+                        handleSaveNavbarCategory();
+                      } else if (modal.type === "deleteNavbarCategory" && modal.data?.id) {
+                        handleDeleteNavbarCategory(modal.data.id);
+                      } else if (modal.type === "addCoupon" || modal.type === "editCoupon") {
+                        handleSaveCoupon();
+                      } else if (modal.type === "deleteCoupon" && modal.data?.id) {
+                        handleDeleteCoupon(modal.data.id);
+                      } else if (modal.type === "addBlog" || modal.type === "editBlog") {
+                        handleSaveBlog();
+                      } else if (modal.type === "deleteBlog" && modal.data?.id) {
+                        handleDeleteBlog(modal.data.id);
+                      } else if (modal.type === "deleteReportedContent" && modal.data?.id) {
+                        handleDeleteReportedContent(modal.data.id);
+                      } else if (modal.type === "addPackage" || modal.type === "editPackage") {
+                        handleSavePackage();
+                      } else if (modal.type === "deletePackage" && modal.data?.id) {
+                        handleDeletePackage(modal.data.id);
+                      } else if (modal.type === "addContentPackage" || modal.type === "editContentPackage") {
+                        handleSaveContentPackage();
+                      } else if (modal.type === "deleteContentPackage" && modal.data?.id) {
+                        handleDeleteContentPackage(modal.data.id);
+                      } else if (modal.type === "addAdPackage" || modal.type === "editAdPackage") {
+                        handleSaveAdPackage();
+                      } else if (modal.type === "deleteAdPackage" && modal.data?.id) {
+                        handleDeleteAdPackage(modal.data.id);
+                      } else if (modal.type === "editAd" && modal.data?.id) {
+                        handleSaveEditAd();
+                      } else if (modal.type === "deleteAd" && modal.data?.id) {
+                        handleDeleteAd(modal.data.id);
+                      } else if (modal.type === "editSubscription" && modal.data?.id) {
+                        handleUpdateSubscriptionStatus(modal.data.id, modal.data.status, modal.data.ends_at);
+                        closeModal();
+                      } else {
+                        closeModal();
+                      }
+                    }}
+                  >
+                    {modal.type.includes("delete") || modal.type.includes("reject") ? "Hapus/Tolak" : "Simpan"}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -10211,22 +11403,25 @@ export default function AdminWeb() {
   return (
     <div className="flex min-h-screen bg-[#f5f6fa] font-['Poppins','Inter','Segoe_UI',sans-serif] text-[#0f172a]">
       {/* ── Sidebar ── */}
-      <aside className={`fixed top-0 left-0 h-screen ${sidebarCollapsed ? "w-[68px]" : "w-[240px] max-lg:w-[68px]"} bg-[#050a16] flex flex-col z-[200] transition-[width] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] overflow-hidden border-r border-[rgba(255,255,255,0.07)]`}>
+      <aside className={`fixed top-0 left-0 h-screen ${sidebarCollapsed ? "w-[68px]" : "w-[240px] max-lg:w-[68px]"} bg-gradient-to-b from-[#0b6b45] via-[#0a5c3c] to-[#083d28] flex flex-col z-[200] transition-[width] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] overflow-hidden border-r border-[rgba(255,255,255,0.08)]`}>
         {/* Header / Brand */}
-        <div className="flex items-center justify-between p-[18px_14px_14px] border-b border-[rgba(255,255,255,0.07)] shrink-0 min-h-[60px]">
+        <div className="flex items-center justify-between p-[16px_14px_14px] border-b border-[rgba(255,255,255,0.07)] shrink-0 min-h-[60px]">
           <div className="flex items-center gap-[10px] overflow-hidden flex-1 min-w-0">
-            <span className={`text-[15px] font-bold text-white whitespace-nowrap transition-[opacity,width] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] ${sidebarCollapsed ? "opacity-0 w-0 overflow-hidden" : "max-lg:opacity-0 max-lg:w-0 max-lg:overflow-hidden"}`}>Info.co.id</span>
-            <span className={`bg-[rgba(0,117,112,0.4)] border border-[rgba(0,179,171,0.3)] text-[#5eead4] text-[0.65rem] px-[7px] py-[2px] rounded-[6px] font-bold whitespace-nowrap shrink-0 transition-[opacity,width,padding] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] ${sidebarCollapsed ? "opacity-0 w-0 overflow-hidden p-0" : "max-lg:opacity-0 max-lg:w-0 max-lg:overflow-hidden max-lg:p-0"}`}>Admin</span>
+            {!sidebarCollapsed && (
+              <img src={logoImg} alt="Surade.co.id" className="h-[28px] w-auto shrink-0 max-lg:hidden" />
+            )}
+            <div className={`flex flex-col gap-[3px] min-w-0 transition-[opacity,width] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] ${sidebarCollapsed ? "opacity-0 w-0 overflow-hidden" : "max-lg:opacity-0 max-lg:w-0 max-lg:overflow-hidden"}`}>
+              <span className="text-[15px] font-bold text-white whitespace-nowrap leading-none">Surade.co.id</span>
+              <span className="bg-[rgba(255,255,255,0.18)] border border-[rgba(255,255,255,0.30)] text-[#a7f3d0] text-[0.62rem] px-[7px] py-[2px] rounded-[6px] font-bold whitespace-nowrap w-fit">Admin</span>
+            </div>
           </div>
           {/* Toggle button */}
           <button
-            className="shrink-0 w-[32px] h-[32px] flex items-center justify-center rounded-[8px] text-[rgba(255,255,255,0.80)] cursor-pointer transition-[background,color] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] bg-transparent border-0 relative z-10 hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
+            className="shrink-0 w-[32px] h-[32px] flex items-center justify-center rounded-[8px] text-[#6ee7b7] cursor-pointer transition-[background,color] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] bg-transparent border-0 relative z-10 hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? "Tampilkan sidebar" : "Sembunyikan sidebar"}
           >
-            {sidebarCollapsed
-              ? <ChevronRight size={18} strokeWidth={2} />
-              : <ChevronLeft size={18} strokeWidth={2} />}
+            <Menu size={22} />
           </button>
         </div>
 
@@ -10237,15 +11432,15 @@ export default function AdminWeb() {
               key={item.id}
               className={`group relative flex items-center gap-[12px] px-[12px] py-[10px] rounded-[10px] border-0 text-[13.5px] font-medium whitespace-nowrap w-full text-left font-['Poppins','Inter','Segoe_UI',sans-serif] cursor-pointer transition-all duration-200 ${
                 activeTab === item.id
-                  ? "bg-[#007570] text-white font-semibold shadow-[0_2px_8px_rgba(0,117,112,0.4)]"
-                  : "bg-transparent text-[rgba(255,255,255,0.75)] hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
+                  ? "bg-white text-[#0a5c3c] font-semibold shadow-[0_2px_10px_rgba(0,0,0,0.18)]"
+                  : "bg-transparent text-[rgba(255,255,255,0.78)] hover:bg-[rgba(255,255,255,0.10)] hover:text-white"
               }`}
               onClick={() => setActiveTab(item.id)}
               title={sidebarCollapsed ? item.label : undefined}
             >
               <span className="shrink-0">{item.icon}</span>
               <span className={`transition-[opacity,width] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] overflow-hidden whitespace-nowrap ${sidebarCollapsed ? "opacity-0 w-0 pointer-events-none" : "max-lg:opacity-0 max-lg:w-0 max-lg:pointer-events-none"}`}>{item.label}</span>
-              <span className={`absolute left-[calc(68px+8px)] top-1/2 -translate-y-1/2 bg-[#1e293b] text-white text-[12px] font-medium px-[10px] py-[5px] rounded-[6px] whitespace-nowrap pointer-events-none opacity-0 ${sidebarCollapsed ? "group-hover:opacity-100" : "max-lg:group-hover:opacity-100"} transition-opacity duration-150 z-[300] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-[5px] before:border-transparent before:border-r-[#1e293b]`}>{item.label}</span>
+              <span className={`absolute left-[calc(68px+8px)] top-1/2 -translate-y-1/2 bg-[#083d28] text-white text-[12px] font-medium px-[10px] py-[5px] rounded-[6px] whitespace-nowrap pointer-events-none opacity-0 ${sidebarCollapsed ? "group-hover:opacity-100" : "max-lg:group-hover:opacity-100"} transition-opacity duration-150 z-[300] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-[5px] before:border-transparent before:border-r-[#083d28]`}>{item.label}</span>
             </button>
           ))}
         </nav>
@@ -10255,14 +11450,14 @@ export default function AdminWeb() {
           {/* Kembali ke Website */}
           <Link
             to="/"
-            className={`group relative flex items-center gap-[12px] px-[12px] py-[10px] rounded-[10px] no-underline bg-transparent text-[rgba(255,255,255,0.75)] cursor-pointer transition-all duration-200 w-full text-left font-['Poppins','Inter','Segoe_UI',sans-serif] text-[13.5px] font-medium whitespace-nowrap hover:bg-[#007570] hover:text-white hover:shadow-[0_2px_8px_rgba(0,117,112,0.4)]`}
+            className={`group relative flex items-center gap-[12px] px-[12px] py-[10px] rounded-[10px] no-underline bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.25)] text-white cursor-pointer transition-all duration-200 w-full text-left font-['Poppins','Inter','Segoe_UI',sans-serif] text-[13.5px] font-medium whitespace-nowrap hover:bg-[rgba(255,255,255,0.22)] hover:border-[rgba(255,255,255,0.4)]`}
             title={sidebarCollapsed ? "Kembali ke Website" : undefined}
           >
-            <ArrowLeft size={18} strokeWidth={2} className="shrink-0 text-[#2dd4bf]" />
+            <Home size={18} strokeWidth={2} className="shrink-0 text-[#6ee7b7]" />
             <span className={`transition-[opacity,width] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] overflow-hidden whitespace-nowrap ${sidebarCollapsed ? "opacity-0 w-0 pointer-events-none" : "max-lg:opacity-0 max-lg:w-0 max-lg:pointer-events-none"}`}>
               Kembali ke Website
             </span>
-            <span className={`absolute left-[calc(68px+8px)] top-1/2 -translate-y-1/2 bg-[#1e293b] text-white text-[12px] font-medium px-[10px] py-[5px] rounded-[6px] whitespace-nowrap pointer-events-none opacity-0 ${sidebarCollapsed ? "group-hover:opacity-100" : "max-lg:group-hover:opacity-100"} transition-opacity duration-150 z-[300] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-[5px] before:border-transparent before:border-r-[#1e293b]`}>
+            <span className={`absolute left-[calc(68px+8px)] top-1/2 -translate-y-1/2 bg-[#083d28] text-white text-[12px] font-medium px-[10px] py-[5px] rounded-[6px] whitespace-nowrap pointer-events-none opacity-0 ${sidebarCollapsed ? "group-hover:opacity-100" : "max-lg:group-hover:opacity-100"} transition-opacity duration-150 z-[300] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-[5px] before:border-transparent before:border-r-[#083d28]`}>
               Kembali ke Website
             </span>
           </Link>
@@ -10317,7 +11512,7 @@ export default function AdminWeb() {
           {activeTab === "dashboard"     && renderDashboard()}
           {activeTab === "users"         && renderUsers()}
           {activeTab === "businesses"    && renderBusinesses()}
-          {activeTab === "categories"    && renderCategories()}
+          {activeTab === "navbar-info"   && renderNavbarCategories()}
           {activeTab === "ads"           && renderAds()}
           {activeTab === "premium"       && renderPremium()}
           {activeTab === "coupons"       && renderCoupons()}
@@ -10325,8 +11520,8 @@ export default function AdminWeb() {
           {activeTab === "blogs"            && renderBlogs()}
           {(activeTab === "content_pricing" || activeTab === "content_packages") && renderBlogs()}
           {activeTab === "reports"          && renderReports()}
-          {activeTab === "settings"      && renderSettings()}
           {activeTab === "notifications" && renderNotifications()}
+          {activeTab === "whatsapp"      && renderWhatsApp()}
         </div>
       </main>
 

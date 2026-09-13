@@ -1,0 +1,183 @@
+/* Halaman 404 — diberi prefix "nf-" supaya class-nya tidak bentrok
+   dengan CSS halaman lain di project ini. */
+
+.nf-body {
+  font-family: "DM Sans", sans-serif;
+  min-height: 100vh;
+  background: #f6f8f6;
+  color: #17231b;
+}
+
+.nf-background {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.nf-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.55;
+}
+
+.nf-blob-1 {
+  width: 450px;
+  height: 450px;
+  background: #a8ddb8;
+  top: -180px;
+  left: -120px;
+}
+
+.nf-blob-2 {
+  width: 500px;
+  height: 500px;
+  background: #c4ead0;
+  bottom: -250px;
+  right: -150px;
+}
+
+.nf-line {
+  position: absolute;
+  border: 1px solid rgba(24, 122, 60, 0.08);
+  border-radius: 50%;
+}
+
+.nf-line-1 {
+  width: 600px;
+  height: 600px;
+  top: -300px;
+  right: -180px;
+}
+
+.nf-line-2 {
+  width: 450px;
+  height: 450px;
+  bottom: -250px;
+  left: -150px;
+}
+
+.nf-main {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 25px;
+  text-align: center;
+}
+
+.nf-container {
+  width: 100%;
+  max-width: 850px;
+  position: relative;
+}
+
+.nf-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border: 1px solid rgba(24, 122, 60, 0.15);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border-radius: 50px;
+  color: #287a47;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  margin-bottom: 25px;
+}
+
+.nf-dot {
+  width: 7px;
+  height: 7px;
+  background: #2d9a54;
+  border-radius: 50%;
+}
+
+.nf-code {
+  font-size: clamp(150px, 24vw, 280px);
+  font-weight: 700;
+  letter-spacing: -14px;
+  line-height: 0.8;
+  background: linear-gradient(135deg, #123b22 0%, #237b43 50%, #77b98c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+  margin-bottom: 40px;
+  filter: drop-shadow(0 20px 30px rgba(32, 110, 58, 0.12));
+}
+
+.nf-underline {
+  width: 90px;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, #3e9a5e, transparent);
+  margin: 0 auto 28px;
+  border-radius: 50px;
+}
+
+.nf-container h1 {
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 700;
+  letter-spacing: -1px;
+  color: #17231b;
+  margin-bottom: 16px;
+}
+
+.nf-container p {
+  max-width: 520px;
+  margin: auto;
+  color: #738078;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.nf-button-wrapper {
+  margin-top: 38px;
+}
+
+.nf-home-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  padding: 16px 30px;
+  background: #176b37;
+  color: white;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 15px 35px rgba(23, 107, 55, 0.22);
+}
+
+.nf-home-button:hover {
+  transform: translateY(-3px);
+  background: #10562b;
+  box-shadow: 0 20px 45px rgba(23, 107, 55, 0.3);
+}
+
+.nf-bottom-text {
+  margin-top: 35px;
+  font-size: 13px;
+  color: #a0aaa3;
+}
+
+@media (max-width: 600px) {
+  .nf-code {
+    letter-spacing: -8px;
+    margin-bottom: 30px;
+  }
+
+  .nf-container p {
+    font-size: 14px;
+    padding: 0 10px;
+  }
+
+  .nf-home-button {
+    width: 100%;
+    max-width: 280px;
+  }
+}

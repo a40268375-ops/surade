@@ -25,31 +25,31 @@ const FAQ_DATA = [
     id: "gen-1",
     category: "general",
     categoryLabel: "Umum",
-    question: "Apa itu Info.co.id?",
+    question: "Apa itu Surade.co.id?",
     answer:
-      "Info.co.id adalah portal informasi digital terlengkap di Indonesia yang menghubungkan masyarakat, pelaku usaha (UMKM hingga perusahaan besar), dan instansi pemerintahan. Platform ini dirancang untuk mewujudkan konsep Smart City dan Smart Village di seluruh pelosok Indonesia dengan kemudahan akses informasi dalam 'One Click Service'.",
+      "Surade.co.id adalah portal informasi digital terlengkap di Indonesia yang menghubungkan masyarakat, pelaku usaha (UMKM hingga perusahaan besar), dan instansi pemerintahan. Platform ini dirancang untuk mewujudkan konsep Smart City dan Smart Village di seluruh pelosok Indonesia dengan kemudahan akses informasi dalam 'One Click Service'.",
   },
   {
     id: "gen-2",
     category: "general",
     categoryLabel: "Umum",
-    question: "Apakah menggunakan Info.co.id gratis?",
+    question: "Apakah menggunakan Surade.co.id gratis?",
     answer:
-      "Ya! Menjelajah informasi, mencari direktori bisnis, membaca artikel blog, dan mendaftar akun pengguna di Info.co.id sepenuhnya GRATIS. Kami juga menyediakan paket promosi dan iklan berbayar (Premium) bagi pemilik bisnis yang ingin meningkatkan visibilitas dan jangkauan usahanya ke tingkat yang lebih tinggi.",
+      "Ya! Menjelajah informasi, mencari direktori bisnis, membaca artikel blog, dan mendaftar akun pengguna di Surade.co.id sepenuhnya GRATIS. Kami juga menyediakan paket promosi dan iklan berbayar (Premium) bagi pemilik bisnis yang ingin meningkatkan visibilitas dan jangkauan usahanya ke tingkat yang lebih tinggi.",
   },
   {
     id: "gen-3",
     category: "general",
     categoryLabel: "Umum",
-    question: "Apa yang dimaksud dengan Smart City & Smart Village di Info.co.id?",
+    question: "Apa yang dimaksud dengan Smart City & Smart Village di Surade.co.id?",
     answer:
-      "Smart City & Smart Village di Info.co.id adalah inisiatif digitalisasi daerah di mana setiap kota, kabupaten, dan desa memiliki etalase virtual khusus. Di dalamnya tercakup direktori bisnis lokal, tempat wisata, layanan publik, berita kegiatan, dan potensi daerah yang terintegrasi secara digital sehingga mudah ditemukan oleh wisatawan, investor, maupun warga setempat.",
+      "Smart City & Smart Village di Surade.co.id adalah inisiatif digitalisasi daerah di mana setiap kota, kabupaten, dan desa memiliki etalase virtual khusus. Di dalamnya tercakup direktori bisnis lokal, tempat wisata, layanan publik, berita kegiatan, dan potensi daerah yang terintegrasi secara digital sehingga mudah ditemukan oleh wisatawan, investor, maupun warga setempat.",
   },
   {
     id: "gen-4",
     category: "general",
     categoryLabel: "Umum",
-    question: "Bagaimana cara mencari bisnis atau informasi di Info.co.id?",
+    question: "Bagaimana cara mencari bisnis atau informasi di Surade.co.id?",
     answer:
       "Anda dapat menggunakan kolom pencarian utama di halaman beranda dengan memasukkan kata kunci (nama tempat/usaha, kategori) dan memilih lokasi kota/kabupaten. Anda juga bisa menelusuri kategori yang tersedia pada menu navigasi Informasi.",
   },
@@ -59,7 +59,7 @@ const FAQ_DATA = [
     id: "acc-1",
     category: "account",
     categoryLabel: "Akun & Keamanan",
-    question: "Bagaimana cara membuat akun baru di Info.co.id?",
+    question: "Bagaimana cara membuat akun baru di Surade.co.id?",
     answer:
       "Klik tombol 'Login' di pojok kanan atas, lalu pilih 'Buat Akun Baru'. Masukkan nama lengkap, alamat email aktif, kata sandi, dan jenis kelamin. Sistem akan mengirimkan 6 digit kode OTP ke email Anda untuk verifikasi instan. Setelah OTP dimasukkan dengan benar, akun Anda langsung aktif!",
   },
@@ -83,7 +83,7 @@ const FAQ_DATA = [
     id: "acc-4",
     category: "account",
     categoryLabel: "Akun & Keamanan",
-    question: "Apakah data pribadi saya aman di Info.co.id?",
+    question: "Apakah data pribadi saya aman di Surade.co.id?",
     answer:
       "Kami menjaga kerahasiaan data pribadi pengguna sesuai standar enkripsi modern dan kebijakan privasi yang ketat. Kata sandi dienkripsi dengan algoritma bcrypt tingkat tinggi, dan kami tidak akan pernah membagikan informasi sensitif Anda ke pihak ketiga tanpa izin Anda.",
   },
@@ -95,7 +95,7 @@ const FAQ_DATA = [
     categoryLabel: "Pemasangan Usaha",
     question: "Bagaimana cara mendaftarkan profil usaha/bisnis saya?",
     answer:
-      "Masuk ke akun Info.co.id Anda, lalu klik tombol '+ Tambah Usaha' di navigasi atas. Isi informasi usaha Anda seperti nama bisnis, kategori & subkategori, alamat lengkap, nomor telepon/WhatsApp, jam operasional, tautan media sosial, serta upload foto galeri dan produk usaha Anda.",
+      "Masuk ke akun Surade.co.id Anda, lalu klik tombol '+ Tambah Usaha' di navigasi atas. Isi informasi usaha Anda seperti nama bisnis, kategori & subkategori, alamat lengkap, nomor telepon/WhatsApp, jam operasional, tautan media sosial, serta upload foto galeri dan produk usaha Anda.",
   },
   {
     id: "biz-2",
@@ -103,7 +103,7 @@ const FAQ_DATA = [
     categoryLabel: "Pemasangan Usaha",
     question: "Berapa lama proses verifikasi bisnis setelah didaftarkan?",
     answer:
-      "Profil bisnis yang Anda daftarkan akan langsung tampil di direktori. Tim moderator Info.co.id akan melakukan peninjauan kualitas data dalam waktu 1x24 jam untuk memastikan kesesuaian kategori dan kelengkapan informasi.",
+      "Profil bisnis yang Anda daftarkan akan langsung tampil di direktori. Tim moderator Surade.co.id akan melakukan peninjauan kualitas data dalam waktu 1x24 jam untuk memastikan kesesuaian kategori dan kelengkapan informasi.",
   },
   {
     id: "biz-3",
@@ -117,7 +117,7 @@ const FAQ_DATA = [
     id: "biz-4",
     category: "business",
     categoryLabel: "Pemasangan Usaha",
-    question: "Apa keuntungan memiliki profil usaha di Info.co.id?",
+    question: "Apa keuntungan memiliki profil usaha di Surade.co.id?",
     answer:
       "Bisnis Anda akan mendapatkan halaman profil virtual mandiri yang terindeks di mesin pencari (Google), memiliki tautan langsung ke WhatsApp, rute Google Maps, katalog produk, ulasan pelanggan, serta berpotensi tampil di rekomendasi bisnis kota setempat.",
   },
@@ -129,7 +129,7 @@ const FAQ_DATA = [
     categoryLabel: "Iklan & Promosi",
     question: "Bagaimana cara memasang iklan banner atau promosi berbayar?",
     answer:
-      "Info.co.id menyediakan berbagai paket iklan strategis seperti Banner Hero Utama, Banner Sidebar, Iklan Rekomendasi Unggulan, dan Iklan Pop-up. Anda dapat memilih paket iklan melalui menu Dashboard atau menghubungi tim pemasaran kami melalui halaman Hubungi Kami.",
+      "Surade.co.id menyediakan berbagai paket iklan strategis seperti Banner Hero Utama, Banner Sidebar, Iklan Rekomendasi Unggulan, dan Iklan Pop-up. Anda dapat memilih paket iklan melalui menu Dashboard atau menghubungi tim pemasaran kami melalui halaman Hubungi Kami.",
   },
   {
     id: "ads-2",
@@ -145,15 +145,15 @@ const FAQ_DATA = [
     id: "trade-1",
     category: "trade",
     categoryLabel: "Jual Beli",
-    question: "Apakah Info.co.id menjual barang secara langsung?",
+    question: "Apakah Surade.co.id menjual barang secara langsung?",
     answer:
-      "Tidak. Info.co.id bertindak sebagai media informasi dan perantara etalase digital. Transaksi jual beli produk/layanan dilakukan secara langsung antara pembeli dan penjual (pemilik usaha) melalui kontak resmi yang tercantum.",
+      "Tidak. Surade.co.id bertindak sebagai media informasi dan perantara etalase digital. Transaksi jual beli produk/layanan dilakukan secara langsung antara pembeli dan penjual (pemilik usaha) melalui kontak resmi yang tercantum.",
   },
   {
     id: "trade-2",
     category: "trade",
     categoryLabel: "Jual Beli",
-    question: "Barang apa saja yang dilarang dipasang di Info.co.id?",
+    question: "Barang apa saja yang dilarang dipasang di Surade.co.id?",
     answer:
       "Barang yang dilarang mencakup narkotika, senjata api/tajam ilegal, obat-obatan tanpa izin BPOM, barang selundupan/curian, materi pornografi, dan barang/jasa lain yang melanggar hukum perundang-undangan Republik Indonesia. Selengkapnya dapat dilihat pada halaman Syarat & Ketentuan.",
   },
@@ -163,9 +163,9 @@ const FAQ_DATA = [
     id: "soc-1",
     category: "social",
     categoryLabel: "Donasi & Sosial",
-    question: "Bagaimana mekanisme program Donasi Sosial di Info.co.id?",
+    question: "Bagaimana mekanisme program Donasi Sosial di Surade.co.id?",
     answer:
-      "Dari setiap pendapatan pemasangan iklan dan layanan berbayar di Info.co.id, kami menyisihkan sebagian dana untuk program tanggung jawab sosial. Dana tersebut dialokasikan untuk pembangunan desa, fasilitas pendidikan anak, bantuan kesehatan warga prasejahtera, dan pelestarian lingkungan hidup.",
+      "Dari setiap pendapatan pemasangan iklan dan layanan berbayar di Surade.co.id, kami menyisihkan sebagian dana untuk program tanggung jawab sosial. Dana tersebut dialokasikan untuk pembangunan desa, fasilitas pendidikan anak, bantuan kesehatan warga prasejahtera, dan pelestarian lingkungan hidup.",
   },
 ];
 
@@ -225,7 +225,7 @@ export default function FAQ() {
           </div>
           <h1 className="faq-hero__title">Pertanyaan yang Sering Diajukan</h1>
           <p className="faq-hero__subtitle">
-            Pusat bantuan dan jawaban lengkap seputar penggunaan layanan, pendaftaran bisnis, akun, dan fitur di Info.co.id
+            Pusat bantuan dan jawaban lengkap seputar penggunaan layanan, pendaftaran bisnis, akun, dan fitur di Surade.co.id
           </p>
 
           {/* SEARCH BAR */}
@@ -364,7 +364,7 @@ export default function FAQ() {
           <div className="faq-support-info">
             <h3>Masih Punya Pertanyaan Lain?</h3>
             <p>
-              Tim Customer Support Info.co.id siap membantu Anda menjawab pertanyaan mengenai pendaftaran akun, kemitraan, periklanan, atau fitur lainnya.
+              Tim Customer Support Surade.co.id siap membantu Anda menjawab pertanyaan mengenai pendaftaran akun, kemitraan, periklanan, atau fitur lainnya.
             </p>
           </div>
           <div className="faq-support-actions">

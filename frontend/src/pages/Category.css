@@ -116,11 +116,22 @@ body {
   position: relative;
   width: 100%;
   min-height: 480px;
-  background: linear-gradient(135deg, #d2f1e4 0%, #e8f7f1 30%, #d4eff0 65%, #e1f4f6 100%);
+  background: url('https://images.unsplash.com/photo-1556740758-90de374c12ad?w=1920&h=1080&fit=crop&q=85') center center / cover no-repeat;
   overflow: visible;
   padding: 105px 0 54px;
   display: flex;
   align-items: center;
+}
+
+/* PERBAIKAN: overlay-nya diganti dari putih/pucat jadi gradasi hijau
+   teal - disamakan persis dengan overlay hero "Blog & Event"
+   (Blog.css .blog-hero__overlay) sesuai permintaan. */
+.category-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 117, 112, 0.75) 0%, rgba(0, 168, 150, 0.65) 50%, rgba(5, 150, 105, 0.70) 100%);
+  z-index: 0;
 }
 
 /* Background Abstract Decorative Elements */
@@ -170,7 +181,7 @@ body {
   opacity: 0.85;
 }
 
-/* Inner Layout */
+/* Inner Layout - 2 Columns: Left Sidebar + Right Area */
 .category-hero__inner {
   position: relative;
   z-index: 1;
@@ -178,10 +189,237 @@ body {
   margin: 0 auto;
   padding: 0 28px;
   display: grid;
-  grid-template-columns: 1fr 1.15fr;
+  grid-template-columns: 1fr 1fr;
   gap: 40px;
   align-items: center;
   width: 100%;
+}
+
+/* Left sidebar with search */
+.category-hero__left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  position: relative;
+  z-index: 50;
+}
+
+/* Right area with professional illustration */
+.category-hero__right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  position: relative;
+}
+
+.hero-illustration__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.88) 0%,
+    rgba(240, 253, 250, 0.78) 45%,
+    rgba(236, 253, 245, 0.7) 100%
+  );
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+}
+
+/* ── Ikon-ikon melayang, menyatu dengan background hero (tanpa kotak foto) ── */
+.hero-floating-icons {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  height: 400px;
+  margin: 0 auto;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.hero-icon-badge {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #007570;
+  box-shadow: 0 16px 40px rgba(0, 117, 112, 0.18), 0 4px 14px rgba(0, 0, 0, 0.08);
+  animation: heroIconFloat 4s ease-in-out infinite, heroIconIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.hero-icon-badge:hover {
+  transform: scale(1.12) !important;
+  box-shadow: 0 20px 48px rgba(0, 117, 112, 0.28), 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.hero-icon-badge--top-right {
+  top: -18px;
+  right: 64px;
+  animation-delay: 0s, 0.2s;
+}
+
+.hero-icon-badge--mid-left {
+  top: 44%;
+  left: -22px;
+  width: 56px;
+  height: 56px;
+  animation-delay: 0.6s, 0.35s;
+}
+
+.hero-icon-badge--bottom-right {
+  bottom: 92px;
+  right: -20px;
+  animation-delay: 1.1s, 0.5s;
+}
+
+.hero-icon-badge--outline {
+  background: #ffffff;
+  border: 2px solid #00c9b1;
+}
+
+.hero-icon-badge--filled {
+  background: linear-gradient(135deg, #007570 0%, #00c9b1 100%);
+  color: #ffffff;
+}
+
+@keyframes heroIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes heroIconIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.7); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Kartu info "Berbagai pilihan usaha terpercaya di Surade" ── */
+.hero-info-card {
+  position: absolute;
+  top: 96px;
+  right: 30px;
+  z-index: 11;
+  max-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.12), 0 6px 18px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  animation: heroCardIn 0.8s 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both, heroIconFloat 5s 0.55s ease-in-out infinite;
+  pointer-events: auto;
+}
+
+.hero-info-card__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #007570 0%, #00c9b1 100%);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.hero-info-card__text {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.45;
+  position: relative;
+  padding-top: 8px;
+}
+
+.hero-info-card__text::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 26px;
+  height: 3px;
+  border-radius: 999px;
+  background: #00c9b1;
+}
+
+@keyframes heroCardIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Titik-titik dekoratif kecil ── */
+.hero-dot {
+  position: absolute;
+  border-radius: 50%;
+  background: #00c9b1;
+  animation: heroDotPulse 2.6s ease-in-out infinite;
+}
+
+.hero-dot--1 { width: 10px; height: 10px; top: 30px; left: 40px; opacity: 0.6; }
+.hero-dot--2 { width: 7px; height: 7px; bottom: 60px; left: 80px; opacity: 0.45; animation-delay: 0.8s; }
+.hero-dot--3 { width: 8px; height: 8px; top: 60%; right: 40px; opacity: 0.5; animation-delay: 1.4s; }
+
+@keyframes heroDotPulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.4); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-icon-badge,
+  .hero-info-card,
+  .hero-dot {
+    animation: none;
+  }
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .category-hero__inner {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .hero-icon-badge {
+    width: 56px;
+    height: 56px;
+  }
+
+  .hero-info-card {
+    max-width: 170px;
+    padding: 14px 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-icon-badge {
+    width: 46px;
+    height: 46px;
+  }
+
+  .hero-icon-badge--mid-left {
+    width: 40px;
+    height: 40px;
+  }
+
+  .hero-info-card {
+    top: 20px;
+    right: 16px;
+    max-width: 150px;
+    padding: 12px 14px;
+  }
+
+  .hero-info-card__text {
+    font-size: 0.75rem;
+  }
 }
 
 .category-hero__left {
@@ -193,31 +431,34 @@ body {
   z-index: 50;
 }
 
+/* PERBAIKAN: warna teks disesuaikan jadi putih supaya tetap kebaca di
+   atas overlay hijau gelap yang baru (sebelumnya abu-abu/hitam, dirancang
+   buat overlay putih yang lama). */
 .category-hero__breadcrumb {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.88rem;
-  color: #475569;
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 500;
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
 
 .category-hero__breadcrumb a {
-  color: #475569;
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .category-hero__breadcrumb a:hover {
-  color: #007570;
+  color: #ffffff;
 }
 
 .category-hero__title {
   font-size: clamp(2.4rem, 4.5vw, 3.4rem);
   font-weight: 900;
-  color: #003835;
+  color: #ffffff;
   letter-spacing: -0.03em;
   line-height: 1.1;
   margin-bottom: 10px;
@@ -230,14 +471,14 @@ body {
   display: block;
   width: 60px;
   height: 5px;
-  background: #007570;
+  background: #ffffff;
   border-radius: 4px;
   margin-top: 8px;
 }
 
 .category-hero__subtitle {
   font-size: 1.05rem;
-  color: #334155;
+  color: rgba(255, 255, 255, 0.9);
   margin-bottom: 28px;
   font-weight: 400;
   line-height: 1.5;
@@ -257,12 +498,14 @@ body {
   box-shadow: 0 4px 20px rgba(0, 117, 112, 0.08);
   transition: all 0.25s ease;
   position: relative;
-  z-index: 60;
+  z-index: 10;
+  isolation: isolate;
 }
 
 .category-unified-search:focus-within {
   border-color: #007570;
   box-shadow: 0 6px 28px rgba(0, 117, 112, 0.18);
+  z-index: 50;
 }
 
 .category-search__group {
@@ -299,6 +542,15 @@ body {
 .category-search__input::placeholder {
   color: #94a3b8;
   font-weight: 400;
+}
+
+/* Disable browser autocomplete dropdown styling */
+.category-search__input::-webkit-contacts-auto-fill-button,
+.category-search__input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
 }
 
 .category-search__divider {
@@ -388,7 +640,7 @@ body {
   border: 1.5px solid #e2e8f0;
   border-radius: 16px;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
-  z-index: 9999;
+  z-index: 100;
   padding: 10px;
   animation: catDropFade 0.15s ease-out;
 }
@@ -584,7 +836,7 @@ body {
   line-height: 1.2;
 }
 
-/* ── CATEGORY TABS CAROUSEL ── */
+/* ── CATEGORY HORIZONTAL PILLS (SmartCity Style) ── */
 .category-tabs-section {
   background: #ffffff;
   padding: 24px 0;
@@ -595,108 +847,112 @@ body {
   max-width: 1240px;
   margin: 0 auto;
   padding: 0 28px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-}
-
-.category-tabs-nav {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #64748b;
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-  transition: all 0.2s ease;
-}
-
-.category-tabs-nav:hover {
-  background: #007570;
-  color: #ffffff;
-  border-color: #007570;
-  transform: scale(1.05);
 }
 
 .reko-tabs {
   display: flex;
-  gap: 14px;
+  align-items: center;
+  gap: 12px;
   overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
-  scroll-behavior: smooth;
-  padding: 4px 2px 14px;
-  flex: 1;
-  -webkit-overflow-scrolling: touch;
+  overflow-y: hidden;
+  white-space: nowrap;
+  padding-bottom: 8px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
 .reko-tabs::-webkit-scrollbar {
-  height: 4px;
-}
-
-.reko-tabs::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+  display: none; /* Chrome/Safari/Opera */
 }
 
 .reko-tab--link {
+  position: relative;
   text-decoration: none;
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 14px 22px;
+  gap: 12px;
+  padding: 14px 24px;
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
-  white-space: nowrap;
-  min-width: 115px;
+  border-radius: 16px;
   color: #475569;
-  font-size: 0.88rem;
+  font-size: 0.75rem;
   font-weight: 600;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
   flex-shrink: 0;
+  white-space: normal;
+  min-width: fit-content;
 }
 
 .reko-tab--link:hover {
-  border-color: #007570;
-  color: #007570;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 117, 112, 0.1);
+  border-color: #059669;
+  background: #f0fdf4;
+  color: #059669;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.1);
 }
 
 .reko-tab--link.active {
-  border-color: #007570;
-  background: #f0fffe;
-  color: #007570;
+  border-color: #059669;
+  background: #059669;
+  color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 4px 14px rgba(0, 117, 112, 0.12);
+  font-size: 0.88rem;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2);
 }
 
 .reko-tab__icon {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+.reko-tab--link:hover .reko-tab__icon {
+  color: #059669;
+}
+
+.reko-tab--link.active .reko-tab__icon {
+  color: #ffffff;
 }
 
 .reko-tab__icon svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 
 .reko-tab__label {
-  font-size: 0.82rem;
-  font-weight: 600;
-  text-align: center;
-  line-height: 1.2;
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: left;
+  line-height: 1.3;
+  max-width: 140px;
+}
+
+.reko-tab--link.active .reko-tab__label {
+  color: #ffffff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .reko-tab--link {
+    padding: 12px 20px;
+    gap: 10px;
+  }
+  
+  .reko-tab__icon svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .reko-tab__label {
+    font-size: 0.7rem;
+  }
 }
 
 /* ── BUSINESS SECTION ── */
@@ -1359,4 +1615,152 @@ body {
   .category-pagination__nav-btn {
     height: 34px;
   }
+}
+
+
+/* ══════════════════════════════════════════════
+   SUB-CATEGORY SECTION (Gambar Kedua Style)
+══════════════════════════════════════════════ */
+.subcategory-section {
+  background: #f8fafc;
+  padding: 32px 0 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.subcategory-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.subcategory-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.subcategory-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.subcategory-subtitle {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+/* Sub-category Grid (6 kolom seperti gambar kedua) */
+.subcategory-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1200px) {
+  .subcategory-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .subcategory-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .subcategory-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Sub-category Card */
+.subcategory-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 12px;
+  background: white;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.subcategory-card:hover {
+  border-color: #007570;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2f1 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 117, 112, 0.15);
+}
+
+.subcategory-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
+  border-radius: 12px;
+  color: #007570;
+  transition: all 0.2s ease;
+}
+
+.subcategory-card:hover .subcategory-card__icon {
+  background: linear-gradient(135deg, #007570 0%, #005f5a 100%);
+  color: white;
+  transform: scale(1.08);
+}
+
+.subcategory-card__label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #334155;
+  line-height: 1.3;
+  transition: color 0.2s ease;
+}
+
+.subcategory-card:hover .subcategory-card__label {
+  color: #007570;
+  font-weight: 600;
+}
+
+/* Kondisi aktif (sedang dipakai buat filter) — beda dari sekadar hover,
+   supaya user tahu sub kategori mana yang lagi aktif dipilih, bahkan
+   setelah mouse dipindah dari kartunya. */
+.subcategory-card--active {
+  border-color: #007570;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2f1 100%);
+  box-shadow: 0 4px 12px rgba(0, 117, 112, 0.18);
+}
+
+.subcategory-card--active .subcategory-card__icon {
+  background: linear-gradient(135deg, #007570 0%, #005f5a 100%);
+  color: white;
+}
+
+.subcategory-card--active .subcategory-card__label {
+  color: #007570;
+  font-weight: 700;
+}
+
+.subcategory-card--active::after {
+  content: "✓";
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #007570;
+  color: #fff;
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }

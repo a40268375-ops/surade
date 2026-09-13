@@ -124,7 +124,7 @@ body {
 }
 
 /* ─────────────────────────────────────────────
-   BLOG HERO (Indonesian Culture Background)
+   BLOG HERO (Modern Business Background)
 ───────────────────────────────────────────── */
 .blog-hero {
   position: relative;
@@ -139,14 +139,17 @@ body {
 .blog-hero__bg {
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1920&h=800&fit=crop') no-repeat center center / cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
   z-index: 0;
+  image-rendering: -webkit-optimize-contrast;
 }
 
 .blog-hero__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.40) 50%, rgba(0, 0, 0, 0.65) 100%);
+  background: linear-gradient(135deg, rgba(0, 117, 112, 0.75) 0%, rgba(0, 168, 150, 0.65) 50%, rgba(5, 150, 105, 0.70) 100%);
   z-index: 1;
 }
 
@@ -189,19 +192,17 @@ body {
   font-weight: 800;
   margin-bottom: 16px;
   color: #fff;
-  -webkit-text-stroke: 3px rgba(0, 0, 0, 0.3);
-  paint-order: stroke fill;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
   letter-spacing: -0.01em;
 }
 
 .blog-hero__subtitle {
   font-size: clamp(1rem, 2.2vw, 1.35rem);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.95);
   max-width: 700px;
   margin: 0 auto;
-  -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.25);
-  paint-order: stroke fill;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* ─────────────────────────────────────────────
@@ -476,13 +477,13 @@ body {
 }
 
 .blog-badge-tag--blog {
-  background: linear-gradient(135deg, #007570 0%, #005c58 100%);
-  box-shadow: 0 2px 8px rgba(0, 117, 112, 0.35);
+  background: linear-gradient(135deg, #007570 0%, #00a896 100%);
+  box-shadow: 0 2px 8px rgba(0, 117, 112, 0.4);
 }
 
 .blog-badge-tag--event {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.4);
 }
 
 .blog-card__body {
@@ -662,4 +663,4 @@ body {
   .blog-card__meta {
     gap: 12px;
   }
-}
+} 

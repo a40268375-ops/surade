@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   ChevronDown, ChevronRight, Plus, LogOut,
-  User, Settings, Loader2, Menu, X, LayoutDashboard,
+  User, Settings, Loader2, Menu, X, LayoutDashboard, Mail,
 } from "lucide-react";
-import logoImg from "../assets/logo.png";
+import logoImg from "../assets/logo-surade.png";
 import { DEFAULT_AVATAR, getStorageUrl } from "../utils/constants";
 
 // In-memory module cache for instant sub-millisecond access across page transitions
@@ -15,6 +15,10 @@ const getCachedCategories = () => {
     return memoryCategoriesCache;
   }
   try {
+    // Clear old cache first
+    localStorage.removeItem("cached_navbar_blog_categories");
+    
+    // Load navbar categories cache (untuk navbar informasi dengan subcategories)
     const raw = localStorage.getItem("cached_navbar_categories");
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -40,6 +44,8 @@ export default function Navbar() {
   const [showUserMenu,     setShowUserMenu]     = useState(false);
   const [mobileOpen,       setMobileOpen]       = useState(false);
   const [infoOpen,         setInfoOpen]         = useState(false);
+  const [inboxUnread,      setInboxUnread]      = useState(0);
+  const prevInboxUnread    = useRef(0);
 
   const userMenuRef    = useRef(null);
   const infoRef        = useRef(null);
@@ -72,7 +78,8 @@ export default function Navbar() {
         setLoadingCategories(true);
       }
       try {
-        const res  = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
+        // Navbar Informasi menggunakan NAVBAR CATEGORIES (10 parent + 95 subcategories)
+        const res  = await fetch(`${import.meta.env.VITE_API_URL}/navbar-categories`);
         const data = await res.json();
         if (isMounted && Array.isArray(data) && data.length > 0) {
           setCategories(data);
@@ -85,7 +92,7 @@ export default function Navbar() {
           }
         }
       } catch (e) {
-        console.error("fetch categories:", e);
+        console.error("fetch blog categories:", e);
       } finally {
         if (isMounted) setLoadingCategories(false);
       }
@@ -110,6 +117,43 @@ export default function Navbar() {
       window.removeEventListener("userAuthChanged", load);
     };
   }, []);
+
+  /* Poll inbox unread count every 15s for logged-in users */
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    // PERBAIKAN: backend membatasi endpoint ini cuma untuk role "user"
+    // (Route::middleware('role:user') di routes/api.php) - dulu di sini
+    // dipanggil untuk SEMUA akun yang login termasuk admin, jadi admin
+    // selalu dapat error 403 berulang-ulang (tiap 15 detik) di console.
+    // Sekarang dilewati sama sekali kalau bukan role "user".
+    if (!token || user?.role !== "user") return;
+
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/inbox/unread-count`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const count = data?.count ?? 0;
+        setInboxUnread(count);
+        // show browser notification if count increased
+        if (count > prevInboxUnread.current && prevInboxUnread.current !== null) {
+          if (typeof window !== "undefined" && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification('Pesan Baru - Surade.co.id', {
+              body: `Anda memiliki ${count} pesan belum dibaca`,
+              icon: '/favicon.ico',
+            });
+          }
+        }
+        prevInboxUnread.current = count;
+      } catch (_) {}
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   /* close menus on outside click */
   useEffect(() => {
@@ -168,41 +212,62 @@ export default function Navbar() {
     "transition-colors duration-[250ms]",
     /* underline pseudo — 2.5px gradient, scale-x animation */
     "after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2.5px]",
-    "after:rounded-sm after:bg-gradient-to-r after:from-[#007570] after:to-[#00B4A9]",
+    "after:rounded-sm after:bg-gradient-to-r after:from-[#059669] after:to-[#10B981]",
     "after:transition-transform after:duration-[250ms] after:[transition-timing-function:cubic-bezier(0.4,0,0.2,1)]",
     isActive
-      ? "text-[#00B4A9] font-semibold after:scale-x-100 after:origin-left"
-      : "text-white/[0.82] after:scale-x-0 after:origin-right hover:text-[#00B4A9] hover:after:scale-x-100 hover:after:origin-left",
+      ? "text-[#10B981] font-semibold after:scale-x-100 after:origin-left"
+      : "text-slate-700 after:scale-x-0 after:origin-right hover:text-[#10B981] hover:after:scale-x-100 hover:after:origin-left",
   ].join(" ");
 
   /* ── Shared CTA button class ── */
   const ctaClass = [
     "inline-flex items-center justify-center gap-1.5 no-underline whitespace-nowrap",
     "rounded-full px-4 h-[38px]",
-    "bg-gradient-to-br from-[#007570] to-[#008f89]",
+    "bg-gradient-to-br from-[#059669] to-[#10B981]",
     "text-white font-semibold text-[0.82rem] font-[inherit]",
-    "shadow-[0_3px_10px_rgba(0,117,112,0.3)]",
+    "shadow-[0_3px_10px_rgba(16,185,129,0.3)]",
     "transition-all duration-[250ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)]",
-    "hover:from-[#008f89] hover:to-[#00B4A9] hover:-translate-y-0.5 hover:shadow-[0_5px_16px_rgba(0,180,169,0.4)]",
+    "hover:from-[#10B981] hover:to-[#34D399] hover:-translate-y-0.5 hover:shadow-[0_5px_16px_rgba(52,211,153,0.4)]",
   ].join(" ");
 
   return (
     <>
       {/* ════════════════════════════════════════
-          NAVBAR  —  fixed, glassmorphism
+          NAVBAR  —  fixed, light theme + wave hijau
       ════════════════════════════════════════ */}
       <header className={[
         /* position & stacking */
         "fixed top-0 left-0 right-0 z-[200]",
-        /* glassmorphism — matches original exactly */
-        "bg-[rgba(10,15,22,0.82)] backdrop-blur-[16px] [-webkit-backdrop-filter:blur(16px)]",
-        "border-b border-white/[0.08]",
-        "shadow-[0_4px_20px_rgba(0,0,0,0.15)]",
+        /* PERBAIKAN: sebelumnya gelap (glassmorphism dark) - sekarang
+           terang dengan aksen hijau tipis, sesuai desain baru. */
+        "bg-white/[0.94] backdrop-blur-[16px] [-webkit-backdrop-filter:blur(16px)]",
+        "border-b border-emerald-100",
+        "shadow-[0_4px_20px_rgba(16,185,129,0.06)]",
         "transition-[background,box-shadow] duration-300",
       ].join(" ")}>
 
+        {/* Dekorasi wave hijau yang bergerak pelan - hanya lapisan visual,
+            tidak mengganggu klik/interaksi apa pun di atasnya. */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-70">
+          <svg
+            className="absolute -top-2 left-0 w-[200%] h-full"
+            viewBox="0 0 2400 100"
+            preserveAspectRatio="none"
+            style={{ animation: "navbarWaveDrift 22s linear infinite" }}
+          >
+            <path
+              d="M0,60 C300,10 600,90 900,50 C1200,10 1500,90 1800,50 C2100,10 2300,60 2400,50 L2400,0 L0,0 Z"
+              fill="rgba(16,185,129,0.07)"
+            />
+            <path
+              d="M0,75 C300,35 600,95 900,65 C1200,35 1500,95 1800,65 C2100,35 2300,75 2400,65 L2400,0 L0,0 Z"
+              fill="rgba(52,211,153,0.06)"
+            />
+          </svg>
+        </div>
+
         {/* inner container — 1240px, 68px tall, 28px side padding */}
-        <div className="max-w-[1240px] mx-auto px-7 h-[68px] flex items-center justify-between gap-5">
+        <div className="relative z-10 max-w-[1240px] mx-auto px-7 h-[68px] flex items-center justify-between gap-5">
 
           {/* ── Logo ── */}
           <Link
@@ -211,7 +276,7 @@ export default function Navbar() {
           >
             <img
               src={logoImg}
-              alt="Info.co.id"
+              alt="Surade.co.id"
               className="h-[38px] w-auto block transition-transform duration-[250ms] group-hover:scale-[1.02]"
             />
           </Link>
@@ -234,16 +299,16 @@ export default function Navbar() {
                 className={[
                   "relative inline-flex items-center gap-1.5 py-1.5",
                   "text-[0.85rem] font-medium whitespace-nowrap",
-                  infoOpen ? "text-[#00B4A9]" : "text-white/[0.82]",
+                  infoOpen ? "text-[#10B981]" : "text-slate-700",
                   "bg-transparent border-none cursor-pointer font-[inherit]",
-                  "transition-colors duration-[250ms] hover:text-[#00B4A9]",
+                  "transition-colors duration-[250ms] hover:text-[#10B981]",
                 ].join(" ")}
               >
                 <span>Informasi</span>
                 <ChevronDown
                   size={14}
                   className={`opacity-70 transition-[opacity,transform] duration-[250ms] ${
-                    infoOpen ? "opacity-100 text-[#00B4A9] rotate-180" : "hover:opacity-100"
+                    infoOpen ? "opacity-100 text-[#10B981] rotate-180" : "hover:opacity-100"
                   }`}
                 />
               </button>
@@ -267,8 +332,8 @@ export default function Navbar() {
 
                 {/* Header bar inside dropdown */}
                 <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                  <span className="flex items-center gap-1.5 text-[#007570]">
-                    <span>Kategori & Direktori Bisnis</span>
+                  <span className="flex items-center gap-1.5 text-[#059669]">
+                    <span>Kategori Bisnis & Jasa</span>
                   </span>
                   <span className="text-[11px] font-medium text-slate-400">
                     {categories.length} Kategori
@@ -278,7 +343,7 @@ export default function Navbar() {
                 <div className="flex min-h-[340px] max-h-[400px]">
                   {loadingCategories ? (
                     <div className="flex items-center justify-center gap-3 p-10 text-slate-500 text-[0.9rem] w-full">
-                      <Loader2 size={20} className="animate-spin text-[#007570]" />
+                      <Loader2 size={20} className="animate-spin text-[#059669]" />
                       <span>Memuat kategori...</span>
                     </div>
                   ) : categories.length > 0 ? (
@@ -299,8 +364,8 @@ export default function Navbar() {
                                 "text-[13px] font-semibold no-underline",
                                 "transition-all duration-150",
                                 isSelected
-                                  ? "bg-[#007570] text-white shadow-sm"
-                                  : "text-slate-700 hover:bg-slate-100/80 hover:text-[#007570]",
+                                  ? "bg-[#059669] text-white shadow-sm"
+                                  : "text-slate-700 hover:bg-slate-100/80 hover:text-[#059669]",
                               ].join(" ")}
                             >
                               <span className="truncate">{item.name}</span>
@@ -331,7 +396,7 @@ export default function Navbar() {
                                   key={child.id}
                                   to={`/category/${child.slug}`}
                                   onClick={() => setInfoOpen(false)}
-                                  className="flex items-center px-3.5 py-2 rounded-lg text-[13px] font-medium text-slate-600 no-underline transition-colors hover:bg-white hover:text-[#007570] hover:shadow-xs"
+                                  className="flex items-center px-3.5 py-2 rounded-lg text-[13px] font-medium text-slate-600 no-underline transition-colors hover:bg-white hover:text-[#059669] hover:shadow-xs"
                                 >
                                   <span>{child.name}</span>
                                 </Link>
@@ -368,19 +433,27 @@ export default function Navbar() {
                     onClick={() => setShowUserMenu((v) => !v)}
                     className={[
                       "inline-flex items-center gap-2 cursor-pointer font-[inherit]",
-                      "bg-white/[0.06] border border-white/[0.12] rounded-full",
+                      "bg-slate-50 border border-slate-200 rounded-full",
                       "pl-1 pr-3 py-1",
-                      "text-white/[0.92] text-[0.82rem] font-semibold",
+                      "text-slate-800 text-[0.82rem] font-semibold",
                       "transition-all duration-[250ms]",
-                      "hover:bg-white/[0.12] hover:border-[rgba(0,180,169,0.4)] hover:-translate-y-px",
+                      "hover:bg-emerald-50 hover:border-[rgba(16,185,129,0.4)] hover:-translate-y-px",
                     ].join(" ")}
                   >
-                    <img
-                      src={getUserAvatar()}
-                      alt={getDisplayName()}
-                      onError={handleImgError}
-                      className="w-[34px] h-[34px] rounded-full object-cover border-2 border-white/30 shrink-0 transition-[border-color] duration-[250ms]"
-                    />
+                    {/* Avatar with unread badge */}
+                    <span className="relative shrink-0">
+                      <img
+                        src={getUserAvatar()}
+                        alt={getDisplayName()}
+                        onError={handleImgError}
+                        className="w-[34px] h-[34px] rounded-full object-cover border-2 border-slate-200 transition-[border-color] duration-[250ms]"
+                      />
+                      {inboxUnread > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-sm animate-pulse">
+                          {inboxUnread > 99 ? '99+' : inboxUnread}
+                        </span>
+                      )}
+                    </span>
                     <span className="max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap">
                       {getDisplayName()}
                     </span>
@@ -420,14 +493,28 @@ export default function Navbar() {
                       <Link
                         to={getDashboardLink()}
                         onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-[10px] w-full px-4 py-[10px] text-[0.875rem] font-medium text-slate-600 no-underline transition-[background,color] duration-150 hover:bg-slate-50 hover:text-[#007570]"
+                        className="flex items-center gap-[10px] w-full px-4 py-[10px] text-[0.875rem] font-medium text-slate-600 no-underline transition-[background,color] duration-150 hover:bg-slate-50 hover:text-[#059669]"
                       >
                         <LayoutDashboard size={15} /><span>Dashboard Saya</span>
                       </Link>
                       <Link
+                        to="/dashboard?tab=inbox"
+                        onClick={() => { setShowUserMenu(false); setInboxUnread(0); }}
+                        className="flex items-center justify-between gap-[10px] w-full px-4 py-[10px] text-[0.875rem] font-medium text-slate-600 no-underline transition-[background,color] duration-150 hover:bg-slate-50 hover:text-[#059669]"
+                      >
+                        <span className="flex items-center gap-[10px]">
+                          <Mail size={15} /><span>Inbox Pesan</span>
+                        </span>
+                        {inboxUnread > 0 && (
+                          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                            {inboxUnread > 99 ? '99+' : inboxUnread}
+                          </span>
+                        )}
+                      </Link>
+                      <Link
                         to={getProfileLink()}
                         onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-[10px] w-full px-4 py-[10px] text-[0.875rem] font-medium text-slate-600 no-underline transition-[background,color] duration-150 hover:bg-slate-50 hover:text-[#007570]"
+                        className="flex items-center gap-[10px] w-full px-4 py-[10px] text-[0.875rem] font-medium text-slate-600 no-underline transition-[background,color] duration-150 hover:bg-slate-50 hover:text-[#059669]"
                       >
                         <Settings size={15} /><span>Pengaturan</span>
                       </Link>
@@ -451,7 +538,7 @@ export default function Navbar() {
               <>
                 <Link
                   to="/login"
-                  className="text-[0.85rem] font-semibold text-[#00B4A9] no-underline transition-colors duration-[250ms]"
+                  className="text-[0.85rem] font-semibold text-[#10B981] no-underline transition-colors duration-[250ms]"
                 >
                   Login
                 </Link>
@@ -466,7 +553,7 @@ export default function Navbar() {
           <button
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
-            className="min-[900px]:hidden ml-auto inline-flex items-center justify-center w-9 h-9 rounded-xl text-white/80 bg-white/[0.07] border border-white/[0.10] transition-colors duration-150 hover:bg-white/[0.14]"
+            className="min-[900px]:hidden ml-auto inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-700 bg-slate-100 border border-slate-200 transition-colors duration-150 hover:bg-slate-200"
             aria-label="Toggle menu"
           >
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
@@ -488,16 +575,16 @@ export default function Navbar() {
 
           {/* panel */}
           <aside
-            className="fixed top-0 right-0 bottom-0 z-[260] w-[300px] bg-[rgba(10,15,22,0.97)] border-l border-white/[0.07] flex flex-col min-[900px]:hidden overflow-y-auto"
+            className="fixed top-0 right-0 bottom-0 z-[260] w-[300px] bg-white border-l border-slate-200 flex flex-col min-[900px]:hidden overflow-y-auto"
             style={{ animation: "sidebarSlide 0.28s cubic-bezier(0.4,0,0.2,1) both" }}
           >
             {/* header */}
-            <div className="flex items-center justify-between px-5 h-20 border-b border-white/[0.07] shrink-0">
-              <img src={logoImg} alt="Info.co.id" className="h-10 w-auto" />
+            <div className="flex items-center justify-between px-5 h-20 border-b border-slate-100 shrink-0">
+              <img src={logoImg} alt="Surade.co.id" className="h-10 w-auto" />
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-xl text-white/60 bg-white/[0.06] hover:bg-white/[0.12] transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
               >
                 <X size={18} />
               </button>
@@ -519,8 +606,8 @@ export default function Navbar() {
                     [
                       "flex items-center px-4 py-3 rounded-xl text-[0.9rem] font-medium no-underline transition-colors duration-150",
                       isActive
-                        ? "bg-[rgba(0,117,112,0.15)] text-[#00B4A9] font-semibold"
-                        : "text-white/[0.75] hover:bg-white/[0.06] hover:text-white",
+                        ? "bg-[rgba(16,185,129,0.1)] text-[#059669] font-semibold"
+                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-900",
                     ].join(" ")
                   }
                 >
@@ -531,7 +618,7 @@ export default function Navbar() {
               {/* categories */}
               {categories.length > 0 && (
                 <div className="px-4 pt-4 pb-1">
-                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-white/30 mb-2">
+                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-2">
                     Kategori
                   </p>
                   <div className="flex flex-col gap-0.5 max-h-44 overflow-y-auto">
@@ -540,11 +627,11 @@ export default function Navbar() {
                         key={c.id}
                         to={`/category/${c.slug}`}
                         onClick={() => setMobileOpen(false)}
-                        className="flex items-center justify-between px-2 py-2 rounded-lg text-[0.84rem] font-medium text-white/55 no-underline transition-colors hover:bg-white/[0.06] hover:text-white"
+                        className="flex items-center justify-between px-2 py-2 rounded-lg text-[0.84rem] font-medium text-slate-600 no-underline transition-colors hover:bg-slate-50 hover:text-slate-900"
                       >
                         <span>{c.name}</span>
                         {c.children?.length > 0 && (
-                          <ChevronRight size={13} className="text-white/25" />
+                          <ChevronRight size={13} className="text-slate-300" />
                         )}
                       </Link>
                     ))}
@@ -554,7 +641,7 @@ export default function Navbar() {
             </nav>
 
             {/* auth */}
-            <div className="px-4 pb-6 pt-4 border-t border-white/[0.07] flex flex-col gap-3 shrink-0">
+            <div className="px-4 pb-6 pt-4 border-t border-slate-100 flex flex-col gap-3 shrink-0">
               {user ? (
                 <>
                   <div className="flex items-center gap-3">
@@ -562,17 +649,17 @@ export default function Navbar() {
                       src={getUserAvatar()}
                       alt={getDisplayName()}
                       onError={handleImgError}
-                      className="w-10 h-10 rounded-full object-cover border-2 border-white/20 shrink-0"
+                      className="w-10 h-10 rounded-full object-cover border-2 border-slate-200 shrink-0"
                     />
                     <div className="min-w-0">
-                      <p className="text-[0.85rem] font-bold text-white truncate m-0">{getDisplayName()}</p>
-                      <p className="text-[0.72rem] text-white/40 truncate m-0">{user.email}</p>
+                      <p className="text-[0.85rem] font-bold text-slate-800 truncate m-0">{getDisplayName()}</p>
+                      <p className="text-[0.72rem] text-slate-400 truncate m-0">{user.email}</p>
                     </div>
                   </div>
                   <Link
                     to={getDashboardLink()}
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-[0.875rem] font-medium text-white/70 no-underline bg-white/[0.06] transition-colors hover:bg-white/[0.12] hover:text-white"
+                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-[0.875rem] font-medium text-slate-700 no-underline bg-slate-50 transition-colors hover:bg-slate-100"
                   >
                     <LayoutDashboard size={15} /><span>Dashboard Saya</span>
                   </Link>
@@ -582,7 +669,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-[0.875rem] font-medium text-red-400 bg-transparent border border-red-500/20 cursor-pointer font-[inherit] transition-colors hover:bg-red-500/[0.10] hover:text-red-300"
+                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-[0.875rem] font-medium text-red-500 bg-transparent border border-red-200 cursor-pointer font-[inherit] transition-colors hover:bg-red-50"
                   >
                     <LogOut size={15} /><span>Keluar</span>
                   </button>
@@ -592,7 +679,7 @@ export default function Navbar() {
                   <Link
                     to="/login"
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-center px-4 py-2.5 rounded-xl text-[0.875rem] font-semibold text-[#00B4A9] no-underline border border-[rgba(0,117,112,0.4)] transition-colors hover:bg-[rgba(0,117,112,0.1)]"
+                    className="flex items-center justify-center px-4 py-2.5 rounded-xl text-[0.875rem] font-semibold text-[#10B981] no-underline border border-[rgba(16,185,129,0.4)] transition-colors hover:bg-[rgba(16,185,129,0.1)]"
                   >
                     Login
                   </Link>

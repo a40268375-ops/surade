@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./ForgotPassword.css";
-import logoImg from "../assets/logo.png";
+import logoImg from "../assets/logo-surade.png";
 import {
   Mail,
   ArrowLeft,
@@ -379,7 +379,7 @@ export default function ForgotPassword() {
           {/* ── Left: Branding ── */}
           <div className="fp-branding">
             <Link to="/">
-              <img src={logoImg} alt="Info.co.id" className="fp-branding__logo" />
+              <img src={logoImg} alt="Surade.co.id" className="fp-branding__logo" />
             </Link>
             <h1 className="fp-branding__tagline">
               {step === "success"
@@ -688,7 +688,7 @@ export default function ForgotPassword() {
             <Link to="/partnership-career">Karir</Link>
           </div>
           <p className="fp-footer__copy">
-            &copy; 2026 Info.co.id. All rights reserved.
+            &copy; 2026 Surade.co.id. All rights reserved.
           </p>
         </div>
       </footer>

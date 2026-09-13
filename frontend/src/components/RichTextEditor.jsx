@@ -549,7 +549,7 @@ export default function RichTextEditor({
       {/* ── TINYMCE STYLE STATUS BAR ── */}
       <div className="bg-[#f8fafc] border-t border-[#e2e8f0] px-3.5 py-1.5 flex items-center justify-between text-[11px] text-slate-500 font-medium select-none">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-600">Info.co.id Editor</span>
+          <span className="font-semibold text-slate-600">Surade.co.id Editor</span>
           <span>&bull;</span>
           <span className="capitalize">{isCodeView ? "Mode Kode HTML" : `Tag: <${currentBlockTag}>`}</span>
         </div>

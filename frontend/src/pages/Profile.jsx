@@ -193,7 +193,7 @@ export default function Profile() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Profil ${seller.name || seller.username} - Info.co.id`,
+          title: `Profil ${seller.name || seller.username} - Surade.co.id`,
           url: url,
         });
         return;
@@ -257,7 +257,7 @@ export default function Profile() {
               </div>
 
               <h1 className="profile-display-name">
-                {seller.name || seller.username || "Pengguna Info.co.id"}
+                {seller.name || seller.username || "Pengguna Surade.co.id"}
               </h1>
 
               {seller.name && seller.username && seller.name !== seller.username && (

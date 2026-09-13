@@ -1,22 +1,26 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "./Login.css";
-import logoImg from "../assets/logo.png";
+import logoImg from "../assets/logo-surade.png";
 import {
   Eye,
   EyeOff,
   AlertCircle,
   X,
-  UserPlus,
   Mail,
+  Lock,
+  Store,
+  TrendingUp,
   RefreshCw,
   CheckCircle,
   ArrowLeft,
+  User,
 } from "lucide-react";
 
-export default function Login() {
+export default function Login({ initialRegister = false }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const refCode = searchParams.get("ref");
 
   /* ── Login form state ── */
   const [email, setEmail] = useState("");
@@ -26,7 +30,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   /* ── Register modal state ── */
-  const [showRegister, setShowRegister] = useState(false);
+  const [showRegister, setShowRegister] = useState(() => {
+    return initialRegister || searchParams.get("register") === "true" || !!searchParams.get("ref");
+  });
+  const [referralCode, setReferralCode] = useState(() => {
+    return searchParams.get("ref") || localStorage.getItem("applied_referral_code") || "";
+  });
   const [regFirstName, setRegFirstName] = useState("");
   const [regLastName, setRegLastName] = useState("");
   const [regEmail, setRegEmail] = useState("");
@@ -45,6 +54,16 @@ export default function Login() {
   const [resendCooldown, setResendCooldown] = useState(0); // seconds
   const otpRefs = useRef([]);
   const cooldownRef = useRef(null);
+
+  useEffect(() => {
+    if (refCode) {
+      localStorage.setItem("applied_referral_code", refCode);
+      setReferralCode(refCode);
+      setShowRegister(true);
+    } else if (initialRegister || searchParams.get("register") === "true") {
+      setShowRegister(true);
+    }
+  }, [initialRegister, searchParams, refCode]);
 
   /* ── Cooldown timer ── */
   useEffect(() => {
@@ -182,18 +201,28 @@ export default function Login() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setRegError(data?.message || "Gagal mengirim kode OTP. Silakan coba lagi.");
+        setRegError(data?.message || "Gagal mengirim kode OTP ke email. Silakan periksa koneksi atau coba lagi.");
         return;
       }
 
       // Move to OTP step
       setRegStep("otp");
-      setOtpDigits(["", "", "", "", "", ""]);
       setOtpError("");
+      if (data?.dev_otp) {
+        setOtpDigits(String(data.dev_otp).split("").slice(0, 6));
+      } else {
+        setOtpDigits(["", "", "", "", "", ""]);
+      }
       startCooldown(60);
 
-      // Auto-focus first input after render
-      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+      // Auto-focus first or last input after render
+      setTimeout(() => {
+        if (data?.dev_otp) {
+          otpRefs.current[5]?.focus();
+        } else {
+          otpRefs.current[0]?.focus();
+        }
+      }, 100);
     } catch {
       setRegError("Terjadi kesalahan koneksi. Silakan coba lagi.");
     } finally {
@@ -306,12 +335,22 @@ export default function Login() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setOtpError(data?.message || "Gagal mengirim ulang OTP.");
+        setOtpError(data?.message || "Gagal mengirim ulang OTP ke email.");
         return;
       }
-      setOtpDigits(["", "", "", "", "", ""]);
+      if (data?.dev_otp) {
+        setOtpDigits(String(data.dev_otp).split("").slice(0, 6));
+      } else {
+        setOtpDigits(["", "", "", "", "", ""]);
+      }
       startCooldown(60);
-      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+      setTimeout(() => {
+        if (data?.dev_otp) {
+          otpRefs.current[5]?.focus();
+        } else {
+          otpRefs.current[0]?.focus();
+        }
+      }, 100);
     } catch {
       setOtpError("Terjadi kesalahan koneksi.");
     }
@@ -334,25 +373,75 @@ export default function Login() {
   };
 
   return (
-    <div className="login-page">
+    <div className="login-page login-page--split">
       {/* ── Main Content ── */}
-      <main className="login-main">
-        <div className="login-container">
+      <main className="login-main login-main--split">
+        <div className="login-container login-container--split">
 
-          {/* ── Left: Branding ── */}
-          <div className="login-branding">
-            <img
-              src={logoImg}
-              alt="Info.co.id"
-              className="login-branding__logo"
-            />
-            <p className="login-branding__tagline">
-              <strong>Info.co.id</strong> Membantu anda meningkatkan dan mempromosikan usaha bisnis anda di seluruh indonesia
-            </p>
+          {/* ── Left: Branding, panel solid hijau dengan pola gelombang tipis ── */}
+          <div className="login-branding login-branding--split">
+            <div className="login-branding__wavepattern" aria-hidden="true" />
+
+            <div className="login-branding__boat-track" aria-hidden="true">
+              <svg className="login-branding__boat" viewBox="0 0 90 60">
+                {/* Gelembung kecil dari mulut ikan */}
+                <circle className="login-branding__fish-bubble login-branding__fish-bubble--1" cx="78" cy="18" r="3" fill="#ffffff" fillOpacity="0.85" />
+                <circle className="login-branding__fish-bubble login-branding__fish-bubble--2" cx="83" cy="10" r="2" fill="#ffffff" fillOpacity="0.7" />
+                <circle className="login-branding__fish-bubble login-branding__fish-bubble--3" cx="75" cy="6" r="1.4" fill="#ffffff" fillOpacity="0.6" />
+
+                {/* Badan ikan */}
+                <path d="M8 32 C8 20 26 12 42 16 C54 19 62 26 70 26 C66 30 66 34 70 38 C62 38 54 45 42 48 C26 52 8 44 8 32 Z"
+                      fill="#ffffff" fillOpacity="0.95" />
+                {/* Ekor */}
+                <path d="M8 32 L0 20 L4 32 L0 44 Z" fill="#a7f3d0" fillOpacity="0.9" />
+                {/* Sirip atas */}
+                <path d="M34 17 L38 6 L46 18 Z" fill="#a7f3d0" fillOpacity="0.85" />
+                {/* Mata */}
+                <circle cx="58" cy="27" r="3.2" fill="#0b6b45" />
+                <circle cx="59" cy="26" r="1.1" fill="#ffffff" />
+              </svg>
+            </div>
+
+            <div className="login-branding__top">
+              <div className="login-branding__header-row">
+                <img src={logoImg} alt="Surade.co.id" className="login-branding__logo-sm" />
+                <span className="login-branding__brand-name login-branding__brand-name--dark">
+                  Surade<span>.co.id</span>
+                </span>
+              </div>
+
+              <h1 className="login-branding__heading login-branding__heading--dark">
+                Masukkan bisnismu ke Surade,<br />jangkau lebih banyak pelanggan.
+              </h1>
+              <p className="login-branding__subtext login-branding__subtext--dark">
+                Surade membantu bisnis Anda ditemukan, dipercaya, dan berkembang
+                bersama masyarakat di 12 desa Kecamatan Surade.
+              </p>
+
+              <ul className="login-branding__points">
+                <li>
+                  <CheckCircle size={18} />
+                  <span>Kelola profil dan informasi bisnis Anda</span>
+                </li>
+                <li>
+                  <CheckCircle size={18} />
+                  <span>Tampilkan produk dan layanan ke pelanggan</span>
+                </li>
+                <li>
+                  <CheckCircle size={18} />
+                  <span>Jangkau lebih banyak warga di 12 desa Surade</span>
+                </li>
+              </ul>
+            </div>
+
+            <p className="login-branding__copy">&copy; 2026 Surade.co.id — Semua hak dilindungi.</p>
           </div>
 
           {/* ── Right: Login Card ── */}
-          <div className="login-card">
+          <div className="login-card login-card--split">
+            <h2 className="login-card__title">Masuk</h2>
+            <p className="login-card__subtitle">Masuk untuk melanjutkan ke akun Anda</p>
+
             <form className="login-form" onSubmit={handleLogin} noValidate>
               {/* Password reset success notification */}
               {searchParams.get("reset") === "success" && !error && (
@@ -371,98 +460,95 @@ export default function Login() {
               )}
 
               {/* Email or Username */}
-              <input
-                id="login-email"
-                type="text"
-                className={`login-input ${error ? "login-input--error" : ""}`}
-                placeholder="Email atau Username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="username"
-              />
+              <div className="login-field-group">
+                <label htmlFor="login-email" className="login-field-label">EMAIL ATAU USERNAME</label>
+                <div className="login-input-wrapper">
+                  <input
+                    id="login-email"
+                    type="text"
+                    className={`login-input login-input--plain ${error ? "login-input--error" : ""}`}
+                    placeholder="nama@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="username"
+                  />
+                </div>
+              </div>
 
               {/* Password */}
-              <div className="login-password-wrapper">
-                <input
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  className={`login-input ${error ? "login-input--error" : ""}`}
-                  placeholder="Kata sandi"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  className="login-password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                  aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+              <div className="login-field-group">
+                <label htmlFor="login-password" className="login-field-label">KATA SANDI</label>
+                <div className="login-password-wrapper">
+                  <input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    className={`login-input login-input--plain ${error ? "login-input--error" : ""}`}
+                    placeholder="Kata sandi"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Forgot Password */}
+              <div className="login-forgot login-forgot--right">
+                <Link to="/forgot-password">Lupa kata sandi?</Link>
               </div>
 
               {/* Login Button */}
               <button
                 id="login-submit"
                 type="submit"
-                className={`login-btn ${loading ? "login-btn--loading" : ""}`}
+                className={`login-btn login-btn--split ${loading ? "login-btn--loading" : ""}`}
                 disabled={loading}
               >
                 {loading && <span className="login-spinner" />}
                 {loading ? "Memproses..." : "Masuk"}
               </button>
 
-              {/* Forgot Password */}
-              <div className="login-forgot">
-                <Link to="/forgot-password">Lupa kata sandi?</Link>
-              </div>
-
-              {/* Divider */}
-              <div className="login-divider">
-                <span className="login-divider__line" />
-                <span className="login-divider__text">atau</span>
-                <span className="login-divider__line" />
-              </div>
-
-              {/* Create Account */}
-              <button
-                id="login-create-account"
-                type="button"
-                className="login-create-btn"
-                onClick={() => setShowRegister(true)}
+              {/* Kembali ke Website — tombol outline, seperti desain referensi */}
+              <Link
+                to="/"
+                className="login-create-btn login-create-btn--outline"
+                style={{ textDecoration: "none" }}
               >
-                <UserPlus size={18} />
-                Buat Akun Baru
-              </button>
+                <ArrowLeft size={18} />
+                Kembali
+              </Link>
             </form>
 
-            {/* Info text */}
-            <p className="login-info">
-              <Link to="/">Buat Halaman</Link> untuk selebritis, merek, atau bisnis Anda.
+            {/* Link ke pendaftaran */}
+            <p className="login-info" style={{ textAlign: "center", marginTop: 20 }}>
+              Belum punya akun?{" "}
+              <button
+                type="button"
+                onClick={() => setShowRegister(true)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  color: "#0f6e46",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                Daftar di sini
+              </button>
             </p>
           </div>
         </div>
       </main>
-
-      {/* ── Footer ── */}
-      <footer className="login-footer">
-        <div className="login-footer__inner">
-          <div className="login-footer__links">
-            <Link to="/about">Tentang</Link>
-            <Link to="/contact">Hubungi Kami</Link>
-            <Link to="/blog">Blog</Link>
-            <Link to="/terms">Syarat &amp; Ketentuan</Link>
-            <Link to="/faq">FAQ</Link>
-            <Link to="/vision-mission">Visi &amp; Misi</Link>
-            <Link to="/partnership-career">Karir</Link>
-          </div>
-          <p className="login-footer__copy">
-            &copy; 2026 Info.co.id. All rights reserved.
-          </p>
-        </div>
-      </footer>
 
       {/* ── Register Modal ── */}
       {showRegister && (
@@ -474,8 +560,8 @@ export default function Login() {
               <>
                 <div className="login-modal__header">
                   <div>
-                    <h2 className="login-modal__title">Daftar</h2>
-                    <p className="login-modal__subtitle">Cepat dan mudah.</p>
+                    <h2 className="login-modal__title">Daftar Akun</h2>
+                    <p className="login-modal__subtitle">Cepat dan mudah, hanya perlu beberapa langkah.</p>
                   </div>
                   <button
                     className="login-modal__close"
@@ -489,6 +575,25 @@ export default function Login() {
                 <div className="login-modal__divider" />
 
                 <form className="login-modal__body" onSubmit={handleSendOtp} noValidate>
+                  {referralCode && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "8px 12px",
+                      background: "#ecfdf5",
+                      border: "1px solid #a7f3d0",
+                      borderRadius: "8px",
+                      color: "#065f46",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      marginBottom: "6px"
+                    }}>
+                      <CheckCircle size={16} className="text-emerald-600" />
+                      <span>Kode Referral aktif: <strong>{referralCode}</strong></span>
+                    </div>
+                  )}
+
                   {regError && (
                     <div className="login-error" style={{ marginBottom: 12 }}>
                       <AlertCircle size={16} className="login-error__icon" />
@@ -519,7 +624,7 @@ export default function Login() {
                     id="reg-email"
                     type="email"
                     className="login-input"
-                    placeholder="Alamat Email (contoh@gmail.com)"
+                    placeholder="Alamat Email Aktif (untuk terima OTP)"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     autoComplete="email"
@@ -570,10 +675,9 @@ export default function Login() {
                   </div>
 
                   <p className="login-modal__terms">
-                    Dengan mengklik Lanjutkan, Anda menyetujui{" "}
-                    <Link to="/terms">Ketentuan</Link>,{" "}
-                    <a href="#">Kebijakan Privasi</a>, dan{" "}
-                    <a href="#">Kebijakan Cookie</a> kami.
+                    Dengan mengklik tombol daftar, Anda menyetujui{" "}
+                    <Link to="/terms">Ketentuan Layanan</Link> dan{" "}
+                    <a href="#">Kebijakan Privasi</a> Surade.co.id.
                   </p>
 
                   <button
@@ -584,9 +688,9 @@ export default function Login() {
                     style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                   >
                     {regLoading ? (
-                      <><span className="login-spinner" /> Mengirim OTP...</>
+                      <><span className="login-spinner" /> Mengirim OTP ke Email...</>
                     ) : (
-                      <><Mail size={16} /> Lanjutkan &amp; Kirim OTP</>
+                      <><Mail size={16} /> Daftar &amp; Kirim OTP ke Email</>
                     )}
                   </button>
                 </form>
@@ -608,7 +712,7 @@ export default function Login() {
                     </button>
                     <div>
                       <h2 className="login-modal__title">Verifikasi Email</h2>
-                      <p className="login-modal__subtitle">Masukkan kode OTP yang dikirim ke Gmail.</p>
+                      <p className="login-modal__subtitle">Masukkan 6 digit kode OTP yang dikirim ke email Anda.</p>
                     </div>
                   </div>
                   <button
@@ -636,7 +740,7 @@ export default function Login() {
                   }}>
                     <Mail size={16} style={{ color: "#0284c7", flexShrink: 0 }} />
                     <span style={{ fontSize: 13, color: "#0369a1" }}>
-                      Kode dikirim ke <strong>{regEmail}</strong>
+                      Kode OTP dikirim ke <strong>{regEmail}</strong>
                     </span>
                   </div>
 
@@ -722,12 +826,12 @@ export default function Login() {
                     {otpLoading ? (
                       <><span className="login-spinner" /> Memverifikasi...</>
                     ) : (
-                      "Verifikasi &amp; Daftar"
+                      "Verifikasi & Daftar"
                     )}
                   </button>
 
                   <p style={{ fontSize: 12, color: "#94a3b8", textAlign: "center", marginTop: 12 }}>
-                    Kode berlaku selama <strong>10 menit</strong>. Periksa folder Spam jika tidak ada.
+                    Kode berlaku selama <strong>10 menit</strong>. Periksa folder Spam jika belum masuk.
                   </p>
                 </form>
               </>

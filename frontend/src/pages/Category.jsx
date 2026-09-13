@@ -1,7 +1,9 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
+import MapView from "../components/MapView";
 import { InlineSpinner } from "../components/LoadingScreen";
+import { BusinessGridSkeleton } from "../components/BusinessCardSkeleton";
 import { getStorageUrl } from "../utils/constants";
 import { requireAuth } from "../utils/authCheck";
 import api from "../services/api";
@@ -29,23 +31,20 @@ import {
   HeartPulse,
   Users,
   Check,
+  Car,
+  Music,
+  GraduationCap,
+  Bed,
+  Fuel,
+  Home,
+  Camera,
+  Wallet,
+  Scissors,
+  Leaf,
+  Award,
 } from "lucide-react";
 import heroImg from "../assets/category_hero_illustration.png";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 import "./Category.css";
-import L from "leaflet";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-// Fix default Leaflet icon for Vite/webpack bundlers
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
 
 const HERO_IMAGE = heroImg;
 
@@ -68,7 +67,7 @@ const SORT_OPTIONS = [
 
 /* ── Categories loaded dynamically from API ── */
 
-const getCategoryIcon = (iconName) => {
+const getCategoryIcon = (iconName, label = "") => {
   switch (iconName) {
     case "store": return <Store size={24} strokeWidth={1.7} />;
     case "coffee": return <Coffee size={24} strokeWidth={1.7} />;
@@ -82,8 +81,47 @@ const getCategoryIcon = (iconName) => {
     case "clipboard": return <ClipboardList size={24} strokeWidth={1.7} />;
     case "heart": return <HeartPulse size={24} strokeWidth={1.7} />;
     case "users": return <Users size={24} strokeWidth={1.7} />;
-    default: return <Store size={24} strokeWidth={1.7} />;
+    case "car": return <Car size={24} strokeWidth={1.7} />;
+    case "music": return <Music size={24} strokeWidth={1.7} />;
+    case "graduation": return <GraduationCap size={24} strokeWidth={1.7} />;
+    case "bed": return <Bed size={24} strokeWidth={1.7} />;
+    case "fuel": return <Fuel size={24} strokeWidth={1.7} />;
+    case "home": return <Home size={24} strokeWidth={1.7} />;
+    case "camera": return <Camera size={24} strokeWidth={1.7} />;
+    case "wallet": return <Wallet size={24} strokeWidth={1.7} />;
+    case "scissors": return <Scissors size={24} strokeWidth={1.7} />;
+    case "leaf": return <Leaf size={24} strokeWidth={1.7} />;
+    default: return getCategoryIconByLabel(label);
   }
+};
+
+/* Kalau field `icon` dari data belum diisi/cocok, tebak ikon dari kata
+   kunci di label kategori supaya tiap kategori tetap tampil beda,
+   bukan ikon toko yang sama semua. */
+const getCategoryIconByLabel = (label) => {
+  const l = (label || "").toLowerCase();
+  if (l.includes("semua")) return <Store size={24} strokeWidth={1.7} />;
+  if (l.includes("kantor")) return <Building2 size={24} strokeWidth={1.7} />;
+  if (l.includes("bisnis") || l.includes("market") || l.includes("retail") || l.includes("belanja")) return <Store size={24} strokeWidth={1.7} />;
+  if (l.includes("rekreasi") || l.includes("hiburan")) return <Camera size={24} strokeWidth={1.7} />;
+  if (l.includes("jasa") || l.includes("servis")) return <Wrench size={24} strokeWidth={1.7} />;
+  if (l.includes("fasilitas")) return <Fuel size={24} strokeWidth={1.7} />;
+  if (l.includes("otomotif")) return <Car size={24} strokeWidth={1.7} />;
+  if (l.includes("pendidikan")) return <GraduationCap size={24} strokeWidth={1.7} />;
+  if (l.includes("kecantikan")) return <HeartPulse size={24} strokeWidth={1.7} />;
+  if (l.includes("kesehatan")) return <HeartPulse size={24} strokeWidth={1.7} />;
+  if (l.includes("elektronik") || l.includes("gadget")) return <Smartphone size={24} strokeWidth={1.7} />;
+  if (l.includes("fashion")) return <Shirt size={24} strokeWidth={1.7} />;
+  if (l.includes("musik")) return <Music size={24} strokeWidth={1.7} />;
+  if (l.includes("komunitas")) return <Users size={24} strokeWidth={1.7} />;
+  if (l.includes("informasi")) return <Info size={24} strokeWidth={1.7} />;
+  if (l.includes("hotel") || l.includes("penginapan")) return <Bed size={24} strokeWidth={1.7} />;
+  if (l.includes("keuangan") || l.includes("asuransi")) return <Wallet size={24} strokeWidth={1.7} />;
+  if (l.includes("makanan") || l.includes("minuman") || l.includes("kuliner")) return <Coffee size={24} strokeWidth={1.7} />;
+  if (l.includes("properti") || l.includes("konstruksi") || l.includes("bangunan") || l.includes("material")) return <Home size={24} strokeWidth={1.7} />;
+  if (l.includes("salon") || l.includes("kecantikan") && !l.includes("kesehatan")) return <Scissors size={24} strokeWidth={1.7} />;
+  if (l.includes("pertanian") || l.includes("peternakan") || l.includes("kebun")) return <Leaf size={24} strokeWidth={1.7} />;
+  return <Store size={24} strokeWidth={1.7} />;
 };
 
 /* ── Hero floating category cards configuration (9 categories in 2 rows) ── */
@@ -125,13 +163,19 @@ const getCoords = (business) => {
 
 /* ── Cities list ── */
 const CITIES = [
-  "Semua", "Jakarta", "Surabaya", "Bandung", "Medan", "Bekasi", "Tangerang", "Depok",
-  "Semarang", "Palembang", "Makassar", "South Tangerang", "Batam", "Pekanbaru",
-  "Bandar Lampung", "Padang", "Malang", "Bogor", "Denpasar", "Samarinda",
-  "Tasikmalaya", "Pontianak", "Banjarmasin", "Balikpapan", "Jambi", "Surakarta",
-  "Mataram", "Manado", "Yogyakarta", "Ambon", "Kupang", "Jayapura", "Sorong",
-  "Ternate", "Gorontalo", "Kendari", "Palu", "Pekalongan", "Tegal", "Cirebon",
-  "Sukabumi", "Aceh", "Bali", "Kep. Mentawai", "Magelang", "Kabupaten Bogor", "Kabupaten Bekasi", "Kabupaten Tangerang",
+  "Semua",
+  "Kelurahan Surade",
+  "Desa Jagamukti",
+  "Desa Citanglar",
+  "Desa Wanasari",
+  "Desa Sirnasari",
+  "Desa Kadaleman",
+  "Desa Gunungsungging",
+  "Desa Cipeundeuy",
+  "Desa Pasiripis",
+  "Desa Buniwangi",
+  "Desa Sukatani",
+  "Desa Kademangan",
 ];
 
 export default function Category() {
@@ -141,6 +185,8 @@ export default function Category() {
   const queryLocation = searchParams.get("location") || "";
 
   const [activeCategory, setActiveCategory] = useState(categoryId || "all");
+  const querySub = searchParams.get("sub") || "";
+  const [activeSubcategory, setActiveSubcategory] = useState(querySub);
   const [saved, setSaved] = useState({});
   const [searchKeyword, setSearchKeyword] = useState(queryQ);
   const [selectedCity, setSelectedCity] = useState(queryLocation || "Semua");
@@ -192,7 +238,8 @@ export default function Category() {
               ...cleanList.map(c => ({
                 id: c.slug || String(c.id),
                 label: c.name,
-                icon: getCategoryIcon(c.icon)
+                icon: getCategoryIcon(c.icon, c.name),
+                children: c.children || [] // Include children
               }))
             ]);
           }
@@ -213,7 +260,8 @@ export default function Category() {
               ...cleanList.map(c => ({
                 id: c.slug || String(c.id),
                 label: c.name,
-                icon: getCategoryIcon(c.icon)
+                icon: getCategoryIcon(c.icon, c.name),
+                children: c.children || [] // Include children for subcategories
               }))
             ];
             setCategories(mappedCategories);
@@ -236,13 +284,18 @@ export default function Category() {
                 name: b.name,
                 category: b.category?.name || "Umum",
                 categorySlug: b.category?.slug || "umum",
+                parentCategorySlug: b.category?.parent?.slug || null,
+                parentCategoryName: b.category?.parent?.name || null,
                 tags: [b.name],
                 location: b.city || "Indonesia",
                 views: b.views || 0,
                 status: "Buka Sekarang",
                 img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
-                lat: b.lat,
-                lng: b.lng,
+                lat: b.lat || b.latitude,
+                lng: b.lng || b.longitude,
+                latitude: b.latitude || b.lat,
+                longitude: b.longitude || b.lng,
+                address: b.address,
                 is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
                 avg_price: avgPrice,
                 min_price: minPrice,
@@ -264,6 +317,8 @@ export default function Category() {
     window.scrollTo(0, 0);
     if (categoryId) {
       setActiveCategory(categoryId);
+      // Ganti kategori utama -> sub kategori sebelumnya jadi tidak relevan
+      setActiveSubcategory("");
     }
   }, [categoryId]);
 
@@ -297,14 +352,24 @@ export default function Category() {
         const catLabel = currentCat?.label || activeCategory;
         const bSlug = (b.categorySlug || "").toLowerCase();
         const bName = (b.category || "").toLowerCase();
+        const parentSlug = (b.parentCategorySlug || "").toLowerCase();
+        const parentName = (b.parentCategoryName || "").toLowerCase();
         const targetId = activeCategory.toLowerCase();
         const targetLabel = catLabel.toLowerCase();
+
+        const isChildMatch = currentCat?.children?.some(child => 
+          (child.slug || "").toLowerCase() === bSlug || 
+          (child.name || "").toLowerCase() === bName
+        );
 
         return (
           bSlug === targetId ||
           bName === targetLabel ||
+          parentSlug === targetId ||
+          parentName === targetLabel ||
           bName.includes(targetId) ||
-          bName.includes(targetLabel.split(" ")[0])
+          bName.includes(targetLabel.split(" ")[0]) ||
+          isChildMatch
         );
       });
 
@@ -312,6 +377,11 @@ export default function Category() {
     // City filter
     const matchesCity = !selectedCity || selectedCity === "Semua" ||
       b.location.toLowerCase().includes(selectedCity.toLowerCase());
+
+    // Sub kategori filter (misal: "Apotek", "Klinik Umum" di bawah Kesehatan)
+    const matchesSubcategory = !activeSubcategory ||
+      (b.categorySlug || "").toLowerCase() === activeSubcategory.toLowerCase() ||
+      (b.category || "").toLowerCase() === activeSubcategory.toLowerCase();
 
     // Keyword filter
     const matchesKeyword = !searchKeyword ||
@@ -336,7 +406,7 @@ export default function Category() {
       }
     }
 
-    return matchesCity && matchesKeyword && matchesPrice;
+    return matchesCity && matchesSubcategory && matchesKeyword && matchesPrice;
   }).sort((a, b) => {
     // 1. PRIMARY: Premium tier first (all Premium businesses come before Free businesses)
     if (a.is_premium && !b.is_premium) return -1;
@@ -364,7 +434,7 @@ export default function Category() {
   // Reset to page 1 whenever search, category, city, price, or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeCategory, selectedCity, searchKeyword, selectedPriceRange, sortOption]);
+  }, [activeCategory, activeSubcategory, selectedCity, searchKeyword, selectedPriceRange, sortOption]);
 
   const totalItems = searchFilteredBisnis.length;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
@@ -432,7 +502,16 @@ export default function Category() {
       (Array.isArray(localBiz) ? localBiz : []).forEach(id => { bizSavedMap[id] = true; });
     } catch (e) {}
 
-    if (token) {
+    // PERBAIKAN: /my-favorites dibatasi backend cuma buat role "user" -
+    // dulu dipanggil untuk semua akun login termasuk admin, jadi admin
+    // selalu dapat error 403 di sini. Sekarang dilewati kalau bukan
+    // role "user".
+    let isRegularUser = false;
+    try {
+      isRegularUser = JSON.parse(localStorage.getItem("user") || "null")?.role === "user";
+    } catch (e) {}
+
+    if (token && isRegularUser) {
       try {
         const res = await api.get("/my-favorites");
         const data = res.data?.data || res.data || [];
@@ -516,7 +595,7 @@ export default function Category() {
         </div>
 
         <div className="category-hero__inner">
-          {/* Left Column */}
+          {/* Left Column: Breadcrumb, Title, Subtitle, Search Bar */}
           <div className="category-hero__left">
             <div className="category-hero__breadcrumb">
               <Link to="/">Home</Link>
@@ -562,6 +641,10 @@ export default function Category() {
                   value={searchKeyword}
                   onChange={handleSearchChange}
                   className="category-search__input"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
                 />
               </div>
 
@@ -587,7 +670,7 @@ export default function Category() {
                       <input
                         autoFocus
                         type="text"
-                        placeholder="Cari kota..."
+                        placeholder="Cari desa..."
                         value={kotaSearch}
                         onChange={(e) => setKotaSearch(e.target.value)}
                         className="category-city-search-input"
@@ -619,7 +702,7 @@ export default function Category() {
                           </li>
                         ))
                       ) : (
-                        <li className="category-city-empty">Kota tidak ditemukan</li>
+                        <li className="category-city-empty">Desa tidak ditemukan</li>
                       )}
                     </ul>
                   </div>
@@ -634,57 +717,47 @@ export default function Category() {
             </form>
           </div>
 
-          {/* Right Column: 9 Interactive Floating Category Cards */}
+          {/* Right Column: ikon-ikon melayang, menyatu langsung dengan
+              background hero (tanpa kotak/bingkai foto) */}
           <div className="category-hero__right">
-            <div className="hero-cat-cards-container">
-              {/* Row 1 (4 items) */}
-              <div className="hero-cat-cards-row hero-cat-cards-row--top">
-                {HERO_CARD_ITEMS[0].map((item) => (
-                  <Link
-                    key={item.id}
-                    to={`/category/${item.id}?${searchParams.toString()}`}
-                    className={`hero-cat-card${activeCategory === item.id ? " active" : ""}`}
-                  >
-                    <div className="hero-cat-card__icon-box" style={{ color: item.color, background: item.bg }}>
-                      {item.icon}
-                    </div>
-                    <span className="hero-cat-card__label">{item.label}</span>
-                  </Link>
-                ))}
+            <div className="hero-floating-icons" aria-hidden="true">
+              {/* Ikon kategori aktif — otomatis ikut berubah sesuai kategori yang dibuka */}
+              <div className="hero-icon-badge hero-icon-badge--top-right">
+                {currentCategory?.icon || <Wrench size={22} strokeWidth={2} />}
               </div>
 
-              {/* Row 2 (5 items) */}
-              <div className="hero-cat-cards-row hero-cat-cards-row--bottom">
-                {HERO_CARD_ITEMS[1].map((item) => (
-                  <Link
-                    key={item.id}
-                    to={`/category/${item.id}?${searchParams.toString()}`}
-                    className={`hero-cat-card${activeCategory === item.id ? " active" : ""}`}
-                  >
-                    <div className="hero-cat-card__icon-box" style={{ color: item.color, background: item.bg }}>
-                      {item.icon}
-                    </div>
-                    <span className="hero-cat-card__label">{item.label}</span>
-                  </Link>
-                ))}
+              {/* Ikon lokasi */}
+              <div className="hero-icon-badge hero-icon-badge--mid-left hero-icon-badge--outline">
+                <MapPin size={20} strokeWidth={2} />
               </div>
+
+              {/* Ikon toko/bisnis */}
+              <div className="hero-icon-badge hero-icon-badge--bottom-right hero-icon-badge--filled">
+                <Store size={22} strokeWidth={2} />
+              </div>
+
+              {/* Kartu info singkat */}
+              <div className="hero-info-card">
+                <span className="hero-info-card__icon">
+                  <Award size={20} strokeWidth={2} />
+                </span>
+                <p className="hero-info-card__text">
+                  Berbagai pilihan usaha<br />terpercaya di Surade
+                </p>
+              </div>
+
+              {/* Titik-titik dekoratif kecil, biar makin hidup */}
+              <span className="hero-dot hero-dot--1" />
+              <span className="hero-dot hero-dot--2" />
+              <span className="hero-dot hero-dot--3" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* CATEGORY TABS CAROUSEL */}
+      {/* CATEGORY HORIZONTAL PILLS */}
       <section className="category-tabs-section">
         <div className="category-tabs-inner">
-          <button
-            type="button"
-            className="category-tabs-nav category-tabs-nav--prev"
-            onClick={() => scrollTabs("left")}
-            aria-label="Previous categories"
-          >
-            <ChevronLeft size={16} />
-          </button>
-
           <div className="reko-tabs" ref={tabsRef}>
             {categories.map((cat) => (
               <Link
@@ -697,17 +770,13 @@ export default function Category() {
               </Link>
             ))}
           </div>
-
-          <button
-            type="button"
-            className="category-tabs-nav category-tabs-nav--next"
-            onClick={() => scrollTabs("right")}
-            aria-label="Next categories"
-          >
-            <ChevronRight size={16} />
-          </button>
         </div>
       </section>
+
+      {/* PERBAIKAN: fitur "Sub Kategori" (kartu-kartu kecil di bawah tab
+          kategori, mis. "Klinik Umum / Apotek / Praktek Dokter" di bawah
+          kategori "Kesehatan") dihapus atas permintaan - subkategori
+          sekarang tidak ditampilkan di halaman ini sama sekali. */}
 
       {/* BUSINESS CARDS */}
       <section className="category-business-section">
@@ -717,8 +786,17 @@ export default function Category() {
               <h2 className="category-business__title">
                 {searchFilteredBisnis.length} Bisnis Ditemukan
               </h2>
-              {(selectedPriceRange !== "all" || (selectedCity && selectedCity !== "Semua") || searchKeyword) && (
+              {(selectedPriceRange !== "all" || (selectedCity && selectedCity !== "Semua") || searchKeyword || activeSubcategory) && (
                 <div className="category-active-filters-badges">
+                  {activeSubcategory && (
+                    <span className="filter-badge">
+                      <Store size={11} /> {currentCategory?.children?.find(c => (c.slug || String(c.id)).toLowerCase() === activeSubcategory.toLowerCase())?.name || activeSubcategory}
+                      <button type="button" onClick={() => {
+                        setActiveSubcategory("");
+                        setSearchParams(prev => { const p = new URLSearchParams(prev); p.delete("sub"); return p; });
+                      }} title="Hapus filter sub kategori"><X size={11} /></button>
+                    </span>
+                  )}
                   {selectedPriceRange !== "all" && (
                     <span className="filter-badge">
                       <Tag size={11} /> {PRICE_RANGES.find(r => r.id === selectedPriceRange)?.label}
@@ -731,7 +809,7 @@ export default function Category() {
                       <button type="button" onClick={() => {
                         setSelectedCity("Semua");
                         setSearchParams(prev => { prev.delete("location"); return prev; });
-                      }} title="Hapus filter kota"><X size={11} /></button>
+                      }} title="Hapus filter desa"><X size={11} /></button>
                     </span>
                   )}
                   {searchKeyword && (
@@ -843,7 +921,7 @@ export default function Category() {
           <div className="category-business-split">
             <div className="category-business-left" ref={listTopRef}>
               {loadingData ? (
-                <InlineSpinner text="Memuat data bisnis..." />
+                <BusinessGridSkeleton count={9} />
               ) : searchFilteredBisnis.length > 0 ? (
                 <>
                   <div className="reko-grid">
@@ -852,7 +930,7 @@ export default function Category() {
                         {/* Image */}
                         <div className="biz-card__img-wrap">
                           <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
-                          {bisnis.is_premium && (
+                          {(bisnis.is_premium || bisnis.is_verified) && (
                             <div className="biz-card__verified-badge" title="Bisnis Terverifikasi - Pengguna Premium">
                               <BadgeCheck size={14} className="biz-card__verified-icon" />
                               <span>Terverifikasi</span>
@@ -979,28 +1057,10 @@ export default function Category() {
 
             {/* MAP LAYOUT */}
             <div className="category-business-right">
-              <MapContainer
-                center={[-6.200000, 106.816666]}
-                zoom={10}
-                style={{ height: "100%", width: "100%", borderRadius: "16px" }}
-                scrollWheelZoom={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {searchFilteredBisnis.map((bisnis) => (
-                  <Marker key={bisnis.id} position={getCoords(bisnis)}>
-                    <Popup>
-                      <strong>{bisnis.name}</strong><br />
-                      {bisnis.location}<br />
-                      <span style={{ color: bisnis.status === "Buka Sekarang" ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
-                        {bisnis.status}
-                      </span>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              <MapView 
+                businesses={searchFilteredBisnis}
+                height="100%"
+              />
             </div>
           </div>
         </div>

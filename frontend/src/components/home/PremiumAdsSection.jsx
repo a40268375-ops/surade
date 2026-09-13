@@ -60,12 +60,16 @@ export default function PremiumAdsSection({ ads = [], loading = false }) {
     return (
       <section className="premium-ads-section">
         <div className="premium-ads-container">
-          <div className="premium-ad-skeleton animate-pulse">
-            <div className="premium-ad-skeleton__content">
-              <div className="h-6 w-28 bg-slate-700/60 rounded-full mb-4" />
-              <div className="h-10 w-3/4 sm:w-1/2 bg-slate-700/60 rounded-lg mb-3" />
-              <div className="h-5 w-32 bg-slate-700/60 rounded mb-2" />
-              <div className="h-4 w-48 bg-slate-700/60 rounded" />
+          <div className="w-full h-[400px] sm:h-[450px] md:h-[500px] bg-gradient-to-br from-slate-800/90 to-slate-900/90 rounded-3xl overflow-hidden animate-pulse">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="space-y-4 w-full max-w-2xl px-8">
+                <div className="h-6 w-32 bg-slate-700/60 rounded-full mx-auto" />
+                <div className="h-12 w-3/4 bg-slate-700/60 rounded-lg mx-auto" />
+                <div className="flex items-center justify-center gap-6">
+                  <div className="h-5 w-24 bg-slate-700/60 rounded" />
+                  <div className="h-5 w-32 bg-slate-700/60 rounded" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -91,7 +95,7 @@ export default function PremiumAdsSection({ ads = [], loading = false }) {
             const isActive = idx === currentIndex;
             const targetUrl = `/business/${ad.business_id || ad.businessId || ad.id}`;
             const bgImage = getStorageUrl(ad.image || ad.banner || ad.logo || ad.business?.banner || ad.business?.logo) || DEFAULT_PREMIUM_IMG;
-            const ratingValue = ad.rating ? Number(ad.rating).toFixed(1) : "4.8";
+            const ratingValue = ad.rating ? Number(ad.rating).toFixed(1) : "0.0";
             const locationText = ad.location || (ad.city ? (ad.province ? `${ad.city}, ${ad.province}` : ad.city) : "Indonesia");
 
             return (

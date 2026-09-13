@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
   overflow: hidden;
 }
 
@@ -70,7 +70,7 @@
 .vm-section__icon {
   width: 120px;
   height: 120px;
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -123,7 +123,7 @@
 .vm-mission-item__icon {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -190,7 +190,7 @@
 .vm-value-card__icon {
   width: 64px;
   height: 64px;
-  background: linear-gradient(135deg, #007570 0%, #004d4a 100%);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
   border-radius: 16px;
   display: flex;
   align-items: center;

@@ -121,20 +121,27 @@ body { background: #f5f6fa; }
 ───────────────────────────────────────────── */
 .home-hero {
   position: relative;
-  min-height: 90vh;
+  /* PERBAIKAN: sebelumnya 78vh - di banyak ukuran layar ini bikin
+     section berikutnya (Premium Ads) mulai terlalu cepat, jadi gambar
+     latar waterfall terasa "terpotong" mendadak tepat di bawah kotak
+     pencarian, bukannya mengalir wajar. Ditambah jadi 92vh + padding
+     bawah yang lebih lega supaya ada "napas" sebelum section berikutnya. */
+  min-height: 92vh;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: left;
   overflow: visible;
-  padding: 40px 0;
+  padding: 40px 0 72px;
+  isolation: isolate;
+  z-index: 10;
 }
 
 /* The hero background */
 .home-hero__bg {
   position: absolute;
   inset: 0;
-  background: url('../assets/hero_bg.jpg') no-repeat center top / cover;
+  background: url('../assets/hero_bg.jpg') no-repeat 65% 42% / cover;
   z-index: 0;
   overflow: hidden;
 }
@@ -144,16 +151,31 @@ body { background: #f5f6fa; }
   inset: 0;
   background: linear-gradient(
     to right,
-    rgba(5, 10, 22, 0.92) 0%,
-    rgba(5, 10, 22, 0.78) 45%,
-    rgba(5, 10, 22, 0.25) 75%,
-    rgba(5, 10, 22, 0.10) 100%
+    rgba(5, 10, 22, 0.88) 0%,
+    rgba(5, 10, 22, 0.68) 45%,
+    rgba(5, 10, 22, 0.32) 75%,
+    rgba(5, 10, 22, 0.12) 100%
   );
+}
+
+/* PERBAIKAN: sebelumnya tidak ada transisi apa pun di tepi bawah -
+   gambar latar (gelap) langsung "bertemu" section berikutnya yang
+   berwarna terang (#f8fafc), jadi terasa seperti terpotong kasar.
+   Lapisan gradasi tambahan ini melembutkan tepi bawahnya supaya
+   mengalir wajar ke section berikutnya. */
+.home-hero__bg::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22%;
+  background: linear-gradient(to bottom, rgba(5, 10, 22, 0) 0%, rgba(5, 10, 22, 0.55) 100%);
+  z-index: 1;
 }
 
 .home-hero__container {
   position: relative;
-  z-index: 1;
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
@@ -164,10 +186,9 @@ body { background: #f5f6fa; }
 
 .home-hero__content {
   position: relative;
-  z-index: 1;
   width: 100%;
   max-width: 620px;
-  padding: 40px 0;
+  padding: 28px 0;
   color: #fff;
   overflow: visible;
   text-align: left;
@@ -175,22 +196,77 @@ body { background: #f5f6fa; }
 
 /* Title */
 .home-hero__title {
+  position: relative;
   font-size: clamp(2.8rem, 5vw, 4.2rem);
   font-weight: 800;
   line-height: 1.08;
   margin-bottom: 14px;
   color: #fff;
   letter-spacing: -0.01em;
+  /* PERBAIKAN BUG: sebelumnya display:block - karena h1 otomatis
+     melebar penuh mengikuti lebar kontainer (bisa jauh lebih lebar
+     dari teks "Surade.co.id" itu sendiri, ada spasi kosong menggantung
+     di kanan), animasi cahaya di bawah jadi salah hitung: seolah-olah
+     harus menyapu SELURUH lebar kotak (termasuk area kosongnya), jadi
+     cahayanya cuma "kebagian" nongol pas berada di area teks ".co.id"
+     yang letaknya di ujung kanan - "Surade" di kiri nyaris tidak
+     pernah kelewatan cahaya. Diganti fit-content supaya kotaknya
+     PERSIS sesuai lebar teks aslinya, jadi cahaya menyapu merata dari
+     huruf "S" di awal sampai "d" di akhir ".co.id". */
+  width: fit-content;
+  max-width: 100%;
   display: block;
 }
 
-.home-hero__title-sub {
-  display: block;
-  color: #00c9b1;
-  font-size: clamp(2.6rem, 5vw, 4rem);
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
+/* Animasi "cahaya melintas" elegan. PERBAIKAN: versi sebelumnya posisi
+   awal & akhir animasinya BEDA (200% -> -100%), jadi begitu satu putaran
+   selesai dan mengulang dari awal, ada "lompatan" mendadak dari -100%
+   balik ke 200% - itu yang kerasa seperti bug/patah-patah.
+   Sekarang didesain ulang total supaya loop-nya benar-benar mulus:
+   posisi AWAL & AKHIR animasinya SAMA PERSIS (sama-sama "kosong/tidak
+   kelihatan", disisakan area transparan besar di kedua ujung gradasi
+   di bawah ini) - jadi begitu mengulang, tidak ada lompatan sama
+   sekali, mulus balik ke kondisi diam sebelum melintas lagi. Cahayanya
+   juga sekarang mulai tepat dari huruf "S" di kata "Surade" (posisi 0%
+   = paling kiri) baru bergerak ke kanan. */
+.home-hero__title::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(52, 211, 153, 0.9) 48%,
+    #6ee7b7 50%,
+    rgba(52, 211, 153, 0.9) 52%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 400% 100%;
+  background-position: 0% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: heroTitleShine 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes heroTitleShine {
+  from { background-position: 100% 0; }
+  to   { background-position: 0% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero__title::after {
+    animation: none;
+    display: none;
+  }
+}
+
+.home-hero__title-accent {
+  color: #fff;
 }
 
 /* Badge */
@@ -198,15 +274,14 @@ body { background: #f5f6fa; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #0d3b2e;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 999px;
-  padding: 6px 14px 6px 8px;
-  margin-bottom: 22px;
+  padding: 6px 16px 6px 8px;
+  margin-bottom: 18px;
   font-size: 0.8rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.90);
-  backdrop-filter: blur(6px);
+  color: #fff;
 }
 
 .home-hero__badge-icon {
@@ -225,8 +300,8 @@ body { background: #f5f6fa; }
   font-size: clamp(0.95rem, 1.6vw, 1.05rem);
   font-weight: 400;
   color: rgba(255,255,255,0.82);
-  margin-bottom: 36px;
-  line-height: 1.65;
+  margin-bottom: 26px;
+  line-height: 1.6;
 }
 
 /* ─────────────────────────────────────────────
@@ -234,17 +309,20 @@ body { background: #f5f6fa; }
 ───────────────────────────────────────────── */
 .home-search {
   width: 100%;
-  max-width: 680px;
+  max-width: 640px;
   margin: 0;
   display: flex;
   align-items: center;
   background: #fff;
   border-radius: 999px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.28);
-  padding: 0 8px 0 20px;
-  height: 56px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.24);
+  /* PERBAIKAN: dirapikan supaya lebih padat/tidak kebesaran - tinggi
+     56px -> 48px, padding kanan-kiri sedikit disempitkan. */
+  padding: 0 6px 0 18px;
+  height: 48px;
   position: relative;
   overflow: visible;
+  z-index: 100;
 }
 
 .home-search__group {
@@ -253,11 +331,17 @@ body { background: #f5f6fa; }
   min-width: 0;
 }
 
-.home-search__group--keyword { position: relative; overflow: visible; }
+.home-search__group--keyword { 
+  position: relative; 
+  overflow: visible;
+}
 .home-search__group--lokasi { flex: 0 0 auto; position: relative; gap: 0; overflow: visible; }
 
 .home-search__label {
-  color: #0f172a; font-weight: 700; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0;
+  /* PERBAIKAN: sebelumnya hitam pekat (#0f172a), tidak senada dengan
+     label "Lokasi" di sebelahnya yang sudah hijau aksen tema - sekarang
+     disamakan warnanya. */
+  color: #007570; font-weight: 700; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0;
 }
 
 .home-search__input {
@@ -283,19 +367,27 @@ body { background: #f5f6fa; }
 }
 
 .home-search__divider {
-  width: 1px; height: 26px;
+  width: 1px; height: 22px;
   background: rgba(15,23,42,0.14);
-  flex-shrink: 0; margin: 0 10px;
+  flex-shrink: 0; margin: 0 8px;
 }
 
 .home-search__kota-btn {
-  display: flex; align-items: center; gap: 5px;
-  padding: 5px 10px;
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px 8px;
   background: transparent; border: none; cursor: pointer;
-  font-family: 'Poppins', sans-serif; font-size: 0.82rem; font-weight: 500; color: #334155;
+  font-family: 'Poppins', sans-serif; font-size: 0.8rem; font-weight: 500; color: #334155;
   white-space: nowrap;
 }
 .home-search__kota-btn:hover { color: #007570; }
+
+/* PERBAIKAN: teks lokasi terpilih sebelumnya warna abu-abu gelap polos
+   (sama seperti teks biasa) - sekarang diberi warna hijau aksen tema,
+   supaya kelihatan jelas ini adalah nilai yang aktif/terpilih. */
+.home-search__kota-text {
+  color: #007570;
+  font-weight: 600;
+}
 
 .home-search__kota-caret { color: #64748b; transition: transform 0.2s; flex-shrink: 0; }
 .home-search__kota-caret.open { transform: rotate(180deg); }
@@ -305,7 +397,7 @@ body { background: #f5f6fa; }
   position: absolute;
   top: calc(100% + 10px); right: 0;
   width: 220px;
-  z-index: 1100;
+  z-index: 10000;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 12px 48px rgba(0,0,0,0.16);
@@ -353,7 +445,7 @@ body { background: #f5f6fa; }
   position: absolute;
   top: calc(100% + 10px);
   left: -20px;
-  z-index: 1100;
+  z-index: 10000;
   width: 320px;
   background: #fff;
   border-radius: 12px;
@@ -431,33 +523,217 @@ body { background: #f5f6fa; }
   color: #94a3b8;
 }
 
-/* Category items styling */
-.home-keyword-dropdown__item--category {
-  gap: 10px;
+/* Category items styling — grid 2 kolom (chip kompak: ikon bulat + label)
+   supaya daftar kategori tidak jadi list panjang 1 kolom yang harus di-scroll
+   terus. Sebelumnya class ".home-keyword-dropdown__item--category" ini
+   didefinisikan DUA KALI di file ini (satu row biasa, satu lagi buat fitur
+   "sub-kategori" yang ternyata tidak pernah dipakai di JSX) — definisi kedua
+   menimpa yang pertama, itu penyebab ikon & label numpuk vertikal/berantakan. */
+.home-keyword-dropdown__list--category {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
 }
+
+.home-keyword-dropdown__item--category {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  text-align: center;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.home-keyword-dropdown__item--category:hover {
+  background: #f0faf8;
+  border-color: rgba(0, 117, 112, 0.18);
+  transform: translateY(-2px);
+}
+
+.home-keyword-dropdown__item--category:active {
+  transform: translateY(0);
+}
+
 .home-keyword-dropdown__cat-icon {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f1f5f9;
   color: #64748b;
+  transition: background 0.16s ease, color 0.16s ease;
 }
+
 .home-keyword-dropdown__item--category:hover .home-keyword-dropdown__cat-icon {
+  background: #007570;
+  color: #ffffff;
+}
+
+.home-keyword-dropdown__cat-label {
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: #334155;
+  line-height: 1.2;
+}
+
+.home-keyword-dropdown__item--category:hover .home-keyword-dropdown__cat-label {
   color: #007570;
 }
-.home-keyword-dropdown__cat-label {
+
+/* Business Search Results Styling */
+.home-keyword-dropdown__item--business {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  background: transparent;
+}
+
+.home-keyword-dropdown__item--business::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 65%;
+  background: linear-gradient(180deg, #007570 0%, #00b89f 100%);
+  border-radius: 0 6px 6px 0;
+  transition: width 0.25s ease;
+}
+
+.home-keyword-dropdown__item--business:hover {
+  background: linear-gradient(90deg, #f0fdf4 0%, rgba(255, 255, 255, 0.5) 100%);
+  transform: translateX(6px);
+  box-shadow: 0 3px 12px rgba(0, 117, 112, 0.1);
+}
+
+.home-keyword-dropdown__item--business:hover::before {
+  width: 4px;
+}
+
+.home-keyword-dropdown__business-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid #e2e8f0;
+}
+
+.home-keyword-dropdown__item--business:hover .home-keyword-dropdown__business-icon {
+  background: linear-gradient(135deg, #d9f7ee 0%, #f0fdf4 100%);
+  color: #007570;
+  transform: scale(1.08) rotate(-5deg);
+  border-color: #00b89f;
+  box-shadow: 0 4px 12px rgba(0, 117, 112, 0.15);
+}
+
+.home-keyword-dropdown__business-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.home-keyword-dropdown__business-name {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-keyword-dropdown__item--business:hover .home-keyword-dropdown__business-name {
+  color: #007570;
+}
+
+.home-keyword-dropdown__business-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #64748b;
+  flex-wrap: wrap;
+}
+
+.home-keyword-dropdown__business-category {
+  font-weight: 600;
+  color: #007570;
+  background: #f0fdf4;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.home-keyword-dropdown__business-separator {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.home-keyword-dropdown__business-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-weight: 500;
+}
+
+.home-keyword-dropdown__business-location svg {
+  flex-shrink: 0;
+}
+
+/* Loading & Empty States */
+.home-keyword-dropdown__item--loading,
+.home-keyword-dropdown__item--empty {
+  justify-content: center;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 20px 14px;
+  text-align: center;
+  cursor: default;
+}
+
+.home-keyword-dropdown__item--loading:hover,
+.home-keyword-dropdown__item--empty:hover {
+  background: transparent;
+  transform: none;
+}
+
+.home-keyword-dropdown__item--loading::before,
+.home-keyword-dropdown__item--empty::before {
+  display: none;
 }
 
 /* Search button */
 .home-search__button {
   flex-shrink: 0;
-  width: 38px; height: 38px;
+  width: 36px; height: 36px;
   border-radius: 50%; border: none;
-  background: #111827; color: #fff;
+  /* PERBAIKAN: sebelumnya hitam pekat (#111827) di kondisi normal, baru
+     berubah hijau saat hover - sekarang hijau tua jadi warna utamanya
+     (senada tema), dan hover sedikit lebih gelap sebagai umpan balik. */
+  background: #007570; color: #fff;
   display: inline-flex; align-items: center; justify-content: center;
   cursor: pointer; margin-left: 4px;
   transition: background 0.18s, transform 0.18s;
 }
-.home-search__button:hover { background: #007570; transform: scale(1.06); }
+.home-search__button:hover { background: #005f5a; transform: scale(1.06); }
 
 /* ─────────────────────────────────────────────
    REKOMENDASI SECTION  (white bg)
@@ -491,6 +767,7 @@ body { background: #f5f6fa; }
   background: #f8fafc;
   position: relative;
   overflow: hidden;
+  z-index: 1;
 }
 
 .premium-ads-container {
@@ -875,7 +1152,14 @@ body { background: #f5f6fa; }
   position: relative;
   mask-image: linear-gradient(to right, transparent 0%, black 2.5%, black 97.5%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 2.5%, black 97.5%, transparent 100%);
-  padding: 6px 0;
+  padding: 22px 0 26px;
+  /* BARU: perspective supaya transform 3D di tiap kartu (lihat
+     .standard-ad-card:hover di bawah) benar-benar kelihatan "berdimensi"
+     (ada rasa jarak/kedalaman), bukan cuma miring datar. Ini aman -
+     cuma memengaruhi TAMPILAN child 3D-nya, tidak mengganggu animasi
+     berjalan (translateX) punya .standard-ads-ticker-track sama sekali,
+     karena keduanya elemen yang beda (parent vs child). */
+  perspective: 1400px;
 }
 
 .standard-ads-ticker-track {
@@ -899,6 +1183,13 @@ body { background: #f5f6fa; }
   }
 }
 
+/* PERBAIKAN: kartu iklan dikasih tampilan 3D - dulu cuma naik dikit
+   (translateY) + shadow tipis pas di-hover, sekarang beneran kelihatan
+   "terangkat berdimensi" (tilt + shadow berlapis + sedikit maju ke
+   depan), gaya kartu produk premium. Tetap murni CSS (transform &
+   transition saja, tanpa library/JS tambahan) supaya tidak menambah
+   risiko error apa pun - hover di 1 kartu juga tidak memengaruhi kartu
+   lain atau animasi ticker yang sedang berjalan. */
 .standard-ad-card {
   flex: 0 0 240px;
   width: 240px;
@@ -906,23 +1197,38 @@ body { background: #f5f6fa; }
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 10px rgba(15, 23, 42, 0.05);
   text-decoration: none;
   display: flex;
   flex-direction: column;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease;
 }
 
 .standard-ad-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.12);
+  transform: perspective(1400px) rotateX(6deg) rotateY(-8deg) translateY(-10px) translateZ(14px) scale(1.035);
+  box-shadow:
+    -14px 22px 34px -14px rgba(15, 23, 42, 0.28),
+    0 4px 10px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(0, 201, 177, 0.15);
   border-color: #00c9b1;
+  z-index: 3;
 }
 
 @media (max-width: 640px) {
   .standard-ad-card {
     flex: 0 0 210px;
     width: 210px;
+  }
+
+  /* Efek tilt 3D dimatikan khusus di layar sentuh/kecil - "hover" di
+     touchscreen gampang nyangkut aktif terus & bikin tata letak ticker
+     yang rapat jadi kelihatan berantakan/miring permanen. Tetap ada
+     efek terangkat + shadow, cuma tanpa kemiringan 3D-nya. */
+  .standard-ad-card:hover {
+    transform: translateY(-6px) scale(1.02);
   }
 }
 
@@ -945,11 +1251,11 @@ body { background: #f5f6fa; }
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.35s ease;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .standard-ad-card:hover .standard-ad-card__img {
-  transform: scale(1.06);
+  transform: scale(1.1);
 }
 
 .standard-ad-card__tag {
@@ -1041,67 +1347,103 @@ body { background: #f5f6fa; }
   margin-bottom: 24px;
 }
 
-/* ── Category tabs ── */
-.reko-tabs {
-  display: flex;
-  gap: 10px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  margin-bottom: 10px;
-  scrollbar-width: none;
-  justify-content: flex-start;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
-.reko-tabs::-webkit-scrollbar { display: none; }
-
-.reko-tab {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 16px 24px;
-  background: #fff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  cursor: pointer;
-  white-space: nowrap;
-  min-width: 110px;
-  color: #475569;
-  flex-shrink: 0;
-  transition: border-color 0.18s, color 0.18s, background 0.18s, box-shadow 0.18s;
+/* ── Category grid (khusus Home) ──
+   Sebelumnya section ini numpang class "reko-tabs" / "reko-tab--link" yang
+   sebenarnya didefinisikan ulang (beda gaya: scroll horizontal) di sini,
+   dan (beda gaya lagi: grid 6 kolom) di Category.css. Karena Home.jsx dulu
+   nge-import KEDUA file CSS itu, siapa yang "menang" jadi tidak jelas dan
+   gampang berubah-ubah tampilannya. Sekarang dikasih nama class sendiri
+   ("home-cat-*") supaya tampilannya stabil dan tidak nyampur ke halaman lain. */
+.home-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 18px;
 }
 
-.reko-tab--link {
+@media (max-width: 1024px) {
+  .home-cat-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+}
+
+@media (max-width: 640px) {
+  .home-cat-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+}
+
+.home-cat-card {
+  position: relative;
   text-decoration: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 24px;
-  background: #fff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  white-space: nowrap;
-  min-width: 110px;
-  color: #475569;
-  flex-shrink: 0;
-  transition: border-color 0.18s, color 0.18s, background 0.18s, box-shadow 0.18s;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px 16px;
+  background: #ffffff;
+  border: 1px solid #eef1f6;
+  border-radius: 20px;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.28s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 24px -18px rgba(15, 23, 42, 0.18);
 }
 
-.reko-tab:hover,
-.reko-tab--link:hover {
-  border-color: #007570;
-  color: #007570;
-  box-shadow: 0 2px 12px rgba(0, 117, 112,0.1);
-}
-.reko-tab.active {
-  border-color: #007570;
-  background: #f0fffe;
-  color: #007570;
-  box-shadow: 0 2px 12px rgba(0, 117, 112,0.12);
+/* Aksen gradasi halus yang muncul dari bawah saat hover — bikin kartu
+   terasa "hidup" tanpa mengubah layout/ukuran (tidak menggeser konten lain). */
+.home-cat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(160deg, rgba(0, 117, 112, 0.06), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.28s ease;
 }
 
-.reko-tab__icon { display: flex; align-items: center; justify-content: center; }
-.reko-tab__label { font-size: 0.85rem; font-weight: 500; line-height: 1.3; text-align: center; }
+.home-cat-card:hover {
+  border-color: rgba(0, 117, 112, 0.28);
+  transform: translateY(-6px);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 20px 32px -16px rgba(0, 117, 112, 0.28);
+}
+
+.home-cat-card:hover::before {
+  opacity: 1;
+}
+
+.home-cat-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(150deg, #eef9f6, #e1f5ef);
+  color: #007570;
+  transition: background 0.28s ease, color 0.28s ease, transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.home-cat-card:hover .home-cat-card__icon {
+  background: linear-gradient(150deg, #009a8f, #007570);
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+.home-cat-card__label {
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  line-height: 1.25;
+  color: #1e293b;
+  transition: color 0.28s ease;
+}
+
+.home-cat-card:hover .home-cat-card__label {
+  color: #007570;
+}
 
 /* ── Business Cards Grid ── */
 .reko-grid {
@@ -1234,6 +1576,12 @@ body { background: #f5f6fa; }
   flex-wrap: wrap;
 }
 
+.biz-card__rating {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.72rem; color: #1e293b;
+  font-weight: 600;
+}
+
 .biz-card__location {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 0.72rem; color: #64748b;
@@ -1277,11 +1625,27 @@ body { background: #f5f6fa; }
   .home-search__divider { width: 100%; height: 1px; margin: 0; }
   .home-search__button { width: 100%; border-radius: 8px; height: 40px; margin-left: 0; }
   .home-kota-dropdown,
-  .home-keyword-dropdown { left: 0; right: 0; width: auto; }
+  .home-keyword-dropdown { left: 0; right: 0; width: auto; min-width: unset; }
+  
+  /* Business search results responsive */
+  .home-keyword-dropdown__item--business {
+    padding: 12px;
+    gap: 10px;
+  }
+  .home-keyword-dropdown__business-icon {
+    width: 38px;
+    height: 38px;
+  }
+  .home-keyword-dropdown__business-name {
+    font-size: 0.88rem;
+  }
+  .home-keyword-dropdown__business-meta {
+    font-size: 0.74rem;
+  }
 }
 
 @media (max-width: 640px) {
-  .home-hero { min-height: 55vh; }
+  .home-hero { min-height: 70vh; }
   .home-nav { gap: 14px; }
   .home-nav__link--login { display: none; }
   .reko-grid { grid-template-columns: 1fr; }
@@ -1416,76 +1780,264 @@ body { background: #f5f6fa; }
 }
 
 /* ─────────────────────────────────────────────
+   WAVE DIVIDER — foto sawah dengan tepi bergelombang beranimasi
+───────────────────────────────────────────── */
+.sawah-wave-divider {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sawah-wave-divider__img {
+  position: absolute;
+  inset: 0;
+  background: #1f4d2c url('../assets/sawah-bg.jpg') no-repeat center 60% / cover;
+  background-attachment: fixed;
+}
+
+.sawah-wave-divider__dim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse 60% 70% at center, rgba(3,15,10,0.55) 0%, rgba(3,15,10,0.15) 60%, rgba(3,15,10,0) 80%),
+    linear-gradient(180deg, rgba(4,20,12,0.30) 0%, rgba(4,20,12,0.05) 40%, rgba(4,20,12,0.32) 100%);
+}
+
+.sawah-wave-divider__text {
+  position: relative;
+  z-index: 3;
+  max-width: 720px;
+  margin: 0 24px;
+  text-align: center;
+  color: #ffffff;
+  padding: 0;
+}
+
+.sawah-wave-divider__eyebrow {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a7f3d0;
+  margin-bottom: 12px;
+}
+
+.sawah-wave-divider__heading {
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5), 0 8px 30px rgba(0,0,0,0.55);
+}
+
+.sawah-wave-divider__underline {
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin: 18px auto 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #34d399, #00c9b1);
+  box-shadow: 0 0 10px rgba(52,211,153,0.6);
+}
+
+.sawah-wave-divider__accent {
+  color: #34d399;
+}
+
+.sawah-wave-divider__br {
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .sawah-wave-divider__text {
+    padding: 24px 22px;
+    margin: 0 16px;
+  }
+  .sawah-wave-divider__br { display: none; }
+}
+
+.sawah-wave-edge {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 150px;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.sawah-wave-edge--top {
+  top: -1px;
+}
+
+.sawah-wave-edge--bottom {
+  bottom: -1px;
+  transform: scaleY(-1);
+}
+
+.sawah-wave-edge__loop {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 200%;
+  height: 100%;
+  fill: #ffffff;
+  opacity: 1;
+  animation: sawahWaveScroll 14s linear infinite;
+}
+
+@keyframes sawahWaveScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@media (max-width: 768px) {
+  .sawah-wave-divider { height: 260px; }
+  .sawah-wave-edge { height: 90px; }
+}
+
+/* ─────────────────────────────────────────────
    CEPAT PENCARIAN SECTION
 ───────────────────────────────────────────── */
 .quick-section {
-  background: #fff;
-  padding: 64px 0 72px;
+  background: linear-gradient(180deg, #fff 0%, #f7faf9 100%);
+  padding: 84px 0 92px;
   border-top: 1px solid #e8ecf0;
 }
 
 .quick-inner {
-  max-width: 1100px;
+  max-width: 1140px;
   margin: 0 auto;
   padding: 0 24px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 56px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 64px;
   align-items: center;
 }
 
+.quick-eyebrow {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #007570;
+  background: rgba(0, 117, 112, 0.08);
+  padding: 5px 12px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
 .quick-title {
-  font-size: 1.55rem;
-  font-weight: 700;
+  font-size: 2rem;
+  font-weight: 800;
   color: #0f172a;
-  margin-bottom: 8px;
-  line-height: 1.3;
+  margin-bottom: 12px;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  min-height: 1.3em;
+}
+
+/* Typing animation */
+.typing-animation {
+  display: inline-block;
+  overflow: hidden;
+  border-right: 3px solid #007570;
+  white-space: nowrap;
+  width: 0;
+  animation: 
+    typing 3s steps(40, end) 0.5s forwards,
+    blink-caret 0.75s step-end infinite 0.5s;
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: #007570; }
+}
+
+/* Remove caret after animation */
+.typing-animation.animation-done {
+  border-right: none;
 }
 
 .quick-subtitle {
-  font-size: 0.82rem;
+  font-size: 1rem;
   color: #64748b;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
+  line-height: 1.6;
 }
 
 .quick-steps {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 22px;
 }
 
 .quick-step {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 14px;
+  transition: background-color 0.25s ease, transform 0.25s ease;
+}
+
+.quick-step:hover {
+  background: rgba(0, 117, 112, 0.05);
+  transform: translateX(4px);
 }
 
 .quick-step__num {
-  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #059669, #007570);
+  color: #fff;
+  font-size: 0.95rem;
   font-weight: 800;
-  color: #007570;
   flex-shrink: 0;
-  min-width: 24px;
-  padding-top: 2px;
 }
 
 .quick-step__title {
-  font-size: 0.92rem;
+  font-size: 1.02rem;
   font-weight: 700;
   color: #0f172a;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .quick-step__desc {
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   color: #64748b;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
+/* ── Kotak video: dipercantik dengan frame, glow, dan badge lokasi ── */
 .quick-img-wrap {
-  border-radius: 16px;
+  position: relative;
+}
+
+.quick-img-frame {
+  position: relative;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(15,23,42,0.12);
+  aspect-ratio: 4 / 3.1;
+  box-shadow: 0 24px 60px rgba(15,23,42,0.16), 0 2px 8px rgba(15,23,42,0.06);
+  border: 6px solid #ffffff;
+  outline: 1px solid #e8ecf0;
 }
 
 .quick-img {
@@ -1495,15 +2047,106 @@ body { background: #f5f6fa; }
   display: block;
 }
 
+.quick-img-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 -60px 70px -40px rgba(0,0,0,0.35);
+}
+
+.quick-img-badge {
+  position: absolute;
+  left: 20px;
+  bottom: -18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 999px;
+  box-shadow: 0 10px 26px rgba(15,23,42,0.16);
+}
+
+.quick-img-badge svg {
+  color: #059669;
+  flex-shrink: 0;
+}
+
+/* ── Animasi masuk yang BERULANG (repeat-reveal): berbeda dari
+   reveal-on-scroll biasa yang cuma sekali jalan — class "is-revealed"
+   di sini ditambah & dilepas otomatis lewat JS (useRepeatReveal) tiap
+   elemen keluar-masuk layar, jadi animasinya muncul lagi terus. ── */
+.repeat-reveal {
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.repeat-reveal--left {
+  opacity: 0;
+  transform: translateX(-32px);
+}
+.repeat-reveal--left.is-revealed {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.repeat-reveal--right {
+  opacity: 0;
+  transform: translateX(32px) scale(0.97);
+}
+.repeat-reveal--right.is-revealed {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.repeat-reveal--up {
+  opacity: 0;
+  transform: translateY(26px);
+}
+.repeat-reveal--up.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Responsive smart & quick */
 @media (max-width: 900px) {
   .smart-grid { grid-template-columns: repeat(2, 1fr); }
-  .quick-inner { grid-template-columns: 1fr; gap: 32px; }
+  .quick-inner { grid-template-columns: 1fr; gap: 40px; }
   .quick-img-wrap { order: -1; }
+  .quick-title { 
+    font-size: 1.65rem; 
+  }
+  .quick-subtitle {
+    font-size: 0.9rem;
+  }
+  .quick-step__title {
+    font-size: 0.95rem;
+  }
+  .quick-step__desc {
+    font-size: 0.85rem;
+  }
 }
 
 @media (max-width: 480px) {
   .smart-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .quick-title {
+    font-size: 1.4rem;
+    white-space: normal;
+    border-right: none;
+    animation: fadeInUp 1s ease forwards;
+  }
+  .quick-subtitle {
+    font-size: 0.85rem;
+  }
+  .quick-step__title {
+    font-size: 0.9rem;
+  }
+  .quick-step__desc {
+    font-size: 0.8rem;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -1846,22 +2489,40 @@ body { background: #f5f6fa; }
 }
 
 .feat-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   padding: 32px 20px;
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid #e8ecf0;
   box-shadow: 0 4px 20px rgba(15,23,42,0.03);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: pointer;
+  overflow: hidden;
+}
+
+.feat-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #059669, #00c9b1);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s ease;
 }
 
 .feat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(15,23,42,0.08);
+  transform: translateY(-6px);
+  box-shadow: 0 14px 34px rgba(5,150,105,0.14);
+  border-color: rgba(5,150,105,0.25);
+}
+
+.feat-card:hover::before {
+  transform: scaleX(1);
 }
 
 .feat-card__icon-wrap {
@@ -1875,6 +2536,36 @@ body { background: #f5f6fa; }
   justify-content: center;
   margin-bottom: 20px;
   box-shadow: 0 4px 12px rgba(30,41,59,0.15);
+  transition: background 0.35s ease, box-shadow 0.35s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Kondisi awal sebelum animasi "pop up" jalan */
+  opacity: 0;
+  transform: translateY(46px) scale(0.4);
+}
+
+/* ── Animasi ikon "meloncat keluar ke atas" saat card terlihat ── */
+@keyframes featIconPopUp {
+  0%   { opacity: 0; transform: translateY(46px) scale(0.4) rotate(-12deg); }
+  55%  { opacity: 1; transform: translateY(-10px) scale(1.14) rotate(6deg); }
+  78%  { transform: translateY(4px) scale(0.95) rotate(-3deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+}
+
+.reveal-card.is-revealed .feat-card__icon-wrap {
+  animation: featIconPopUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Selaraskan jeda animasi ikon dengan stagger fade tiap kartu */
+.reveal-stagger > *:nth-child(1) .feat-card__icon-wrap { animation-delay: 0.20s; }
+.reveal-stagger > *:nth-child(2) .feat-card__icon-wrap { animation-delay: 0.30s; }
+.reveal-stagger > *:nth-child(3) .feat-card__icon-wrap { animation-delay: 0.40s; }
+.reveal-stagger > *:nth-child(4) .feat-card__icon-wrap { animation-delay: 0.50s; }
+
+/* Hover: ikon melompat kecil + lingkaran berubah jadi gradasi hijau */
+.feat-card:hover .feat-card__icon-wrap {
+  background: linear-gradient(135deg, #059669, #00997f);
+  box-shadow: 0 8px 22px rgba(5,150,105,0.35);
+  transform: translateY(-5px) scale(1.08) rotate(-4deg);
 }
 
 .feat-card__title {
@@ -1882,6 +2573,11 @@ body { background: #f5f6fa; }
   font-weight: 700;
   color: #0f172a;
   margin-bottom: 10px;
+  transition: color 0.25s ease;
+}
+
+.feat-card:hover .feat-card__title {
+  color: #007570;
 }
 
 .feat-card__text {
@@ -2281,4 +2977,109 @@ body { background: #f5f6fa; }
 }
 
 
+/* ─────────────────────────────────────────────
+   SCROLL REVEAL ANIMATIONS
+───────────────────────────────────────────── */
 
+/* Fade in up animation */
+.fade-in-up {
+  opacity: 0;
+  transform: translateY(30px);
+  animation: fadeInUp 0.8s ease forwards;
+  animation-play-state: paused;
+}
+
+.fade-in-up.delay-1 {
+  animation-delay: 0.2s;
+}
+
+.fade-in-up.delay-2 {
+  animation-delay: 0.4s;
+}
+
+.fade-in-up.delay-3 {
+  animation-delay: 0.6s;
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Reveal from left */
+.reveal-from-left {
+  opacity: 0;
+  transform: translateX(-50px);
+  animation: revealFromLeft 1s ease forwards;
+  animation-delay: 0.3s;
+  animation-play-state: paused;
+}
+
+@keyframes revealFromLeft {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Reveal from right */
+.reveal-from-right {
+  opacity: 0;
+  transform: translateX(50px);
+  animation: revealFromRight 1s ease forwards;
+  animation-delay: 0.5s;
+  animation-play-state: paused;
+}
+
+@keyframes revealFromRight {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Typing animation for title */
+.typing-animation {
+  display: inline-block;
+  overflow: hidden;
+  border-right: 3px solid #007570;
+  white-space: nowrap;
+  animation: 
+    typing 3s steps(40, end),
+    blink-caret 0.75s step-end infinite;
+  animation-delay: 0.5s;
+  animation-fill-mode: forwards;
+  width: 0;
+}
+
+@keyframes typing {
+  from { 
+    width: 0; 
+  }
+  to { 
+    width: 100%; 
+  }
+}
+
+@keyframes blink-caret {
+  from, to { 
+    border-color: transparent; 
+  }
+  50% { 
+    border-color: #007570; 
+  }
+}
+
+/* Stop caret blinking after typing is done */
+.typing-animation::after {
+  content: '';
+  animation: removeCaret 0s 4s forwards;
+}
+
+@keyframes removeCaret {
+  to {
+    border-right: none;
+  }
+}

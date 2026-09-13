@@ -22,19 +22,19 @@ export default function StandardAdsSection({ ads = [], loading = false }) {
       <section className="standard-ads-section">
         <div className="standard-ads-container">
           <div className="standard-ads-header">
-            <div className="h-5 w-36 bg-slate-200 rounded animate-pulse" />
+            <div className="h-5 w-36 bg-slate-200 rounded animate-pulse mb-4" />
           </div>
           <div className="flex gap-4 overflow-hidden py-2">
             {[1, 2, 3, 4, 5, 6].map((n) => (
               <div
                 key={`std-skel-${n}`}
-                className="w-[220px] sm:w-[250px] flex-shrink-0 bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-pulse"
+                className="w-[220px] sm:w-[250px] flex-shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
               >
-                <div className="h-32 sm:h-36 bg-slate-200" />
-                <div className="p-3 space-y-2">
-                  <div className="h-4 bg-slate-200 rounded w-3/4" />
-                  <div className="h-3 bg-slate-200 rounded w-1/2" />
-                  <div className="h-3 bg-slate-200 rounded w-2/3" />
+                <div className="h-32 sm:h-36 bg-slate-200 animate-pulse" />
+                <div className="p-3 space-y-2.5">
+                  <div className="h-4 bg-slate-200 rounded w-3/4 animate-pulse" />
+                  <div className="h-3 bg-slate-200 rounded w-1/2 animate-pulse" />
+                  <div className="h-3 bg-slate-200 rounded w-2/3 animate-pulse" />
                 </div>
               </div>
             ))}
@@ -55,7 +55,7 @@ export default function StandardAdsSection({ ads = [], loading = false }) {
             <Sparkles size={13} className="text-teal-600" />
             <span>Iklan Terverifikasi</span>
           </div>
-          <span className="standard-ads-header__hint">Mitra Pilihan Info.co.id</span>
+          <span className="standard-ads-header__hint">Mitra Pilihan Surade.co.id</span>
         </div>
 
         {/* Continuous Horizontal Scrolling Ticker Track */}
@@ -64,7 +64,7 @@ export default function StandardAdsSection({ ads = [], loading = false }) {
             {tickerItems.map((ad, idx) => {
               const targetUrl = `/business/${ad.business_id || ad.businessId || ad.id}`;
               const cardImage = getStorageUrl(ad.image || ad.banner || ad.logo || ad.business?.banner || ad.business?.logo) || DEFAULT_STANDARD_IMG;
-              const ratingValue = ad.rating ? Number(ad.rating).toFixed(1) : "4.8";
+              const ratingValue = ad.rating ? Number(ad.rating).toFixed(1) : "0.0";
               const cityName = ad.city || (ad.location ? ad.location.split(",")[0].trim() : "Indonesia");
 
               return (

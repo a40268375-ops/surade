@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import logoImg from "../assets/logo.png";
+import logoImg from "../assets/logo-surade.png";
 import {
   MousePointer2,
   Globe,
@@ -35,19 +35,19 @@ export default function About() {
             <span className="separator">/</span>
             <span>Tentang Kami</span>
           </div>
-          <h1 className="about-hero__title">Tentang Info.co.id</h1>
+          <h1 className="about-hero__title">Tentang Surade.co.id</h1>
           <p className="about-hero__subtitle">
             Platform informasi terlengkap untuk mendukung Smart City dan Smart Village di Indonesia
           </p>
         </div>
       </section>
 
-      {/* WHY INFO.CO.ID SECTION */}
+      {/* WHY SURADE.CO.ID SECTION */}
       <section className="about-why">
         <div className="about-why__inner">
-          <h2 className="about-why__title">Mengapa Info.co.id?</h2>
+          <h2 className="about-why__title">Mengapa Surade.co.id?</h2>
           <p className="about-why__subtitle">
-            Info.co.id adalah pilihan tepat untuk kebutuhan informasi dan branding usaha Anda
+            Surade.co.id adalah pilihan tepat untuk kebutuhan informasi dan branding usaha Anda
           </p>
 
           <div className="about-features">
@@ -73,7 +73,7 @@ export default function About() {
               </div>
               <h3 className="about-feature-card__title">Smart City & Village</h3>
               <p className="about-feature-card__text">
-                Setiap usaha/kegiatan Anda akan memiliki website secara virtual (dapat menambahkan dan mengedit informasi). Info.co.id menjadi wadah untuk daerah berkarya dan berdaya saing menuju Smart City dan Smart Village.
+                Setiap usaha/kegiatan Anda akan memiliki website secara virtual (dapat menambahkan dan mengedit informasi). Surade.co.id menjadi wadah untuk daerah berkarya dan berdaya saing menuju Smart City dan Smart Village.
               </p>
               <button className="about-feature-card__button">
                 <Users size={16} />

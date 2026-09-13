@@ -116,9 +116,32 @@ export default function AddProduct() {
       });
 
       setSuccess(true);
+      
+      // Re-fetch businesses to update product count
+      try {
+        const bizRes = await api.get("/my-businesses");
+        const bizData = bizRes.data?.data || bizRes.data || [];
+        const bizList = Array.isArray(bizData) ? bizData : (bizData?.data || []);
+        if (Array.isArray(bizList)) {
+          setBusinesses(bizList);
+        }
+      } catch (err) {
+        console.error("Failed to re-fetch businesses:", err);
+      }
+
+      // Reset form untuk tambah produk lagi
+      setForm({
+        business_id: form.business_id, // Keep selected business
+        name: "",
+        price: "",
+        description: "",
+      });
+      setPriceDisplay("");
+      removeImage();
+      
       setTimeout(() => {
-        navigate("/admin-user?tab=produk");
-      }, 2000);
+        setSuccess(false);
+      }, 3000);
     } catch (err) {
       console.error("Failed to create product:", err);
       setError(err.response?.data?.message || "Gagal menambahkan produk");

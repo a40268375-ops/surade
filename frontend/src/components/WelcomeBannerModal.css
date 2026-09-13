@@ -1,0 +1,78 @@
+.welcome-banner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: welcome-banner-fade-in 0.25s ease;
+}
+
+.welcome-banner-modal {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+  animation: welcome-banner-pop-in 0.3s ease;
+}
+
+.welcome-banner-modal__image-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.welcome-banner-modal__image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.welcome-banner-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.welcome-banner-modal__close:hover {
+  background: #ffffff;
+  transform: scale(1.08);
+}
+
+@keyframes welcome-banner-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes welcome-banner-pop-in {
+  from { opacity: 0; transform: scale(0.94) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .welcome-banner-modal {
+    max-width: 100%;
+  }
+}

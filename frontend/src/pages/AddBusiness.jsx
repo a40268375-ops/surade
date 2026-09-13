@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
-import SubCategorySelector from "../components/SubCategorySelector";
+import CategorySelector from "../components/CategorySelector";
 import RichTextEditor, { isYouTubeUrl } from "../components/RichTextEditor";
+import DiscountCodeInput from "../components/DiscountCodeInput";
 import api from "../services/api";
 import { getStorageUrl } from "../utils/constants";
 import {
@@ -13,6 +14,18 @@ import {
   Crown, CreditCard, FileText, Sparkles, Copy, CheckCircle2, ShieldCheck, Clock
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
 function getYouTubeEmbedUrl(url) {
   if (!url || typeof url !== "string") return null;
@@ -56,20 +69,39 @@ function MapResizeHandler() {
   }, [map]);
   return null;
 }
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
+function MapCenterHandler({ coords }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (coords && map) {
+      // Fly to new coordinates with animation
+      map.flyTo([coords.lat, coords.lng], 15, {
+        duration: 1.5, // 1.5 seconds animation
+        easeLinearity: 0.25
+      });
+    }
+  }, [coords, map]);
+  
+  return null;
+}
 
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+
+const DESA_LIST = [
+  "Kelurahan Surade",
+  "Desa Jagamukti",
+  "Desa Citanglar",
+  "Desa Wanasari",
+  "Desa Sirnasari",
+  "Desa Kadaleman",
+  "Desa Gunungsungging",
+  "Desa Cipeundeuy",
+  "Desa Pasiripis",
+  "Desa Buniwangi",
+  "Desa Sukatani",
+  "Desa Kademangan"
+];
 
 const TIME_OPTIONS = [];
 for (let h = 0; h < 24; h++) {
@@ -112,8 +144,14 @@ const PAYMENT_METHODS = [
     category: "E-Wallet",
     items: [
       { id: "OVO", name: "OVO", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#4c2a86] text-white" },
-      { id: "DANA", name: "DANA", accountName: "Triwala Mitra Bestari", accountNumber: "XXX (Belum Terdaftar)", badgeColor: "bg-[#008cff] text-white" },
-      { id: "GoPay", name: "GoPay", accountName: "Triwala Mitra Bestari", accountNumber: "XXX (Belum Terdaftar)", badgeColor: "bg-[#00a5cf] text-white" },
+      { id: "DANA", name: "DANA", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#008cff] text-white" },
+      { id: "GoPay", name: "GoPay", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#00a5cf] text-white" },
+    ]
+  },
+  {
+    category: "QRIS",
+    items: [
+      { id: "QRIS", name: "QRIS (Semua E-Wallet & Bank)", accountName: "Triwala Mitra Bestari", accountNumber: "Scan QR Code", badgeColor: "bg-gradient-to-r from-[#00a5cf] to-[#008cff] text-white", isQRIS: true },
     ]
   }
 ];
@@ -132,11 +170,16 @@ export default function AddBusiness() {
   const [categories, setCategories] = useState([]);
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(false);
+  
+  // Desa dropdown state
+  const [desaSearch, setDesaSearch] = useState("");
+  const [desaDropdownOpen, setDesaDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [createdId, setCreatedId] = useState(null);
+  const [draftBizId, setDraftBizId] = useState(null); // bisnis yg sudah dibuat di step 2, dipakai di step 5
   const [deleting, setDeleting] = useState(false);
   const [isPendingVerification, setIsPendingVerification] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -151,6 +194,21 @@ export default function AddBusiness() {
   const [couponError, setCouponError] = useState("");
   const [couponSuccessMsg, setCouponSuccessMsg] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponPrefill, setCouponPrefill] = useState(""); // dipicu saat user klik chip "Kupon Tersedia"
+  // Daftar kode kupon yang sedang aktif & bisa dipakai, supaya user tahu
+  // kode apa saja yang tersedia (bukan cuma nebak-nebak).
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [availableCouponsLoading, setAvailableCouponsLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/coupons/public-codes")
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setAvailableCoupons(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => console.error("Gagal memuat daftar kupon:", err))
+      .finally(() => setAvailableCouponsLoading(false));
+  }, []);
 
   // ── Referral State (Optional - Premium Only) ──
   const [referralInput, setReferralInput] = useState("");
@@ -164,6 +222,7 @@ export default function AddBusiness() {
   const [copiedAccount, setCopiedAccount] = useState(false);
   const [proofFile, setProofFile] = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
+  const [hasExistingProof, setHasExistingProof] = useState(false); // Flag untuk existing proof
   const proofInputRef = useRef();
 
   // Category selection state
@@ -244,12 +303,24 @@ export default function AddBusiness() {
     return active.map((d) => d.day).join(", ");
   };
 
-  // Fetch Categories
+  // Fetch Categories from NavbarCategory (same as Navbar Informasi dropdown)
   useEffect(() => {
     setCategoriesLoading(true);
-    fetch(`${import.meta.env.VITE_API_URL}/categories`)
+    fetch(`${import.meta.env.VITE_API_URL}/navbar-categories`)
       .then((r) => r.json())
-      .then((d) => { if (Array.isArray(d)) setCategories(d); })
+      .then((d) => { 
+        const list = Array.isArray(d) ? d : (d?.data || []);
+        if (Array.isArray(list) && list.length > 0) {
+          setCategories(list);
+          
+          if (!isEditing && !selectedMainCategory) {
+            const defaultCat = list.find((cat) => cat.name === "Pendidikan" || cat.name === "Hiburan") || list[0];
+            if (defaultCat) {
+              setSelectedMainCategory(defaultCat);
+            }
+          }
+        }
+      })
       .catch(console.error)
       .finally(() => setCategoriesLoading(false));
   }, []);
@@ -261,24 +332,41 @@ export default function AddBusiness() {
       .then((r) => r.json())
       .then((d) => {
         const raw = Array.isArray(d) ? d : (d?.data || []);
-        const list = raw.filter((p) => Number(p.price) > 0 || !p.name?.toLowerCase().includes("free"));
-        setPlans(list);
-        if (list.length > 0 && isUpgradeParam) {
-          setSelectedPackage({ ...list[0], isFree: false });
+        // Simpan SEMUA plan (termasuk Free) supaya kartu Free juga bisa
+        // menampilkan fitur asli dari database, bukan teks statis.
+        setPlans(raw);
+        const premiumOnly = raw.filter((p) => Number(p.price) > 0);
+        if (premiumOnly.length > 0 && isUpgradeParam) {
+          setSelectedPackage({ ...premiumOnly[0], isFree: false });
         }
       })
       .catch(console.error)
       .finally(() => setPlansLoading(false));
   }, [isUpgradeParam]);
-
-  // Update form.category_id when subcategory changes
+  
+  // Close desa dropdown when clicking outside
   useEffect(() => {
-    if (selectedSubCategory) {
-      setForm((prev) => ({ ...prev, category_id: selectedSubCategory.id }));
+    const handleClickOutside = (e) => {
+      if (desaDropdownOpen && !e.target.closest('.desa-dropdown-container')) {
+        setDesaDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [desaDropdownOpen]);
+
+  // Update form.category_id when subcategory or main category changes
+  useEffect(() => {
+    const targetCatId = selectedSubCategory?.id || selectedMainCategory?.id || "";
+    if (targetCatId) {
+      console.log('[DEBUG] Setting category_id:', targetCatId, selectedSubCategory?.name || selectedMainCategory?.name);
+      setForm((prev) => ({ ...prev, category_id: targetCatId }));
     } else {
+      console.log('[DEBUG] Clearing category_id (no category selected)');
       setForm((prev) => ({ ...prev, category_id: "" }));
     }
-  }, [selectedSubCategory]);
+  }, [selectedSubCategory, selectedMainCategory]);
 
   // Load existing business data when editing
   useEffect(() => {
@@ -286,8 +374,9 @@ export default function AddBusiness() {
       setLoading(true);
       api.get(`/businesses/${id}`)
         .then((res) => {
-          const data = res.data?.data;
-          if (data) {
+          // show endpoint returns unwrapped business, fallback handles both formats
+          const data = res.data?.data || res.data;
+          if (data && data.id) {
             setForm({
               name: data.name || "",
               category_id: data.category_id || "",
@@ -341,8 +430,9 @@ export default function AddBusiness() {
               }
             }
 
-            // Load existing media items
-            if (data.media && Array.isArray(data.media)) {
+            // Load existing media from gallery column (array of paths) stored on businesses table
+            // Also try legacy data.media for backwards compat
+            if (data.media && Array.isArray(data.media) && data.media.length > 0) {
               const existingBanners = data.media
                 .filter((m) => m.title === "Banner")
                 .map((m) => ({ id: m.id, preview: getStorageUrl(m.file_path), isExisting: true }));
@@ -356,7 +446,7 @@ export default function AddBusiness() {
                   url: getStorageUrl(m.file_path),
                   isExisting: true,
                 }));
-              setPhotos(existingPhotos);
+              if (existingPhotos.length > 0) setPhotos(existingPhotos);
 
               const existingVideoItem = data.media.find((m) => m.type === "video");
               if (existingVideoItem) {
@@ -364,7 +454,6 @@ export default function AddBusiness() {
                 const isUrl = rawPath.startsWith("http://") || rawPath.startsWith("https://");
                 const fullUrl = isUrl ? rawPath : getStorageUrl(rawPath);
                 const embed = getYouTubeEmbedUrl(fullUrl);
-
                 setVideo({
                   id: existingVideoItem.id,
                   type: embed || isUrl ? "youtube" : "file",
@@ -373,6 +462,50 @@ export default function AddBusiness() {
                   embedUrl: embed,
                   isExisting: true,
                 });
+              }
+            } else {
+              // Primary source: gallery column on businesses table (array of paths/urls)
+              if (data.gallery && Array.isArray(data.gallery) && data.gallery.length > 0) {
+                const galleryPhotos = data.gallery
+                  .filter((path) => typeof path === 'string' && !path.includes('youtube.com') && !path.includes('youtu.be'))
+                  .map((path, idx) => ({
+                    id: `gallery_col_${idx}`,
+                    preview: getStorageUrl(path),
+                    url: getStorageUrl(path),
+                    galleryPath: path,
+                    isExisting: true,
+                  }));
+                if (galleryPhotos.length > 0) setPhotos(galleryPhotos);
+
+                // Load youtube video from gallery column
+                const galleryVideoUrl = data.gallery.find(
+                  (path) => typeof path === 'string' && (path.includes('youtube.com') || path.includes('youtu.be'))
+                );
+                if (galleryVideoUrl) {
+                  const embed = getYouTubeEmbedUrl(galleryVideoUrl);
+                  setVideo({
+                    type: 'youtube',
+                    file: null,
+                    preview: null,
+                    url: galleryVideoUrl,
+                    embedUrl: embed,
+                    isExisting: true,
+                  });
+                }
+              }
+
+              // Load existing banners from banners column
+              if (data.banners && Array.isArray(data.banners) && data.banners.length > 0) {
+                const existingBanners = data.banners.map((path, idx) => ({
+                  id: `banner_col_${idx}`,
+                  preview: getStorageUrl(path),
+                  bannerPath: path,
+                  isExisting: true,
+                }));
+                setBanners(existingBanners);
+              } else if (data.banner) {
+                // Single banner fallback
+                setBanners([{ id: 'banner_col_0', preview: getStorageUrl(data.banner), bannerPath: data.banner, isExisting: true }]);
               }
             }
 
@@ -383,6 +516,7 @@ export default function AddBusiness() {
             const existingProof = data.subscriptions?.[0]?.payment?.proof || data.latest_subscription?.payment?.proof || data.payment?.proof || data.proof;
             if (existingProof) {
               setProofPreview(getStorageUrl(existingProof));
+              setHasExistingProof(true); // Mark that we have existing proof
             }
 
             if (data.rejection_reason) {
@@ -478,6 +612,7 @@ export default function AddBusiness() {
     if (file) {
       setProofFile(file);
       setProofPreview(URL.createObjectURL(file));
+      setHasExistingProof(false); // Clear existing proof flag when new file uploaded
       setError("");
     }
   };
@@ -488,29 +623,48 @@ export default function AddBusiness() {
       URL.revokeObjectURL(proofPreview);
     }
     setProofPreview(null);
+    setHasExistingProof(false); // Clear existing proof flag
   };
   const handleRemoveProof = removeProof;
 
   const geocodeAddress = async () => {
     const query = address.trim();
-    if (!query) return;
+    if (!query) {
+      setError("Masukkan alamat terlebih dahulu");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+    
     setGeocoding(true);
+    setError(""); // Clear previous error
+    
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
         { headers: { "Accept-Language": "id" } }
       );
       const data = await res.json();
+      
       if (data?.[0]) {
-        setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+        const newCoords = { 
+          lat: parseFloat(data[0].lat), 
+          lng: parseFloat(data[0].lon) 
+        };
+        setCoords(newCoords);
         setMapKey((k) => k + 1);
+        
+        // Show success message
+        toast.success(`Lokasi ditemukan: ${data[0].display_name.split(',').slice(0, 3).join(',')}`);
       } else {
-        setError("Alamat tidak ditemukan.");
-        setTimeout(() => setError(""), 4000);
+        setError("Alamat tidak ditemukan. Coba gunakan format: Nama Tempat, Kota, Provinsi");
+        setTimeout(() => setError(""), 5000);
+        toast.error("Alamat tidak ditemukan");
       }
-    } catch {
-      setError("Gagal geocode.");
+    } catch (err) {
+      console.error("Geocoding error:", err);
+      setError("Gagal mencari lokasi. Periksa koneksi internet Anda.");
       setTimeout(() => setError(""), 4000);
+      toast.error("Gagal mencari lokasi");
     } finally {
       setGeocoding(false);
     }
@@ -763,12 +917,13 @@ export default function AddBusiness() {
         setCategoryError("Pilih kategori utama.");
         return "Pilih kategori utama.";
       }
-      if (!selectedSubCategory) {
+      if (selectedMainCategory.children && selectedMainCategory.children.length > 0 && !selectedSubCategory) {
         setCategoryError("Pilih sub kategori.");
         return "Pilih sub kategori.";
       }
       setCategoryError("");
-      if (!form.city.trim()) return "Kota wajib diisi.";
+      // Desa boleh kosong (Semua) atau harus dipilih salah satu
+      // if (!form.city.trim()) return "Desa wajib dipilih.";
       if (!form.province.trim()) return "Provinsi wajib diisi.";
       if (!form.description.trim()) return "Deskripsi wajib diisi.";
       if (isYouTubeUrl(form.description)) {
@@ -782,19 +937,71 @@ export default function AddBusiness() {
       if (!address.trim()) return "Alamat wajib diisi.";
     }
     if (step === 5 && !isFreeSelection) {
-      if (!proofFile) return "Wajib mengunggah bukti pembayaran sebelum mengirim.";
+      // Validasi: harus ada proof file baru ATAU existing proof
+      if (!proofFile && !hasExistingProof) {
+        return "Wajib mengunggah bukti pembayaran sebelum mengirim.";
+      }
     }
     return null;
   };
 
-  const nextStep = () => {
+  const nextStep = async () => {
     const err = validateCurrentStep();
     if (err) {
       setError(err);
+      toast.error(err, { duration: 4000 });
       setTimeout(() => setError(""), 3500);
       return;
     }
     setError("");
+
+    // Pada step 2 (form bisnis), buat bisnis dulu ke backend sebelum lanjut ke step 3
+    // supaya di step 5 kita tinggal kirim subscription + proof saja
+    if (step === 2 && !isFreeSelection && !isEditing && !draftBizId) {
+      setLoading(true);
+      try {
+        const selectedDays = openingDays
+          .filter((d) => d.selected)
+          .map((d) => ({ day: d.day, open: d.open, close: d.close }));
+        const categoryIdToSend = selectedSubCategory?.id || selectedMainCategory?.id || form.category_id;
+        const payload = {
+          ...form,
+          category_id: categoryIdToSend,
+          address,
+          tags,
+          opening_days: selectedDays,
+          latitude: coords?.lat ?? null,
+          longitude: coords?.lng ?? null,
+        };
+        const bizRes = await api.post("/businesses", payload);
+        const bizId = bizRes.data?.data?.id || bizRes.data?.id;
+        if (!bizId) throw new Error("ID bisnis tidak ditemukan.");
+        setDraftBizId(bizId);
+
+        // Upload logo & banner jika ada
+        if (logo) {
+          const fd = new FormData();
+          fd.append("logo", logo);
+          await api.post(`/businesses/${bizId}/logo`, fd);
+        }
+        for (const banner of banners) {
+          if (!banner.isExisting) {
+            const fd = new FormData();
+            fd.append("banner", banner.file);
+            await api.post(`/businesses/${bizId}/banner`, fd);
+          }
+        }
+      } catch (e) {
+        const msg = e?.response?.data?.message ||
+          (e?.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(", ") : e.message) ||
+          "Terjadi kesalahan saat menyimpan data bisnis.";
+        setError(msg);
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
+
     const maxSteps = isEditing ? (isUpgradeMode ? 5 : 2) : (isFreeSelection ? 3 : 5);
     setStep((s) => Math.min(s + 1, maxSteps));
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -812,18 +1019,26 @@ export default function AddBusiness() {
     setLoading(true);
     setError("");
     try {
+      console.log('[DEBUG] handleFreeSubmit - form.category_id:', form.category_id);
+      console.log('[DEBUG] selectedSubCategory:', selectedSubCategory);
+      console.log('[DEBUG] selectedMainCategory:', selectedMainCategory);
+      
       const selectedDays = openingDays
         .filter((d) => d.selected)
         .map((d) => ({ day: d.day, open: d.open, close: d.close }));
 
+      const categoryIdToSend = selectedSubCategory?.id || selectedMainCategory?.id || form.category_id;
       const payload = {
         ...form,
+        category_id: categoryIdToSend,
         address,
         tags,
         opening_days: selectedDays,
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
       };
+      
+      console.log('[DEBUG] Payload being sent:', payload);
 
       let bizId;
       if (isEditing) {
@@ -831,7 +1046,8 @@ export default function AddBusiness() {
         bizId = id;
       } else {
         const bizRes = await api.post("/businesses", payload);
-        bizId = bizRes.data?.data?.id;
+        // Handle both response formats: { data: { id } } or { id }
+        bizId = bizRes.data?.data?.id || bizRes.data?.id;
         if (!bizId) throw new Error("ID bisnis tidak ditemukan.");
       }
 
@@ -842,6 +1058,8 @@ export default function AddBusiness() {
       }
 
       for (const banner of banners) {
+        // Skip existing banners (already saved, no file object)
+        if (banner.isExisting || !banner.file) continue;
         const fd = new FormData();
         fd.append("banner", banner.file);
         await api.post(`/businesses/${bizId}/banner`, fd);
@@ -892,6 +1110,10 @@ export default function AddBusiness() {
 
   // Submit Premium Business + Subscription + Proof
   const handlePremiumSubmit = async () => {
+    console.log('[DEBUG] handlePremiumSubmit called');
+    console.log('[DEBUG] proofFile:', proofFile);
+    console.log('[DEBUG] draftBizId:', draftBizId);
+    
     const err = validateCurrentStep();
     if (err) {
       setError(err);
@@ -901,69 +1123,90 @@ export default function AddBusiness() {
     setLoading(true);
     setError("");
     try {
-      const selectedDays = openingDays
-        .filter((d) => d.selected)
-        .map((d) => ({ day: d.day, open: d.open, close: d.close }));
+      let bizId = draftBizId;
 
-      const payload = {
-        ...form,
-        address,
-        tags,
-        opening_days: selectedDays,
-        latitude: coords?.lat ?? null,
-        longitude: coords?.lng ?? null,
-      };
+      // Fallback: jika draftBizId belum ada (misal user reload), buat bisnis dulu
+      if (!bizId) {
+        const selectedDays = openingDays
+          .filter((d) => d.selected)
+          .map((d) => ({ day: d.day, open: d.open, close: d.close }));
 
-      let bizId;
-      if (isEditing) {
-        await api.put(`/businesses/${id}`, payload);
-        bizId = id;
-      } else {
-        const bizRes = await api.post("/businesses", payload);
-        bizId = bizRes.data?.data?.id;
-        if (!bizId) throw new Error("ID bisnis tidak ditemukan.");
-      }
+        const categoryIdToSend = selectedSubCategory?.id || selectedMainCategory?.id || form.category_id;
+        const payload = {
+          ...form,
+          category_id: categoryIdToSend,
+          address,
+          tags,
+          opening_days: selectedDays,
+          latitude: coords?.lat ?? null,
+          longitude: coords?.lng ?? null,
+        };
 
-      if (logo) {
-        const fd = new FormData();
-        fd.append("logo", logo);
-        await api.post(`/businesses/${bizId}/logo`, fd);
-      }
+        if (isEditing) {
+          await api.put(`/businesses/${id}`, payload);
+          bizId = id;
+        } else {
+          const bizRes = await api.post("/businesses", payload);
+          bizId = bizRes.data?.data?.id || bizRes.data?.id;
+          if (!bizId) throw new Error("ID bisnis tidak ditemukan.");
+        }
 
-      for (const banner of banners) {
-        const fd = new FormData();
-        fd.append("banner", banner.file);
-        await api.post(`/businesses/${bizId}/banner`, fd);
-      }
-
-      // Delete removed existing media items
-      if (deletedMediaIds.length > 0) {
-        for (const mediaId of deletedMediaIds) {
-          try {
-            await api.delete(`/business-media/${mediaId}`);
-          } catch (err) {
-            console.error("Failed to delete media item:", err);
+        if (logo) {
+          const fd = new FormData();
+          fd.append("logo", logo);
+          await api.post(`/businesses/${bizId}/logo`, fd);
+        }
+        for (const banner of banners) {
+          if (!banner.isExisting) {
+            const fd = new FormData();
+            fd.append("banner", banner.file);
+            await api.post(`/businesses/${bizId}/banner`, fd);
           }
         }
+      } else if (isEditing) {
+        // Edit mode: update bisnis
+        const selectedDays = openingDays
+          .filter((d) => d.selected)
+          .map((d) => ({ day: d.day, open: d.open, close: d.close }));
+        const categoryIdToSend = selectedSubCategory?.id || selectedMainCategory?.id || form.category_id;
+        const payload = {
+          ...form,
+          category_id: categoryIdToSend,
+          address,
+          tags,
+          opening_days: selectedDays,
+          latitude: coords?.lat ?? null,
+          longitude: coords?.lng ?? null,
+        };
+        await api.put(`/businesses/${id}`, payload);
+        bizId = id;
       }
 
       // Upload new photo gallery files
       const newPhotoFiles = photos.filter((p) => !p.isExisting && p.file).map((p) => p.file);
       if (newPhotoFiles.length > 0) {
-        const fd = new FormData();
-        newPhotoFiles.forEach((file) => fd.append("files[]", file));
-        await api.post(`/businesses/${bizId}/gallery`, fd);
+        try {
+          const fd = new FormData();
+          newPhotoFiles.forEach((file) => fd.append("files[]", file));
+          await api.post(`/businesses/${bizId}/gallery`, fd);
+        } catch (gErr) {
+          console.warn("Failed to upload gallery photos:", gErr);
+        }
       }
 
       // Upload or save new video
       if (video && !video.isExisting) {
-        const fd = new FormData();
-        if (video.type === "file" && video.file) {
-          fd.append("files[]", video.file);
-          await api.post(`/businesses/${bizId}/gallery`, fd);
-        } else if (video.type === "youtube" && video.url) {
-          fd.append("video_url", video.url);
-          await api.post(`/businesses/${bizId}/gallery`, fd);
+        try {
+          const fd = new FormData();
+          if (video.type === "file" && video.file) {
+            fd.append("files[]", video.file);
+            await api.post(`/businesses/${bizId}/gallery`, fd);
+          } else if (video.type === "youtube" && video.url) {
+            fd.append("video_url", video.url);
+            await api.post(`/businesses/${bizId}/gallery`, fd);
+          }
+        } catch (vErr) {
+          console.warn("Failed to upload video:", vErr);
         }
       }
 
@@ -1009,18 +1252,26 @@ export default function AddBusiness() {
     setLoading(true);
     setError("");
     try {
+      console.log('[DEBUG handleSaveEdit] form.category_id:', form.category_id);
+      console.log('[DEBUG handleSaveEdit] selectedSubCategory:', selectedSubCategory);
+      console.log('[DEBUG handleSaveEdit] selectedMainCategory:', selectedMainCategory);
+      
       const selectedDays = openingDays
         .filter((d) => d.selected)
         .map((d) => ({ day: d.day, open: d.open, close: d.close }));
 
+      const categoryIdToSend = selectedSubCategory?.id || selectedMainCategory?.id || form.category_id;
       const payload = {
         ...form,
+        category_id: categoryIdToSend,
         address,
         tags,
         opening_days: selectedDays,
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
       };
+      
+      console.log('[DEBUG handleSaveEdit] Payload:', payload);
 
       await api.put(`/businesses/${id}`, payload);
       const bizId = id;
@@ -1076,6 +1327,14 @@ export default function AddBusiness() {
       setCreatedId(bizId);
       setIsPendingVerification(false);
       setSuccess(true);
+      
+      // Show success message immediately
+      toast.success('Perubahan berhasil disimpan dan dikirim untuk verifikasi!', { duration: 4000 });
+      
+      // Auto redirect after short delay
+      setTimeout(() => {
+        navigate('/admin-user?tab=bisnis');
+      }, 2000);
     } catch (e) {
       const msg = e?.response?.data?.message ||
         (e?.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(", ") : e.message) ||
@@ -1252,7 +1511,10 @@ export default function AddBusiness() {
                 <Loader2 size={36} className={spinCls} />
                 <span className="text-sm font-medium mt-3">Memuat pilihan paket...</span>
               </div>
-            ) : (
+            ) : (() => {
+              const freePlan = plans.find((p) => Number(p.price) === 0);
+              const premiumPlans = plans.filter((p) => Number(p.price) > 0);
+              return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
                 {/* ── CARD FREE ── */}
                 <div
@@ -1283,38 +1545,41 @@ export default function AddBusiness() {
                     </p>
 
                     <div className="space-y-3 pt-5 border-t border-slate-100 text-[0.88rem]">
-                      <div className="flex items-center gap-2.5 text-slate-700 font-medium">
-                        <Check size={16} className="text-[#007570] shrink-0" />
-                        <span>Profil &amp; Informasi Usaha</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-slate-700 font-medium">
-                        <Check size={16} className="text-[#007570] shrink-0" />
-                        <span>Alamat &amp; Kontak Manual</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-slate-700 font-medium">
-                        <Check size={16} className="text-[#007570] shrink-0" />
-                        <span>Kategori Usaha Dasar</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
-                        <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Peta / Lokasi Interaktif</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
-                        <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Galeri Foto Banner &amp; Video</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
-                        <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Katalog Produk &amp; Harga</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
-                        <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Fitur Chat Pelanggan</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-slate-400 line-through">
-                        <X size={16} className="text-slate-300 shrink-0" />
-                        <span>Badge Bisnis Terverifikasi</span>
-                      </div>
+                      {freePlan?.features && Object.keys(freePlan.features).length > 0 ? (
+                        Object.entries(freePlan.features).map(([featureName, enabled]) => (
+                          <div
+                            key={featureName}
+                            className={`flex items-center gap-2.5 font-medium ${enabled ? "text-slate-700" : "text-slate-400 line-through"}`}
+                          >
+                            {enabled ? (
+                              <Check size={16} className="text-[#007570] shrink-0" />
+                            ) : (
+                              <X size={16} className="text-slate-300 shrink-0" />
+                            )}
+                            <span>{featureName}</span>
+                          </div>
+                        ))
+                      ) : (
+                        [
+                          { name: "Lokasi Peta Penuh", enabled: false },
+                          { name: "Galeri Foto Profil", enabled: false },
+                          { name: "Fitur Katalog Produk", enabled: true },
+                          { name: "Akses Chat & WA Direct", enabled: true },
+                          { name: "Prioritas & Badge Premium", enabled: false },
+                        ].map((f) => (
+                          <div
+                            key={f.name}
+                            className={`flex items-center gap-2.5 font-medium ${f.enabled ? "text-slate-700" : "text-slate-400 line-through"}`}
+                          >
+                            {f.enabled ? (
+                              <Check size={16} className="text-[#007570] shrink-0" />
+                            ) : (
+                              <X size={16} className="text-slate-300 shrink-0" />
+                            )}
+                            <span>{f.name}</span>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
 
@@ -1336,7 +1601,7 @@ export default function AddBusiness() {
                 </div>
 
                 {/* ── CARD PREMIUM (Clean Ultra-Premium Design) ── */}
-                {plans.length === 0 ? (
+                {premiumPlans.length === 0 ? (
                   <div
                     onClick={() => setSelectedPackage({ id: 1, name: "Premium Business", price: 50000, duration_value: 1, duration_unit: "month", formatted_duration: "1 Bulan", isFree: false })}
                     className={`relative rounded-3xl p-7 md:p-8 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer overflow-hidden group ${
@@ -1420,7 +1685,7 @@ export default function AddBusiness() {
                     </button>
                   </div>
                 ) : (
-                  plans.map((plan) => {
+                  premiumPlans.map((plan) => {
                     const isSelected = selectedPackage?.id === plan.id;
                     const durationText = plan.formatted_duration || `${plan.duration_value || 1} ${plan.duration_unit === 'year' || plan.duration_unit === 'tahun' ? 'Tahun' : 'Bulan'}`;
 
@@ -1467,26 +1732,26 @@ export default function AddBusiness() {
                             </p>
 
                             <div className="space-y-3 pt-5 border-t border-white/15 text-[0.88rem]">
-                              <div className="flex items-center gap-2.5 text-slate-100 font-medium">
-                                <Check size={16} className="text-emerald-400 shrink-0" />
-                                <span>Integrasi Map &amp; Lokasi Interaktif</span>
-                              </div>
-                              <div className="flex items-center gap-2.5 text-slate-100 font-medium">
-                                <Check size={16} className="text-emerald-400 shrink-0" />
-                                <span>Galeri Foto Banner &amp; Video Profil</span>
-                              </div>
-                              <div className="flex items-center gap-2.5 text-slate-100 font-medium">
-                                <Check size={16} className="text-emerald-400 shrink-0" />
-                                <span>Katalog Produk &amp; Rata-rata Harga</span>
-                              </div>
-                              <div className="flex items-center gap-2.5 text-slate-100 font-medium">
-                                <Check size={16} className="text-emerald-400 shrink-0" />
-                                <span>Akses Fitur Chat Langsung</span>
-                              </div>
-                              <div className="flex items-center gap-2.5 text-amber-300 font-semibold">
-                                <Check size={16} className="text-amber-400 shrink-0" />
-                                <span>Badge Bisnis Terverifikasi &amp; Prioritas</span>
-                              </div>
+                              {plan.features && Object.keys(plan.features).length > 0 ? (
+                                Object.entries(plan.features).map(([featureName, enabled]) => (
+                                  <div
+                                    key={featureName}
+                                    className={`flex items-center gap-2.5 font-medium ${enabled ? "text-slate-100" : "text-slate-400 line-through"}`}
+                                  >
+                                    {enabled ? (
+                                      <Check size={16} className="text-emerald-400 shrink-0" />
+                                    ) : (
+                                      <X size={16} className="text-slate-500 shrink-0" />
+                                    )}
+                                    <span>{featureName}</span>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="flex items-center gap-2.5 text-slate-100 font-medium">
+                                  <Check size={16} className="text-emerald-400 shrink-0" />
+                                  <span>Akses fitur lengkap untuk usaha Anda</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1512,7 +1777,8 @@ export default function AddBusiness() {
                   })
                 )}
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -1730,7 +1996,7 @@ export default function AddBusiness() {
 
                   {/* Kategori & Sub Kategori */}
                   <div className="flex flex-col gap-2">
-                    <SubCategorySelector
+                    <CategorySelector
                       categories={categories}
                       selectedMainCategory={selectedMainCategory}
                       selectedSubCategory={selectedSubCategory}
@@ -1862,13 +2128,21 @@ export default function AddBusiness() {
                           type="button"
                           onClick={geocodeAddress}
                           disabled={geocoding}
-                          className="px-5 bg-[#007570] text-white border-0 rounded-xl font-semibold cursor-pointer shrink-0 hover:bg-[#005a58] flex items-center gap-2 transition-colors"
+                          className="px-5 bg-[#007570] text-white border-0 rounded-xl font-semibold cursor-pointer shrink-0 hover:bg-[#005a58] flex items-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           {geocoding ? <Loader2 size={16} className={spinCls} /> : <Search size={16} />}
                           <span className="hidden sm:inline">Cari Peta</span>
                         </button>
                       )}
                     </div>
+                    {!isFreeSelection && (
+                      <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1.5">
+                        <Search size={12} className="text-[#007570]" />
+                        <span>
+                          Tips: Ketik alamat lengkap (contoh: "Desa Surade, Sukabumi, Jawa Barat") lalu klik <strong>Cari Peta</strong> atau tekan <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-[10px] font-mono">Enter</kbd>
+                        </span>
+                      </p>
+                    )}
 
                     {!isFreeSelection ? (
                       <div className="w-full max-w-full rounded-2xl overflow-hidden mt-3 border border-[#e2e8f0] relative isolate z-0 min-w-0">
@@ -1880,6 +2154,7 @@ export default function AddBusiness() {
                           scrollWheelZoom
                         >
                           <MapResizeHandler />
+                          <MapCenterHandler coords={coords} />
                           <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                           <MapClickHandler onMapClick={(latlng) => setCoords({ lat: latlng.lat, lng: latlng.lng })} />
                           {coords && <Marker position={[coords.lat, coords.lng]} />}
@@ -1897,15 +2172,96 @@ export default function AddBusiness() {
                     )}
                   </div>
 
-                  {/* Kota & Provinsi */}
+                  {/* Desa & Provinsi */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-2">
-                      <label className={labelCls}>Kota <span className="text-[#dc2626]">*</span></label>
-                      <input name="city" type="text" placeholder="Contoh: Jakarta Selatan" value={form.city} onChange={handleFormChange} className={inputCls} />
+                    <div className="flex flex-col gap-2 relative desa-dropdown-container">
+                      <label className={labelCls}>Desa <span className="text-[#dc2626]">*</span></label>
+                      
+                      {/* Custom Searchable Dropdown */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setDesaDropdownOpen(!desaDropdownOpen)}
+                          className={`${inputCls} flex items-center justify-between text-left ${!form.city ? 'text-gray-400' : ''}`}
+                        >
+                          <span>{form.city || "Lokasi Semua"}</span>
+                          <ChevronRight 
+                            size={18} 
+                            className={`transition-transform duration-200 ${desaDropdownOpen ? 'rotate-90' : ''}`}
+                          />
+                        </button>
+                        
+                        {desaDropdownOpen && (
+                          <div className="absolute z-50 w-full mt-2 bg-white border-2 border-[#007570] rounded-xl shadow-2xl max-h-[320px] overflow-hidden">
+                            {/* Search Input */}
+                            <div className="p-3 border-b border-slate-200 bg-slate-50">
+                              <div className="relative">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                  type="text"
+                                  placeholder="Cari desa..."
+                                  value={desaSearch}
+                                  onChange={(e) => setDesaSearch(e.target.value)}
+                                  className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007570]/20"
+                                />
+                              </div>
+                            </div>
+                            
+                            {/* Options List */}
+                            <div className="overflow-y-auto max-h-[240px]">
+                              {/* Semua Option */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setForm(prev => ({ ...prev, city: "" }));
+                                  setDesaDropdownOpen(false);
+                                  setDesaSearch("");
+                                }}
+                                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#007570]/5 transition-colors ${
+                                  !form.city ? 'bg-[#007570]/10 font-semibold text-[#007570]' : 'text-slate-700'
+                                }`}
+                              >
+                                <div className="font-medium">Semua</div>
+                              </button>
+                              
+                              {/* Filtered Desa List */}
+                              {DESA_LIST
+                                .filter(desa => 
+                                  desa.toLowerCase().includes(desaSearch.toLowerCase())
+                                )
+                                .map((desa) => (
+                                  <button
+                                    key={desa}
+                                    type="button"
+                                    onClick={() => {
+                                      setForm(prev => ({ ...prev, city: desa }));
+                                      setDesaDropdownOpen(false);
+                                      setDesaSearch("");
+                                    }}
+                                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[#007570]/5 transition-colors ${
+                                      form.city === desa ? 'bg-[#007570]/10 font-semibold text-[#007570]' : 'text-slate-700'
+                                    }`}
+                                  >
+                                    {desa}
+                                  </button>
+                                ))}
+                              
+                              {/* No Results */}
+                              {DESA_LIST.filter(desa => 
+                                desa.toLowerCase().includes(desaSearch.toLowerCase())
+                              ).length === 0 && (
+                                <div className="px-4 py-8 text-center text-sm text-slate-400">
+                                  Tidak ada desa ditemukan
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2">
                       <label className={labelCls}>Provinsi <span className="text-[#dc2626]">*</span></label>
-                      <input name="province" type="text" placeholder="Contoh: DKI Jakarta" value={form.province} onChange={handleFormChange} className={inputCls} />
+                      <input name="province" type="text" placeholder="Contoh: Jawa Barat" value={form.province} onChange={handleFormChange} className={inputCls} />
                     </div>
                   </div>
 
@@ -1959,11 +2315,16 @@ export default function AddBusiness() {
 
                 <div className="space-y-6">
                   {/* 1. LOGO (Top Priority) */}
-                  <div className="flex flex-col gap-2 bg-white p-4 rounded-xl border border-slate-200">
-                    <label className={labelCls}><Camera size={16} className="text-[#007570]" /> 1. Logo / Thumbnail Utama Usaha</label>
-                    <p className="text-xs text-slate-500 mb-2">Gambar ini akan menjadi foto profil &amp; thumbnail utama di halaman pencarian.</p>
+                  <div className="flex flex-col gap-3 bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-xl border-2 border-purple-200 shadow-sm">
+                    <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Camera size={18} className="text-purple-600" /> 
+                      1. Logo / Thumbnail Utama Usaha
+                    </label>
+                    <p className="text-xs text-purple-700 mb-1">
+                      Gambar ini akan menjadi foto profil &amp; thumbnail utama di halaman pencarian.
+                    </p>
                     {logoPreview ? (
-                      <div className="relative max-w-[180px] rounded-xl overflow-hidden border-2 border-[#007570] shadow-sm">
+                      <div className="relative max-w-[180px] rounded-xl overflow-hidden border-2 border-purple-400 shadow-md">
                         <img src={logoPreview} alt="Logo" className="w-full aspect-square object-cover" />
                         <button
                           type="button"
@@ -1976,31 +2337,40 @@ export default function AddBusiness() {
                       </div>
                     ) : (
                       <div
-                        className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer bg-slate-50 hover:bg-[#f0fffe] hover:border-[#007570] transition-colors max-w-[360px]"
+                        className="border-2 border-dashed border-purple-300 rounded-xl p-8 text-center cursor-pointer bg-white hover:bg-purple-50 hover:border-purple-500 transition-colors max-w-[360px]"
                         onClick={() => logoInputRef.current?.click()}
                       >
                         <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoChange} />
-                        <Camera size={28} className="mx-auto text-[#007570] mb-2" />
+                        <Camera size={32} className="mx-auto text-purple-600 mb-3" />
                         <span className="text-sm font-bold text-slate-700 block">Upload Logo Usaha</span>
-                        <span className="text-xs text-slate-400">Format JPG, PNG (Maks 4MB)</span>
+                        <span className="text-xs text-slate-400 block mt-1">JPG, PNG (Maks 4MB)</span>
                       </div>
                     )}
                   </div>
 
                   {/* 2. BANNER (After Logo) */}
-                  <div className="flex flex-col gap-2 bg-white p-4 rounded-xl border border-slate-200">
-                    <label className={labelCls}><ImageIcon size={16} className="text-[#007570]" /> 2. Banner / Foto Latar Header (Maks. 4 Foto)</label>
-                    <p className="text-xs text-slate-500 mb-2">Banner akan ditampilkan sebagai latar belakang header halaman detail bisnis Anda.</p>
+                  <div className="flex flex-col gap-3 bg-gradient-to-br from-blue-50 to-cyan-50 p-5 rounded-xl border-2 border-blue-200 shadow-sm">
+                    <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Upload size={18} className="text-blue-600" /> 
+                      2. Banner / Foto Latar Header (Maks. 4 Foto)
+                    </label>
+                    <p className="text-xs text-blue-700 mb-1">
+                      Banner akan ditampilkan sebagai latar belakang header halaman detail bisnis Anda.
+                    </p>
                     <div
-                      className={`border-2 border-dashed border-slate-300 rounded-xl p-6 text-center transition-all bg-slate-50
-                        ${banners.length >= 4 ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-[#007570] hover:bg-[#f0fffe]"}`}
+                      className={`border-2 border-dashed rounded-xl p-8 text-center transition-all bg-white
+                        ${banners.length >= 4 
+                          ? "border-slate-300 cursor-not-allowed opacity-60" 
+                          : "border-blue-300 cursor-pointer hover:border-blue-500 hover:bg-blue-50"}`}
                       {...createDropHandler(handleBannerAdd)}
                       onClick={() => banners.length < 4 && bannerInputRef.current?.click()}
                     >
                       <input ref={bannerInputRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleBannerAdd(e.target.files)} />
-                      <Upload size={28} className="text-[#007570] mb-2 mx-auto" />
-                      <p className="text-sm font-bold text-slate-700">{banners.length >= 4 ? "Maksimum 4 foto banner telah tercapai" : "Klik atau drag & drop foto banner"}</p>
-                      <p className="text-xs text-slate-400">{banners.length}/4 foto terunggah</p>
+                      <Upload size={32} className="text-blue-600 mb-3 mx-auto" />
+                      <p className="text-sm font-bold text-slate-700">
+                        {banners.length >= 4 ? "Maksimum 4 foto banner telah tercapai" : "Klik atau drag & drop foto banner"}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">{banners.length}/4 foto terunggah</p>
                     </div>
                     {banners.length > 0 && (
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
@@ -2022,20 +2392,20 @@ export default function AddBusiness() {
                   </div>
 
                   {/* 3. GALERI USAHA */}
-                  <div className="flex flex-col gap-3.5 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex flex-col gap-4 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 rounded-xl border-2 border-emerald-200 shadow-sm">
+                    <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
                       <div className="flex items-center gap-2">
-                        <ImageIcon size={16} className="text-[#007570]" />
-                        <label className="text-[0.9rem] font-bold text-slate-800">
+                        <ImageIcon size={18} className="text-emerald-600" />
+                        <label className="text-sm font-bold text-slate-800">
                           3. Galeri Usaha
                         </label>
                       </div>
-                      <span className="text-xs font-semibold text-slate-500">
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
                         {photos.length}{isFreeSelection ? "/3" : ""} foto
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-emerald-700">
                       {isFreeSelection
                         ? "Tambahkan hingga maksimal 3 foto suasana toko atau produk unggulan (Paket Free)."
                         : "Tambahkan foto galeri foto tanpa batas untuk menarik lebih banyak pelanggan (Paket Premium)."}
@@ -2045,10 +2415,10 @@ export default function AddBusiness() {
                     <div className="w-full">
                       {/* Photo Upload Area */}
                       <div
-                        className={`border border-dashed rounded-xl p-5 text-center transition-all bg-slate-50 flex flex-col items-center justify-center min-h-[100px] ${
+                        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all min-h-[120px] flex flex-col items-center justify-center ${
                           isFreeSelection && photos.length >= 3
-                            ? "border-slate-200 opacity-60 cursor-not-allowed"
-                            : "border-slate-300 cursor-pointer hover:border-[#007570] hover:bg-[#f0fffe]"
+                            ? "border-slate-300 bg-slate-50 opacity-60 cursor-not-allowed"
+                            : "border-emerald-300 bg-white cursor-pointer hover:border-emerald-500 hover:bg-emerald-50"
                         }`}
                         {...createDropHandler(handlePhotoAdd)}
                         onClick={() => {
@@ -2065,26 +2435,22 @@ export default function AddBusiness() {
                           disabled={isFreeSelection && photos.length >= 3}
                           onChange={(e) => handlePhotoAdd(e.target.files)}
                         />
-                        <div className="flex items-center gap-2 mb-1 text-[#007570]">
-                          <Upload size={20} />
-                          <span className="text-sm font-bold text-slate-700">
+                        <div className="flex items-center gap-2 mb-2 text-emerald-600">
+                          <ImageIcon size={32} />
+                        </div>
+                        <span className="text-sm font-bold text-slate-700 block">
                             {isFreeSelection && photos.length >= 3
                               ? "Batas 3 Foto Paket Free Tercapai"
                               : "Upload Foto Galeri Usaha"}
                           </span>
-                        </div>
-                        <p className="text-xs text-slate-400">
-                          {isFreeSelection
-                            ? "Maksimal 3 foto untuk paket Free. Upgrade ke Premium untuk foto tanpa batas."
-                            : "JPG, PNG, WEBP (Bisa pilih banyak foto sekaligus)"}
-                        </p>
+                        <span className="text-xs text-slate-400 mt-1">JPG, PNG, WEBP (Bisa pilih banyak)</span>
                       </div>
                     </div>
 
                     {/* UNIFIED MEDIA THUMBNAILS GRID (Photos + Video together!) */}
                     {(photos.length > 0 || video !== null) && (
-                      <div className="pt-2 border-t border-slate-100">
-                        <span className="text-[0.75rem] font-bold text-slate-600 block mb-2">Media Galeri Usaha</span>
+                      <div className="pt-3 border-t border-emerald-200">
+                        <span className="text-xs font-bold text-emerald-700 block mb-2">Media Galeri Usaha</span>
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
                           {/* Photo Thumbnails */}
                           {photos.map((p, i) => (
@@ -2268,7 +2634,7 @@ export default function AddBusiness() {
                   <span className="text-sm font-bold text-slate-800">{form.name || "-"}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Kota &amp; Provinsi</span>
+                  <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Desa &amp; Provinsi</span>
                   <span className="text-sm font-medium text-slate-800">{form.city}, {form.province}</span>
                 </div>
                 <div>
@@ -2359,119 +2725,67 @@ export default function AddBusiness() {
               </div>
             </div>
 
-            {/* ── Kode Kupon / Diskon (Opsional) ── */}
-            <div className="border border-slate-200 rounded-2xl p-5 bg-white mb-4">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
-                <Tag size={16} className="text-[#007570]" />
-                Kode Kupon / Diskon <span className="text-xs font-normal text-slate-400">(Opsional)</span>
-              </label>
+            {/* ── Kupon Tersedia — supaya user tahu kode apa yang bisa dipakai ── */}
+            <div className="mb-4 p-4 rounded-2xl border border-emerald-200 bg-emerald-50/60">
+              <p className="text-xs font-bold text-emerald-800 mb-2.5 flex items-center gap-1.5">
+                <Sparkles size={14} />
+                Kupon Tersedia — klik untuk pakai
+              </p>
 
-              {appliedCoupon ? (
-                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
-                    <div>
-                      <span className="text-xs font-bold text-emerald-800 uppercase block">Kupon Terpasang: {appliedCoupon.code}</span>
-                      <span className="text-xs text-emerald-600 font-medium">Diskon Rp {appliedCoupon.discount_amount?.toLocaleString('id-ID')}</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveCoupon}
-                    className="text-xs font-semibold text-red-600 bg-white border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                  >
-                    Hapus
-                  </button>
+              {availableCouponsLoading ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500 py-1">
+                  <Loader2 size={14} className="animate-spin" />
+                  Memuat kupon aktif...
+                </div>
+              ) : availableCoupons.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {availableCoupons.map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => setCouponPrefill(c.code)}
+                      className="group flex items-center gap-2 bg-white border border-emerald-300 hover:border-emerald-500 hover:bg-emerald-100 rounded-xl px-3 py-2 text-left transition-all cursor-pointer"
+                      title={c.description || ""}
+                    >
+                      <span className="font-mono font-extrabold text-xs text-emerald-700 tracking-wide">
+                        {c.code}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {c.discount_type === "percentage"
+                          ? `-${Number(c.discount_value)}%`
+                          : `-Rp${Number(c.discount_value).toLocaleString('id-ID')}`}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Masukkan kode kupon diskon"
-                      value={couponInput}
-                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                      className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#007570]"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleApplyCoupon}
-                      disabled={couponLoading}
-                      className="px-5 py-2.5 bg-[#007570] text-white rounded-xl text-sm font-semibold border-0 cursor-pointer hover:bg-[#005a58] disabled:opacity-60 flex items-center gap-2"
-                    >
-                      {couponLoading ? <Loader2 size={16} className={spinCls} /> : "Terapkan"}
-                    </button>
-                  </div>
-                  {couponError && (
-                    <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                      <AlertCircle size={13} /> {couponError}
-                    </p>
-                  )}
-                  {couponSuccessMsg && (
-                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                      <CheckCircle2 size={13} /> {couponSuccessMsg}
-                    </p>
-                  )}
-                </div>
+                <p className="text-xs text-slate-500">
+                  Belum ada kupon promo aktif saat ini. Kalau kamu punya kode kupon, masukkan langsung di kotak di bawah.
+                </p>
               )}
             </div>
+
+            {/* ── Kode Kupon / Diskon (Opsional) ── */}
+            <DiscountCodeInput
+              type="coupon"
+              amount={selectedPackage?.price || 0}
+              appliedCode={appliedCoupon}
+              prefillCode={couponPrefill}
+              onApplied={(data) => setAppliedCoupon(data)}
+              onRemoved={() => setAppliedCoupon(null)}
+              className="mb-4"
+            />
 
             {/* ── Kode Referral (Opsional - Paket Premium) ── */}
-            <div className="border border-slate-200 rounded-2xl p-5 bg-white mb-6">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
-                <Sparkles size={16} className="text-[#007570]" />
-                Kode Referral <span className="text-xs font-normal text-slate-400">(Opsional - Potongan Rp 5.000)</span>
-              </label>
-
-              {appliedReferral ? (
-                <div className="flex items-center justify-between bg-teal-50 border border-teal-200 rounded-xl p-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <CheckCircle2 size={20} className="text-[#007570] shrink-0" />
-                    <div>
-                      <span className="text-xs font-bold text-[#007570] uppercase block">Referral Terpasang: {appliedReferral.referral_code}</span>
-                      <span className="text-xs text-teal-700 font-medium">Potongan Diskon (-Rp {appliedReferral.discount_amount?.toLocaleString('id-ID')})</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveReferral}
-                    className="text-xs font-semibold text-red-600 bg-white border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                  >
-                    Hapus
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Masukkan kode referral"
-                      value={referralInput}
-                      onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
-                      className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#007570]"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleApplyReferral}
-                      disabled={referralLoading}
-                      className="px-5 py-2.5 bg-[#007570] text-white rounded-xl text-sm font-semibold border-0 cursor-pointer hover:bg-[#005a58] disabled:opacity-60 flex items-center gap-2"
-                    >
-                      {referralLoading ? <Loader2 size={16} className={spinCls} /> : "Terapkan"}
-                    </button>
-                  </div>
-                  {referralError && (
-                    <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                      <AlertCircle size={13} /> {referralError}
-                    </p>
-                  )}
-                  {referralSuccessMsg && (
-                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                      <CheckCircle2 size={13} /> {referralSuccessMsg}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+            <DiscountCodeInput
+              type="referral"
+              amount={selectedPackage?.price || 0}
+              appliedCode={appliedReferral}
+              onApplied={(data) => setAppliedReferral(data)}
+              onRemoved={() => setAppliedReferral(null)}
+              disabled={isFreeSelection}
+              className="mb-6"
+            />
 
             {/* Total Pembayaran Calculation */}
             {(() => {
@@ -2536,9 +2850,19 @@ export default function AddBusiness() {
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className={`px-2.5 py-1 text-xs font-black rounded-md ${item.badgeColor}`}>
-                              {item.id.split(' ')[0]}
-                            </span>
+                            {/* Logo Images from local/CDN */}
+                            <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-white border border-slate-200 p-2 overflow-hidden">
+                              <img 
+                                src={`/logos/${item.id.toLowerCase()}.png`}
+                                alt={item.name}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  // Fallback to colored badge if image fails
+                                  e.target.style.display = 'none';
+                                  e.target.parentElement.innerHTML = `<div class="w-full h-full flex items-center justify-center ${item.badgeColor} rounded"><span class="text-white text-xs font-bold">${item.id}</span></div>`;
+                                }}
+                              />
+                            </div>
                             <span className="text-sm font-bold text-slate-800">{item.name}</span>
                           </div>
                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#007570] bg-[#007570]" : "border-slate-300"}`}>
@@ -2558,27 +2882,120 @@ export default function AddBusiness() {
                 <ShieldCheck size={18} className="text-[#007570]" /> Instruksi Pembayaran {currentAccount.name}
               </h4>
               <p className="text-xs text-slate-600">
-                Silakan lakukan transfer sebesar total tagihan ke rekening / Virtual Account berikut:
+                {currentAccount.isQRIS 
+                  ? "Scan QR Code di bawah menggunakan aplikasi e-wallet atau mobile banking kamu:"
+                  : "Silakan lakukan transfer sebesar total tagihan ke rekening / Virtual Account berikut:"}
               </p>
-              <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-400 font-medium block">Nomor Rekening / Virtual Account</span>
-                  <span className="text-lg font-black text-[#0f172a]">{currentAccount.accountNumber}</span>
-                  <span className="text-xs text-slate-500 block mt-0.5">a.n {currentAccount.accountName}</span>
+              
+              {currentAccount.isQRIS ? (
+                /* QRIS QR Code Display */
+                <div className="bg-white border-2 border-slate-200 rounded-xl p-6 flex flex-col items-center space-y-4">
+                  <div className="w-64 h-64 bg-white border-4 border-[#007570] rounded-2xl p-4 flex items-center justify-center shadow-lg">
+                    {/* QR Code SVG - Dummy/Placeholder */}
+                    <svg viewBox="0 0 200 200" className="w-full h-full">
+                      {/* QR Code Pattern - Simplified representation */}
+                      <rect width="200" height="200" fill="white"/>
+                      
+                      {/* Top-left corner square */}
+                      <rect x="10" y="10" width="60" height="60" fill="black"/>
+                      <rect x="20" y="20" width="40" height="40" fill="white"/>
+                      <rect x="30" y="30" width="20" height="20" fill="black"/>
+                      
+                      {/* Top-right corner square */}
+                      <rect x="130" y="10" width="60" height="60" fill="black"/>
+                      <rect x="140" y="20" width="40" height="40" fill="white"/>
+                      <rect x="150" y="30" width="20" height="20" fill="black"/>
+                      
+                      {/* Bottom-left corner square */}
+                      <rect x="10" y="130" width="60" height="60" fill="black"/>
+                      <rect x="20" y="140" width="40" height="40" fill="white"/>
+                      <rect x="30" y="150" width="20" height="20" fill="black"/>
+                      
+                      {/* QR Code data pattern (simplified) */}
+                      <rect x="80" y="20" width="10" height="10" fill="black"/>
+                      <rect x="95" y="20" width="10" height="10" fill="black"/>
+                      <rect x="110" y="20" width="10" height="10" fill="black"/>
+                      
+                      <rect x="20" y="80" width="10" height="10" fill="black"/>
+                      <rect x="35" y="80" width="10" height="10" fill="black"/>
+                      <rect x="50" y="80" width="10" height="10" fill="black"/>
+                      <rect x="80" y="80" width="10" height="10" fill="black"/>
+                      <rect x="95" y="80" width="10" height="10" fill="black"/>
+                      <rect x="110" y="80" width="10" height="10" fill="black"/>
+                      <rect x="140" y="80" width="10" height="10" fill="black"/>
+                      <rect x="155" y="80" width="10" height="10" fill="black"/>
+                      <rect x="170" y="80" width="10" height="10" fill="black"/>
+                      
+                      <rect x="80" y="95" width="10" height="10" fill="black"/>
+                      <rect x="110" y="95" width="10" height="10" fill="black"/>
+                      <rect x="140" y="95" width="10" height="10" fill="black"/>
+                      <rect x="170" y="95" width="10" height="10" fill="black"/>
+                      
+                      <rect x="20" y="110" width="10" height="10" fill="black"/>
+                      <rect x="50" y="110" width="10" height="10" fill="black"/>
+                      <rect x="80" y="110" width="10" height="10" fill="black"/>
+                      <rect x="110" y="110" width="10" height="10" fill="black"/>
+                      <rect x="140" y="110" width="10" height="10" fill="black"/>
+                      <rect x="170" y="110" width="10" height="10" fill="black"/>
+                      
+                      <rect x="80" y="140" width="10" height="10" fill="black"/>
+                      <rect x="95" y="140" width="10" height="10" fill="black"/>
+                      <rect x="110" y="140" width="10" height="10" fill="black"/>
+                      <rect x="140" y="140" width="10" height="10" fill="black"/>
+                      <rect x="155" y="140" width="10" height="10" fill="black"/>
+                      <rect x="170" y="140" width="10" height="10" fill="black"/>
+                      
+                      <rect x="80" y="155" width="10" height="10" fill="black"/>
+                      <rect x="110" y="155" width="10" height="10" fill="black"/>
+                      <rect x="140" y="155" width="10" height="10" fill="black"/>
+                      <rect x="170" y="155" width="10" height="10" fill="black"/>
+                      
+                      <rect x="80" y="170" width="10" height="10" fill="black"/>
+                      <rect x="95" y="170" width="10" height="10" fill="black"/>
+                      <rect x="110" y="170" width="10" height="10" fill="black"/>
+                      <rect x="140" y="170" width="10" height="10" fill="black"/>
+                      <rect x="155" y="170" width="10" height="10" fill="black"/>
+                      <rect x="170" y="170" width="10" height="10" fill="black"/>
+                      
+                      <rect x="35" y="95" width="10" height="10" fill="black"/>
+                      <rect x="50" y="95" width="10" height="10" fill="black"/>
+                      <rect x="35" y="110" width="10" height="10" fill="black"/>
+                    </svg>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <p className="text-sm font-bold text-slate-800">Scan QRIS untuk Pembayaran</p>
+                    <p className="text-xs text-slate-500">Kompatibel dengan semua e-wallet & mobile banking</p>
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <span className="px-2 py-1 bg-[#4c2a86] text-white text-[10px] font-bold rounded">OVO</span>
+                      <span className="px-2 py-1 bg-[#008cff] text-white text-[10px] font-bold rounded">DANA</span>
+                      <span className="px-2 py-1 bg-[#00a5cf] text-white text-[10px] font-bold rounded">GoPay</span>
+                      <span className="px-2 py-1 bg-[#003d79] text-white text-[10px] font-bold rounded">BCA</span>
+                      <span className="px-2 py-1 bg-[#f15a24] text-white text-[10px] font-bold rounded">BNI</span>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(currentAccount.accountNumber.replace(/-/g, ''));
-                    setCopiedAccount(true);
-                    setTimeout(() => setCopiedAccount(false), 2500);
-                  }}
-                  className="px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5"
-                >
-                  {copiedAccount ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                  <span>{copiedAccount ? "Tersalin!" : "Salin No"}</span>
-                </button>
-              </div>
+              ) : (
+                /* Bank Transfer / E-Wallet Account Number Display */
+                <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-slate-400 font-medium block">Nomor Rekening / Virtual Account</span>
+                    <span className="text-lg font-black text-[#0f172a]">{currentAccount.accountNumber}</span>
+                    <span className="text-xs text-slate-500 block mt-0.5">a.n {currentAccount.accountName}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(currentAccount.accountNumber.replace(/-/g, ''));
+                      setCopiedAccount(true);
+                      setTimeout(() => setCopiedAccount(false), 2500);
+                    }}
+                    className="px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5"
+                  >
+                    {copiedAccount ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                    <span>{copiedAccount ? "Tersalin!" : "Salin No"}</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2617,12 +3034,15 @@ export default function AddBusiness() {
               );
             })()}
 
+            {/* Hidden input for file picking - always rendered so ref works */}
+            <input ref={proofInputRef} type="file" accept="image/*" hidden onChange={handleProofChange} />
+
             {/* Upload Area */}
             {proofPreview ? (
               <div className="relative max-w-[320px] mx-auto rounded-2xl overflow-hidden border-2 border-slate-200 shadow-md">
                 <img src={proofPreview} alt="Bukti Pembayaran" className="w-full h-auto max-h-[300px] object-contain bg-slate-900" />
                 <div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
-                  <span className="text-xs font-semibold text-slate-700 truncate max-w-[180px]">{proofFile?.name}</span>
+                  <span className="text-xs font-semibold text-slate-700 truncate max-w-[180px]">{proofFile?.name || "Bukti Transfer"}</span>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -2646,7 +3066,6 @@ export default function AddBusiness() {
                 className="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer bg-slate-50 hover:bg-[#f0fffe] hover:border-[#007570] transition-colors"
                 onClick={() => proofInputRef.current?.click()}
               >
-                <input ref={proofInputRef} type="file" accept="image/*" hidden onChange={handleProofChange} />
                 <Upload size={40} className="mx-auto text-slate-400 mb-3" />
                 <p className="text-base font-semibold text-slate-800 mb-1">Klik atau drag &amp; drop bukti transfer</p>
                 <p className="text-xs text-slate-400">Format JPG, PNG, WEBP max 10MB</p>

@@ -1,10 +1,13 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Navbar from "../components/Navbar";
+import ProductCoverflowCarousel from "../components/ProductCoverflowCarousel";
 import { InlineSpinner } from "../components/LoadingScreen";
 import api from "../services/api";
-import { getStorageUrl, DEFAULT_AVATAR } from "../utils/constants";
+import { getStorageUrl, DEFAULT_AVATAR, OFFICIAL_BANK_ACCOUNTS, OFFICIAL_EWALLET_ACCOUNTS, OFFICIAL_ACCOUNT_HOLDER } from "../utils/constants";
 import { requireAuth, isUserLoggedIn } from "../utils/authCheck";
+import { isOpenNow } from "../utils/businessHours";
+import WhatsAppIcon from "../components/icons/WhatsAppIcon";
 import toast from "react-hot-toast";
 import {
   MapPin,
@@ -38,6 +41,16 @@ import {
   Sparkles,
   Crown,
   Edit,
+  ThumbsUp,
+  ThumbsDown,
+  Lock,
+  Store,
+  Copy,
+  Upload,
+  Camera,
+  Check,
+  Tag,
+  Ticket,
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 
@@ -96,32 +109,6 @@ function getTodayName() {
   return today;
 }
 
-function isOpenNow(openingDays) {
-  if (!openingDays || !Array.isArray(openingDays) || openingDays.length === 0) return null;
-  const todayName = getTodayName();
-  const todayEntry = openingDays.find((d) => d.day === todayName);
-  if (!todayEntry) return false;
-
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  const parseMinutes = (timeStr) => {
-    if (!timeStr || typeof timeStr !== "string") return null;
-    const parts = timeStr.split(":");
-    if (parts.length !== 2) return null;
-    const h = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
-    return h * 60 + m;
-  };
-
-  const openMin = parseMinutes(todayEntry.open);
-  const closeMin = parseMinutes(todayEntry.close);
-  if (openMin === null || closeMin === null) return null;
-
-  return currentMinutes >= openMin && currentMinutes <= closeMin;
-}
-
 function getYouTubeEmbedUrl(url) {
   if (!url || typeof url !== "string") return null;
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -141,6 +128,7 @@ export default function BusinessDetail() {
   const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
   const [priceCategory, setPriceCategory] = useState(2);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
+  const [isHoursExpanded, setIsHoursExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [products, setProducts] = useState([]);
@@ -154,6 +142,10 @@ export default function BusinessDetail() {
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [openReplyId, setOpenReplyId] = useState(null);
+  const [replyTexts, setReplyTexts] = useState({});
+  const [submittingReplyId, setSubmittingReplyId] = useState(null);
+  const [reactingId, setReactingId] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductPopup, setShowProductPopup] = useState(false);
   const [showAllReviewsModal, setShowAllReviewsModal] = useState(false);
@@ -175,6 +167,41 @@ export default function BusinessDetail() {
   const [activeGalleryTab, setActiveGalleryTab] = useState("photo");
   const [startingChat, setStartingChat] = useState(false);
 
+  // WhatsApp Payment Wall States
+  const [showWaPaymentModal, setShowWaPaymentModal] = useState(false);
+  const [waSettings, setWaSettings] = useState(null);
+  const [waSettingsLoading, setWaSettingsLoading] = useState(false);
+  const [waPendingAction, setWaPendingAction] = useState(null); // 'direct' | 'product'
+  const [waPendingProduct, setWaPendingProduct] = useState(null);
+  const [waPaymentConfirmed, setWaPaymentConfirmed] = useState(false);
+  const [waLogId, setWaLogId] = useState(null); // store log ID for status polling
+  const waPollingRef = useRef(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("BCA");
+  const [waProofFile, setWaProofFile] = useState(null);
+  const [waProofPreview, setWaProofPreview] = useState(null);
+  const [waSubmittingLog, setWaSubmittingLog] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [appliedCouponInfo, setAppliedCouponInfo] = useState(null);
+  const [couponMsg, setCouponMsg] = useState("");
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [availableCouponsLoading, setAvailableCouponsLoading] = useState(false);
+
+  useEffect(() => {
+    setAvailableCouponsLoading(true);
+    api.get("/coupons/public-codes")
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        const filtered = Array.isArray(list)
+          ? list.filter(c => !c.applies_to || c.applies_to === 'all')
+          : [];
+        setAvailableCoupons(filtered);
+      })
+      .catch((err) => console.error("Gagal memuat daftar kupon:", err))
+      .finally(() => setAvailableCouponsLoading(false));
+  }, []);
+
   const getStorageUrlLocal = (path) => {
     if (!path) return "";
     if (path.startsWith("http")) return path;
@@ -185,29 +212,44 @@ export default function BusinessDetail() {
   // Build hero & gallery images list
   const allImages = useMemo(() => {
     if (!business) return [];
-    const allMedia = Array.isArray(business.media) ? business.media : [];
-    const bannerMedia = allMedia.filter((m) => m.title === "Banner");
-    const galleryMedia = allMedia.filter((m) => m.title !== "Banner" && m.type === "image");
-
     const list = [];
 
-    // 1. Banner
-    bannerMedia.forEach((m) => {
-      const url = getStorageUrlLocal(m.file_path);
+    const addUrl = (p) => {
+      if (!p) return;
+      const url = getStorageUrlLocal(p);
       if (url && !list.includes(url)) list.push(url);
-    });
+    };
 
-    // 2. Gallery Media
-    galleryMedia.forEach((m) => {
-      const url = getStorageUrlLocal(m.file_path);
-      if (url && !list.includes(url)) list.push(url);
-    });
+    // 1. Main banner
+    if (business.banner) addUrl(business.banner);
 
-    // 3. Logo fallback
-    if (business.logo) {
-      const url = getStorageUrlLocal(business.logo);
-      if (url && !list.includes(url)) list.push(url);
+    // 2. Banners array
+    if (Array.isArray(business.banners)) {
+      business.banners.forEach((b) => {
+        if (typeof b === "string") addUrl(b);
+        else if (b?.file_path) addUrl(b.file_path);
+        else if (b?.url) addUrl(b.url);
+      });
     }
+
+    // 3. Gallery array (strings or objects)
+    if (Array.isArray(business.gallery)) {
+      business.gallery.forEach((g) => {
+        if (typeof g === "string") addUrl(g);
+        else if (g?.file_path) addUrl(g.file_path);
+        else if (g?.url) addUrl(g.url);
+      });
+    }
+
+    // 4. Media relation (from backend)
+    if (Array.isArray(business.media)) {
+      business.media.forEach((m) => {
+        if (m.type !== "video" && m.file_path) addUrl(m.file_path);
+      });
+    }
+
+    // 5. Logo
+    if (business.logo) addUrl(business.logo);
 
     if (list.length === 0) {
       list.push("https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&auto=format&fit=crop&q=80");
@@ -246,6 +288,9 @@ export default function BusinessDetail() {
     }
     return null;
   }, [business]);
+
+  // Premium: tampilkan semua produk di carousel. Non-premium: dibatasi 3 saja.
+  const displayedProducts = isPremiumBusiness ? products : products.slice(0, 3);
 
   // Product pagination
   const totalProductPages = Math.ceil(products.length / productsPerPage) || 1;
@@ -451,7 +496,7 @@ export default function BusinessDetail() {
     const url = window.location.href;
     if (navigator.share) {
       try {
-        await navigator.share({ title: business?.name || "Info.co.id", url });
+        await navigator.share({ title: business?.name || "Surade.co.id", url });
       } catch (e) {}
     } else {
       await navigator.clipboard.writeText(url);
@@ -533,19 +578,171 @@ export default function BusinessDetail() {
     }
   };
 
-  const handleWhatsApp = () => {
+  const handleWhatsApp = async () => {
     if (!business?.phone) {
       toast.error("Nomor WhatsApp belum tersedia untuk bisnis ini.");
       return;
     }
-    const phone = business.phone.replace(/\D/g, "");
-    window.open(`https://wa.me/${phone}`, "_blank");
+    const openDirectWa = () => {
+      const phone = business.phone.replace(/\D/g, "");
+      const formattedPhone = phone.startsWith("0") ? "62" + phone.slice(1) : phone;
+      window.open(`https://wa.me/${formattedPhone}`, "_blank");
+    };
+
+    setWaSettingsLoading(true);
+    try {
+      // Cek dulu: kalau user sudah pernah disetujui admin untuk bisnis INI,
+      // langsung buka WhatsApp tanpa minta bayar lagi.
+      try {
+        const statusRes = await api.get(`/whatsapp-access-status?business_id=${business.id}`);
+        if (statusRes?.data?.data?.has_access) {
+          openDirectWa();
+          return;
+        }
+      } catch (e) {
+        // lanjut ke pengecekan fee normal kalau gagal cek status
+      }
+
+      const res = await api.get("/whatsapp-settings");
+      const data = res.data?.data;
+      if (data?.enabled && data?.amount > 0) {
+        setWaSettings(data);
+        setWaPendingAction("direct");
+        setWaPendingProduct(null);
+        setWaPaymentConfirmed(false);
+        setShowWaPaymentModal(true);
+      } else {
+        openDirectWa();
+      }
+    } catch (err) {
+      openDirectWa();
+    } finally {
+      setWaSettingsLoading(false);
+    }
   };
 
-  const handleDirections = () => {
-    const query = encodeURIComponent(business.address || `${business.name}, ${cityName}`);
-    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
+  const handleProductWhatsApp = async (prod) => {
+    if (!business?.phone) {
+      toast.error("Nomor WhatsApp belum tersedia untuk bisnis ini.");
+      return;
+    }
+    // Fetch WA payment settings and show modal if fee enabled
+    setWaSettingsLoading(true);
+    try {
+      const res = await api.get("/whatsapp-settings");
+      const data = res.data?.data;
+      if (data?.enabled && data?.amount > 0) {
+        setWaSettings(data);
+        setWaPendingAction("product");
+        setWaPendingProduct(prod);
+        setWaPaymentConfirmed(false);
+        setShowWaPaymentModal(true);
+      } else {
+        // No fee, go directly
+        const cleanPhone = business.phone.replace(/\D/g, "");
+        const formattedPhone = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+        const priceFormatted = prod?.price != null ? `(Rp ${Number(prod.price).toLocaleString("id-ID")})` : "";
+        const msg = encodeURIComponent(
+          `Halo ${business.name}, saya ingin memesan/menanyakan produk "${prod?.name || 'ini'}" ${priceFormatted} yang saya lihat di Surade.co.id. Apakah produk ini masih tersedia?`
+        );
+        window.open(`https://wa.me/${formattedPhone}?text=${msg}`, "_blank");
+      }
+    } catch (err) {
+      // On error, allow access
+      const cleanPhone = business.phone.replace(/\D/g, "");
+      const formattedPhone = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+      const priceFormatted = prod?.price != null ? `(Rp ${Number(prod.price).toLocaleString("id-ID")})` : "";
+      const msg = encodeURIComponent(
+        `Halo ${business.name}, saya ingin memesan/menanyakan produk "${prod?.name || 'ini'}" ${priceFormatted} yang saya lihat di Surade.co.id. Apakah produk ini masih tersedia?`
+      );
+      window.open(`https://wa.me/${formattedPhone}?text=${msg}`, "_blank");
+    } finally {
+      setWaSettingsLoading(false);
+    }
   };
+const handleWaPaymentConfirm = async () => {
+    setWaSubmittingLog(true);
+    try {
+      const formData = new FormData();
+      if (business?.id) formData.append("business_id", business.id);
+      if (business?.name) formData.append("business_name", business.name);
+      formData.append("fee_amount", waSettings?.amount || 2000);
+
+      const selectedAcc =
+        OFFICIAL_BANK_ACCOUNTS.find((b) => b.id === selectedPaymentMethod) ||
+        OFFICIAL_EWALLET_ACCOUNTS.find((e) => e.id === selectedPaymentMethod);
+      formData.append("payment_method", selectedAcc?.name || (selectedPaymentMethod === "qris" ? "QRIS (Semua E-Wallet & Bank)" : selectedPaymentMethod));
+
+      if (waProofFile) {
+        formData.append("proof_image", waProofFile);
+      }
+
+      const res = await api.post("/whatsapp-access-log", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      // Store log ID for later status checking
+      if (res?.data?.id) {
+        setWaLogId(res.data.id);
+      }
+    } catch (e) {
+      console.error("Error logging WA access:", e);
+    } finally {
+      setWaSubmittingLog(false);
+    }
+
+    // Close modal and show pending confirmation UI
+    setShowWaPaymentModal(false);
+    setWaProofFile(null);
+    setWaProofPreview(null);
+    toast.success("Bukti pembayaran terkirim. Menunggu verifikasi admin.");
+    // Start polling status
+    setWaPaymentConfirmed(true);
+  };
+
+
+
+  const handleDirections = () => {
+    // Use lat/lng coordinates if available for precise navigation
+    const lat = business.latitude || business.lat;
+    const lng = business.longitude || business.lng || business.long;
+    if (lat && lng) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank");
+    } else {
+      const query = encodeURIComponent(business.address || `${business.name}, ${business.city?.name || business.city || "Sukabumi"}`);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
+    }
+  };
+
+  // Polling effect for WhatsApp access verification
+  useEffect(() => {
+    if (!waPaymentConfirmed || !waLogId || !business) return;
+    if (waPollingRef.current) clearInterval(waPollingRef.current);
+    waPollingRef.current = setInterval(async () => {
+      try {
+        const res = await api.get(`/whatsapp-access-status?business_id=${business.id}`);
+        const data = res.data?.data;
+        if (data?.status && data.status !== "pending") {
+          clearInterval(waPollingRef.current);
+          waPollingRef.current = null;
+          setWaPaymentConfirmed(false);
+          if (data.status === "completed" || data.status === "approved") {
+            toast.success("Admin menyetujui akses WhatsApp. Membuka chat...");
+            const phone = business.phone.replace(/\\D/g, "");
+            const formattedPhone = phone.startsWith("0") ? "62" + phone.slice(1) : phone;
+            window.open(`https://wa.me/${formattedPhone}`, "_blank");
+          } else if (data.status === "rejected") {
+            const reason = data.rejection_reason || "Bukti pembayaran tidak sesuai atau tidak valid.";
+            toast.error(`Akses WhatsApp ditolak: ${reason}`);
+          }
+        }
+      } catch (e) {
+        console.error("Error checking WA access status:", e);
+      }
+    }, 5000);
+    return () => {
+      if (waPollingRef.current) clearInterval(waPollingRef.current);
+    };
+  }, [waPaymentConfirmed, waLogId, business]);
 
   const handleReportSubmit = async (e) => {
     e.preventDefault();
@@ -666,6 +863,59 @@ export default function BusinessDetail() {
     }
   };
 
+  const handleReact = async (ratingId, type) => {
+    if (!requireAuth()) return;
+    if (reactingId) return;
+
+    setReactingId(ratingId);
+    try {
+      const res = await api.post(`/ratings/${ratingId}/react`, { type });
+      const { likes_count, dislikes_count, my_reaction } = res.data;
+      setReviews((prev) =>
+        prev.map((r) =>
+          r.id === ratingId
+            ? { ...r, likes_count, dislikes_count, my_reaction }
+            : r
+        )
+      );
+    } catch (err) {
+      console.error("Failed to react to review:", err);
+      toast.error(err.response?.data?.message || "Gagal memproses reaksi.");
+    } finally {
+      setReactingId(null);
+    }
+  };
+
+  const handleSubmitReply = async (ratingId) => {
+    if (!requireAuth()) return;
+    const text = (replyTexts[ratingId] || "").trim();
+    if (!text) {
+      toast.error("Tulis balasan terlebih dahulu.");
+      return;
+    }
+
+    setSubmittingReplyId(ratingId);
+    try {
+      const res = await api.post(`/ratings/${ratingId}/replies`, { reply: text });
+      const newReply = res.data?.data;
+      setReviews((prev) =>
+        prev.map((r) =>
+          r.id === ratingId
+            ? { ...r, replies: [...(r.replies || []), newReply] }
+            : r
+        )
+      );
+      setReplyTexts((prev) => ({ ...prev, [ratingId]: "" }));
+      setOpenReplyId(null);
+      toast.success("Balasan terkirim.");
+    } catch (err) {
+      console.error("Failed to submit reply:", err);
+      toast.error(err.response?.data?.message || "Gagal mengirim balasan.");
+    } finally {
+      setSubmittingReplyId(null);
+    }
+  };
+
   const scrollToReviews = () => {
     const el = document.getElementById("reviews-section");
     if (el) {
@@ -729,12 +979,17 @@ export default function BusinessDetail() {
     return { starVal, count, percentage };
   });
 
-  // Dynamic open/closed status
+  // Dynamic open/closed status — konsisten dengan Home.jsx & Category.jsx
+  // (lihat utils/businessHours.js): kalau bisnis belum isi jadwal sama
+  // sekali, dianggap "Buka" (fallback netral) supaya teks & warna badge
+  // tidak saling kontradiksi (sebelumnya teks bisa bilang "Buka" padahal
+  // titik/warna status menunjukkan tutup, karena null dianggap falsy).
   const openDays = business.opening_days;
   const todayName = getTodayName();
   const todaySchedule = Array.isArray(openDays) ? openDays.find((d) => d.day === todayName) : null;
-  const isOpen = isOpenNow(openDays);
-  const displayStatus = isOpen === true ? "Buka Sekarang" : isOpen === false ? "Tutup" : "Buka";
+  const isOpenRaw = isOpenNow(openDays);
+  const isOpen = isOpenRaw === null ? true : isOpenRaw;
+  const displayStatus = isOpen ? "Buka Sekarang" : "Tutup";
 
   // Seller info
   const seller = business.user
@@ -928,11 +1183,31 @@ export default function BusinessDetail() {
                     </h1>
 
                     {/* Verified Badge */}
-                    {isVerifiedBusiness && (
+                    {isVerifiedBusiness ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/25 border border-emerald-400 text-emerald-300 shadow-xs backdrop-blur-xs">
                         <CheckCircle2 size={13} className="text-emerald-400" />
                         Terverifikasi
                       </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isOwner) {
+                            navigate(`/add-business/${business.id}?upgrade=true`);
+                          } else {
+                            navigate(`/admin-user?tab=premium`);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider text-slate-950 transition-all cursor-pointer border-0 hover:scale-105 active:scale-95 shadow-md group"
+                        style={{
+                          background: "linear-gradient(180deg, #fef08a 0%, #f59e0b 55%, #d97706 100%)",
+                          boxShadow: "0 4px 14px rgba(217, 119, 6, 0.45), inset 0 1px 1px #ffffff, inset 0 -1.5px 1px #78350f",
+                        }}
+                        title="Upgrade usaha ini ke Paket Premium untuk fitur lengkap dan badge Terverifikasi"
+                      >
+                        <Crown size={13} className="text-slate-950 shrink-0 group-hover:rotate-12 transition-transform" strokeWidth={2.5} />
+                        <span>Upgrade ke Premium</span>
+                      </button>
                     )}
 
                     {/* Premium Ads Badge */}
@@ -1042,19 +1317,34 @@ export default function BusinessDetail() {
               onClick={handleWhatsApp}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs sm:text-sm transition-all cursor-pointer"
             >
-              <Phone size={15} />
+              <WhatsAppIcon size={15} />
               <span>WhatsApp</span>
             </button>
 
             {/* Petunjuk Arah */}
-            <button
-              type="button"
-              onClick={handleDirections}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-all cursor-pointer"
-            >
-              <Compass size={15} />
-              <span className="hidden sm:inline">Petunjuk Arah</span>
-            </button>
+            {isVerifiedBusiness ? (
+              <button
+                type="button"
+                onClick={handleDirections}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-all cursor-pointer"
+              >
+                <Compass size={15} />
+                <span className="hidden sm:inline">Petunjuk Arah</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isOwner) navigate(`/add-business/${business.id}?upgrade=true`);
+                  else navigate(`/admin-user?tab=premium`);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                title="Fitur Petunjuk Arah khusus untuk usaha Premium"
+              >
+                <Lock size={14} className="text-amber-600" />
+                <span className="hidden sm:inline">Petunjuk Arah (Premium)</span>
+              </button>
+            )}
           </div>
 
           {/* Right Action Group */}
@@ -1214,6 +1504,28 @@ export default function BusinessDetail() {
                 </div>
               </div>
 
+              {/* Free Business Gallery Notice */}
+              {!isVerifiedBusiness && (
+                <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between gap-3 text-left">
+                  <div className="flex items-center gap-2 text-amber-900 text-xs">
+                    <Crown size={15} className="text-amber-600 shrink-0" />
+                    <span>
+                      <strong>Paket Reguler:</strong> Galeri foto &amp; video profil penuh adalah fitur eksklusif <strong>Paket Premium</strong>.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isOwner) navigate(`/add-business/${business.id}?upgrade=true`);
+                      else navigate(`/admin-user?tab=premium`);
+                    }}
+                    className="px-2.5 py-1 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 rounded-lg text-[11px] font-black uppercase tracking-wider shrink-0 border-0 cursor-pointer shadow-xs hover:scale-105 transition-all"
+                  >
+                    Upgrade
+                  </button>
+                </div>
+              )}
+
               {/* Photo Mosaic Grid (1 Feature Photo + 3 Side Thumbnails) */}
               {activeGalleryTab === "photo" ? (
                 galleryImages.length > 0 ? (
@@ -1299,65 +1611,28 @@ export default function BusinessDetail() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      {currentProducts.map((product) => (
-                        <div
-                          key={product.id}
-                          onClick={() => handleProductClick(product)}
-                          className="group p-3 rounded-xl border border-slate-200/80 bg-white hover:border-teal-300 hover:shadow-sm transition-all duration-200 flex flex-col justify-between cursor-pointer"
-                        >
-                          <div className="space-y-2.5">
-                            <div className="w-full aspect-4/3 rounded-lg overflow-hidden bg-slate-100 border border-slate-100">
-                              <img
-                                src={product.image ? getStorageUrlLocal(product.image) : "https://via.placeholder.com/200"}
-                                alt={product.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/200"; }}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-[#007570] transition-colors">
-                                {product.name}
-                              </h4>
-                              <p className="text-xs font-black text-[#007570] mt-0.5">
-                                {product.price != null
-                                  ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(product.price))
-                                  : "-"}
-                              </p>
-                              {product.description && (
-                                <p className="text-[11px] text-slate-500 line-clamp-2 mt-1">{product.description}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <ProductCoverflowCarousel
+                      sectionLabel={isPremiumBusiness ? "KATALOG PRODUK" : "PRODUK UNGGULAN"}
+                      items={displayedProducts.map((product) => ({
+                        img: product.image ? getStorageUrlLocal(product.image) : "https://via.placeholder.com/270x400?text=Produk",
+                        titleLine1: product.name,
+                        titleLine2:
+                          product.price != null
+                            ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(product.price))
+                            : null,
+                        desc: product.description,
+                        ctaText: "Lihat Detail",
+                        onCta: () => handleProductClick(product),
+                      }))}
+                    />
 
-                    {/* Pagination */}
-                    {totalProductPages > 1 && (
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
-                        <span className="text-slate-500">
-                          Halaman {currentProductPage} dari {totalProductPages}
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setProductPage((p) => Math.max(1, p - 1))}
-                            disabled={currentProductPage === 1}
-                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold disabled:opacity-40 cursor-pointer"
-                          >
-                            Prev
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setProductPage((p) => Math.min(totalProductPages, p + 1))}
-                            disabled={currentProductPage === totalProductPages}
-                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold disabled:opacity-40 cursor-pointer"
-                          >
-                            Next
-                          </button>
-                        </div>
-                      </div>
+                    {/* Bisnis non-premium hanya menampilkan maksimal 3 produk.
+                        Ajakan upgrade supaya semua produk bisa tampil. */}
+                    {!isPremiumBusiness && products.length > 3 && (
+                      <p className="text-center text-xs text-slate-500 pt-1">
+                        Menampilkan 3 dari {products.length} produk.{" "}
+                        <span className="text-[#007570] font-semibold">Upgrade ke Premium</span> untuk menampilkan semua produk.
+                      </p>
                     )}
                   </>
                 )}
@@ -1367,14 +1642,9 @@ export default function BusinessDetail() {
             {/* CARD 4: REVIEWS & RATINGS (YELP-STYLE UGC) */}
             <div id="reviews-section" className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-6">
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Star size={18} className="fill-amber-400 text-amber-400" />
-                    Ulasan &amp; Penilaian Pelanggan
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Penilaian transparan dari pengunjung terverifikasi</p>
-                </div>
+              <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                <span className="w-1 h-5 rounded-full bg-[#059669]" />
+                <h3 className="text-lg font-bold text-slate-900">Rating &amp; Ulasan</h3>
               </div>
 
               {/* Yelp Rating Overview Breakdown Bar */}
@@ -1392,22 +1662,23 @@ export default function BusinessDetail() {
                       />
                     ))}
                   </div>
-                  <span className="text-xs font-semibold text-slate-500">Berdasarkan {displayReviews} ulasan</span>
+                  <span className="text-xs font-semibold text-slate-500">{displayReviews} Ulasan</span>
                 </div>
 
                 {/* Rating bars */}
                 <div className="sm:col-span-7 space-y-1.5">
                   {ratingDistribution.map((dist) => (
                     <div key={dist.starVal} className="flex items-center gap-2 text-xs">
-                      <span className="w-12 font-bold text-slate-700 shrink-0">{dist.starVal} Bintang</span>
+                      <span className="w-6 font-bold text-slate-700 shrink-0">{dist.starVal}</span>
+                      <Star size={13} fill="#fbbf24" color="#fbbf24" className="shrink-0" />
                       <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full"
                           style={{ width: `${dist.percentage}%` }}
                         />
                       </div>
-                      <span className="w-6 text-right text-slate-400 font-semibold text-[11px] shrink-0">
-                        {dist.count}
+                      <span className="w-10 text-right text-slate-400 font-semibold text-[11px] shrink-0">
+                        {dist.percentage}%
                       </span>
                     </div>
                   ))}
@@ -1531,6 +1802,73 @@ export default function BusinessDetail() {
                         <p className="text-xs text-slate-600 leading-relaxed pl-13">
                           "{review.review || review.comment || ""}"
                         </p>
+
+                        {/* Like / Dislike / Reply actions */}
+                        <div className="flex items-center gap-4 pl-13 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleReact(review.id, "like")}
+                            disabled={reactingId === review.id}
+                            className={`flex items-center gap-1 text-[11px] font-semibold cursor-pointer disabled:opacity-50 ${review.my_reaction === "like" ? "text-[#007570]" : "text-slate-400 hover:text-[#007570]"}`}
+                          >
+                            <ThumbsUp size={13} fill={review.my_reaction === "like" ? "#007570" : "none"} />
+                            <span>{review.likes_count || 0}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReact(review.id, "dislike")}
+                            disabled={reactingId === review.id}
+                            className={`flex items-center gap-1 text-[11px] font-semibold cursor-pointer disabled:opacity-50 ${review.my_reaction === "dislike" ? "text-rose-600" : "text-slate-400 hover:text-rose-600"}`}
+                          >
+                            <ThumbsDown size={13} fill={review.my_reaction === "dislike" ? "#e11d48" : "none"} />
+                            <span>{review.dislikes_count || 0}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOpenReplyId(openReplyId === review.id ? null : review.id)}
+                            className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-[#007570] cursor-pointer"
+                          >
+                            <MessageCircle size={13} />
+                            <span>Balas</span>
+                          </button>
+                        </div>
+
+                        {/* Reply input box */}
+                        {openReplyId === review.id && (
+                          <div className="pl-13 pt-2 flex items-start gap-2">
+                            <input
+                              type="text"
+                              value={replyTexts[review.id] || ""}
+                              onChange={(e) => setReplyTexts((prev) => ({ ...prev, [review.id]: e.target.value }))}
+                              onKeyDown={(e) => { if (e.key === "Enter") handleSubmitReply(review.id); }}
+                              placeholder="Tulis balasan..."
+                              className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSubmitReply(review.id)}
+                              disabled={submittingReplyId === review.id}
+                              className="px-3 py-1.5 rounded-lg bg-[#007570] hover:bg-[#005a58] text-white text-[11px] font-bold cursor-pointer disabled:opacity-50 shrink-0"
+                            >
+                              {submittingReplyId === review.id ? <Loader2 size={13} className="animate-spin" /> : "Kirim"}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Existing replies */}
+                        {review.replies && review.replies.length > 0 && (
+                          <div className="pl-13 pt-2 space-y-2">
+                            {review.replies.map((rep) => (
+                              <div key={rep.id} className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-slate-800">{rep.user_name || "Pengguna"}</span>
+                                  <span className="text-[10px] text-slate-400">{formatRelativeDate(rep.created_at)}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{rep.reply}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1551,49 +1889,69 @@ export default function BusinessDetail() {
 
             {/* SIDEBAR CARD 1: JAM BUKA / OPENING HOURS */}
             <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-3.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setIsHoursExpanded((v) => !v)}
+                className="w-full flex items-center justify-between border-b border-slate-100 pb-3 bg-transparent cursor-pointer"
+              >
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <Clock size={16} className="text-[#007570]" />
                   Jam Operasional
                 </h3>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  isOpen ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
-                }`}>
-                  {isOpen ? "Buka" : "Tutup"}
-                </span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    isOpen ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}>
+                    {isOpen ? "Buka" : "Tutup"}
+                  </span>
+                  <ChevronDown
+                    size={15}
+                    className={`text-slate-400 transition-transform duration-200 ${isHoursExpanded ? "rotate-180 text-[#10B981]" : ""}`}
+                  />
+                </div>
+              </button>
 
               {/* Table of Hours */}
-              {openDays && Array.isArray(openDays) && openDays.length > 0 ? (
-                <div className="space-y-1 text-xs">
-                  {openDays.map((d) => {
-                    const isToday = d.day === todayName;
-                    return (
-                      <div
-                        key={d.day}
-                        className={`flex items-center justify-between p-2 rounded-xl transition-colors ${
-                          isToday
-                            ? "bg-teal-50/80 font-bold text-[#007570] border border-teal-200/70"
-                            : "text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {isToday && <span className="w-1.5 h-1.5 rounded-full bg-[#007570]" />}
-                          {d.day}
-                          {isToday && <span className="text-[9px] font-bold bg-[#007570] text-white px-1.5 py-0.2 rounded">HARI INI</span>}
-                        </span>
-                        <span className="font-semibold text-slate-800">
-                          {d.open} - {d.close}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-3 rounded-xl bg-slate-50 text-xs text-slate-600 flex items-center gap-2">
-                  <Clock size={15} className="text-slate-400" />
-                  <span>{business.opening_hours || business.hours || "Senin - Minggu: 09:00 - 21:00"}</span>
-                </div>
+              {isHoursExpanded && (
+                openDays && Array.isArray(openDays) && openDays.length > 0 ? (
+                  <div className="space-y-1 text-xs">
+                    {["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"].map((dayName) => {
+                      const d = openDays.find((od) => od.day === dayName);
+                      const isToday = dayName === todayName;
+                      const dayIsOpen = !!d;
+                      return (
+                        <div
+                          key={dayName}
+                          className={`flex items-center justify-between p-2 rounded-xl transition-colors ${
+                            isToday
+                              ? "bg-teal-50/80 font-bold text-[#007570] border border-teal-200/70"
+                              : "text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${dayIsOpen ? "bg-emerald-500" : "bg-rose-400"}`} />
+                            {dayName}
+                            {isToday && <span className="text-[9px] font-bold bg-[#007570] text-white px-1.5 py-0.2 rounded">HARI INI</span>}
+                          </span>
+                          {dayIsOpen ? (
+                            <span className="font-semibold text-slate-800">
+                              {d.open} - {d.close}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                              Tutup
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-50 text-xs text-slate-600 flex items-center gap-2">
+                    <Clock size={15} className="text-slate-400" />
+                    <span>{business.opening_hours || business.hours || "Senin - Minggu: 09:00 - 21:00"}</span>
+                  </div>
+                )
               )}
             </div>
 
@@ -1604,12 +1962,37 @@ export default function BusinessDetail() {
                   <MapPin size={16} className="text-[#007570]" />
                   Lokasi &amp; Peta
                 </h3>
-                <span className="text-xs font-semibold text-slate-500">{cityName}</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  {business.village?.name || business.village || business.district || cityName}
+                </span>
               </div>
 
               {/* Mini Map Container */}
               <div className="rounded-xl overflow-hidden border border-slate-200 relative h-[160px] bg-slate-100">
-                {business.latitude && business.longitude ? (
+                {!isVerifiedBusiness ? (
+                  <div className="w-full h-full relative flex flex-col items-center justify-center p-3 text-center bg-gradient-to-b from-slate-100 to-slate-200">
+                    <div className="absolute inset-0 opacity-25 bg-[radial-gradient(#007570_1.5px,transparent_1.5px)] [background-size:12px_12px]" />
+                    <div className="relative z-10 flex flex-col items-center gap-1">
+                      <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-xs">
+                        <Lock size={14} strokeWidth={2.5} />
+                      </div>
+                      <span className="text-[12px] font-black text-slate-800">Peta Rute (Khusus Premium)</span>
+                      <p className="text-[10.5px] text-slate-600 max-w-[220px] leading-tight">
+                        Peta interaktif Leaflet aktif untuk usaha yang telah di-upgrade ke Paket Premium.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isOwner) navigate(`/add-business/${business.id}?upgrade=true`);
+                          else navigate(`/admin-user?tab=premium`);
+                        }}
+                        className="mt-1 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer border-0"
+                      >
+                        BUKA PETA (UPGRADE)
+                      </button>
+                    </div>
+                  </div>
+                ) : business.latitude && business.longitude ? (
                   <MapContainer
                     center={[parseFloat(business.latitude), parseFloat(business.longitude)]}
                     zoom={15}
@@ -1647,15 +2030,29 @@ export default function BusinessDetail() {
               </div>
 
               {/* Get Directions Button */}
-              <button
-                type="button"
-                onClick={handleDirections}
-                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border-0"
-              >
-                <Compass size={14} className="text-[#007570]" />
-                <span>Petunjuk Arah (Google Maps)</span>
-                <ExternalLink size={12} className="text-slate-400" />
-              </button>
+              {!isVerifiedBusiness ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isOwner) navigate(`/add-business/${business.id}?upgrade=true`);
+                    else navigate(`/admin-user?tab=premium`);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Lock size={14} className="text-amber-600" />
+                  <span>Petunjuk Arah (Khusus Premium)</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleDirections}
+                  className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border-0"
+                >
+                  <Compass size={14} className="text-[#007570]" />
+                  <span>Petunjuk Arah (Google Maps)</span>
+                  <ExternalLink size={12} className="text-slate-400" />
+                </button>
+              )}
             </div>
 
             {/* SIDEBAR CARD 3: KONTAK & INFORMASI RESMI */}
@@ -1666,37 +2063,43 @@ export default function BusinessDetail() {
               </h3>
 
               <div className="space-y-2 text-xs">
-                {/* Telepon */}
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                  <div className="flex items-center gap-2 text-slate-700 min-w-0">
-                    <Phone size={14} className="text-[#007570] shrink-0" />
-                    <span className="font-bold truncate">
-                      {showPhone ? business.phone : `${(business.phone || "08123456789").slice(0, 4)} **** ****`}
-                    </span>
+                {/* Telepon - khusus Premium */}
+                {isVerifiedBusiness && (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                    <div className="flex items-center gap-2 text-slate-700 min-w-0">
+                      <Phone size={14} className="text-[#007570] shrink-0" />
+                      <span className="font-bold truncate">
+                        {showPhone ? business.phone : `${(business.phone || "08123456789").slice(0, 4)} **** ****`}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPhone(!showPhone)}
+                      className="text-[#007570] font-bold text-[11px] hover:underline cursor-pointer shrink-0 border-0 bg-transparent"
+                    >
+                      {showPhone ? "Sembunyikan" : "Tampilkan"}
+                    </button>
                   </div>
+                )}
+
+                {/* WhatsApp - disatukan dengan alur akses berbayar (sama seperti tombol WhatsApp di action bar) */}
+                {business.phone && (
                   <button
                     type="button"
-                    onClick={() => setShowPhone(!showPhone)}
-                    className="text-[#007570] font-bold text-[11px] hover:underline cursor-pointer shrink-0 border-0 bg-transparent"
-                  >
-                    {showPhone ? "Sembunyikan" : "Tampilkan"}
-                  </button>
-                </div>
-
-                {/* WhatsApp */}
-                {business.phone && (
-                  <a
-                    href={`https://wa.me/${business.phone.replace(/\D/g, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/70 text-emerald-800 hover:bg-emerald-100 transition-colors"
+                    onClick={handleWhatsApp}
+                    disabled={waSettingsLoading}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/70 text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer disabled:opacity-60"
                   >
                     <div className="flex items-center gap-2">
-                      <MessageCircle size={14} className="text-emerald-600 shrink-0" />
+                      <WhatsAppIcon size={14} className="text-emerald-600 shrink-0" />
                       <span className="font-bold">Hubungi via WhatsApp</span>
                     </div>
-                    <ExternalLink size={12} className="text-emerald-600" />
-                  </a>
+                    {waSettingsLoading ? (
+                      <Loader2 size={12} className="animate-spin text-emerald-600" />
+                    ) : (
+                      <ExternalLink size={12} className="text-emerald-600" />
+                    )}
+                  </button>
                 )}
 
                 {/* Email */}
@@ -1804,40 +2207,108 @@ export default function BusinessDetail() {
 
       {/* MODAL 1: PRODUCT POPUP */}
       {showProductPopup && selectedProduct && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-4" onClick={closeProductPopup}>
-          <div className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-md shadow-2xl border border-slate-200 space-y-4 text-left relative" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[1000] flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out]"
+          onClick={closeProductPopup}
+        >
+          <div
+            className="bg-white rounded-[26px] p-6 sm:p-7 w-full max-w-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-200 text-left relative overflow-hidden space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Bar */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 truncate">{selectedProduct.name}</h3>
-              <button type="button" onClick={closeProductPopup} className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer border-0 bg-transparent">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="aspect-4/3 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
-              <img
-                src={selectedProduct.image ? getStorageUrlLocal(selectedProduct.image) : "https://via.placeholder.com/400"}
-                alt={selectedProduct.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="space-y-2">
-              <p className="text-xl font-black text-[#007570]">
-                {selectedProduct.price != null
-                  ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(selectedProduct.price))
-                  : "-"}
-              </p>
-              {selectedProduct.description && (
-                <p className="text-xs text-slate-600 leading-relaxed">{selectedProduct.description}</p>
-              )}
-            </div>
-            <div className="pt-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f0fdfa] text-[#007570] border border-[#ccfbf1]">
+                  <Package size={13} />
+                  Detail Produk &amp; Layanan
+                </span>
+                <span className="text-xs text-slate-400 hidden sm:inline">• {business.name}</span>
+              </div>
               <button
                 type="button"
-                onClick={() => { closeProductPopup(); handleWhatsApp(); }}
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer border-0 shadow-sm"
+                onClick={closeProductPopup}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors border-0"
+                title="Tutup Modal"
               >
-                <MessageCircle size={16} />
-                Pesan via WhatsApp
+                <X size={18} />
               </button>
+            </div>
+
+            {/* 2-Column Responsive Body: Foto di KIRI, Info & Deskripsi di KANAN */}
+            <div className="flex flex-col sm:flex-row gap-5 items-start">
+              {/* SISI KIRI: Foto Produk */}
+              <div className="w-full sm:w-5/12 shrink-0 flex flex-col gap-2">
+                <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm group">
+                  <img
+                    src={selectedProduct.image ? getStorageUrlLocal(selectedProduct.image) : "https://via.placeholder.com/400"}
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  {/* Badge Tag on Image */}
+                  <div className="absolute top-2.5 left-2.5">
+                    <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-black/60 text-white backdrop-blur-xs shadow-xs flex items-center gap-1">
+                      <Store size={10} className="text-amber-400" />
+                      Produk Toko
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SISI KANAN: Detail, Harga, Deskripsi & Tombol Pemesanan */}
+              <div className="w-full sm:w-7/12 flex flex-col justify-between min-h-[200px] space-y-3.5">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-snug mb-1.5">
+                    {selectedProduct.name}
+                  </h3>
+
+                  {/* Price Tag */}
+                  <div className="inline-flex items-baseline gap-1.5 px-3 py-1 rounded-xl bg-teal-50 border border-teal-200 text-[#007570] my-1">
+                    <span className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Harga:</span>
+                    <span className="text-xl sm:text-2xl font-black tracking-tight text-[#007570]">
+                      {selectedProduct.price != null
+                        ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(selectedProduct.price))
+                        : "-"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Description Box */}
+                <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Deskripsi Produk
+                  </span>
+                  <p className="text-xs text-slate-700 leading-relaxed max-h-[120px] overflow-y-auto pr-1">
+                    {selectedProduct.description || "Tidak ada rincian deskripsi tambahan untuk produk ini. Silakan tanyakan langsung kepada penjual melalui WhatsApp."}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeProductPopup();
+                      handleProductWhatsApp(selectedProduct);
+                    }}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-extrabold text-xs sm:text-[13px] flex items-center justify-center gap-2 cursor-pointer border-0 shadow-[0_4px_12px_rgba(16,185,129,0.3)] hover:scale-[1.01] active:scale-[0.99] transition-all"
+                  >
+                    <WhatsAppIcon size={16} />
+                    <span>Pesan via WhatsApp</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeProductPopup();
+                      handleChatWithSeller();
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer border-0 transition-colors"
+                    title="Kirim pesan inbox ke penjual"
+                  >
+                    <MessageCircle size={15} />
+                    <span className="hidden sm:inline">Chat</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1973,6 +2444,70 @@ export default function BusinessDetail() {
                     <p className="text-xs text-slate-600 leading-relaxed pl-13">
                       "{review.review || review.comment || ""}"
                     </p>
+
+                    <div className="flex items-center gap-4 pl-13 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleReact(review.id, "like")}
+                        disabled={reactingId === review.id}
+                        className={`flex items-center gap-1 text-[11px] font-semibold cursor-pointer disabled:opacity-50 ${review.my_reaction === "like" ? "text-[#007570]" : "text-slate-400 hover:text-[#007570]"}`}
+                      >
+                        <ThumbsUp size={13} fill={review.my_reaction === "like" ? "#007570" : "none"} />
+                        <span>{review.likes_count || 0}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleReact(review.id, "dislike")}
+                        disabled={reactingId === review.id}
+                        className={`flex items-center gap-1 text-[11px] font-semibold cursor-pointer disabled:opacity-50 ${review.my_reaction === "dislike" ? "text-rose-600" : "text-slate-400 hover:text-rose-600"}`}
+                      >
+                        <ThumbsDown size={13} fill={review.my_reaction === "dislike" ? "#e11d48" : "none"} />
+                        <span>{review.dislikes_count || 0}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOpenReplyId(openReplyId === review.id ? null : review.id)}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-[#007570] cursor-pointer"
+                      >
+                        <MessageCircle size={13} />
+                        <span>Balas</span>
+                      </button>
+                    </div>
+
+                    {openReplyId === review.id && (
+                      <div className="pl-13 pt-2 flex items-start gap-2">
+                        <input
+                          type="text"
+                          value={replyTexts[review.id] || ""}
+                          onChange={(e) => setReplyTexts((prev) => ({ ...prev, [review.id]: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleSubmitReply(review.id); }}
+                          placeholder="Tulis balasan..."
+                          className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSubmitReply(review.id)}
+                          disabled={submittingReplyId === review.id}
+                          className="px-3 py-1.5 rounded-lg bg-[#007570] hover:bg-[#005a58] text-white text-[11px] font-bold cursor-pointer disabled:opacity-50 shrink-0"
+                        >
+                          {submittingReplyId === review.id ? <Loader2 size={13} className="animate-spin" /> : "Kirim"}
+                        </button>
+                      </div>
+                    )}
+
+                    {review.replies && review.replies.length > 0 && (
+                      <div className="pl-13 pt-2 space-y-2">
+                        {review.replies.map((rep) => (
+                          <div key={rep.id} className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-800">{rep.user_name || "Pengguna"}</span>
+                              <span className="text-[10px] text-slate-400">{formatRelativeDate(rep.created_at)}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{rep.reply}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ));
               })()}
@@ -1998,7 +2533,7 @@ export default function BusinessDetail() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">Laporkan Profil Bisnis</h3>
-                  <p className="text-xs text-slate-500">Bantu kami menjaga akurasi informasi Info.co.id</p>
+                  <p className="text-xs text-slate-500">Bantu kami menjaga akurasi informasi Surade.co.id</p>
                 </div>
               </div>
               <button onClick={() => setShowReportModal(false)} className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer border-0 bg-transparent">
@@ -2043,6 +2578,489 @@ export default function BusinessDetail() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: WHATSAPP PAYMENT WALL */}
+      {showWaPaymentModal && waSettings && (
+        <div
+          className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[1100] flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setShowWaPaymentModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden my-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#007570] to-[#00b3ab] px-6 py-5 text-white text-center relative">
+              <button
+                onClick={() => setShowWaPaymentModal(false)}
+                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white cursor-pointer border-0 transition-all"
+              >
+                <X size={16} />
+              </button>
+              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-2.5 backdrop-blur-sm">
+                <WhatsAppIcon className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-lg font-black">Akses Kontak WhatsApp</h3>
+              <p className="text-xs text-white/80 mt-0.5">Biaya administrasi resmi Surade.co.id</p>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Fee amount banner */}
+              <div className="text-center bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-100 rounded-2xl py-3.5">
+                <p className="text-xs text-slate-500 font-semibold mb-0.5">Biaya Akses</p>
+                <p className="text-3xl font-black text-[#007570]">
+                  Rp {Number(waSettings.amount || 2000).toLocaleString("id-ID")}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Sekali bayar per akses</p>
+              </div>
+
+              {/* Instruction alert */}
+              {waSettings.instruction && (
+                <p className="text-xs text-slate-600 leading-relaxed text-center bg-amber-50 border border-amber-100 rounded-xl px-3.5 py-2.5">
+                  {waSettings.instruction}
+                </p>
+              )}
+
+              {/* Coupon Code Input Section */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Ticket size={14} className="text-[#007570]" />
+                    Kode Kupon Diskon (Opsional)
+                  </label>
+                  {appliedCouponInfo && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      <CheckCircle2 size={11} /> Terpasang
+                    </span>
+                  )}
+                </div>
+
+                {/* Daftar Kupon Tersedia */}
+                {!appliedCouponInfo && (
+                  <div className="space-y-1.5">
+                    {availableCouponsLoading ? (
+                      <div className="flex items-center gap-2 text-xs text-slate-500 py-1">
+                        <Loader2 size={12} className="animate-spin text-[#007570]" />
+                        <span className="text-[11px]">Memuat kupon promo...</span>
+                      </div>
+                    ) : availableCoupons.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {availableCoupons.map((c) => {
+                          const isPercentage = c.discount_type === 'percentage';
+                          const discountLabel = isPercentage 
+                            ? `-${Number(c.discount_value)}%`
+                            : `-Rp${Number(c.discount_value).toLocaleString('id-ID')}`;
+                          return (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={async () => {
+                                setCouponCode(c.code);
+                                setValidatingCoupon(true);
+                                setCouponMsg("");
+                                const baseAmount = Number(waSettings?.amount || 0);
+                                try {
+                                  const res = await api.post("/coupons/validate", {
+                                    code: c.code,
+                                    amount: baseAmount,
+                                  });
+                                  const data = res.data?.data || res.data;
+                                  if (data?.valid) {
+                                    const discountAmt = Number(data.discount_amount ?? data.discount ?? 0);
+                                    setAppliedCouponInfo(data);
+                                    setCouponDiscount(discountAmt);
+                                    setCouponMsg("");
+                                    toast.success("Kupon berhasil! Hemat Rp " + discountAmt.toLocaleString("id-ID"));
+                                  } else {
+                                    setAppliedCouponInfo(null);
+                                    setCouponDiscount(0);
+                                    const msg = data?.message || "Kode kupon tidak valid.";
+                                    setCouponMsg(msg);
+                                    toast.error(msg);
+                                  }
+                                } catch (err) {
+                                  setAppliedCouponInfo(null);
+                                  setCouponDiscount(0);
+                                  const msg = err.response?.data?.message || "Kode kupon tidak valid atau sudah kadaluarsa.";
+                                  setCouponMsg(msg);
+                                  toast.error(msg);
+                                } finally {
+                                  setValidatingCoupon(false);
+                                }
+                              }}
+                              disabled={validatingCoupon}
+                              className="group inline-flex items-center gap-1.5 bg-emerald-50/70 hover:bg-emerald-100/90 border border-emerald-200 hover:border-emerald-300 rounded-lg px-2.5 py-1 text-left transition-all cursor-pointer text-xs"
+                              title={c.description || `Gunakan ${c.code}`}
+                            >
+                              <Tag size={11} className="text-emerald-700" />
+                              <span className="font-mono font-extrabold text-[11px] text-slate-800">{c.code}</span>
+                              <span className="text-[10px] font-bold text-emerald-700">{discountLabel}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="CONTOH: IKLAN20"
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value.toUpperCase());
+                      if (appliedCouponInfo) {
+                        setAppliedCouponInfo(null);
+                        setCouponDiscount(0);
+                        setCouponMsg("");
+                      }
+                    }}
+                    disabled={!!appliedCouponInfo}
+                    className="flex-1 px-3.5 py-2.5 text-xs rounded-lg border border-slate-200 focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-400 font-mono uppercase"
+                  />
+                  {appliedCouponInfo ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedCouponInfo(null);
+                        setCouponDiscount(0);
+                        setCouponCode("");
+                        setCouponMsg("");
+                      }}
+                      className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer border-0 shrink-0 flex items-center gap-1"
+                    >
+                      <X size={13} />
+                      Hapus
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={validatingCoupon || !couponCode.trim()}
+                      onClick={async () => {
+                        if (!couponCode.trim()) {
+                          toast.error("Masukkan kode kupon terlebih dahulu");
+                          return;
+                        }
+                        setValidatingCoupon(true);
+                        setCouponMsg("");
+                        const baseAmount = Number(waSettings?.amount || 0);
+                        try {
+                          const res = await api.post("/coupons/validate", {
+                            code: couponCode.trim(),
+                            amount: baseAmount,
+                          });
+                          const data = res.data?.data || res.data;
+                          if (data?.valid) {
+                            const discountAmt = Number(data.discount_amount ?? data.discount ?? 0);
+                            setAppliedCouponInfo(data);
+                            setCouponDiscount(discountAmt);
+                            setCouponMsg("");
+                            toast.success("Kupon berhasil! Hemat Rp " + discountAmt.toLocaleString("id-ID"));
+                          } else {
+                            setAppliedCouponInfo(null);
+                            setCouponDiscount(0);
+                            const msg = data?.message || "Kode kupon tidak valid.";
+                            setCouponMsg(msg);
+                            toast.error(msg);
+                          }
+                        } catch (err) {
+                          setAppliedCouponInfo(null);
+                          setCouponDiscount(0);
+                          const msg = err.response?.data?.message || "Kode kupon tidak valid atau sudah kadaluarsa.";
+                          setCouponMsg(msg);
+                          toast.error(msg);
+                        } finally {
+                          setValidatingCoupon(false);
+                        }
+                      }}
+                      className="px-4 py-2.5 bg-[#007570] hover:bg-[#005a58] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                    >
+                      {validatingCoupon ? (
+                        <><Loader2 size={13} className="animate-spin" /><span>Cek...</span></>
+                      ) : (
+                        "Gunakan Kupon"
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {/* Applied coupon success banner */}
+                {appliedCouponInfo && couponDiscount > 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-xs space-y-1">
+                    <p className="text-green-700 font-bold flex items-center gap-1.5">
+                      <span>&#x2705;</span>
+                      Kupon <span className="font-black">{appliedCouponInfo.code}</span> berhasil diterapkan!
+                    </p>
+                    <p className="text-green-600">
+                      Diskon:{" "}
+                      <span className="font-bold">Rp {Number(couponDiscount).toLocaleString("id-ID")}</span>
+                      {"  |  "}Bayar:{" "}
+                      <span className="font-bold">
+                        Rp {Math.max(0, Number(waSettings?.amount || 0) - couponDiscount).toLocaleString("id-ID")}
+                      </span>
+                    </p>
+                    {appliedCouponInfo.description && (
+                      <p className="text-green-500 italic">{appliedCouponInfo.description}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Error message */}
+                {couponMsg && !appliedCouponInfo && (
+                  <p className="text-xs text-rose-600 font-semibold">
+                    &#x26A0;&#xFE0F; {couponMsg}
+                  </p>
+                )}
+              </div>
+
+
+              {/* Payment Method Selector - Simple Fix */}
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Pilih Saluran Pembayaran:
+                </p>
+
+                {/* Section 1: Transfer Bank */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    TRANSFER BANK / REKENING RESMI
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {OFFICIAL_BANK_ACCOUNTS.map((bank) => (
+                      <div
+                        key={bank.id}
+                        onClick={() => setSelectedPaymentMethod(bank.id)}
+                        className={`p-4 rounded-2xl border-2 flex items-center gap-3 cursor-pointer transition-all text-xs font-bold ${
+                          selectedPaymentMethod === bank.id
+                            ? "border-[#007570] bg-gradient-to-br from-teal-50 to-emerald-50 text-[#007570] shadow-lg ring-2 ring-[#007570]/20"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-[#007570]/50 hover:bg-teal-50/30 shadow-sm"
+                        }`}
+                      >
+                        <div className={`flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0 text-xl transition-all ${
+                          selectedPaymentMethod === bank.id
+                            ? "bg-white shadow-sm"
+                            : "bg-slate-100"
+                        }`}>
+                          {bank.logo}
+                        </div>
+                        <span className="flex-1">{bank.name}</span>
+                        {selectedPaymentMethod === bank.id ? (
+                          <div className="w-5 h-5 rounded-full bg-[#007570] text-white flex items-center justify-center flex-shrink-0">
+                            <Check size={12} strokeWidth={3} />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border border-slate-300 flex-shrink-0" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section 2: E-Wallet */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    E-WALLET
+                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {OFFICIAL_EWALLET_ACCOUNTS.filter((e) => e.isReady).map((ewallet) => (
+                      <div
+                        key={ewallet.id}
+                        onClick={() => setSelectedPaymentMethod(ewallet.id)}
+                        className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-xs font-bold ${
+                          selectedPaymentMethod === ewallet.id
+                            ? "border-[#007570] bg-gradient-to-br from-teal-50 to-emerald-50 text-[#007570] shadow-lg ring-2 ring-[#007570]/20"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-[#007570]/50 hover:bg-teal-50/30 shadow-sm"
+                        }`}
+                      >
+                        <div className={`flex items-center justify-center text-3xl transition-all ${
+                          selectedPaymentMethod === ewallet.id
+                            ? "scale-110"
+                            : ""
+                        }`}>
+                          {ewallet.logo}
+                        </div>
+                        <span>{ewallet.name}</span>
+                        {selectedPaymentMethod === ewallet.id ? (
+                          <div className="w-5 h-5 rounded-full bg-[#007570] text-white flex items-center justify-center">
+                            <Check size={12} strokeWidth={3} />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border border-slate-300" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section 3: QRIS */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    QRIS
+                  </span>
+                  <div
+                    onClick={() => setSelectedPaymentMethod("qris")}
+                    className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all text-xs font-bold ${
+                      selectedPaymentMethod === "qris"
+                        ? "border-[#007570] bg-gradient-to-br from-teal-50 to-emerald-50 text-[#007570] shadow-lg ring-2 ring-[#007570]/20"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-[#007570]/50 hover:bg-teal-50/30 shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`flex items-center justify-center w-9 h-9 rounded-lg text-xl transition-all ${
+                        selectedPaymentMethod === "qris"
+                          ? "bg-white shadow-sm"
+                          : "bg-slate-100"
+                      }`}>
+                        🔳
+                      </div>
+                      <span>QRIS (Semua E-Wallet &amp; Bank)</span>
+                    </div>
+                    {selectedPaymentMethod === "qris" ? (
+                      <div className="w-5 h-5 rounded-full bg-[#007570] text-white flex items-center justify-center flex-shrink-0">
+                        <Check size={12} strokeWidth={3} />
+                      </div>
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border border-slate-300 flex-shrink-0" />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Details Box */}
+              {(() => {
+                const selectedAccount =
+                  OFFICIAL_BANK_ACCOUNTS.find((b) => b.id === selectedPaymentMethod) ||
+                  OFFICIAL_EWALLET_ACCOUNTS.find((e) => e.id === selectedPaymentMethod);
+                const accountNumber = selectedAccount?.accountNumber || waSettings.account_number || "0954152045";
+                const accountHolder = selectedAccount?.accountName || OFFICIAL_ACCOUNT_HOLDER;
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Metode Dipilih</span>
+                      <span className="font-bold text-[#007570] uppercase">{selectedAccount?.name || selectedPaymentMethod}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">No. Rekening / Tujuan</span>
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        {accountNumber}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(accountNumber);
+                            toast.success("Nomor rekening disalin!");
+                          }}
+                          className="text-[#007570] hover:text-[#005a58] cursor-pointer border-0 bg-transparent p-0"
+                          title="Salin No Rekening"
+                        >
+                          <Copy size={13} />
+                        </button>
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Atas Nama</span>
+                      <span className="font-bold text-slate-900">{accountHolder}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
+                      <span className="text-slate-500 font-medium">Total Pembayaran</span>
+                      <span className="font-black text-[#007570] text-sm">
+                        Rp {Number(waSettings.amount || 2000).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* QRIS Scan preview if QRIS is selected or available */}
+              {(selectedPaymentMethod === "qris" || waSettings.qris_image) && (
+                <div className="text-center bg-slate-50 border border-slate-200 rounded-2xl p-3">
+                  <p className="text-[11px] font-bold text-slate-700 mb-2">Scan QRIS Resmi Surade.co.id:</p>
+                  {waSettings.qris_image ? (
+                    <img
+                      src={waSettings.qris_image}
+                      alt="QRIS Payment"
+                      className="w-40 h-40 object-contain mx-auto rounded-xl border border-slate-200 shadow-2xs"
+                    />
+                  ) : (
+                    <div className="w-36 h-36 mx-auto bg-white border border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 gap-1 p-2">
+                      <Camera size={28} className="text-[#007570]" />
+                      <span className="text-[10px] font-bold text-slate-600">QRIS All Payment</span>
+                      <span className="text-[9px]">Gunakan aplikasi M-Banking / E-Wallet</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Upload Proof of Payment Section */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+                  <span>Kirim Bukti Pembayaran:</span>
+                  <span className="text-[10px] text-[#007570] font-bold">(Disarankan)</span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="flex-1 border-2 border-dashed border-teal-200 hover:border-[#007570] bg-teal-50/40 hover:bg-teal-50 p-3 rounded-2xl cursor-pointer transition-all flex items-center justify-center gap-2 text-xs font-bold text-[#007570]">
+                    <Upload size={16} />
+                    <span>{waProofFile ? "Ganti Bukti Transfer" : "Unggah Foto Bukti Transfer"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setWaProofFile(file);
+                          setWaProofPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                {waProofPreview && (
+                  <div className="relative mt-2 rounded-2xl overflow-hidden border border-teal-300 w-full h-32 bg-slate-900/5 flex items-center justify-center">
+                    <img src={waProofPreview} alt="Bukti Transfer" className="h-full object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWaProofFile(null);
+                        setWaProofPreview(null);
+                      }}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/80 text-white flex items-center justify-center border-0 cursor-pointer hover:bg-rose-600 transition-colors"
+                      title="Hapus bukti"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="pt-2 space-y-2">
+                <button
+                  onClick={handleWaPaymentConfirm}
+                  disabled={waSubmittingLog}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#22bf5b] hover:to-[#0f7a6e] text-white font-black text-sm shadow-md hover:shadow-lg transition-all cursor-pointer border-0 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {waSubmittingLog ? (
+                    <Loader2 size={18} className="animate-spin text-white" />
+                  ) : (
+                    <WhatsAppIcon className="w-5 h-5 text-white" />
+                  )}
+                  <span>
+                    {waProofFile ? "Sudah Bayar & Kirim Bukti — Buka WhatsApp" : "Sudah Bayar — Buka WhatsApp"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setShowWaPaymentModal(false)}
+                  className="w-full py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs cursor-pointer border-0 transition-all"
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

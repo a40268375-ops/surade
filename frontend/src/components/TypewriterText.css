@@ -1,0 +1,32 @@
+.typewriter-text {
+  display: inline;
+}
+
+.typewriter-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  font-weight: 400;
+  color: #007570;
+  animation: typewriterBlink 0.9s step-end infinite;
+}
+
+/* Kursor berhenti berkedip & memudar begitu ketikan selesai */
+.typewriter-cursor--done {
+  animation: typewriterFadeOut 0.6s ease forwards 0.4s;
+}
+
+@keyframes typewriterBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes typewriterFadeOut {
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typewriter-cursor {
+    animation: none;
+    opacity: 0;
+  }
+}

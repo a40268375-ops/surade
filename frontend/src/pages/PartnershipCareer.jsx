@@ -46,7 +46,7 @@ export default function PartnershipCareer() {
             <h2 className="pc-section__title">Kerjasama</h2>
           </div>
           <p className="pc-section__intro">
-            Info.co.id terbuka untuk kerjasamaan dengan berbagai pihak untuk memperluas jangkauan dan memberikan dampak positif bagi masyarakat Indonesia.
+            Surade.co.id terbuka untuk kerjasamaan dengan berbagai pihak untuk memperluas jangkauan dan memberikan dampak positif bagi masyarakat Indonesia.
           </p>
 
           <div className="pc-cards">
@@ -114,7 +114,7 @@ export default function PartnershipCareer() {
             <h2 className="pc-section__title">Karir</h2>
           </div>
           <p className="pc-section__intro">
-            Bergabunglah dengan tim Info.co.id dan berkontribusi dalam membangun ekosistem digital Indonesia yang lebih baik.
+            Bergabunglah dengan tim Surade.co.id dan berkontribusi dalam membangun ekosistem digital Indonesia yang lebih baik.
           </p>
 
           <div className="pc-benefits">

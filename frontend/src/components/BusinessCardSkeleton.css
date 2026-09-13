@@ -1,0 +1,71 @@
+/* Skeleton grid — meniru layout .temukan-grid (lihat pages/Home.css) */
+.biz-grid-skeleton {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .biz-grid-skeleton {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .biz-grid-skeleton {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Kartu skeleton — dimensi disamakan dengan .biz-card asli */
+.biz-card-skeleton {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e8ecf0;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+}
+
+.biz-card-skeleton__img {
+  height: 180px;
+  width: 100%;
+  background: linear-gradient(90deg, #eef1f4 25%, #e4e8ec 37%, #eef1f4 63%);
+  background-size: 400% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.biz-card-skeleton__body {
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.biz-card-skeleton__line {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #eef1f4 25%, #e4e8ec 37%, #eef1f4 63%);
+  background-size: 400% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.biz-card-skeleton__line--title {
+  height: 16px;
+  width: 70%;
+}
+
+.biz-card-skeleton__line--sub {
+  height: 12px;
+  width: 45%;
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .biz-card-skeleton__img,
+  .biz-card-skeleton__line {
+    animation: none;
+  }
+}

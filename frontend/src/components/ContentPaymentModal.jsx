@@ -18,6 +18,19 @@ export default function ContentPaymentModal({
   const [couponCode, setCouponCode] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  // Daftar kode kupon aktif (sama seperti fitur di halaman Tambah Usaha/Iklan)
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [availableCouponsLoading, setAvailableCouponsLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/coupons/public-codes")
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setAvailableCoupons(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => console.error("Gagal memuat daftar kupon:", err))
+      .finally(() => setAvailableCouponsLoading(false));
+  }, []);
   const [couponError, setCouponError] = useState("");
 
   const [paymentCategory, setPaymentCategory] = useState("bank"); // 'bank' | 'ewallet'
@@ -277,7 +290,7 @@ export default function ContentPaymentModal({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Biaya publikasi 1 kali untuk penayangan aktif di platform Info.co.id
+                Biaya publikasi 1 kali untuk penayangan aktif di platform Surade.co.id
               </p>
             </div>
           </div>
@@ -383,6 +396,46 @@ export default function ContentPaymentModal({
                     Rp {basePrice.toLocaleString("id-ID")}
                   </span>
                 </div>
+              </div>
+
+              {/* Kupon Tersedia — supaya user tahu kode apa yang bisa dipakai */}
+              <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200">
+                <p className="text-xs font-bold text-emerald-800 mb-2.5 flex items-center gap-1.5">
+                  <Sparkles size={14} />
+                  Kupon Tersedia — klik untuk pakai
+                </p>
+                {availableCouponsLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-500 py-1">
+                    <Loader2 size={14} className="animate-spin" />
+                    Memuat kupon aktif...
+                  </div>
+                ) : availableCoupons.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {availableCoupons.map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => setCouponCode(c.code)}
+                        disabled={!!appliedCoupon}
+                        className="group flex items-center gap-2 bg-white border border-emerald-300 hover:border-emerald-500 hover:bg-emerald-100 rounded-xl px-3 py-2 text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={c.description || ""}
+                      >
+                        <span className="font-mono font-extrabold text-xs text-emerald-700 tracking-wide">
+                          {c.code}
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-500">
+                          {c.discount_type === "percentage"
+                            ? `-${Number(c.discount_value)}%`
+                            : `-Rp${Number(c.discount_value).toLocaleString('id-ID')}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Belum ada kupon promo aktif saat ini. Kalau kamu punya kode kupon, masukkan langsung di kotak di bawah.
+                  </p>
+                )}
               </div>
 
               {/* Kupon Diskon */}
