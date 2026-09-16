@@ -15,6 +15,7 @@ import {
   CheckCircle,
   ArrowLeft,
   User,
+  Home,
 } from "lucide-react";
 
 export default function Login({ initialRegister = false }) {
@@ -51,9 +52,27 @@ export default function Login({ initialRegister = false }) {
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
   const [otpError, setOtpError] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
+  const [otpDevCode, setOtpDevCode] = useState(null);
   const [resendCooldown, setResendCooldown] = useState(0); // seconds
   const otpRefs = useRef([]);
   const cooldownRef = useRef(null);
+
+  const getEmailProviderInfo = (emailStr) => {
+    if (!emailStr) return { name: "Gmail", url: "https://mail.google.com/mail/u/0/#inbox" };
+    const domain = emailStr.split("@")[1]?.toLowerCase() || "";
+    if (domain.includes("gmail")) {
+      return { name: "Gmail", url: "https://mail.google.com/mail/u/0/#inbox" };
+    } else if (domain.includes("yahoo")) {
+      return { name: "Yahoo", url: "https://mail.yahoo.com/" };
+    } else if (domain.includes("outlook") || domain.includes("hotmail") || domain.includes("live") || domain.includes("msn")) {
+      return { name: "Outlook", url: "https://outlook.live.com/mail/0/inbox" };
+    } else if (domain.includes("icloud")) {
+      return { name: "iCloud", url: "https://www.icloud.com/mail" };
+    } else if (domain) {
+      return { name: domain, url: `https://${domain}` };
+    }
+    return { name: "Email", url: "https://mail.google.com/mail/u/0/#inbox" };
+  };
 
   useEffect(() => {
     if (refCode) {
@@ -208,20 +227,13 @@ export default function Login({ initialRegister = false }) {
       // Move to OTP step
       setRegStep("otp");
       setOtpError("");
-      if (data?.dev_otp) {
-        setOtpDigits(String(data.dev_otp).split("").slice(0, 6));
-      } else {
-        setOtpDigits(["", "", "", "", "", ""]);
-      }
+      setOtpDigits(["", "", "", "", "", ""]);
+      setOtpDevCode(data?.dev_otp || null);
       startCooldown(60);
 
-      // Auto-focus first or last input after render
+      // Auto-focus first input after render
       setTimeout(() => {
-        if (data?.dev_otp) {
-          otpRefs.current[5]?.focus();
-        } else {
-          otpRefs.current[0]?.focus();
-        }
+        otpRefs.current[0]?.focus();
       }, 100);
     } catch {
       setRegError("Terjadi kesalahan koneksi. Silakan coba lagi.");
@@ -338,18 +350,11 @@ export default function Login({ initialRegister = false }) {
         setOtpError(data?.message || "Gagal mengirim ulang OTP ke email.");
         return;
       }
-      if (data?.dev_otp) {
-        setOtpDigits(String(data.dev_otp).split("").slice(0, 6));
-      } else {
-        setOtpDigits(["", "", "", "", "", ""]);
-      }
+      setOtpDigits(["", "", "", "", "", ""]);
+      setOtpDevCode(data?.dev_otp || null);
       startCooldown(60);
       setTimeout(() => {
-        if (data?.dev_otp) {
-          otpRefs.current[5]?.focus();
-        } else {
-          otpRefs.current[0]?.focus();
-        }
+        otpRefs.current[0]?.focus();
       }, 100);
     } catch {
       setOtpError("Terjadi kesalahan koneksi.");
@@ -368,12 +373,26 @@ export default function Login({ initialRegister = false }) {
     setRegError("");
     setOtpDigits(["", "", "", "", "", ""]);
     setOtpError("");
+    setOtpDevCode(null);
     if (cooldownRef.current) clearInterval(cooldownRef.current);
     setResendCooldown(0);
   };
 
   return (
     <div className="login-page login-page--split">
+      {/* ── Mobile Top Bar ── */}
+      <header className="login-mobile-topbar">
+        <Link to="/" className="login-mobile-logo-wrap">
+          <span className="login-mobile-brand-name">
+            Surade<span>.co.id</span>
+          </span>
+        </Link>
+        <Link to="/" className="login-mobile-home-btn">
+          <Home size={15} />
+          <span>Beranda</span>
+        </Link>
+      </header>
+
       {/* ── Main Content ── */}
       <main className="login-main login-main--split">
         <div className="login-container login-container--split">
@@ -404,18 +423,19 @@ export default function Login({ initialRegister = false }) {
 
             <div className="login-branding__top">
               <div className="login-branding__header-row">
-                <img src={logoImg} alt="Surade.co.id" className="login-branding__logo-sm" />
-                <span className="login-branding__brand-name login-branding__brand-name--dark">
+                <span className="login-branding__brand-name--dark">
                   Surade<span>.co.id</span>
                 </span>
               </div>
 
               <h1 className="login-branding__heading login-branding__heading--dark">
-                Masukkan bisnismu ke Surade,<br />jangkau lebih banyak pelanggan.
+                Masukkan bisnismu ke<br />
+                Surade,<br />
+                jangkau lebih banyak<br />
+                pelanggan.
               </h1>
               <p className="login-branding__subtext login-branding__subtext--dark">
-                Surade membantu bisnis Anda ditemukan, dipercaya, dan berkembang
-                bersama masyarakat di 12 desa Kecamatan Surade.
+                Surade membantu bisnis Anda ditemukan, dipercaya, dan berkembang bersama masyarakat di 12 desa Kecamatan Surade.
               </p>
 
               <ul className="login-branding__points">
@@ -434,11 +454,19 @@ export default function Login({ initialRegister = false }) {
               </ul>
             </div>
 
-            <p className="login-branding__copy">&copy; 2026 Surade.co.id — Semua hak dilindungi.</p>
+            <p className="login-branding__copy">&copy; 2026 Surade.co.id — All rights reserved.</p>
           </div>
 
           {/* ── Right: Login Card ── */}
           <div className="login-card login-card--split">
+            {/* Logo dipindahkan di atas masuk (ditengah) dengan teksnya */}
+            <div className="login-card__header-logo">
+              <img src={logoImg} alt="Surade.co.id" className="login-card__logo" />
+              <span className="login-card__brand-name">
+                Surade<span>.co.id</span>
+              </span>
+            </div>
+
             <h2 className="login-card__title">Masuk</h2>
             <p className="login-card__subtitle">Masuk untuk melanjutkan ke akun Anda</p>
 
@@ -727,22 +755,54 @@ export default function Login({ initialRegister = false }) {
                 <div className="login-modal__divider" />
 
                 <form className="login-modal__body" onSubmit={handleVerifyOtp} noValidate>
-                  {/* Email hint */}
-                  <div style={{
-                    background: "#f0f9ff",
-                    border: "1px solid #bae6fd",
-                    borderRadius: 10,
-                    padding: "12px 16px",
-                    marginBottom: 20,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                  }}>
-                    <Mail size={16} style={{ color: "#0284c7", flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: "#0369a1" }}>
-                      Kode OTP dikirim ke <strong>{regEmail}</strong>
-                    </span>
-                  </div>
+                  {/* Dynamic Inbox Button matching email provider */}
+                  {(() => {
+                    const provider = getEmailProviderInfo(regEmail);
+                    return (
+                      <div style={{
+                        background: "#f0f9ff",
+                        border: "1px solid #bae6fd",
+                        borderRadius: 12,
+                        padding: "14px 16px",
+                        marginBottom: 16,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        flexWrap: "wrap",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <Mail size={18} style={{ color: "#0284c7", flexShrink: 0 }} />
+                          <span style={{ fontSize: 13, color: "#0369a1" }}>
+                            Kode OTP dikirim ke <strong>{regEmail}</strong>
+                          </span>
+                        </div>
+                        <a
+                          href={provider.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "6px 14px",
+                            background: "#0284c7",
+                            color: "#ffffff",
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            textDecoration: "none",
+                            boxShadow: "0 2px 4px rgba(2,132,199,0.2)",
+                            transition: "background 0.2s",
+                          }}
+                        >
+                          Buka {provider.name} Inbox ↗
+                        </a>
+                      </div>
+                    );
+                  })()}
+
+
 
                   {/* OTP Error */}
                   {otpError && (

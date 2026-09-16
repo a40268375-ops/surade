@@ -13,7 +13,7 @@ export default function Footer() {
               <img src={logoImg} alt="Surade.co.id" className="footer-logo__img" />
             </Link>
             <p className="footer-desc">
-              Surade.co.id adalah portal digital UMKM Kecamatan Surade yang menghubungkan pelaku usaha lokal dengan masyarakat di 12 desa/kelurahan.
+              Surade adalah platform yang membantu pelaku usaha mikro, kecil dan menengah dalam mempromosikan dan memperluas dalam jaringan.
             </p>
             <div className="footer-social">
               <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="footer-social__link footer-social__link--instagram" aria-label="Instagram">
@@ -70,6 +70,7 @@ export default function Footer() {
               <li><Link to="/faq">FAQ</Link></li>
               <li><Link to="/terms">Syarat &amp; Ketentuan</Link></li>
               <li><Link to="/contact">Hubungi Kami</Link></li>
+              <li><Link to="/panduan">Panduan Lengkap</Link></li>
             </ul>
           </div>
 
@@ -96,7 +97,7 @@ export default function Footer() {
       <div className="footer-bottom">
         <div className="footer-bottom__inner">
           <p className="footer-copyright">
-            &copy; 2026 Surade.co.id — Semua hak dilindungi.
+            &copy; 2026 Surade.co.id — All rights reserved.
           </p>
           <div className="footer-bottom-links">
             <Link to="/terms#privasi">Privasi</Link>

@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
             BusinessProductSeeder::class, // Add products to all businesses
             ContentPackageSeeder::class,
             SmartCitySeeder::class,
-            RatingSeeder::class, // Added for real ratings data
+            AuthenticSuradeBusinessesSeeder::class,
         ]);
     }
 }

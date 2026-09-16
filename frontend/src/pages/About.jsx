@@ -37,7 +37,7 @@ export default function About() {
           </div>
           <h1 className="about-hero__title">Tentang Surade.co.id</h1>
           <p className="about-hero__subtitle">
-            Platform informasi terlengkap untuk mendukung Smart City dan Smart Village di Indonesia
+            Portal Digital Resmi &amp; Direktori UMKM Terpadu Kecamatan Surade, Kabupaten Sukabumi
           </p>
         </div>
       </section>
@@ -47,7 +47,7 @@ export default function About() {
         <div className="about-why__inner">
           <h2 className="about-why__title">Mengapa Surade.co.id?</h2>
           <p className="about-why__subtitle">
-            Surade.co.id adalah pilihan tepat untuk kebutuhan informasi dan branding usaha Anda
+            Surade.co.id hadir sebagai wadah digital resmi yang menghubungkan pelaku UMKM lokal dengan masyarakat di 12 desa dan kelurahan se-Kecamatan Surade
           </p>
 
           <div className="about-features">
@@ -58,7 +58,7 @@ export default function About() {
               </div>
               <h3 className="about-feature-card__title">One Click Service</h3>
               <p className="about-feature-card__text">
-                Memudahkan pencarian dan meningkatkan branding usaha Anda dengan jangkauan yang sangat luas hanya dengan satu kali klik. Langsung menemukan informasi dan lokasi yang dicari. Dimana saja, kapan saja kemudahan di tangan Anda.
+                Memudahkan masyarakat menemukan kontak pedagang, bengkel, kuliner, dan aneka jasa di Surade hanya dengan satu kali klik. Langsung terhubung via WhatsApp dan navigasi peta lokasi.
               </p>
               <button className="about-feature-card__button">
                 <Zap size={16} />
@@ -71,13 +71,13 @@ export default function About() {
               <div className="about-feature-card__icon">
                 <Globe size={48} />
               </div>
-              <h3 className="about-feature-card__title">Smart City & Village</h3>
+              <h3 className="about-feature-card__title">Digitalisasi Desa &amp; UMKM</h3>
               <p className="about-feature-card__text">
-                Setiap usaha/kegiatan Anda akan memiliki website secara virtual (dapat menambahkan dan mengedit informasi). Surade.co.id menjadi wadah untuk daerah berkarya dan berdaya saing menuju Smart City dan Smart Village.
+                Setiap usaha lokal memiliki etalase profil virtual interaktif lengkap dengan katalog produk, jam operasional, dan ulasan. Surade.co.id mendorong kemandirian ekonomi desa di era digital.
               </p>
               <button className="about-feature-card__button">
                 <Users size={16} />
-                <span>Membangun Smart City</span>
+                <span>Membangun Surade Digital</span>
               </button>
             </div>
 
@@ -86,13 +86,13 @@ export default function About() {
               <div className="about-feature-card__icon">
                 <Heart size={48} />
               </div>
-              <h3 className="about-feature-card__title">Donasi Sosial</h3>
+              <h3 className="about-feature-card__title">Dukungan Sosial &amp; Komunitas</h3>
               <p className="about-feature-card__text">
-                Bersama menyisihkan donasi setiap adanya pemasangan info di info.co.id sebagai kontribusi kami untuk membangun daerah Smart City dan Smart Village lebih baik. Donasi diarahkan untuk kesehatan, pendidikan, kemiskinan, keagamaan, lingkungan hidup dan sosial lainnya.
+                Bersama menyisihkan kontribusi dari setiap pemasangan promosi di Surade.co.id untuk mendukung program sosial, kemajuan UMKM, pendidikan, dan kegiatan kemasyarakatan di Kecamatan Surade.
               </p>
               <button className="about-feature-card__button">
                 <Heart size={16} />
-                <span>Kita Berdonasi</span>
+                <span>Peduli Komunitas</span>
               </button>
             </div>
           </div>
@@ -108,9 +108,9 @@ export default function About() {
               <div className="about-benefit-item__icon">
                 <MapPin size={24} />
               </div>
-              <h4 className="about-benefit-item__title">Info Terlengkap</h4>
+              <h4 className="about-benefit-item__title">Info Direktori Terlengkap</h4>
               <p className="about-benefit-item__text">
-                Data dan informasi yang komprehensif dari berbagai sektor usaha dan layanan
+                Data komprehensif mulai dari warung kuliner, kerajinan, agribisnis, jasa, hingga destinasi wisata di Surade
               </p>
             </div>
 
@@ -118,9 +118,9 @@ export default function About() {
               <div className="about-benefit-item__icon">
                 <Users size={24} />
               </div>
-              <h4 className="about-benefit-item__title">Berbagi Event</h4>
+              <h4 className="about-benefit-item__title">Info Event &amp; Komunitas</h4>
               <p className="about-benefit-item__text">
-                Update event, aktivitas, dan perkembangan informasi kegiatan pemerintahan, sekolah, komunitas, dan pameran
+                Update agenda event desa, bazar UMKM, festival budaya, dan kegiatan sosial warga se-Kecamatan Surade
               </p>
             </div>
 
@@ -128,9 +128,9 @@ export default function About() {
               <div className="about-benefit-item__icon">
                 <Globe size={24} />
               </div>
-              <h4 className="about-benefit-item__title">Jangkauan Mudah</h4>
+              <h4 className="about-benefit-item__title">Akses Cepat &amp; Mudah</h4>
               <p className="about-benefit-item__text">
-                Akses informasi detil, kontak person, nomor handphone, dan akses lokasi berbasis peta
+                Informasi detail nomor WhatsApp resmi, alamat lengkap, dan panduan rute Google Maps langsung di smartphone Anda
               </p>
             </div>
           </div>

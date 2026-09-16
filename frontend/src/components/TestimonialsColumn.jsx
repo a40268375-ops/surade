@@ -53,9 +53,11 @@ export default function TestimonialsColumn({ testimonials, duration = 15, classN
                       <cite className="font-bold not-italic tracking-tight leading-5 text-slate-900">
                         {testi.name}
                       </cite>
-                      <span className="text-xs font-semibold leading-5 tracking-tight text-amber-600 mt-0.5">
-                        {testi.role}
-                      </span>
+                      {testi.role && (
+                        <span className="text-xs font-semibold leading-5 tracking-tight text-amber-600 mt-0.5">
+                          {testi.role}
+                        </span>
+                      )}
                     </div>
                   </footer>
                 </blockquote>

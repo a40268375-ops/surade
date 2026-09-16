@@ -8,6 +8,7 @@ import { getStorageUrl, DEFAULT_AVATAR, OFFICIAL_BANK_ACCOUNTS, OFFICIAL_EWALLET
 import { requireAuth, isUserLoggedIn } from "../utils/authCheck";
 import { isOpenNow } from "../utils/businessHours";
 import WhatsAppIcon from "../components/icons/WhatsAppIcon";
+import PaymentMethodSelector from "../components/PaymentMethodSelector";
 import toast from "react-hot-toast";
 import {
   MapPin,
@@ -22,6 +23,7 @@ import {
   Clock,
   X,
   Building2,
+  CreditCard,
   ArrowRight,
   Package,
   User,
@@ -41,6 +43,7 @@ import {
   Sparkles,
   Crown,
   Edit,
+  Trash2,
   ThumbsUp,
   ThumbsDown,
   Lock,
@@ -263,6 +266,29 @@ export default function BusinessDetail() {
     business?.features?.is_premium ||
     business?.premium_info?.status === "active"
   );
+
+  const displayTags = useMemo(() => {
+    let raw = business?.tags;
+    if (typeof raw === "string") {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        raw = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw.map((t) => (typeof t === "object" ? (t?.name || t?.title || String(t)) : String(t))).filter(Boolean);
+    }
+    const fallbacks = [];
+    if (business?.category?.name) fallbacks.push(business.category.name);
+    if (business?.village) fallbacks.push(business.village);
+    if (Array.isArray(products) && products.length > 0) {
+      products.slice(0, 3).forEach((p) => {
+        if (p?.name && !fallbacks.includes(p.name)) fallbacks.push(p.name);
+      });
+    }
+    return fallbacks.length > 0 ? fallbacks : ["UMKM Surade", "Produk Lokal"];
+  }, [business?.tags, business?.category?.name, business?.village, products]);
 
   const galleryImages = useMemo(() => {
     return allImages;
@@ -579,6 +605,11 @@ export default function BusinessDetail() {
   };
 
   const handleWhatsApp = async () => {
+    if (!isUserLoggedIn()) {
+      toast.error("Silakan login terlebih dahulu untuk menghubungi via WhatsApp.");
+      navigate("/login", { state: { from: window.location.pathname } });
+      return;
+    }
     if (!business?.phone) {
       toast.error("Nomor WhatsApp belum tersedia untuk bisnis ini.");
       return;
@@ -607,6 +638,9 @@ export default function BusinessDetail() {
       const data = res.data?.data;
       if (data?.enabled && data?.amount > 0) {
         setWaSettings(data);
+        if (data?.bank_name) {
+          setSelectedPaymentMethod(data.bank_name);
+        }
         setWaPendingAction("direct");
         setWaPendingProduct(null);
         setWaPaymentConfirmed(false);
@@ -622,6 +656,11 @@ export default function BusinessDetail() {
   };
 
   const handleProductWhatsApp = async (prod) => {
+    if (!isUserLoggedIn()) {
+      toast.error("Silakan login terlebih dahulu untuk memesan via WhatsApp.");
+      navigate("/login", { state: { from: window.location.pathname } });
+      return;
+    }
     if (!business?.phone) {
       toast.error("Nomor WhatsApp belum tersedia untuk bisnis ini.");
       return;
@@ -633,6 +672,9 @@ export default function BusinessDetail() {
       const data = res.data?.data;
       if (data?.enabled && data?.amount > 0) {
         setWaSettings(data);
+        if (data?.bank_name) {
+          setSelectedPaymentMethod(data.bank_name);
+        }
         setWaPendingAction("product");
         setWaPendingProduct(prod);
         setWaPaymentConfirmed(false);
@@ -666,7 +708,11 @@ const handleWaPaymentConfirm = async () => {
       const formData = new FormData();
       if (business?.id) formData.append("business_id", business.id);
       if (business?.name) formData.append("business_name", business.name);
-      formData.append("fee_amount", waSettings?.amount || 2000);
+      const finalAmount = Math.max(0, Number(waSettings?.amount || 2000) - Number(couponDiscount || 0));
+      formData.append("fee_amount", finalAmount);
+      if (appliedCouponInfo?.code) {
+        formData.append("coupon_code", appliedCouponInfo.code);
+      }
 
       const selectedAcc =
         OFFICIAL_BANK_ACCOUNTS.find((b) => b.id === selectedPaymentMethod) ||
@@ -863,6 +909,43 @@ const handleWaPaymentConfirm = async () => {
     }
   };
 
+  const [deletingReviewId, setDeletingReviewId] = useState(null);
+
+  const handleEditMyReview = (rev) => {
+    setUserRating(rev.rating || 5);
+    setReviewComment(rev.review || "");
+    const el = document.getElementById("reviews-section");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus ulasan ini?")) return;
+    setDeletingReviewId(reviewId);
+    try {
+      await api.delete(`/ratings/${reviewId}`);
+      toast.success("Ulasan berhasil dihapus.");
+      setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+      setUserRating(0);
+      setReviewComment("");
+      try {
+        const bizRes = await api.get(`/businesses/${id}`);
+        const bizData = bizRes.data?.data || bizRes.data;
+        if (bizData && bizData.id) {
+          setBusiness(bizData);
+        }
+      } catch (refreshErr) {
+        console.error("Failed to refresh business data:", refreshErr);
+      }
+    } catch (err) {
+      console.error("Gagal menghapus ulasan:", err);
+      toast.error(err.response?.data?.message || "Gagal menghapus ulasan.");
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
+
   const handleReact = async (ratingId, type) => {
     if (!requireAuth()) return;
     if (reactingId) return;
@@ -970,7 +1053,14 @@ const handleWaPaymentConfirm = async () => {
     : (business.rating ?? business.averageRating ?? 0);
   const displayReviews = reviews.length > 0
     ? reviews.length
-    : (business.reviews ?? business.total_rating ?? 0);
+    : (business.rating_count ?? business.reviews_count ?? business.reviews ?? business.total_rating ?? 0);
+
+  // Current user & their review
+  const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+  const currentUser = userStr ? JSON.parse(userStr) : null;
+  const myExistingReview = reviews.find(
+    (r) => currentUser && (r.user_id === currentUser.id || r.user?.id === currentUser.id)
+  );
 
   // Rating Distribution breakdown (1-5 stars)
   const ratingDistribution = [5, 4, 3, 2, 1].map((starVal) => {
@@ -1013,7 +1103,6 @@ const handleWaPaymentConfirm = async () => {
     business.user?.role === "premium"
   );
 
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
   const isOwner = Boolean(currentUser?.id && business?.user_id && Number(currentUser.id) === Number(business.user_id));
 
   const logoUrl = business.logo ? getStorageUrl(business.logo) : null;
@@ -1024,14 +1113,14 @@ const handleWaPaymentConfirm = async () => {
 
       {/* OWNER MANAGEMENT & UPGRADE BAR */}
       {isOwner && (
-        <section className="bg-gradient-to-r from-[#0c2b27] via-[#053733] to-[#021f1d] border-b border-teal-800 text-white shadow-sm relative z-20">
+        <section className="mt-[68px] bg-gradient-to-r from-[#003d38] via-[#005e57] to-[#003d38] border-b border-teal-500/30 text-white shadow-md relative z-30">
           <div className="bd-container py-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider">
-                Pemilik Usaha
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-400 text-slate-950 uppercase tracking-wider shadow-xs">
+                ⭐ Pemilik Usaha
               </span>
-              <span className="text-xs text-slate-200">
-                Anda adalah pemilik profil usaha ini.
+              <span className="text-xs text-teal-100 font-medium">
+                Anda login sebagai pemilik resmi profil usaha ini.
               </span>
             </div>
             <div className="flex items-center gap-2.5">
@@ -1276,6 +1365,21 @@ const handleWaPaymentConfirm = async () => {
                       <span className="truncate">{business.address ? `${business.address.substring(0, 42)}...` : cityName}</span>
                     </div>
                   </div>
+
+                  {/* Tags Badges in Hero */}
+                  {displayTags.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+                      {displayTags.map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-semibold backdrop-blur-md border border-white/25 transition-all shadow-xs"
+                        >
+                          <Tag size={10} className="text-teal-300" />
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1452,15 +1556,18 @@ const handleWaPaymentConfirm = async () => {
               </div>
 
               {/* Highlights & Tags */}
-              {Array.isArray(business.tags) && business.tags.length > 0 && (
-                <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs font-bold text-slate-500 mr-1">Tags:</span>
-                  {business.tags.map((tag, idx) => (
+              {displayTags.length > 0 && (
+                <div className="pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1 text-xs font-bold text-slate-500 mr-1">
+                    <Tag size={13} className="text-[#007570]" />
+                    <span>Tags:</span>
+                  </div>
+                  {displayTags.map((tag, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50/80 text-[#007570] text-xs font-bold border border-teal-200/80 shadow-2xs hover:bg-teal-100 transition-colors"
                     >
-                      #{typeof tag === "object" ? (tag?.name || tag?.title || String(tag)) : String(tag)}
+                      #{tag}
                     </span>
                   ))}
                 </div>
@@ -1688,7 +1795,16 @@ const handleWaPaymentConfirm = async () => {
               {/* Submit Review Box */}
               <div className="p-4 sm:p-5 rounded-2xl bg-teal-50/40 border border-teal-200/80 space-y-3.5">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">Bagikan Pengalaman Anda</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      {myExistingReview ? "Ulasan Anda" : "Bagikan Pengalaman Anda"}
+                    </h4>
+                    {myExistingReview && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-[#007570]">
+                        Sudah Diulas
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[11px] text-slate-500">Ulasan publik</span>
                 </div>
 
@@ -1736,12 +1852,12 @@ const handleWaPaymentConfirm = async () => {
                     {submittingReview ? (
                       <>
                         <Loader2 size={14} className="animate-spin" />
-                        <span>Mengirimkan...</span>
+                        <span>Menyimpan...</span>
                       </>
                     ) : (
                       <>
                         <Send size={14} />
-                        <span>Kirim Ulasan</span>
+                        <span>{myExistingReview ? "Perbarui Ulasan" : "Kirim Ulasan"}</span>
                       </>
                     )}
                   </button>
@@ -1831,6 +1947,34 @@ const handleWaPaymentConfirm = async () => {
                             <MessageCircle size={13} />
                             <span>Balas</span>
                           </button>
+
+                          {currentUser && (review.user_id === currentUser.id || review.user?.id === currentUser.id) && (
+                            <button
+                              type="button"
+                              onClick={() => handleEditMyReview(review)}
+                              className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 hover:text-amber-700 cursor-pointer"
+                            >
+                              <Edit size={12} />
+                              <span>Edit</span>
+                            </button>
+                          )}
+
+                          {currentUser && (
+                            review.user_id === currentUser.id ||
+                            review.user?.id === currentUser.id ||
+                            currentUser.role === "admin" ||
+                            (business && business.user_id === currentUser.id)
+                          ) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReview(review.id)}
+                              disabled={deletingReviewId === review.id}
+                              className="flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-700 cursor-pointer disabled:opacity-50"
+                            >
+                              <Trash2 size={12} />
+                              <span>{deletingReviewId === review.id ? "Menghapus..." : "Hapus"}</span>
+                            </button>
+                          )}
                         </div>
 
                         {/* Reply input box */}
@@ -2472,6 +2616,37 @@ const handleWaPaymentConfirm = async () => {
                         <MessageCircle size={13} />
                         <span>Balas</span>
                       </button>
+
+                      {currentUser && (review.user_id === currentUser.id || review.user?.id === currentUser.id) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAllReviewsModal(false);
+                            handleEditMyReview(review);
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 hover:text-amber-700 cursor-pointer"
+                        >
+                          <Edit size={12} />
+                          <span>Edit</span>
+                        </button>
+                      )}
+
+                      {currentUser && (
+                        review.user_id === currentUser.id ||
+                        review.user?.id === currentUser.id ||
+                        currentUser.role === "admin" ||
+                        (business && business.user_id === currentUser.id)
+                      ) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReview(review.id)}
+                          disabled={deletingReviewId === review.id}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-700 cursor-pointer disabled:opacity-50"
+                        >
+                          <Trash2 size={12} />
+                          <span>{deletingReviewId === review.id ? "Menghapus..." : "Hapus"}</span>
+                        </button>
+                      )}
                     </div>
 
                     {openReplyId === review.id && (
@@ -2589,7 +2764,7 @@ const handleWaPaymentConfirm = async () => {
           onClick={() => setShowWaPaymentModal(false)}
         >
           <div
-            className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden my-6"
+            className="bg-white rounded-3xl w-full max-w-2xl sm:max-w-3xl shadow-2xl border border-slate-100 overflow-hidden my-6 transition-all"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -2600,11 +2775,11 @@ const handleWaPaymentConfirm = async () => {
               >
                 <X size={16} />
               </button>
-              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-2.5 backdrop-blur-sm">
-                <WhatsAppIcon className="w-8 h-8 text-white" />
+              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-2.5 backdrop-blur-sm shadow-inner">
+                <CreditCard className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-lg font-black">Akses Kontak WhatsApp</h3>
-              <p className="text-xs text-white/80 mt-0.5">Biaya administrasi resmi Surade.co.id</p>
+              <h3 className="text-lg font-black">Pembayaran &amp; Akses Layanan Surade.co.id</h3>
+              <p className="text-xs text-white/80 mt-0.5">Biaya administrasi resmi &amp; transaksi terverifikasi Surade.co.id</p>
             </div>
 
             {/* Body */}
@@ -2819,181 +2994,35 @@ const handleWaPaymentConfirm = async () => {
               </div>
 
 
-              {/* Payment Method Selector - Simple Fix */}
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Pilih Saluran Pembayaran:
-                </p>
+              {/* Payment Method Selector - Standardized UI with Official Logos */}
+              <div className="space-y-4">
+                <PaymentMethodSelector
+                  selectedMethod={selectedPaymentMethod}
+                  onSelect={(method) => setSelectedPaymentMethod(method.id)}
+                  qrisImage={waSettings?.qris_image}
+                  customAccount={{
+                    bankName: waSettings?.bank_name,
+                    accountNumber: waSettings?.account_number,
+                    accountName: waSettings?.account_holder,
+                  }}
+                  showInstruction={true}
+                />
 
-                {/* Section 1: Transfer Bank */}
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                    TRANSFER BANK / REKENING RESMI
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {OFFICIAL_BANK_ACCOUNTS.map((bank) => (
-                      <div
-                        key={bank.id}
-                        onClick={() => setSelectedPaymentMethod(bank.id)}
-                        className={`p-4 rounded-2xl border-2 flex items-center gap-3 cursor-pointer transition-all text-xs font-bold ${
-                          selectedPaymentMethod === bank.id
-                            ? "border-[#007570] bg-gradient-to-br from-teal-50 to-emerald-50 text-[#007570] shadow-lg ring-2 ring-[#007570]/20"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-[#007570]/50 hover:bg-teal-50/30 shadow-sm"
-                        }`}
-                      >
-                        <div className={`flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0 text-xl transition-all ${
-                          selectedPaymentMethod === bank.id
-                            ? "bg-white shadow-sm"
-                            : "bg-slate-100"
-                        }`}>
-                          {bank.logo}
-                        </div>
-                        <span className="flex-1">{bank.name}</span>
-                        {selectedPaymentMethod === bank.id ? (
-                          <div className="w-5 h-5 rounded-full bg-[#007570] text-white flex items-center justify-center flex-shrink-0">
-                            <Check size={12} strokeWidth={3} />
-                          </div>
-                        ) : (
-                          <div className="w-5 h-5 rounded-full border border-slate-300 flex-shrink-0" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Section 2: E-Wallet */}
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                    E-WALLET
-                  </span>
-                  <div className="grid grid-cols-3 gap-2">
-                    {OFFICIAL_EWALLET_ACCOUNTS.filter((e) => e.isReady).map((ewallet) => (
-                      <div
-                        key={ewallet.id}
-                        onClick={() => setSelectedPaymentMethod(ewallet.id)}
-                        className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-xs font-bold ${
-                          selectedPaymentMethod === ewallet.id
-                            ? "border-[#007570] bg-gradient-to-br from-teal-50 to-emerald-50 text-[#007570] shadow-lg ring-2 ring-[#007570]/20"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-[#007570]/50 hover:bg-teal-50/30 shadow-sm"
-                        }`}
-                      >
-                        <div className={`flex items-center justify-center text-3xl transition-all ${
-                          selectedPaymentMethod === ewallet.id
-                            ? "scale-110"
-                            : ""
-                        }`}>
-                          {ewallet.logo}
-                        </div>
-                        <span>{ewallet.name}</span>
-                        {selectedPaymentMethod === ewallet.id ? (
-                          <div className="w-5 h-5 rounded-full bg-[#007570] text-white flex items-center justify-center">
-                            <Check size={12} strokeWidth={3} />
-                          </div>
-                        ) : (
-                          <div className="w-5 h-5 rounded-full border border-slate-300" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Section 3: QRIS */}
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                    QRIS
-                  </span>
-                  <div
-                    onClick={() => setSelectedPaymentMethod("qris")}
-                    className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all text-xs font-bold ${
-                      selectedPaymentMethod === "qris"
-                        ? "border-[#007570] bg-gradient-to-br from-teal-50 to-emerald-50 text-[#007570] shadow-lg ring-2 ring-[#007570]/20"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-[#007570]/50 hover:bg-teal-50/30 shadow-sm"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`flex items-center justify-center w-9 h-9 rounded-lg text-xl transition-all ${
-                        selectedPaymentMethod === "qris"
-                          ? "bg-white shadow-sm"
-                          : "bg-slate-100"
-                      }`}>
-                        🔳
-                      </div>
-                      <span>QRIS (Semua E-Wallet &amp; Bank)</span>
-                    </div>
-                    {selectedPaymentMethod === "qris" ? (
-                      <div className="w-5 h-5 rounded-full bg-[#007570] text-white flex items-center justify-center flex-shrink-0">
-                        <Check size={12} strokeWidth={3} />
-                      </div>
-                    ) : (
-                      <div className="w-5 h-5 rounded-full border border-slate-300 flex-shrink-0" />
+                {/* Ringkasan Total Tagihan */}
+                <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-200/80 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-semibold text-slate-700 block">Total Biaya Akses WhatsApp</span>
+                    {couponDiscount > 0 && (
+                      <span className="text-[11px] text-emerald-700 font-bold">
+                        Hemat Rp {Number(couponDiscount).toLocaleString("id-ID")}
+                      </span>
                     )}
                   </div>
+                  <span className="text-lg font-black text-[#007570]">
+                    Rp {Math.max(0, Number(waSettings?.amount || 2000) - couponDiscount).toLocaleString("id-ID")}
+                  </span>
                 </div>
               </div>
-
-              {/* Payment Details Box */}
-              {(() => {
-                const selectedAccount =
-                  OFFICIAL_BANK_ACCOUNTS.find((b) => b.id === selectedPaymentMethod) ||
-                  OFFICIAL_EWALLET_ACCOUNTS.find((e) => e.id === selectedPaymentMethod);
-                const accountNumber = selectedAccount?.accountNumber || waSettings.account_number || "0954152045";
-                const accountHolder = selectedAccount?.accountName || OFFICIAL_ACCOUNT_HOLDER;
-                return (
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Metode Dipilih</span>
-                      <span className="font-bold text-[#007570] uppercase">{selectedAccount?.name || selectedPaymentMethod}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">No. Rekening / Tujuan</span>
-                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                        {accountNumber}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(accountNumber);
-                            toast.success("Nomor rekening disalin!");
-                          }}
-                          className="text-[#007570] hover:text-[#005a58] cursor-pointer border-0 bg-transparent p-0"
-                          title="Salin No Rekening"
-                        >
-                          <Copy size={13} />
-                        </button>
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Atas Nama</span>
-                      <span className="font-bold text-slate-900">{accountHolder}</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
-                      <span className="text-slate-500 font-medium">Total Pembayaran</span>
-                      <span className="font-black text-[#007570] text-sm">
-                        Rp {Number(waSettings.amount || 2000).toLocaleString("id-ID")}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* QRIS Scan preview if QRIS is selected or available */}
-              {(selectedPaymentMethod === "qris" || waSettings.qris_image) && (
-                <div className="text-center bg-slate-50 border border-slate-200 rounded-2xl p-3">
-                  <p className="text-[11px] font-bold text-slate-700 mb-2">Scan QRIS Resmi Surade.co.id:</p>
-                  {waSettings.qris_image ? (
-                    <img
-                      src={waSettings.qris_image}
-                      alt="QRIS Payment"
-                      className="w-40 h-40 object-contain mx-auto rounded-xl border border-slate-200 shadow-2xs"
-                    />
-                  ) : (
-                    <div className="w-36 h-36 mx-auto bg-white border border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 gap-1 p-2">
-                      <Camera size={28} className="text-[#007570]" />
-                      <span className="text-[10px] font-bold text-slate-600">QRIS All Payment</span>
-                      <span className="text-[9px]">Gunakan aplikasi M-Banking / E-Wallet</span>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Upload Proof of Payment Section */}
               <div className="space-y-1.5 pt-1">

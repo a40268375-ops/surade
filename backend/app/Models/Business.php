@@ -10,41 +10,93 @@ class Business extends Model
     protected $fillable = [
         'user_id',
         'category_id',
+        'name',
         'title',
+        'slug',
         'description',
         'address',
         'village',
+        'city',
+        'province',
+        'postal_code',
         'latitude',
         'longitude',
         'phone',
         'email',
         'operating_hours',
+        'opening_days',
         'closed_days',
         'price_category',
         'tags',
         'website',
+        'logo',
+        'banner',
+        'banners',
         'image',
         'images',
+        'gallery',
         'video_url',
         'is_premium',
         'premium_expires_at',
         'premium_plan',
         'package',
+        'featured',
         'status',
+        'is_active',
+        'views',
+        'clicks',
+        'rating',
+        'rating_count',
         'referred_by',
     ];
 
     protected $casts = [
         'is_premium' => 'boolean',
+        'is_active' => 'boolean',
         'premium_expires_at' => 'datetime',
         'images' => 'array',
+        'banners' => 'array',
+        'gallery' => 'array',
         'closed_days' => 'array',
         'tags' => 'array',
+        'opening_days' => 'json',
     ];
+
+    public function getTitleAttribute()
+    {
+        return $this->attributes['title'] ?? $this->attributes['name'] ?? null;
+    }
+
+    public function getNameAttribute()
+    {
+        return $this->attributes['name'] ?? $this->attributes['title'] ?? null;
+    }
+
+    public function getTagsAttribute($value)
+    {
+        $decoded = is_string($value) ? json_decode($value, true) : $value;
+        if (!empty($decoded) && is_array($decoded)) {
+            return $decoded;
+        }
+
+        $tags = [];
+        if ($this->relationLoaded('category') && $this->category) {
+            $tags[] = $this->category->name;
+        }
+        if (!empty($this->village)) {
+            $tags[] = $this->village;
+        }
+        return !empty($tags) ? array_values(array_unique($tags)) : ['UMKM Surade'];
+    }
 
     // Rating rata-rata & jumlah ulasan dihitung otomatis dari business_reviews,
     // supaya tidak lagi angka statis (dulu selalu rating 4.5 / 0 ulasan).
-    protected $appends = ['is_premium_active', 'starting_price', 'rating', 'reviews_count', 'is_open_now', 'premium_features'];
+    protected $appends = ['is_premium_active', 'starting_price', 'rating', 'reviews_count', 'is_open_now', 'premium_features', 'village'];
+
+    public function getVillageAttribute(): ?string
+    {
+        return $this->city ?? null;
+    }
 
     public function getIsPremiumActiveAttribute(): bool
     {
@@ -247,5 +299,34 @@ class Business extends Model
     public function subscriptions(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    public function latestSubscription(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Subscription::class)->latestOfMany();
+    }
+
+    public function products(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    /**
+     * Retrieve the model for a bound value (supports both numeric ID and slug).
+     *
+     * @param  mixed  $value
+     * @param  string|null  $field
+     * @return \Illuminate\Database\Eloquent\Model|null
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if (is_numeric($value)) {
+            $record = $this->where('id', $value)->first();
+            if ($record) return $record;
+        }
+
+        return $this->where('slug', $value)
+            ->orWhere('id', $value)
+            ->firstOrFail();
     }
 }

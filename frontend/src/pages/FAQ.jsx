@@ -27,7 +27,7 @@ const FAQ_DATA = [
     categoryLabel: "Umum",
     question: "Apa itu Surade.co.id?",
     answer:
-      "Surade.co.id adalah portal informasi digital terlengkap di Indonesia yang menghubungkan masyarakat, pelaku usaha (UMKM hingga perusahaan besar), dan instansi pemerintahan. Platform ini dirancang untuk mewujudkan konsep Smart City dan Smart Village di seluruh pelosok Indonesia dengan kemudahan akses informasi dalam 'One Click Service'.",
+      "Surade.co.id adalah portal informasi dan direktori digital resmi yang menghubungkan masyarakat, pelaku UMKM, dan instansi di Kecamatan Surade, Kabupaten Sukabumi. Platform ini dirancang untuk mewujudkan digitalisasi desa di seluruh wilayah Kecamatan Surade dengan kemudahan akses informasi dalam 'One Click Service'.",
   },
   {
     id: "gen-2",
@@ -41,9 +41,9 @@ const FAQ_DATA = [
     id: "gen-3",
     category: "general",
     categoryLabel: "Umum",
-    question: "Apa yang dimaksud dengan Smart City & Smart Village di Surade.co.id?",
+    question: "Apa yang dimaksud dengan Digitalisasi Desa di Surade.co.id?",
     answer:
-      "Smart City & Smart Village di Surade.co.id adalah inisiatif digitalisasi daerah di mana setiap kota, kabupaten, dan desa memiliki etalase virtual khusus. Di dalamnya tercakup direktori bisnis lokal, tempat wisata, layanan publik, berita kegiatan, dan potensi daerah yang terintegrasi secara digital sehingga mudah ditemukan oleh wisatawan, investor, maupun warga setempat.",
+      "Digitalisasi Desa di Surade.co.id adalah inisiatif digital di mana setiap desa dan kelurahan di wilayah Kecamatan Surade memiliki etalase virtual khusus. Di dalamnya tercakup direktori bisnis lokal, tempat wisata, layanan publik, berita kegiatan, dan potensi desa yang terintegrasi secara digital sehingga mudah ditemukan oleh wisatawan maupun warga setempat.",
   },
   {
     id: "gen-4",
@@ -51,7 +51,7 @@ const FAQ_DATA = [
     categoryLabel: "Umum",
     question: "Bagaimana cara mencari bisnis atau informasi di Surade.co.id?",
     answer:
-      "Anda dapat menggunakan kolom pencarian utama di halaman beranda dengan memasukkan kata kunci (nama tempat/usaha, kategori) dan memilih lokasi kota/kabupaten. Anda juga bisa menelusuri kategori yang tersedia pada menu navigasi Informasi.",
+      "Anda dapat menggunakan kolom pencarian utama di halaman beranda dengan memasukkan kata kunci (nama tempat/usaha, kategori) atau memilih wilayah desa di Kecamatan Surade. Anda juga bisa menelusuri kategori yang tersedia pada menu navigasi Informasi.",
   },
 
   // ── Akun & Keamanan ──
@@ -119,7 +119,7 @@ const FAQ_DATA = [
     categoryLabel: "Pemasangan Usaha",
     question: "Apa keuntungan memiliki profil usaha di Surade.co.id?",
     answer:
-      "Bisnis Anda akan mendapatkan halaman profil virtual mandiri yang terindeks di mesin pencari (Google), memiliki tautan langsung ke WhatsApp, rute Google Maps, katalog produk, ulasan pelanggan, serta berpotensi tampil di rekomendasi bisnis kota setempat.",
+      "Bisnis Anda akan mendapatkan halaman profil virtual mandiri yang terindeks di mesin pencari (Google), memiliki tautan langsung ke WhatsApp, rute Google Maps, katalog produk, ulasan pelanggan, serta berpotensi tampil di rekomendasi bisnis lokal Surade.",
   },
 
   // ── Iklan & Promosi ──
@@ -261,8 +261,8 @@ export default function FAQ() {
               <Building2 size={24} />
             </div>
             <div>
-              <div className="faq-stat-number">500+ Kota &amp; Desa</div>
-              <div className="faq-stat-label">Terhubung dalam Smart City</div>
+              <div className="faq-stat-number">12 Desa &amp; Kelurahan</div>
+              <div className="faq-stat-label">Terhubung di Kecamatan Surade</div>
             </div>
           </div>
 

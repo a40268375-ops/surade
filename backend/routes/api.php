@@ -109,8 +109,9 @@ Route::get('/users/{id}', [ProfileController::class, 'showUser']);
 Route::get('/businesses/{business}/products', [ProductController::class, 'getByBusiness']);
 Route::get('/plans', [AdminController::class, 'publicPlans']);
 
-// Public WhatsApp fee settings (no auth needed)
+// Public WhatsApp fee settings & Payment Methods (no auth needed)
 Route::get('/whatsapp-settings', [SettingController::class, 'getWhatsAppSettings']);
+Route::get('/payment-methods', [SettingController::class, 'getPaymentMethods']);
 
 // Public Coupon routes (can be accessed by users & guests)
 Route::get('/coupons/public-codes', [CouponController::class, 'publicCodes']);
@@ -196,6 +197,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/referrals/validate', [ReferralController::class, 'validateCode']);
         Route::get('/referrals/my-stats', [ReferralController::class, 'myStats']);
         Route::post('/referrals/withdraw', [ReferralController::class, 'requestWithdrawal']);
+        Route::delete('/referrals/transactions/{id}', [ReferralController::class, 'deleteTransaction']);
+        Route::delete('/referrals/transactions', [ReferralController::class, 'clearTransactions']);
+        Route::delete('/referrals/withdrawals/{id}', [ReferralController::class, 'deleteWithdrawal']);
+        Route::delete('/referrals/withdrawals', [ReferralController::class, 'clearWithdrawals']);
         // PERBAIKAN: kedua fungsi ini (publicCodes & leaderboard) sudah lengkap
         // ditulis di ReferralController, tapi rutenya lupa didaftarkan di sini -
         // itu sebabnya frontend selalu dapat 404 Not Found waktu memanggilnya.
@@ -320,6 +325,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/referrals/transactions/{referral}/approve', [AdminReferralController::class, 'approveTransaction']);
         Route::post('/referrals/transactions/{referral}/reject', [AdminReferralController::class, 'rejectTransaction']);
         Route::put('/referrals/transactions/{referral}/reject', [AdminReferralController::class, 'rejectTransaction']);
+        Route::delete('/referrals/transactions/{id}', [AdminReferralController::class, 'deleteTransaction']);
+        Route::delete('/referrals/transactions', [AdminReferralController::class, 'clearTransactions']);
         Route::get('/referrals/commissions', [AdminReferralController::class, 'commissions']);
         Route::post('/referrals/commissions/{referral}/approve', [AdminReferralController::class, 'approveCommission']);
         Route::put('/referrals/commissions/{referral}/approve', [AdminReferralController::class, 'approveCommission']);
@@ -336,6 +343,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/referrals/withdrawals/{withdrawal}/reject', [AdminReferralController::class, 'rejectWithdrawal']);
         Route::post('/referrals/withdrawals/{withdrawal}/paid', [AdminReferralController::class, 'markWithdrawalPaid']);
         Route::put('/referrals/withdrawals/{withdrawal}/paid', [AdminReferralController::class, 'markWithdrawalPaid']);
+        Route::delete('/referrals/withdrawals/{id}', [AdminReferralController::class, 'deleteWithdrawal']);
+        Route::delete('/referrals/withdrawals', [AdminReferralController::class, 'clearWithdrawals']);
         Route::get('/referrals/settings', [AdminReferralController::class, 'getSettings']);
         Route::put('/referrals/settings', [AdminReferralController::class, 'updateSettings']);
         Route::post('/referrals/settings', [AdminReferralController::class, 'updateSettings']);
@@ -344,7 +353,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/contacts', [ContactController::class, 'index']);
         Route::put('/contacts/{id}/status', [ContactController::class, 'updateStatus']);
 
-        // WhatsApp Payment Wall Management
+        // WhatsApp Payment Wall & Official Bank Payment Management
+        Route::get('/payment-methods', [SettingController::class, 'getPaymentMethods']);
+        Route::match(['post', 'put'], '/payment-methods', [SettingController::class, 'updatePaymentMethods']);
         Route::get('/whatsapp-settings', [SettingController::class, 'getWhatsAppSettings']);
         Route::post('/whatsapp-settings', [SettingController::class, 'updateWhatsAppSettings']);
         Route::put('/whatsapp-settings', [SettingController::class, 'updateWhatsAppSettings']);

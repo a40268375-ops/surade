@@ -270,7 +270,7 @@ export default function Terms() {
                 <div className="terms-contact">
                   <p><strong>Call Center:</strong> <a href="tel:08071001500">0807 - 100 - 1500</a></p>
                   <p><strong>WhatsApp:</strong> <a href="https://wa.me/628111919711" target="_blank" rel="noopener noreferrer">+62 811-1919-711</a></p>
-                  <p><strong>Email Dukungan:</strong> <a href="mailto:support@info.co.id">support@info.co.id</a></p>
+                  <p><strong>Email Dukungan:</strong> <a href="mailto:support@surade.co.id">support@surade.co.id</a></p>
                 </div>
               </div>
             </section>

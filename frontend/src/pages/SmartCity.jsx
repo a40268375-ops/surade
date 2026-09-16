@@ -6,6 +6,9 @@ import api from "../services/api";
 import { requireAuth } from "../utils/authCheck";
 import { getStorageUrl } from "../utils/constants";
 import { SMART_CITY_IMAGE_BY_SLUG } from "../data/smartVillageData";
+import { getBusinessOpenStatus } from "../utils/businessHours";
+import { getSubcategoryIcon } from "../utils/subcategoryIcons";
+import BusinessCardSkeleton from "../components/BusinessCardSkeleton";
 import {
   MapPin,
   Building2,
@@ -30,8 +33,10 @@ import {
   Tag,
   Bookmark,
   Eye,
+  Crown,
 } from "lucide-react";
 import "./Category.css";
+import "./Home.css";
 
 const getCategoryIcon = (iconName, label = "") => {
   const lower = (iconName || label || "").toLowerCase();
@@ -111,8 +116,17 @@ const PRICE_RANGES = [
   { id: "50k_150k", label: "Rp 50.000 - Rp 150.000", min: 50000, max: 150000, desc: "Menengah" },
   { id: "150k_500k", label: "Rp 150.000 - Rp 500.000", min: 150000, max: 500000, desc: "Standar" },
   { id: "500k_1m", label: "Rp 500.000 - Rp 1.000.000", min: 500000, max: 1000000, desc: "Premium" },
-  { id: "above_1m", label: "> Rp 1.000.000", min: 1000000, max: null, desc: "Eksklusif & High-End" },
+  { id: "above_1m", label: "> Rp 1.000.000", min: 1000000, max: null, desc: "1 Juta ke atas" },
 ];
+
+const getPriceTierLabel = (price) => {
+  if (!price || price <= 0) return null;
+  if (price <= 50000) return "Ekonomis & Terjangkau";
+  if (price <= 150000) return "Menengah";
+  if (price <= 500000) return "Standar";
+  if (price <= 1000000) return "Premium";
+  return "1 Juta ke atas";
+};
 
 const SORT_OPTIONS = [
   { id: "relevance", label: "Paling Relevan" },
@@ -361,8 +375,42 @@ export default function SmartCity() {
           const maxPrice = b.products_max_price ? Number(b.products_max_price) : 0;
           const productsCount = Number(b.products_count || 0);
 
+          const mainCategory = b.category?.parent || b.category;
+          const subCategory = b.category?.parent ? b.category : null;
+          const categoryName = mainCategory?.name || b.category?.name || "Umum";
+          const subCategoryName = subCategory?.name || (b.sub_category?.name || null);
+          const openStatus = getBusinessOpenStatus(b.opening_days);
+
+          let bTags = [];
+          if (Array.isArray(b.tags) && b.tags.length > 0) {
+            bTags = b.tags;
+          } else if (typeof b.tags === "string") {
+            try {
+              const p = JSON.parse(b.tags);
+              if (Array.isArray(p)) bTags = p;
+            } catch {
+              bTags = b.tags.split(",").map((t) => t.trim()).filter(Boolean);
+            }
+          }
+          if (bTags.length === 0) {
+            bTags = [categoryName, b.village || b.city].filter(Boolean);
+          }
+
           return {
             ...b,
+            name: b.name,
+            category: categoryName,
+            subCategory: subCategoryName,
+            categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
+            tags: bTags,
+            location: b.city ? (b.province ? `${b.city}, ${b.province}` : b.city) : (b.address || "Indonesia"),
+            views: b.views || 0,
+            rating: b.rating || b.average_rating || "0.0",
+            rating_count: b.rating_count || 0,
+            status: openStatus.label,
+            open: openStatus.open,
+            img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+            is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
             avg_price: avgPrice,
             min_price: minPrice,
             max_price: maxPrice,
@@ -835,111 +883,107 @@ export default function SmartCity() {
             {loadingBusinesses ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 {[1, 2, 3, 4].map((n) => (
-                  <div key={n} className="bg-white border border-slate-200 rounded-2xl p-4 animate-pulse h-64 flex flex-col justify-between">
-                    <div className="h-32 bg-slate-200 rounded-xl mb-3" />
-                    <div className="h-4 bg-slate-200 rounded w-3/4 mb-2" />
-                    <div className="h-3 bg-slate-100 rounded w-1/2" />
-                  </div>
+                  <BusinessCardSkeleton key={`sc-skel-${n}`} />
                 ))}
               </div>
             ) : filteredBusinesses.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {paginatedBusinesses.map((b, index) => {
-                    const imgUrl = getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600&h=400&fit=crop";
-                    const categoryName = typeof b.category === "object" ? b.category?.name : (b.category || "Umum");
-                    const rating = b.rating || b.average_rating || 5.0;
-                    const isPremium = Boolean(b.is_premium || b.is_verified || b.features?.is_premium);
-
-                    return (
-                      <Link
-                        key={b.id || index}
-                        to={`/business/${b.slug || b.id}`}
-                        className="group bg-white border border-slate-200/80 hover:border-[#059669]/50 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col relative"
-                      >
-                        {/* Image Cover */}
-                        <div className="relative h-44 w-full overflow-hidden bg-slate-100">
-                          <img
-                            src={imgUrl}
-                            alt={b.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                          />
-                          <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#059669] text-white shadow-xs">
-                            Buka
-                          </span>
-
-                          {/* Verified Badge */}
-                          {isPremium && (
-                            <div
-                              className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-[#059669] to-[#047857] text-white flex items-center gap-1 shadow-sm"
-                              title="Bisnis Terverifikasi - Pengguna Premium"
-                            >
-                              <BadgeCheck size={13} className="text-white" />
-                              <span>Terverifikasi</span>
-                            </div>
-                          )}
-
-                          {/* Bookmark Save Button */}
+                  {paginatedBusinesses.map((bisnis) => (
+                    <Link
+                      key={bisnis.id}
+                      to={`/business/${bisnis.slug || bisnis.id}`}
+                      className={`biz-card biz-card--link ${bisnis.is_premium ? "biz-card--premium" : "biz-card--free"}`}
+                    >
+                      {/* Image */}
+                      <div className="biz-card__img-wrap">
+                        <img 
+                          src={bisnis.img} 
+                          alt={bisnis.name} 
+                          className="biz-card__img" 
+                          loading="lazy" 
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&h=350&fit=crop&q=80";
+                          }}
+                        />
+                        {bisnis.is_premium && (
+                          <div className="biz-card__verified-badge biz-card__verified-badge--premium" title="Bisnis Terverifikasi - Mitra Resmi">
+                            <BadgeCheck size={14} className="biz-card__verified-icon" />
+                            <span>Terverifikasi</span>
+                          </div>
+                        )}
+                        <div className="biz-card__img-overlay">
                           <button
                             type="button"
-                            className={`biz-card__save${saved[b.id] ? " saved" : ""}`}
-                            style={{ position: "absolute", bottom: "10px", right: "10px", zIndex: 10 }}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              toggleSave(b.id, b.name);
-                            }}
-                            aria-label="Simpan Bisnis"
+                            className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(bisnis.id, bisnis.name); }}
+                            aria-label="Simpan"
                           >
-                            <Bookmark size={13} fill={saved[b.id] ? "currentColor" : "none"} />
-                            <span>Simpan</span>
+                            <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
+                            <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
                           </button>
-                        </div>
-
-                        {/* Card Body */}
-                        <div className="p-5 flex flex-col flex-1">
-                          <span className="text-xs font-semibold text-[#059669] uppercase tracking-wider mb-1">
-                            {categoryName}
+                          <span className="biz-card__views">
+                            <Eye size={13} />
+                            <span>{bisnis.views || 0}</span>
                           </span>
-                          <h4 className="text-base font-bold text-slate-900 group-hover:text-[#059669] transition-colors line-clamp-1 mb-1.5">
-                            {b.name}
-                          </h4>
-
-                          {/* Average Product Price Badge */}
-                          {b.avg_price > 0 && (
-                            <div className="mb-2">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-50 text-[#059669] text-xs font-bold border border-teal-100">
-                                Rp {Math.round(b.avg_price).toLocaleString("id-ID")}{" "}
-                                <span className="text-[10px] font-normal text-slate-500">(rata-rata)</span>
-                              </span>
-                            </div>
-                          )}
-
-                          <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
-                            {b.description || "Informasi bisnis resmi terdaftar di direktori Smart Village."}
-                          </p>
-
-                          <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                            <span className="flex items-center gap-1 truncate max-w-[150px]">
-                              <MapPin size={13} className="text-[#059669] shrink-0" />
-                              <span className="truncate">{b.city || city.name}</span>
-                            </span>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <span className="flex items-center gap-1 text-slate-400">
-                                <Eye size={13} />
-                                <span>{b.views || 0}</span>
-                              </span>
-                              <span className="flex items-center gap-1 font-semibold text-amber-500">
-                                <Star size={13} fill="currentColor" />
-                                <span>{rating}</span>
-                              </span>
-                            </div>
-                          </div>
                         </div>
-                      </Link>
-                    );
-                  })}
+                      </div>
+
+                      {/* Body */}
+                      <div className="biz-card__body">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className={`biz-card__name flex-1 ${bisnis.is_premium ? "font-bold text-slate-900" : "font-semibold text-slate-800"}`}>{bisnis.name}</h3>
+                          {bisnis.is_premium && (
+                            <span className="biz-card__vip-pill" title="Mitra Terverifikasi">
+                              <Crown size={11} className="fill-amber-400 text-amber-500" />
+                              <span>Mitra</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="biz-card__categories">
+                          <p className="biz-card__category">
+                            <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor || "#007570" }} />
+                            {bisnis.category}
+                          </p>
+                          {bisnis.subCategory && (
+                            <p className={`biz-card__category biz-card__category--sub flex items-center gap-1 font-semibold ${bisnis.is_premium ? "text-[#007570] bg-[#f0faf8] px-2 py-0.5 rounded-md border border-[#ccebe8]" : "text-slate-600"}`}>
+                              <span className="shrink-0 flex items-center">{getSubcategoryIcon(bisnis.subCategory)}</span>
+                              <span>{bisnis.subCategory}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="biz-card__tags">
+                          {bisnis.tags.slice(0, 3).map((tag, idx) => (
+                            <span key={idx} className="biz-card__tag">
+                              <Tag size={11} />{tag}
+                            </span>
+                          ))}
+                          {bisnis.tags.length > 3 && (
+                            <span
+                              className="biz-card__tag biz-card__tag--more text-[#007570] font-bold bg-teal-50 border border-teal-200 cursor-pointer"
+                              title={`Semua tag: ${bisnis.tags.join(', ')}`}
+                            >
+                              +{bisnis.tags.length - 3} lainnya
+                            </span>
+                          )}
+                        </div>
+                        <div className="biz-card__footer">
+                          <span className="biz-card__rating">
+                            <Star size={13} className="fill-amber-400 text-amber-400" />
+                            <span>{Number(bisnis.rating || 0).toFixed(1)}</span>
+                            {bisnis.rating_count > 0 && <span className="text-slate-400">({bisnis.rating_count})</span>}
+                          </span>
+                          <span className="biz-card__location">
+                            <MapPin size={12} />{bisnis.location}
+                          </span>
+                          <span className={`biz-card__cta${bisnis.open ? "" : " closed"}${bisnis.is_premium ? " biz-card__cta--premium" : ""}`}>
+                            {bisnis.open ? "Buka Sekarang →" : "Tutup Sekarang!"}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
 
                 {/* ── Responsive Pagination Controls ── */}

@@ -166,25 +166,27 @@ export default function ImageCropper({ imageUrl, onCropComplete, onCancel, aspec
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full my-auto flex flex-col max-h-[92vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
-          <h3 className="text-lg font-bold text-slate-800">Crop & Atur Foto</h3>
+        <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-slate-50">
+          <h3 className="text-base font-bold text-slate-800">Crop & Atur Foto</h3>
           <button
             onClick={onCancel}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 transition-colors"
+            title="Tutup"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Canvas Container */}
-        <div className="p-6 bg-slate-100">
-          <div className="relative bg-slate-900 rounded-xl overflow-hidden" style={{ touchAction: "none" }}>
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+          {/* Canvas Container */}
+          <div className="relative bg-slate-900 rounded-xl overflow-hidden shadow-inner flex items-center justify-center p-2" style={{ touchAction: "none" }}>
             <canvas
               ref={canvasRef}
-              className="w-full h-auto cursor-move"
+              className="max-h-[220px] sm:max-h-[250px] w-auto h-auto max-w-full aspect-square cursor-move rounded-lg mx-auto block shadow-md"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -193,8 +195,8 @@ export default function ImageCropper({ imageUrl, onCropComplete, onCancel, aspec
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
             />
-            <div className="absolute top-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1.5">
-              <Move size={12} />
+            <div className="absolute top-3 left-3 bg-black/70 text-white text-[11px] px-2 py-0.5 rounded-md flex items-center gap-1 backdrop-blur-xs pointer-events-none">
+              <Move size={11} />
               <span>Geser untuk reposisi</span>
             </div>
           </div>
@@ -205,72 +207,80 @@ export default function ImageCropper({ imageUrl, onCropComplete, onCancel, aspec
             className="hidden"
             onLoad={handleImageLoad}
           />
-        </div>
 
-        {/* Controls */}
-        <div className="px-6 py-4 space-y-4 border-t border-slate-200">
-          {/* Zoom Slider */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-slate-700">Zoom</label>
-              <span className="text-xs text-slate-500">{Math.round(zoom * 100)}%</span>
+          {/* Controls Card */}
+          <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-3">
+            {/* Zoom Slider */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700">Zoom</label>
+                <span className="text-xs text-slate-500 font-medium">{Math.round(zoom * 100)}%</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleZoomOut}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                  title="Perkecil"
+                >
+                  <ZoomOut size={14} />
+                </button>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="3"
+                  step="0.05"
+                  value={zoom}
+                  onChange={(e) => setZoom(parseFloat(e.target.value))}
+                  className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                />
+                <button
+                  type="button"
+                  onClick={handleZoomIn}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                  title="Perbesar"
+                >
+                  <ZoomIn size={14} />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Rotate & Reset */}
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
               <button
-                onClick={handleZoomOut}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                type="button"
+                onClick={handleRotate}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
               >
-                <ZoomOut size={16} />
+                <RotateCcw size={14} />
+                <span>Putar 90°</span>
               </button>
-              <input
-                type="range"
-                min="0.5"
-                max="3"
-                step="0.1"
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-              />
               <button
-                onClick={handleZoomIn}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                type="button"
+                onClick={handleReset}
+                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
               >
-                <ZoomIn size={16} />
+                Reset
               </button>
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRotate}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-colors"
-            >
-              <RotateCcw size={16} />
-              <span>Putar 90°</span>
-            </button>
-            <button
-              onClick={handleReset}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-colors"
-            >
-              Reset
-            </button>
-          </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex items-center gap-3 px-6 py-5 border-t-2 border-slate-200 bg-white">
+        {/* Sticky Footer Actions */}
+        <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 border-t border-slate-200 bg-white shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
           <button
+            type="button"
             onClick={onCancel}
-            className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-300 text-slate-700 font-bold text-base hover:bg-slate-100 transition-colors shadow-sm"
+            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-sm hover:bg-slate-100 transition-colors"
           >
             Batal
           </button>
           <button
+            type="button"
             onClick={handleCrop}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white font-bold text-base transition-all shadow-lg"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm transition-all shadow-md hover:shadow-lg"
           >
-            <Check size={18} strokeWidth={3} />
+            <Check size={16} strokeWidth={2.5} />
             <span>Simpan Foto</span>
           </button>
         </div>

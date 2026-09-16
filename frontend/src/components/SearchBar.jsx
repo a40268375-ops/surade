@@ -136,15 +136,11 @@ export default function SearchBar({ categoriesList = [], initialKeyword = "", in
 
                         if (cat.id === "all") {
                           setSearchKeyword("");
-                          navigate(`/category/all?location=${encodeURIComponent("Semua")}`);
-                          return;
+                        } else {
+                          setSearchKeyword(cat.label);
                         }
-
-                        setSearchKeyword(cat.label);
-                        document.getElementById("search-keyword")?.focus();
                       }}
                     >
-                      <span className="home-keyword-dropdown__cat-icon">{cat.icon}</span>
                       <span className="home-keyword-dropdown__cat-label">{cat.label}</span>
                     </li>
                   ))}

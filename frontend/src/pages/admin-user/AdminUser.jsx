@@ -73,6 +73,17 @@ import {
   Flame,
   Tag,
   Ticket,
+  CheckCheck,
+  Pin,
+  Heart,
+  Archive,
+  VolumeX,
+  Volume2,
+  Reply,
+  Smile,
+  Paperclip,
+  MoreVertical,
+  ChevronDown,
 } from "lucide-react";
 
 import logoImg from "../../assets/logo-surade.png";
@@ -371,17 +382,27 @@ export default function AdminUser() {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [copyToast, setCopyToast] = useState(false);
   
-  // Payment methods state
-  const [paymentMethods, setPaymentMethods] = useState([
-    { id: "mandiri", name: "Bank Mandiri", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Bank_Mandiri_logo_2016.svg/200px-Bank_Mandiri_logo_2016.svg.png", account_number: "133-0011-409-331", account_holder: "Triwala Mitra Bestari" },
-    { id: "bni", name: "Bank BNI", logo: "https://upload.wikimedia.org/wikipedia/id/thumb/5/55/BNI_logo.svg/200px-BNI_logo.svg.png", account_number: "0973607008", account_holder: "Triwala Mitra Bestari" },
-    { id: "bca", name: "Bank BCA", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Bank_Central_Asia.svg/200px-Bank_Central_Asia.svg.png", account_number: "0954152045", account_holder: "Triwala Mitra Bestari" },
-    { id: "maybank", name: "Maybank", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Maybank_Logo.svg/200px-Maybank_Logo.svg.png", account_number: "2097000009", account_holder: "Triwala Mitra Bestari" },
-    { id: "bjb", name: "Bank BJB", logo: "https://upload.wikimedia.org/wikipedia/id/thumb/2/27/Bank_bjb_logo.svg/200px-Bank_bjb_logo.svg.png", account_number: "0119213282001", account_holder: "Triwala Mitra Bestari" },
-    { id: "ovo", name: "OVO", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Logo_ovo_purple.svg/200px-Logo_ovo_purple.svg.png", account_number: "0811-1919-711", account_holder: "Triwala Mitra Bestari" },
-    { id: "dana", name: "DANA", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Logo_dana_blue.svg/200px-Logo_dana_blue.svg.png", account_number: "XXX", account_holder: "Triwala Mitra Bestari" },
-    { id: "gopay", name: "GoPay", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Gopay_logo.svg/200px-Gopay_logo.svg.png", account_number: "XXX", account_holder: "Triwala Mitra Bestari" },
-  ]);
+  // Payment methods state - fetched live from API (same source as Kelola Pembayaran in AdminWeb)
+  const [paymentMethods, setPaymentMethods] = useState(() => {
+    try {
+      const cached = localStorage.getItem("official_payment_methods_custom");
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    api.get("/payment-methods")
+      .then((res) => {
+        const data = res.data?.data?.methods;
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setPaymentMethods(data);
+          localStorage.setItem("official_payment_methods_custom", JSON.stringify(data));
+        }
+      })
+      .catch((err) => console.warn("AdminUser: failed to fetch payment methods:", err));
+    return () => { isMounted = false; };
+  }, []);
 
   const getPaymentNumber = (method) => {
     if (!method) return '0954152045';
@@ -392,7 +413,8 @@ export default function AdminUser() {
     if (m.includes('maybank')) return '2097000009';
     if (m.includes('bjb')) return '0119213282001';
     if (m.includes('ovo')) return '0811-1919-711';
-    if (m.includes('dana') || m.includes('gopay') || m.includes('shopee')) return 'XXX (Belum Terdaftar)';
+    if (m.includes('dana') || m.includes('gopay')) return 'xxxx';
+    if (m.includes('qris')) return 'Scan QR Code';
     return '0954152045';
   };
 
@@ -607,6 +629,54 @@ export default function AdminUser() {
     }
   };
 
+  const handleDeleteReferralTx = async (id) => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus riwayat transaksi referral ini?")) return;
+    try {
+      const res = await api.delete(`/referrals/transactions/${id}`);
+      if (res.data?.success) {
+        fetchReferralStats();
+      }
+    } catch (err) {
+      console.error("Failed to delete referral transaction:", err);
+    }
+  };
+
+  const handleClearAllReferralTx = async () => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus SEMUA riwayat transaksi referral? Data yang dihapus tidak dapat dikembalikan.")) return;
+    try {
+      const res = await api.delete("/referrals/transactions");
+      if (res.data?.success) {
+        fetchReferralStats();
+      }
+    } catch (err) {
+      console.error("Failed to clear referral transactions:", err);
+    }
+  };
+
+  const handleDeleteWithdrawal = async (id) => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus riwayat penarikan komisi ini?")) return;
+    try {
+      const res = await api.delete(`/referrals/withdrawals/${id}`);
+      if (res.data?.success) {
+        fetchReferralStats();
+      }
+    } catch (err) {
+      console.error("Failed to delete withdrawal history:", err);
+    }
+  };
+
+  const handleClearAllWithdrawals = async () => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus SEMUA riwayat penarikan komisi? Data yang dihapus tidak dapat dikembalikan.")) return;
+    try {
+      const res = await api.delete("/referrals/withdrawals");
+      if (res.data?.success) {
+        fetchReferralStats();
+      }
+    } catch (err) {
+      console.error("Failed to clear withdrawal history:", err);
+    }
+  };
+
   const fetchPublicCodes = async () => {
     setLoadingPublicCodes(true);
     try {
@@ -762,7 +832,7 @@ export default function AdminUser() {
     }
   }, [activeTab]);
 
-  /* ── Real Inbox / Chat States & Handlers ── */
+  /* ── Real Inbox / Chat States & Handlers (WhatsApp Web Style) ── */
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(
     searchParams.get("conversation") || null
@@ -775,6 +845,80 @@ export default function AdminUser() {
   const [inboxSearchQuery, setInboxSearchQuery] = useState("");
   const chatMessagesEndRef = useRef(null);
 
+  // WhatsApp-specific states
+  const [chatFilter, setChatFilter] = useState("all"); // "all" | "unread" | "favorites"
+  const [activeMenuConvId, setActiveMenuConvId] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [chatImageFile, setChatImageFile] = useState(null);       // File object for photo send
+  const [chatImagePreview, setChatImagePreview] = useState(null); // Data URL preview
+  const chatImageInputRef = useRef(null);                         // Hidden file input ref
+
+  // LocalStorage-synced WhatsApp features (Pin, Favorite, Manual Unread, Archive, Mute, Clear, Delete)
+  const [pinnedChats, setPinnedChats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("surade_wa_pinned_chats") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [favoriteChats, setFavoriteChats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("surade_wa_fav_chats") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [manualUnreadChats, setManualUnreadChats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("surade_wa_manual_unread") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [archivedChats, setArchivedChats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("surade_wa_archived_chats") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [mutedChats, setMutedChats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("surade_wa_muted_chats") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [clearedChats, setClearedChats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("surade_wa_cleared_chats") || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const [deletedChats, setDeletedChats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("surade_wa_deleted_chats") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  // Close menus and emoji pickers on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest(".wa-dropdown-menu") && !e.target.closest(".wa-menu-trigger")) {
+        setActiveMenuConvId(null);
+      }
+      if (!e.target.closest(".wa-emoji-picker") && !e.target.closest(".wa-emoji-trigger")) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, []);
+
   // Persistent Cache for Messages to ensure 0ms instant loading & zero flickering
   const chatMessagesCacheRef = useRef({});
 
@@ -783,6 +927,12 @@ export default function AdminUser() {
     const convParam = searchParams.get("conversation");
     if (convParam) {
       setActiveConversationId(convParam);
+      // Remove from manual unread when opened
+      setManualUnreadChats((prev) => {
+        const next = prev.filter((id) => String(id) !== String(convParam));
+        localStorage.setItem("surade_wa_manual_unread", JSON.stringify(next));
+        return next;
+      });
     } else {
       setActiveConversationId(null);
       setActiveChatData(null);
@@ -934,17 +1084,203 @@ export default function AdminUser() {
     return conversations.reduce((acc, conv) => acc + (conv.unread_count || 0), 0);
   }, [conversations]);
 
-  // Filtered conversations by search query
+  // Filtered conversations with WhatsApp Pin, Tabs (All/Unread/Favorites), and Search
   const filteredConversations = useMemo(() => {
-    if (!inboxSearchQuery.trim()) return conversations;
-    const q = inboxSearchQuery.toLowerCase();
-    return conversations.filter(
-      (c) =>
-        (c.business_name && c.business_name.toLowerCase().includes(q)) ||
-        (c.counterparty_name && c.counterparty_name.toLowerCase().includes(q)) ||
-        (c.last_message && c.last_message.toLowerCase().includes(q))
+    // 1. Exclude deleted chats
+    let list = conversations.filter((c) => !deletedChats.includes(c.id));
+
+    // 2. Filter tabs
+    if (chatFilter === "unread") {
+      list = list.filter((c) => (c.unread_count > 0) || manualUnreadChats.includes(c.id));
+    } else if (chatFilter === "favorites") {
+      list = list.filter((c) => favoriteChats.includes(c.id));
+    }
+
+    // 3. Search query filter
+    if (inboxSearchQuery.trim()) {
+      const q = inboxSearchQuery.toLowerCase();
+      list = list.filter(
+        (c) =>
+          (c.business_name && c.business_name.toLowerCase().includes(q)) ||
+          (c.counterparty_name && c.counterparty_name.toLowerCase().includes(q)) ||
+          (c.last_message && c.last_message.toLowerCase().includes(q))
+      );
+    }
+
+    // 4. Sort: Pinned chats first, then latest message descending
+    return [...list].sort((a, b) => {
+      const aPinned = pinnedChats.includes(a.id);
+      const bPinned = pinnedChats.includes(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      const timeA = new Date(a.last_message_at || 0).getTime();
+      const timeB = new Date(b.last_message_at || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [conversations, inboxSearchQuery, chatFilter, pinnedChats, favoriteChats, manualUnreadChats, deletedChats]);
+
+  // WhatsApp Context Menu Handlers
+  const togglePinChat = (convId, e) => {
+    if (e) e.stopPropagation();
+    setPinnedChats((prev) => {
+      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [convId, ...prev];
+      localStorage.setItem("surade_wa_pinned_chats", JSON.stringify(next));
+      return next;
+    });
+    setActiveMenuConvId(null);
+  };
+
+  const toggleFavoriteChat = (convId, e) => {
+    if (e) e.stopPropagation();
+    setFavoriteChats((prev) => {
+      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+      localStorage.setItem("surade_wa_fav_chats", JSON.stringify(next));
+      return next;
+    });
+    setActiveMenuConvId(null);
+  };
+
+  const toggleManualUnread = (convId, e) => {
+    if (e) e.stopPropagation();
+    setManualUnreadChats((prev) => {
+      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+      localStorage.setItem("surade_wa_manual_unread", JSON.stringify(next));
+      return next;
+    });
+    setActiveMenuConvId(null);
+  };
+
+  const toggleArchiveChat = (convId, e) => {
+    if (e) e.stopPropagation();
+    setArchivedChats((prev) => {
+      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+      localStorage.setItem("surade_wa_archived_chats", JSON.stringify(next));
+      return next;
+    });
+    setActiveMenuConvId(null);
+  };
+
+  const toggleMuteChat = (convId, e) => {
+    if (e) e.stopPropagation();
+    setMutedChats((prev) => {
+      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+      localStorage.setItem("surade_wa_muted_chats", JSON.stringify(next));
+      return next;
+    });
+    setActiveMenuConvId(null);
+  };
+
+  const clearChatHistory = (convId, e) => {
+    if (e) e.stopPropagation();
+    const now = new Date().toISOString();
+    setClearedChats((prev) => {
+      const next = { ...prev, [convId]: now };
+      localStorage.setItem("surade_wa_cleared_chats", JSON.stringify(next));
+      return next;
+    });
+    if (String(activeConversationId) === String(convId)) {
+      setActiveChatData((prev) => (prev ? { ...prev, messages: [] } : prev));
+      if (chatMessagesCacheRef.current[convId]) {
+        chatMessagesCacheRef.current[convId] = [];
+      }
+    }
+    setActiveMenuConvId(null);
+  };
+
+  const deleteConversation = (convId, e) => {
+    if (e) e.stopPropagation();
+    setDeletedChats((prev) => {
+      const next = [...new Set([...prev, convId])];
+      localStorage.setItem("surade_wa_deleted_chats", JSON.stringify(next));
+      return next;
+    });
+    if (String(activeConversationId) === String(convId)) {
+      setActiveConversationId(null);
+      setActiveChatData(null);
+      navigate("/dashboard?tab=inbox", { replace: true });
+    }
+    setActiveMenuConvId(null);
+  };
+
+  // WhatsApp Message Checkmarks (c1 = 1 abu, c2 = 2 abu, dibaca = 2 biru #53bdeb)
+  const renderMessageTicks = (msg, isMine) => {
+    if (!isMine) return null;
+
+    // c1: sending / pending
+    if (msg.status === "sending" || String(msg.id).startsWith("temp-")) {
+      return (
+        <span title="c1 - Terkirim ke server" className="inline-flex items-center text-slate-400">
+          <Check size={14} className="stroke-[2.5]" />
+        </span>
+      );
+    }
+
+    // Dibaca: read by recipient (centang dua biru)
+    if (msg.is_read || msg.read_at || msg.status === "read") {
+      return (
+        <span title="Dibaca oleh penerima" className="inline-flex items-center text-[#53bdeb]">
+          <CheckCheck size={15} className="stroke-[2.5]" />
+        </span>
+      );
+    }
+
+    // c2: delivered to recipient device (centang dua abu-abu)
+    return (
+      <span title="c2 - Diterima penerima" className="inline-flex items-center text-slate-400">
+        <CheckCheck size={15} className="stroke-[2.5]" />
+      </span>
     );
-  }, [conversations, inboxSearchQuery]);
+  };
+
+  // Parse Reply from message if formatted as [Balas Sender: "Snippet"]
+  const parseReplyInMessage = (text) => {
+    if (!text) return { replySender: null, replyText: null, bodyText: "" };
+    const match = text.match(/^\[(?:Balas|Membalas)\s+([^:]+):\s*"([^"]*)"\]\n?([\s\S]*)$/);
+    if (match) {
+      return {
+        replySender: match[1],
+        replyText: match[2],
+        bodyText: match[3],
+      };
+    }
+    return { replySender: null, replyText: null, bodyText: text };
+  };
+
+  // WhatsApp Date Badges for grouping
+  const getMessageDateBadge = (dateString) => {
+    if (!dateString) return "HARI INI";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "HARI INI";
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+    if (isToday) return "HARI INI";
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+    if (isYesterday) return "KEMARIN";
+
+    return date.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).toUpperCase();
+  };
+
+  // Active messages considering cleared chat cutoffs
+  const activeConversationMessages = useMemo(() => {
+    if (!activeChatData?.messages) return [];
+    const clearCutoff = clearedChats[activeConversationId];
+    if (!clearCutoff) return activeChatData.messages;
+    const cutoffTime = new Date(clearCutoff).getTime();
+    return activeChatData.messages.filter((m) => new Date(m.created_at).getTime() > cutoffTime);
+  }, [activeChatData?.messages, activeConversationId, clearedChats]);
 
   const formatChatTimestamp = (dateString) => {
     if (!dateString) return "";
@@ -980,14 +1316,26 @@ export default function AdminUser() {
     });
   };
 
-  // True Optimistic UI Message Sender
+  // True Optimistic UI Message Sender with WhatsApp reply support (text + photo)
   const handleSendChatMessage = async (e) => {
-    e.preventDefault();
-    if (!chatMessageInput.trim() || !activeConversationId || sendingChatMessage) return;
+    if (e) e.preventDefault();
+    const hasText = chatMessageInput.trim().length > 0;
+    const hasImage = !!chatImageFile;
+    if ((!hasText && !hasImage) || !activeConversationId || sendingChatMessage) return;
 
-    const messageText = chatMessageInput.trim();
+    let messageText = chatMessageInput.trim();
+    if (replyingTo && messageText) {
+      messageText = `[Balas ${replyingTo.senderName}: "${replyingTo.text.slice(0, 60)}${replyingTo.text.length > 60 ? "..." : ""}"]\n${messageText}`;
+    }
+
     const tempId = "temp-" + Date.now();
+    const capturedFile = chatImageFile;
+    const capturedPreview = chatImagePreview;
     setChatMessageInput("");
+    setReplyingTo(null);
+    setShowEmojiPicker(false);
+    setChatImageFile(null);
+    setChatImagePreview(null);
     setSendingChatMessage(true);
 
     const optimisticMessage = {
@@ -995,6 +1343,8 @@ export default function AdminUser() {
       conversation_id: activeConversationId,
       sender_id: user.id,
       message: messageText,
+      image_url: capturedPreview || null, // Show local preview instantly
+      message_type: capturedFile ? "image" : "text",
       status: "sending",
       created_at: new Date().toISOString(),
       sender: {
@@ -1009,26 +1359,32 @@ export default function AdminUser() {
       if (!prev) return prev;
       const updatedMessages = [...(prev.messages || []), optimisticMessage];
       chatMessagesCacheRef.current[activeConversationId] = updatedMessages;
-      return {
-        ...prev,
-        messages: updatedMessages,
-      };
+      return { ...prev, messages: updatedMessages };
     });
 
     // 2. Instantly update conversation preview locally
     setConversations((prev) =>
       prev.map((c) =>
         String(c.id) === String(activeConversationId) || String(c.conversation_id) === String(activeConversationId)
-          ? { ...c, last_message: messageText, last_message_at: new Date().toISOString() }
+          ? { ...c, last_message: capturedFile ? (messageText || "📷 Foto") : messageText, last_message_at: new Date().toISOString() }
           : c
       )
     );
 
     // 3. Asynchronously post message to backend
     try {
-      const res = await api.post(`/inbox/${activeConversationId}/messages`, {
-        message: messageText,
-      });
+      let res;
+      if (capturedFile) {
+        // Send as multipart/form-data to support image
+        const formData = new FormData();
+        if (messageText) formData.append("message", messageText);
+        formData.append("image", capturedFile);
+        res = await api.post(`/inbox/${activeConversationId}/messages`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        res = await api.post(`/inbox/${activeConversationId}/messages`, { message: messageText });
+      }
 
       if (res.data && res.data.success) {
         const savedMessage = { ...res.data.data, status: "sent" };
@@ -1038,10 +1394,7 @@ export default function AdminUser() {
             m.id === tempId ? savedMessage : m
           );
           chatMessagesCacheRef.current[activeConversationId] = updatedMessages;
-          return {
-            ...prev,
-            messages: updatedMessages,
-          };
+          return { ...prev, messages: updatedMessages };
         });
       }
     } catch (err) {
@@ -1052,14 +1405,33 @@ export default function AdminUser() {
           m.id === tempId ? { ...m, status: "failed" } : m
         );
         chatMessagesCacheRef.current[activeConversationId] = updatedMessages;
-        return {
-          ...prev,
-          messages: updatedMessages,
-        };
+        return { ...prev, messages: updatedMessages };
       });
     } finally {
       setSendingChatMessage(false);
     }
+  };
+
+  // Handle selecting image from file input
+  const handleChatImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran foto maksimal 5 MB.");
+      return;
+    }
+    setChatImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setChatImagePreview(ev.target.result);
+    reader.readAsDataURL(file);
+    // Reset file input so same file can be re-selected
+    if (chatImageInputRef.current) chatImageInputRef.current.value = "";
+  };
+
+  // Cancel selected image
+  const cancelChatImage = () => {
+    setChatImageFile(null);
+    setChatImagePreview(null);
   };
 
   // States for Premium Upgrade Wizard (similar to AddBusiness flow)
@@ -2762,7 +3134,7 @@ export default function AdminUser() {
         formData.append("avatar", profilePhoto);
         console.log("📷 Uploading new avatar:", profilePhoto.name);
       } else if (removeAvatarFlag) {
-        formData.append("remove_avatar", "true");
+        formData.append("remove_avatar", "1");
         console.log("🗑️ Removing avatar");
       }
 
@@ -2770,7 +3142,7 @@ export default function AdminUser() {
         formData.append("banner", profileBanner);
         console.log("🖼️ Uploading new banner:", profileBanner.name);
       } else if (removeBannerFlag) {
-        formData.append("remove_banner", "true");
+        formData.append("remove_banner", "1");
         console.log("🗑️ Removing banner");
       }
 
@@ -2920,7 +3292,7 @@ export default function AdminUser() {
       setIsUploadingProfile(true);
       const formData = new FormData();
       formData.append("_method", "PUT");
-      formData.append("remove_avatar", "true");
+      formData.append("remove_avatar", "1");
 
       const res = await api.post("/users/profile", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -3363,6 +3735,44 @@ export default function AdminUser() {
                   </div>
                 </div>
               </div>
+
+              {/* 3. PREMIUM UPGRADE PROMO BANNER */}
+              <div className="relative overflow-hidden rounded-[16px] bg-gradient-to-br from-[#1c1917] via-[#292524] to-[#1c1917] border border-[#f5c451]/30 p-[22px_24px] shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-[18px]">
+                <div className="absolute -right-8 -top-12 w-48 h-48 rounded-full bg-[#f5c451]/10 blur-2xl pointer-events-none" />
+                <div className="flex items-start sm:items-center gap-[16px] z-10">
+                  <div
+                    className="shrink-0 w-[52px] h-[52px] rounded-2xl flex items-center justify-center"
+                    style={{
+                      background: "linear-gradient(145deg, #fde68a 0%, #f5c451 38%, #b8860b 100%)",
+                      boxShadow: "0 8px 20px rgba(184,134,11,0.4), inset 0 1px 2px rgba(255,255,255,0.6)"
+                    }}
+                  >
+                    <Crown size={26} className="text-[#3d2c05]" strokeWidth={2.3} />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-[5px] px-[8px] py-[2px] rounded-full bg-[#f5c451]/15 border border-[#f5c451]/30 text-[#f5d876] text-[10px] font-bold uppercase tracking-wider mb-[4px]">
+                      <Sparkles size={10} /> Upgrade Usaha
+                    </div>
+                    <h3 className="text-[16px] sm:text-[18px] font-extrabold text-white">Dapatkan Badge Centang Emas Resmi & Prioritas Pencarian</h3>
+                    <p className="text-[12.5px] text-[#d6d3d1] mt-[2px] max-w-[650px] leading-relaxed">
+                      Tingkatkan kredibilitas toko Anda dengan posisi teratas, rute Google Maps interaktif, katalog tanpa batas, dan verifikasi centang emas resmi.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleTabChange("premium")}
+                  className="z-10 px-[18px] py-[10px] rounded-[10px] font-extrabold text-[12.5px] text-slate-950 flex items-center gap-[8px] transition-all duration-200 hover:scale-105 active:scale-95 shadow-md cursor-pointer border-0 shrink-0"
+                  style={{
+                    background: "linear-gradient(180deg, #fef08a 0%, #f59e0b 55%, #d97706 100%)",
+                    boxShadow: "0 4px 12px rgba(217, 119, 6, 0.4)"
+                  }}
+                >
+                  <Crown size={15} strokeWidth={2.5} />
+                  <span>Upgrade ke Premium</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -3642,7 +4052,8 @@ export default function AdminUser() {
                                               type="button"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                navigate(`/add-business/${biz.id}?upgrade=true`);
+                                                setSelectedUpgradeBusiness(String(biz.id));
+                                                handleTabChange("premium");
                                               }}
                                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider text-slate-950 transition-all cursor-pointer border-0 hover:scale-105 active:scale-95 shadow-xs"
                                               style={{
@@ -3768,13 +4179,16 @@ export default function AdminUser() {
                                       {/* Upgrade button only for Free businesses without pending subscription */}
                                       {!isPrem && !isPendingSub && (
                                         <button
-                                          onClick={() => navigate(`/add-business/${biz.id}?upgrade=true`)}
+                                          onClick={() => {
+                                            setSelectedUpgradeBusiness(String(biz.id));
+                                            handleTabChange("premium");
+                                          }}
                                           className="h-[30px] px-2.5 rounded-lg text-slate-950 flex items-center justify-center gap-1 transition-all cursor-pointer border-0 hover:scale-105 active:scale-95 font-bold text-[11px] shrink-0"
                                           style={{
                                             background: "linear-gradient(180deg, #fef08a 0%, #f59e0b 55%, #d97706 100%)",
                                             boxShadow: "0 2px 6px rgba(217, 119, 6, 0.4), inset 0 1px 0 #ffffff, inset 0 -1px 0 #78350f",
                                           }}
-                                          title="Upgrade bisnis ini ke Paket Premium"
+                                          title="Upgrade bisnis ini ke Paket Premium (Centang Emas)"
                                         >
                                           <Crown size={13} className="shrink-0 text-slate-950" strokeWidth={2.5} />
                                           <span className="hidden sm:inline">Upgrade</span>
@@ -4401,47 +4815,122 @@ export default function AdminUser() {
             </div>
           )}
 
-          {/* 4. INBOX / CHAT VIEW */}
+          {/* 4. INBOX / CHAT VIEW (WHATSAPP WEB STYLE - GAMBAR 2 & 3) */}
           {activeTab === "inbox" && (
-            <div className="grid grid-cols-1 md:grid-cols-[340px_1fr] gap-4 md:gap-5 h-[calc(100vh-140px)] min-h-[550px] max-h-[850px] overflow-hidden">
-              {/* LEFT PANEL: Daftar Conversation */}
-              <div className={`bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden shadow-sm ${activeConversationId ? "max-md:hidden" : "w-full"}`}>
-                <div className="p-4 border-b border-slate-100 space-y-3 shrink-0">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Mail size={18} className="text-[#059669]" />
-                      Kotak Masuk
-                    </h2>
+            <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] h-[calc(100vh-140px)] min-h-[580px] max-h-[860px] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-md">
+              {/* LEFT PANEL: Daftar Obrolan WhatsApp */}
+              <div
+                className={`bg-[#f0f2f5] border-r border-slate-200 flex flex-col overflow-hidden ${
+                  activeConversationId ? "max-md:hidden" : "w-full"
+                }`}
+              >
+                {/* WhatsApp Left Header */}
+                <div className="p-3.5 bg-[#f0f2f5] border-b border-slate-200 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src={user?.avatar ? getStorageUrl(user.avatar) : DEFAULT_AVATAR}
+                      alt={user?.name || "Profil"}
+                      className="w-10 h-10 rounded-full object-cover border border-slate-300 shadow-xs"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_AVATAR;
+                      }}
+                    />
+                    <div>
+                      <h2 className="text-base font-bold text-[#111b21] leading-tight">Inbox Pesan</h2>
+                      <p className="text-[11px] text-[#667781] font-medium">Inbox Komunitas Surade</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[#54656f]">
                     {totalInboxUnreadCount > 0 && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-bold text-xs shadow-xs animate-pulse">
+                      <span className="px-2 py-0.5 rounded-full bg-[#25d366] text-white font-bold text-[11px] shadow-xs mr-1 animate-pulse">
                         {totalInboxUnreadCount} baru
                       </span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => fetchConversationsList(true)}
+                      className="p-2 hover:bg-slate-200/70 rounded-full transition-colors cursor-pointer text-[#54656f] hover:text-[#111b21]"
+                      title="Perbarui Obrolan"
+                    >
+                      <RefreshCw size={17} className={loadingConversations ? "animate-spin text-[#00a884]" : ""} />
+                    </button>
                   </div>
+                </div>
 
-                  {/* Search Bar */}
-                  <div className="relative">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                {/* WhatsApp Search Bar & Filter Tabs */}
+                <div className="p-2.5 bg-white border-b border-slate-100 space-y-2 shrink-0">
+                  <div className="relative flex items-center">
+                    <Search size={15} className="absolute left-3 text-[#54656f]" />
                     <input
                       type="text"
                       value={inboxSearchQuery}
                       onChange={(e) => setInboxSearchQuery(e.target.value)}
-                      placeholder="Cari pesan atau bisnis..."
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#007570] focus:ring-1 focus:ring-[#007570]"
+                      placeholder="Cari atau mulai obrolan baru"
+                      className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[#f0f2f5] text-xs text-[#111b21] placeholder:text-[#8696a0] focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#00a884] border border-transparent transition-all"
                     />
+                  </div>
+
+                  {/* Filter Pills: Semua, Belum dibaca, Favorit */}
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setChatFilter("all")}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                        chatFilter === "all"
+                          ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
+                          : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
+                      }`}
+                    >
+                      Semua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChatFilter("unread")}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                        chatFilter === "unread"
+                          ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
+                          : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
+                      }`}
+                    >
+                      Belum dibaca
+                      {totalInboxUnreadCount > 0 && (
+                        <span className="w-4 h-4 rounded-full bg-[#25d366] text-white text-[10px] font-bold inline-flex items-center justify-center">
+                          {totalInboxUnreadCount}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChatFilter("favorites")}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                        chatFilter === "favorites"
+                          ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
+                          : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
+                      }`}
+                    >
+                      <Heart size={11} className={chatFilter === "favorites" ? "fill-current" : ""} />
+                      Favorit
+                    </button>
                   </div>
                 </div>
 
-                {/* Conversation List Container */}
-                <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                {/* WhatsApp Conversation List */}
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 bg-white">
                   {loadingConversations ? (
                     <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-2">
-                      <Loader2 size={28} className="animate-spin text-[#059669]" />
-                      <p className="text-xs font-medium">Memuat percakapan...</p>
+                      <Loader2 size={26} className="animate-spin text-[#00a884]" />
+                      <p className="text-xs font-medium text-[#667781]">Memuat obrolan...</p>
                     </div>
                   ) : filteredConversations.length > 0 ? (
                     filteredConversations.map((conv) => {
                       const isActive = String(activeConversationId) === String(conv.id);
+                      const isPinned = pinnedChats.includes(conv.id);
+                      const isFav = favoriteChats.includes(conv.id);
+                      const isMuted = mutedChats.includes(conv.id);
+                      const isManualUnread = manualUnreadChats.includes(conv.id);
+                      const unreadCount = conv.unread_count || (isManualUnread ? 1 : 0);
+
                       return (
                         <div
                           key={conv.id}
@@ -4449,53 +4938,192 @@ export default function AdminUser() {
                             setActiveConversationId(conv.id);
                             navigate(`/dashboard?tab=inbox&conversation=${conv.id}`, { replace: true });
                           }}
-                          className={`p-3.5 cursor-pointer transition-all flex items-start gap-3 relative ${isActive ? "bg-teal-50/70 border-l-4 border-l-[#007570]" : "hover:bg-slate-50"} ${conv.unread_count > 0 ? "bg-slate-50/90 font-semibold" : ""}`}
+                          className={`group relative p-3 cursor-pointer transition-colors flex items-start gap-3 border-l-4 ${
+                            isActive
+                              ? "bg-[#f0f2f5] border-l-[#00a884]"
+                              : "hover:bg-[#f5f6f6] border-l-transparent"
+                          } ${unreadCount > 0 ? "bg-[#f8fafc]" : ""}`}
                         >
-                          {/* Avatar / Logo */}
+                          {/* Avatar */}
                           <div className="relative shrink-0">
                             <SafeImage
-                              src={conv.business_logo ? getStorageUrl(conv.business_logo) : (conv.counterparty_avatar ? getStorageUrl(conv.counterparty_avatar) : DEFAULT_AVATAR)}
+                              src={
+                                conv.business_logo
+                                  ? getStorageUrl(conv.business_logo)
+                                  : conv.counterparty_avatar
+                                  ? getStorageUrl(conv.counterparty_avatar)
+                                  : DEFAULT_AVATAR
+                              }
                               alt={conv.business_name}
-                              className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-xs"
+                              className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-2xs"
                               fallback={DEFAULT_AVATAR}
                             />
-                            {conv.unread_count > 0 && (
-                              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white font-black text-[10px] flex items-center justify-center border-2 border-white shadow-xs">
-                                {conv.unread_count}
+                            {unreadCount > 0 && (
+                              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#25d366] text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-xs">
+                                {unreadCount}
                               </span>
                             )}
                           </div>
 
-                          {/* Content info */}
-                          <div className="flex-1 min-w-0 space-y-1">
+                          {/* Content */}
+                          <div className="flex-1 min-w-0 space-y-0.5">
+                            {/* Line 1: Title & Timestamp */}
                             <div className="flex items-center justify-between gap-1">
-                              <h4 className="text-xs font-bold text-slate-900 truncate">
-                                {conv.business_name}
+                              <h4 className="text-sm font-semibold text-[#111b21] truncate flex items-center gap-1.5">
+                                <span className="truncate">{conv.business_name || conv.counterparty_name}</span>
                               </h4>
-                              <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                              <span
+                                className={`text-[11px] font-medium shrink-0 ${
+                                  unreadCount > 0 ? "text-[#00a884] font-bold" : "text-[#667781]"
+                                }`}
+                              >
                                 {formatChatTimestamp(conv.last_message_at)}
                               </span>
                             </div>
-                            <div className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1">
-                              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-bold shrink-0">
-                                {conv.counterparty_role}
+
+                            {/* Line 2: Role badge */}
+                            <div className="text-[11px] text-[#667781] font-medium truncate flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wider">
+                                {conv.counterparty_role === "seller" ? "Penjual" : "Pembeli"}
                               </span>
                               <span className="truncate">{conv.counterparty_name}</span>
                             </div>
-                            <p className={`text-xs truncate ${conv.unread_count > 0 ? "font-bold text-slate-900" : "text-slate-500"}`}>
-                              {conv.last_message || "Belum ada pesan."}
-                            </p>
+
+                            {/* Line 3: Last Message snippet + Icons (Pin, Fav, Mute, Menu) */}
+                            <div className="flex items-center justify-between gap-1 pt-0.5">
+                              <p
+                                className={`text-xs truncate flex items-center gap-1 ${
+                                  unreadCount > 0 ? "font-bold text-[#111b21]" : "text-[#667781]"
+                                }`}
+                              >
+                                {conv.last_message && (
+                                  <span className="inline-flex items-center shrink-0">
+                                    {unreadCount > 0 ? (
+                                      <CheckCheck size={14} className="text-slate-400" title="c2 - Diterima" />
+                                    ) : (
+                                      <CheckCheck size={14} className="text-[#53bdeb]" title="Dibaca" />
+                                    )}
+                                  </span>
+                                )}
+                                <span className="truncate">{conv.last_message || "Mulai obrolan..."}</span>
+                              </p>
+
+                              {/* Badges & Actions */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                {isPinned && (
+                                  <Pin size={13} className="text-amber-500 rotate-45 shrink-0" title="Disematkan" />
+                                )}
+                                {isFav && (
+                                  <Heart size={12} className="text-rose-500 fill-rose-500 shrink-0" title="Favorit" />
+                                )}
+                                {isMuted && (
+                                  <VolumeX size={13} className="text-slate-400 shrink-0" title="Dibisukan" />
+                                )}
+
+                                {/* WhatsApp Context Menu Trigger (Gambar 3) */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuConvId(activeMenuConvId === conv.id ? null : conv.id);
+                                  }}
+                                  className="wa-menu-trigger p-1 rounded-full text-[#8696a0] hover:text-[#111b21] hover:bg-slate-200/80 transition-colors cursor-pointer"
+                                  title="Opsi Obrolan"
+                                >
+                                  <ChevronDown size={15} />
+                                </button>
+                              </div>
+                            </div>
                           </div>
+
+                          {/* WHATSAPP CONTEXT DROPDOWN MENU (GAMBAR 3) */}
+                          {activeMenuConvId === conv.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="wa-dropdown-menu absolute right-3 top-12 z-50 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 w-52 text-left animate-in fade-in zoom-in-95"
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => togglePinChat(conv.id, e)}
+                                className="w-full px-3.5 py-2 text-xs text-[#111b21] hover:bg-[#f5f6f6] flex items-center gap-2.5 transition-colors cursor-pointer"
+                              >
+                                <Pin size={14} className={isPinned ? "text-amber-500 rotate-45" : "text-slate-500"} />
+                                <span>{isPinned ? "Lepas sematan chat" : "Sematkan chat"}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => toggleManualUnread(conv.id, e)}
+                                className="w-full px-3.5 py-2 text-xs text-[#111b21] hover:bg-[#f5f6f6] flex items-center gap-2.5 transition-colors cursor-pointer"
+                              >
+                                <Mail size={14} className="text-slate-500" />
+                                <span>{unreadCount > 0 ? "Tandai sudah dibaca" : "Tandai belum dibaca"}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => toggleFavoriteChat(conv.id, e)}
+                                className="w-full px-3.5 py-2 text-xs text-[#111b21] hover:bg-[#f5f6f6] flex items-center gap-2.5 transition-colors cursor-pointer"
+                              >
+                                <Heart size={14} className={isFav ? "text-rose-500 fill-rose-500" : "text-slate-500"} />
+                                <span>{isFav ? "Hapus dari favorit" : "Tambah ke favorit"}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => toggleArchiveChat(conv.id, e)}
+                                className="w-full px-3.5 py-2 text-xs text-[#111b21] hover:bg-[#f5f6f6] flex items-center gap-2.5 transition-colors cursor-pointer"
+                              >
+                                <Archive size={14} className="text-slate-500" />
+                                <span>Arsipkan chat</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => toggleMuteChat(conv.id, e)}
+                                className="w-full px-3.5 py-2 text-xs text-[#111b21] hover:bg-[#f5f6f6] flex items-center gap-2.5 transition-colors cursor-pointer"
+                              >
+                                {isMuted ? <Volume2 size={14} className="text-slate-500" /> : <VolumeX size={14} className="text-slate-500" />}
+                                <span>{isMuted ? "Bunyikan notifikasi" : "Bisukan notifikasi"}</span>
+                              </button>
+
+                              <div className="h-px bg-slate-100 my-1" />
+
+                              <button
+                                type="button"
+                                onClick={(e) => clearChatHistory(conv.id, e)}
+                                className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-[#f5f6f6] flex items-center gap-2.5 transition-colors cursor-pointer"
+                              >
+                                <RefreshCw size={14} className="text-slate-500" />
+                                <span>Bersihkan obrolan</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => deleteConversation(conv.id, e)}
+                                className="w-full px-3.5 py-2 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={14} className="text-rose-600" />
+                                <span>Hapus obrolan</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })
                   ) : (
                     <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400 space-y-3">
-                      <Mail size={40} className="text-slate-300 stroke-[1.5]" />
+                      <div className="w-14 h-14 rounded-full bg-[#f0f2f5] flex items-center justify-center text-slate-400">
+                        <MessageCircle size={30} className="stroke-[1.5]" />
+                      </div>
                       <div className="space-y-1">
-                        <p className="text-sm font-bold text-slate-700">Belum Ada Pesan</p>
-                        <p className="text-xs text-slate-500 max-w-[200px]">
-                          Pesan dari bisnis yang Anda hubungi akan muncul di sini.
+                        <p className="text-sm font-bold text-[#111b21]">Tidak Ada Percakapan</p>
+                        <p className="text-xs text-[#667781] max-w-[210px]">
+                          {chatFilter === "unread"
+                            ? "Semua pesan sudah Anda baca."
+                            : chatFilter === "favorites"
+                            ? "Belum ada obrolan yang ditandai favorit."
+                            : "Pesan dari kontak atau UMKM Surade akan tampil di sini."}
                         </p>
                       </div>
                     </div>
@@ -4503,12 +5131,16 @@ export default function AdminUser() {
                 </div>
               </div>
 
-              {/* RIGHT PANEL: Chat Detail & Window */}
-              <div className={`bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden shadow-sm ${!activeConversationId ? "max-md:hidden" : "w-full"}`}>
+              {/* RIGHT PANEL: Area Percakapan WhatsApp (Gambar 2) */}
+              <div
+                className={`bg-[#efeae2] flex flex-col overflow-hidden relative ${
+                  !activeConversationId ? "max-md:hidden" : "w-full"
+                }`}
+              >
                 {activeConversationId && activeChatData ? (
                   <>
-                    {/* Header Chat Window */}
-                    <div className="p-3.5 md:p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                    {/* WhatsApp Active Header */}
+                    <div className="px-4 py-2.5 bg-[#f0f2f5] border-b border-slate-200 flex items-center justify-between shrink-0 shadow-xs z-10">
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Mobile Back Button */}
                         <button
@@ -4518,136 +5150,367 @@ export default function AdminUser() {
                             setActiveChatData(null);
                             navigate(`/dashboard?tab=inbox`, { replace: true });
                           }}
-                          className="md:hidden p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
-                          title="Kembali ke Daftar Pesan"
+                          className="md:hidden p-1.5 rounded-lg hover:bg-slate-200 text-[#54656f] transition-colors cursor-pointer"
+                          title="Kembali ke Daftar Obrolan"
                         >
                           <ChevronLeft size={20} />
                         </button>
 
                         <SafeImage
-                          src={activeChatData.business?.logo ? getStorageUrl(activeChatData.business.logo) : DEFAULT_AVATAR}
+                          src={
+                            activeChatData.business?.logo
+                              ? getStorageUrl(activeChatData.business.logo)
+                              : DEFAULT_AVATAR
+                          }
                           alt={activeChatData.business?.name}
-                          className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0 shadow-xs"
+                          className="w-10 h-10 rounded-full object-cover border border-slate-300 shrink-0 shadow-2xs"
                           fallback={DEFAULT_AVATAR}
                         />
 
                         <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-slate-900 truncate">
-                            {activeChatData.business?.name || "Detail Bisnis"}
+                          <h3 className="text-sm font-bold text-[#111b21] truncate flex items-center gap-2">
+                            <span>{activeChatData.business?.name || activeChatData.counterparty_name}</span>
                           </h3>
-                          <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
-                            <span className="px-2 py-0.5 rounded-full bg-teal-100 text-[#059669] font-bold text-[10px]">
-                              {activeChatData.counterparty_role}
+                          <p className="text-[11px] text-[#00a884] font-medium flex items-center gap-1.5 truncate">
+                            <span className="w-2 h-2 rounded-full bg-[#25d366] inline-block animate-pulse" />
+                            <span>online</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-[#667781] font-normal truncate">
+                              {activeChatData.counterparty_name} ({activeChatData.counterparty_role === "seller" ? "Penjual" : "Pembeli"})
                             </span>
-                            <span className="truncate">{activeChatData.counterparty_name}</span>
                           </p>
                         </div>
                       </div>
 
-                      {/* Desktop Close/Exit Chat Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveConversationId(null);
-                          setActiveChatData(null);
-                          navigate(`/dashboard?tab=inbox`, { replace: true });
-                        }}
-                        className="hidden md:flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/70 transition-colors cursor-pointer font-medium"
-                        title="Tutup Percakapan"
-                      >
-                        <X size={15} />
-                        <span>Tutup</span>
-                      </button>
+                      {/* Header Action Icons */}
+                      <div className="flex items-center gap-1 text-[#54656f]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveConversationId(null);
+                            setActiveChatData(null);
+                            navigate(`/dashboard?tab=inbox`, { replace: true });
+                          }}
+                          className="flex items-center gap-1 text-xs text-[#54656f] hover:text-[#111b21] px-2.5 py-1.5 rounded-lg hover:bg-slate-200/70 transition-colors cursor-pointer font-medium"
+                          title="Tutup Percakapan"
+                        >
+                          <X size={16} />
+                          <span className="hidden sm:inline">Tutup</span>
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Body: Messages List */}
-                    <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-3.5 bg-slate-50/40">
+                    {/* WhatsApp Doodle Wallpaper Chat Area */}
+                    <div
+                      className="flex-1 p-3 md:p-5 overflow-y-auto space-y-3"
+                      style={{
+                        backgroundColor: "#efeae2",
+                        backgroundImage:
+                          "radial-gradient(#cdd3d8 0.85px, transparent 0.85px), radial-gradient(#cdd3d8 0.85px, #efeae2 0.85px)",
+                        backgroundSize: "26px 26px",
+                        backgroundPosition: "0 0, 13px 13px",
+                      }}
+                    >
+                      {/* WhatsApp End-to-End Encryption Security Card */}
+                      <div className="max-w-md mx-auto my-2 p-2 rounded-lg bg-[#ffeecd] border border-[#ffe09e] text-center shadow-2xs">
+                        <p className="text-[11px] text-[#54656f] leading-snug flex items-center justify-center gap-1.5 font-medium">
+                          <span>🔒</span>
+                          <span>
+                            Pesan dan obrolan terenkripsi aman secara end-to-end dalam ekosistem portal Surade.co.id.
+                          </span>
+                        </p>
+                      </div>
+
                       {loadingChatDetails ? (
-                        <div className="flex items-center justify-center h-full text-slate-400 space-y-2">
-                          <Loader2 size={24} className="animate-spin text-[#059669]" />
-                          <span className="text-xs ml-2 font-semibold">Memuat pesan...</span>
+                        <div className="flex items-center justify-center h-48 text-slate-500 space-y-2">
+                          <Loader2 size={24} className="animate-spin text-[#00a884]" />
+                          <span className="text-xs ml-2 font-semibold">Memuat riwayat pesan...</span>
                         </div>
-                      ) : activeChatData.messages && activeChatData.messages.length > 0 ? (
-                        activeChatData.messages.map((msg) => {
+                      ) : activeConversationMessages.length > 0 ? (
+                        activeConversationMessages.map((msg, idx) => {
                           const isMine = String(msg.sender_id) === String(user?.id);
+                          const prevMsg = idx > 0 ? activeConversationMessages[idx - 1] : null;
+                          const showDateBadge =
+                            !prevMsg ||
+                            new Date(prevMsg.created_at).toDateString() !==
+                              new Date(msg.created_at).toDateString();
+
+                          const { replySender, replyText, bodyText } = parseReplyInMessage(msg.message);
+
                           return (
-                            <div
-                              key={msg.id}
-                              className={`flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"}`}
-                            >
-                              {!isMine && (
-                                <img
-                                  src={msg.sender?.avatar ? getStorageUrl(msg.sender.avatar) : DEFAULT_AVATAR}
-                                  alt={msg.sender?.name}
-                                  className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0 mb-1"
-                                  onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
-                                />
-                              )}
-                              <div
-                                className={`max-w-[78%] md:max-w-[68%] rounded-2xl p-3.5 shadow-xs space-y-1 ${
-                                  isMine
-                                    ? "bg-gradient-to-r from-[#007570] to-teal-700 text-white rounded-br-none"
-                                    : "bg-white text-slate-800 border border-slate-200/90 rounded-bl-none"
-                                }`}
-                              >
-                                <p className="text-xs leading-relaxed font-normal whitespace-pre-wrap break-words">
-                                  {msg.message}
-                                </p>
-                                <div className={`text-[10px] font-medium flex items-center justify-end gap-1 ${isMine ? "text-teal-200" : "text-slate-400"}`}>
-                                  <span>{formatChatTimestamp(msg.created_at)}</span>
-                                  {isMine && <CheckCircle size={11} className="text-teal-200" />}
+                            <div key={msg.id} className="space-y-2">
+                              {/* Date Separator Pill */}
+                              {showDateBadge && (
+                                <div className="flex justify-center my-3">
+                                  <span className="px-3 py-1 rounded-md bg-white/90 backdrop-blur-xs text-[10px] font-bold text-[#54656f] shadow-2xs uppercase tracking-wide">
+                                    {getMessageDateBadge(msg.created_at)}
+                                  </span>
                                 </div>
+                              )}
+
+                              <div className={`group flex items-end gap-1.5 ${isMine ? "justify-end" : "justify-start"}`}>
+                                {/* Quick Reply Trigger Button on hover */}
+                                {!isMine && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setReplyingTo({
+                                        id: msg.id,
+                                        senderName: activeChatData.counterparty_name || "Pengguna",
+                                        text: bodyText,
+                                      })
+                                    }
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded-full bg-white/80 hover:bg-white text-[#54656f] shadow-xs transition-opacity cursor-pointer mb-1"
+                                    title="Balas pesan ini"
+                                  >
+                                    <Reply size={13} />
+                                  </button>
+                                )}
+
+                                {/* WhatsApp Bubble */}
+                                <div
+                                  className={`relative max-w-[82%] md:max-w-[65%] px-3 py-2 rounded-2xl shadow-2xs space-y-1 ${
+                                    isMine
+                                      ? "bg-[#d9fdd3] text-[#111b21] rounded-tr-xs"
+                                      : "bg-white text-[#111b21] rounded-tl-xs"
+                                  }`}
+                                >
+                                  {/* Counterparty name inside incoming bubble */}
+                                  {!isMine && (
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-[#008069] pb-0.5">
+                                      <span>{activeChatData.counterparty_name}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Quoted Reply Box inside bubble */}
+                                  {replyText && (
+                                    <div className="p-1.5 mb-1 rounded bg-black/5 border-l-4 border-l-[#00a884] text-left text-xs">
+                                      <p className="text-[10px] font-bold text-[#008069]">{replySender || "Pesan Terpilih"}</p>
+                                      <p className="text-[11px] text-[#54656f] line-clamp-2 italic">{replyText}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Image Attachment inside bubble */}
+                                  {msg.image_url && (
+                                    <div className="mb-1 rounded-lg overflow-hidden bg-black/5 flex justify-center">
+                                      <SafeImage
+                                        src={msg.image_url.startsWith('data:') ? msg.image_url : getStorageUrl(msg.image_url)}
+                                        alt="Lampiran Foto"
+                                        className="max-w-full max-h-[280px] object-contain rounded-lg"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* Main message text */}
+                                  {bodyText && (
+                                    <p className="text-xs md:text-[13px] leading-relaxed font-normal whitespace-pre-wrap break-words">
+                                      {bodyText}
+                                    </p>
+                                  )}
+
+                                  {/* Timestamp + WhatsApp Ticks (c1 / c2 / centang dua biru) */}
+                                  <div
+                                    className={`text-[10px] font-medium flex items-center justify-end gap-1 select-none ${
+                                      isMine ? "text-[#667781]" : "text-[#667781]"
+                                    }`}
+                                  >
+                                    <span>{formatChatTimestamp(msg.created_at)}</span>
+                                    {renderMessageTicks(msg, isMine)}
+                                  </div>
+                                </div>
+
+                                {isMine && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setReplyingTo({
+                                        id: msg.id,
+                                        senderName: "Saya",
+                                        text: bodyText,
+                                      })
+                                    }
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded-full bg-white/80 hover:bg-white text-[#54656f] shadow-xs transition-opacity cursor-pointer mb-1"
+                                    title="Balas pesan Anda sendiri"
+                                  >
+                                    <Reply size={13} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
                         })
                       ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 space-y-2 py-10">
-                          <MessageCircle size={36} className="text-slate-300" />
-                          <p className="text-xs font-semibold text-slate-600">Belum ada pesan dalam percakapan ini.</p>
-                          <p className="text-[11px] text-slate-400">Kirim pesan pertama Anda di bawah ini.</p>
+                        <div className="flex flex-col items-center justify-center h-64 text-center text-[#54656f] space-y-2 py-10">
+                          <div className="w-14 h-14 rounded-full bg-white/80 flex items-center justify-center text-[#00a884] shadow-xs">
+                            <MessageSquare size={28} />
+                          </div>
+                          <p className="text-xs font-bold text-[#111b21]">Belum ada riwayat percakapan</p>
+                          <p className="text-[11px] text-[#667781] max-w-xs">
+                            Kirim salam atau ajukan pertanyaan pertama Anda kepada {activeChatData.counterparty_name} di bawah ini.
+                          </p>
                         </div>
                       )}
                       <div ref={chatMessagesEndRef} />
                     </div>
 
-                    {/* Input Bar */}
+                    {/* WhatsApp Quote Reply Preview Bar */}
+                    {replyingTo && (
+                      <div className="px-4 py-2 bg-[#f0f2f5] border-t border-l-4 border-l-[#00a884] border-slate-200 flex items-center justify-between shrink-0 animate-in slide-in-from-bottom-2">
+                        <div className="text-xs min-w-0 pr-2">
+                          <p className="text-[11px] font-bold text-[#008069]">Membalas {replyingTo.senderName}</p>
+                          <p className="text-xs text-[#54656f] truncate italic">{replyingTo.text}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setReplyingTo(null)}
+                          className="p-1 rounded-full hover:bg-slate-200 text-[#54656f] hover:text-[#111b21] cursor-pointer"
+                          title="Batal balas"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* WhatsApp Quick Emoji Picker Popover */}
+                    {showEmojiPicker && (
+                      <div className="wa-emoji-picker p-3 bg-white border-t border-slate-200 shadow-lg flex flex-wrap gap-2 shrink-0 animate-in slide-in-from-bottom-2">
+                        {["😊", "😂", "👍", "❤️", "🙏", "🤝", "🔥", "🎉", "😍", "✨", "👏", "💯", "☕", "🛒", "📦", "💼", "📍", "👋", "✅", "💬"].map(
+                          (emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => {
+                                setChatMessageInput((prev) => prev + emoji);
+                              }}
+                              className="text-lg p-1.5 hover:bg-slate-100 rounded-lg transition-transform active:scale-125 cursor-pointer"
+                            >
+                              {emoji}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {/* Chat Image Preview Area */}
+                    {chatImagePreview && (
+                      <div className="p-3 bg-[#f0f2f5] border-t border-slate-200 shadow-inner flex flex-col gap-2 shrink-0 animate-in slide-in-from-bottom-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-[#54656f]">Preview Gambar</span>
+                          <button
+                            type="button"
+                            onClick={cancelChatImage}
+                            className="p-1 rounded-full hover:bg-slate-200 text-[#54656f] hover:text-rose-600 cursor-pointer transition-colors"
+                            title="Batal lampirkan gambar"
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                        <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden border border-slate-300 bg-white">
+                          <img src={chatImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* WhatsApp Bottom Input Bar */}
                     <form
                       onSubmit={handleSendChatMessage}
-                      className="p-3 md:p-4 border-t border-slate-100 bg-white flex items-center gap-2 md:gap-3 shrink-0"
+                      className="p-2.5 md:p-3 bg-[#f0f2f5] border-t border-slate-200 flex items-center gap-2 shrink-0"
                     >
+                      {/* Hidden File Input for Paperclip */}
+                      <input 
+                        type="file"
+                        ref={chatImageInputRef}
+                        onChange={handleChatImageSelect}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      
+                      {/* Hidden File Input for Camera */}
+                      <input 
+                        type="file"
+                        id="chat-camera-input"
+                        onChange={handleChatImageSelect}
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                      />
+
+                      {/* Emoji Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker((prev) => !prev)}
+                        className={`wa-emoji-trigger p-2 rounded-full transition-colors cursor-pointer hidden sm:flex ${
+                          showEmojiPicker ? "text-[#00a884] bg-slate-200" : "text-[#54656f] hover:text-[#111b21]"
+                        }`}
+                        title="Pilih Emoji"
+                      >
+                        <Smile size={22} />
+                      </button>
+
+                      {/* Camera Button */}
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('chat-camera-input').click()}
+                        className="p-2 rounded-full text-[#54656f] hover:text-[#111b21] transition-colors cursor-pointer shrink-0"
+                        title="Ambil Foto"
+                      >
+                        <Camera size={20} />
+                      </button>
+
+                      {/* Paperclip Button */}
+                      <button
+                        type="button"
+                        onClick={() => chatImageInputRef.current?.click()}
+                        className="p-2 rounded-full text-[#54656f] hover:text-[#111b21] transition-colors cursor-pointer shrink-0"
+                        title="Lampirkan Gambar"
+                      >
+                        <Paperclip size={20} />
+                      </button>
+
+                      {/* Text Input */}
                       <input
                         type="text"
                         value={chatMessageInput}
                         onChange={(e) => setChatMessageInput(e.target.value)}
-                        placeholder={`Tulis pesan untuk ${activeChatData.counterparty_name || "pemilik"}...`}
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-xs md:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#007570] focus:ring-1 focus:ring-[#007570]"
+                        placeholder={`Ketik pesan untuk ${activeChatData.counterparty_name || "pengguna"}...`}
+                        className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-white border border-transparent text-xs md:text-sm text-[#111b21] placeholder:text-[#8696a0] focus:outline-none focus:border-slate-300 shadow-2xs min-w-0"
                       />
+
+                      {/* Send Button */}
                       <button
                         type="submit"
-                        disabled={!chatMessageInput.trim() || sendingChatMessage}
-                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#059669] hover:bg-[#005a58] text-white font-bold text-xs md:text-sm transition-all shadow-md cursor-pointer disabled:opacity-50 active:scale-95"
+                        disabled={(!chatMessageInput.trim() && !chatImageFile) || sendingChatMessage}
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full text-white flex items-center justify-center transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shrink-0 ${
+                          chatMessageInput.trim() || chatImageFile ? "bg-[#00a884] hover:bg-[#008f6f]" : "bg-slate-300"
+                        }`}
+                        title="Kirim Pesan"
                       >
                         {sendingChatMessage ? (
-                          <Loader2 size={16} className="animate-spin" />
+                          <Loader2 size={16} className="animate-spin sm:w-[18px] sm:h-[18px]" />
                         ) : (
-                          <Send size={16} />
+                          <Send size={16} className="translate-x-0.5 sm:w-[18px] sm:h-[18px]" />
                         )}
-                        <span>Kirim</span>
                       </button>
                     </form>
                   </>
                 ) : (
-                  /* Empty state when no conversation is selected */
-                  <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400 p-8 text-center bg-slate-50/30">
-                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-1">
-                      <Mail size={32} className="stroke-[1.5]" />
+                  /* Empty state when no conversation is selected (WhatsApp Web Welcome screen) */
+                  <div className="flex-1 flex flex-col items-center justify-center gap-4 text-[#54656f] p-8 text-center bg-[#f0f2f5] select-none">
+                    <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-[#00a884] mb-2 shadow-xs">
+                      <MessageCircle size={44} className="stroke-[1.7]" />
                     </div>
-                    <div className="space-y-1 max-w-sm">
-                      <h4 className="text-sm font-bold text-slate-800">Ruang Obrolan</h4>
-                      <p className="text-xs text-slate-500 leading-relaxed">
-                        Pilih pesan dari menu sebelah kiri untuk membaca detail isi percakapan atau membalas pesan.
+                    <div className="space-y-2 max-w-md">
+                      <h3 className="text-xl font-bold text-[#111b21]">Inbox Pesan Komunitas Surade</h3>
+                      <p className="text-xs text-[#667781] leading-relaxed">
+                        Kirim dan terima pesan langsung dengan pelaku UMKM, pembeli, dan pengelola bisnis di kawasan Surade.
                       </p>
+                      <p className="text-[11px] text-[#8696a0] pt-2">
+                        Pilih obrolan di sebelah kiri untuk membaca atau membalas pesan.
+                      </p>
+                    </div>
+                    <div className="pt-6 flex items-center gap-1.5 text-[11px] text-[#8696a0]">
+                      <span>🔒</span>
+                      <span>Terenkripsi secara end-to-end</span>
                     </div>
                   </div>
                 )}
@@ -4997,8 +5860,10 @@ export default function AdminUser() {
                 </div>
               </div>
 
-              {/* Katalog Kode Referral Komunitas (Pengguna Lain) */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+              {/* Katalog Kode Referral Komunitas & Leaderboard (Khusus Tampilan Admin) */}
+              {user?.role === "admin" && (
+                <>
+                  <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                   <div>
                     <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -5209,6 +6074,8 @@ export default function AdminUser() {
                   </div>
                 )}
               </div>
+            </>
+          )}
 
               {/* Tabel Riwayat Transaksi Referral */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5 md:p-6">
@@ -5245,6 +6112,17 @@ export default function AdminUser() {
                       <option value="pending">Menunggu Verifikasi</option>
                       <option value="cancelled">Dibatalkan</option>
                     </select>
+
+                    {referralTransactions.length > 0 && (
+                      <button
+                        onClick={handleClearAllReferralTx}
+                        className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="Hapus seluruh riwayat transaksi referral"
+                      >
+                        <Trash2 size={13} />
+                        <span>Bersihkan Riwayat</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -5255,7 +6133,7 @@ export default function AdminUser() {
                       <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                         <th className="py-3 px-4">ID Transaksi</th>
                         <th className="py-3 px-4">Pengguna / Pembeli</th>
-                        <th className="py-3 px-4">Layanan & Bisnis</th>
+                        <th className="py-3 px-4">Layanan &amp; Bisnis</th>
                         <th className="py-3 px-4">Tanggal</th>
                         <th className="py-3 px-4 text-right">Total Transaksi</th>
                         <th className="py-3 px-4 text-right">Komisi Anda (Rp 10.000)</th>
@@ -5324,13 +6202,23 @@ export default function AdminUser() {
                               )}
                             </td>
                             <td className="py-3.5 px-4 text-center">
-                              <button
-                                onClick={() => setSelectedReferralTx(tx)}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-                              >
-                                <Eye size={13} />
-                                <span>Detail</span>
-                              </button>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => setSelectedReferralTx(tx)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                                >
+                                  <Eye size={13} />
+                                  <span>Detail</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteReferralTx(tx.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
+                                  title="Hapus riwayat transaksi ini"
+                                >
+                                  <Trash2 size={13} />
+                                  <span>Hapus</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -5362,19 +6250,31 @@ export default function AdminUser() {
                       Status dan histori pengajuan pencairan dana tunai komisi referral Anda ke rekening bank / e-wallet.
                     </p>
                   </div>
-                  {availableReferralBalance >= 50000 && (
-                    <button
-                      onClick={() => {
-                        setWithdrawSuccessMsg("");
-                        setWithdrawErrorMsg("");
-                        setShowWithdrawModal(true);
-                      }}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#059669] hover:bg-[#005a58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
-                    >
-                      <ArrowUpRight size={14} />
-                      <span>Ajukan Penarikan Baru</span>
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {referralWithdrawals.length > 0 && (
+                      <button
+                        onClick={handleClearAllWithdrawals}
+                        className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="Hapus seluruh riwayat penarikan"
+                      >
+                        <Trash2 size={13} />
+                        <span>Bersihkan Riwayat</span>
+                      </button>
+                    )}
+                    {availableReferralBalance >= 50000 && (
+                      <button
+                        onClick={() => {
+                          setWithdrawSuccessMsg("");
+                          setWithdrawErrorMsg("");
+                          setShowWithdrawModal(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#059669] hover:bg-[#005a58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                      >
+                        <ArrowUpRight size={14} />
+                        <span>Ajukan Penarikan Baru</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Banner Peringatan jika ada penarikan yang ditolak */}
@@ -5431,6 +6331,7 @@ export default function AdminUser() {
                         <th className="py-3 px-4 text-right">Nominal (Rp)</th>
                         <th className="py-3 px-4 text-center">Status</th>
                         <th className="py-3 px-4">Catatan / Alasan</th>
+                        <th className="py-3 px-4 text-center">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -5485,11 +6386,21 @@ export default function AdminUser() {
                                 <span className="text-slate-400 text-[11px]">-</span>
                               )}
                             </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                onClick={() => handleDeleteWithdrawal(w.id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
+                                title="Hapus riwayat penarikan ini"
+                              >
+                                <Trash2 size={13} />
+                                <span>Hapus</span>
+                              </button>
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-slate-500 space-y-1">
+                          <td colSpan={6} className="py-8 text-center text-slate-500 space-y-1">
                             <p className="font-semibold text-xs text-slate-700">Belum ada riwayat penarikan saldo.</p>
                             <p className="text-[11px] text-slate-400">
                               Ketika Anda melakukan penarikan komisi referral, status dan bukti pemrosesan akan tampil di sini.

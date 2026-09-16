@@ -417,10 +417,13 @@
 
 .login-branding__brand-name--dark {
   display: inline-block;
-  font-size: 1.3rem;
-  font-weight: 800;
+  font-size: 2.5rem;
+  font-weight: 900;
   color: #ffffff;
+  letter-spacing: -0.03em;
   margin-bottom: 0;
+  line-height: 1.1;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 .login-branding__brand-name--dark span { color: #a7f3d0; }
 
@@ -633,13 +636,60 @@
   margin-top: 16px;
 }
 
+.login-mobile-topbar {
+  display: none;
+}
+
 @media (max-width: 900px) {
+  .login-mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 14px 20px;
+    background: #ffffff;
+    border-bottom: 1px solid #eef2f6;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  }
+  .login-mobile-brand-name {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+  .login-mobile-brand-name span {
+    color: #059669;
+  }
+  .login-mobile-home-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 20px;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #047857;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .login-mobile-home-btn:hover,
+  .login-mobile-home-btn:active {
+    background: #d1fae5;
+    transform: scale(0.97);
+  }
+
   .login-container--split {
     flex-direction: column;
     min-height: auto;
   }
   .login-branding--split {
-    padding: 40px 28px;
+    padding: 32px 20px;
     align-items: center;
     text-align: center;
   }
@@ -655,7 +705,7 @@
     text-align: left;
   }
   .login-card--split {
-    margin: 40px 28px;
+    margin: 24px 16px;
     max-width: none;
   }
 }
@@ -1051,4 +1101,51 @@
   color: #047857;
   line-height: 1.4;
   margin: 0;
+}
+
+/* ─────────────────────────────────────────────
+   NEW: CENTERED LOGO IN LOGIN CARD & BRANDING BADGE
+───────────────────────────────────────────── */
+.login-branding__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #a7f3d0;
+  margin-bottom: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.login-card__header-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.login-card__logo {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+.login-card__brand-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.login-card__brand-name span {
+  color: #007570;
 }

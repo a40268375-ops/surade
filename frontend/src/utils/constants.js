@@ -67,19 +67,29 @@ export const getBusinessImageUrl = (business) => {
 export const OFFICIAL_ACCOUNT_HOLDER = "Triwala Mitra Bestari";
 
 export const OFFICIAL_BANK_ACCOUNTS = [
-  { id: "Mandiri", name: "Bank Mandiri", accountNumber: "133-0011-409-331", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#003d79] text-white", logo: "🏦", logoText: "Mandiri" },
-  { id: "BNI", name: "Bank BNI", accountNumber: "0973607008", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#f15a24] text-white", logo: "🏦", logoText: "BNI" },
-  { id: "BCA", name: "Bank BCA", accountNumber: "0954152045", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#00529c] text-white", logo: "🏦", logoText: "BCA" },
-  { id: "Maybank", name: "Maybank", accountNumber: "2097000009", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#ffc800] text-black", logo: "🏦", logoText: "Maybank" },
-  { id: "BJB", name: "Bank BJB", accountNumber: "0119213282001", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#0072bc] text-white", logo: "🏦", logoText: "BJB" },
+  { id: "Mandiri", name: "Bank Mandiri", accountNumber: "133-0011-409-331", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#003d79] text-white", logoUrl: "/logos/mandiri.png", logo: "🏦", logoText: "Mandiri" },
+  { id: "BNI", name: "Bank BNI", accountNumber: "0973607008", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#f15a24] text-white", logoUrl: "/logos/bni.png", logo: "🏦", logoText: "BNI" },
+  { id: "BCA", name: "Bank BCA", accountNumber: "0954152045", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#00529c] text-white", logoUrl: "/logos/bca.png", logo: "🏦", logoText: "BCA" },
+  { id: "Maybank", name: "Maybank", accountNumber: "2097000009", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#ffc800] text-black", logoUrl: "/logos/maybank.png", logo: "🏦", logoText: "Maybank" },
+  { id: "BJB", name: "Bank BJB", accountNumber: "0119213282001", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#0072bc] text-white", logoUrl: "/logos/bjb.png", logo: "🏦", logoText: "BJB" },
 ];
 
 export const OFFICIAL_EWALLET_ACCOUNTS = [
-  { id: "OVO", name: "OVO", accountNumber: "0811-1919-711", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#4c2a86] text-white", logo: "💜", logoText: "OVO", isReady: true },
-  { id: "DANA", name: "DANA", accountNumber: "XXX", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#008cff] text-white", logo: "💙", logoText: "DANA", isReady: false },
-  { id: "GoPay", name: "GoPay", accountNumber: "XXX", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#00a5cf] text-white", logo: "💳", logoText: "GoPay", isReady: false },
-  { id: "ShopeePay", name: "ShopeePay", accountNumber: "XXX", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#ee4d2d] text-white", logo: "🛒", logoText: "ShopPay", isReady: false },
+  { id: "OVO", name: "OVO", accountNumber: "0811-1919-711", accountName: OFFICIAL_ACCOUNT_HOLDER, badgeColor: "bg-[#4c2a86] text-white", logoUrl: "/logos/ovo.png", logo: "💜", logoText: "OVO", isReady: true },
+  { id: "DANA", name: "DANA", accountNumber: "xxxx", accountName: "xxxx", badgeColor: "bg-[#008cff] text-white", logoUrl: "/logos/dana.png", logo: "💙", logoText: "DANA", isReady: false },
+  { id: "GoPay", name: "GoPay", accountNumber: "xxxx", accountName: "xxxx", badgeColor: "bg-[#00a5cf] text-white", logoUrl: "/logos/gopay.png", logo: "💳", logoText: "GoPay", isReady: false },
 ];
+
+export const OFFICIAL_QRIS_ACCOUNT = {
+  id: "QRIS",
+  name: "QRIS (Semua E-Wallet & Bank)",
+  accountNumber: "Scan QR Code",
+  accountName: OFFICIAL_ACCOUNT_HOLDER,
+  badgeColor: "bg-[#007570] text-white",
+  logoUrl: "/logos/qris.png",
+  isQRIS: true,
+  isReady: true,
+};
 
 export const OFFICIAL_PAYMENT_METHODS = [
   {
@@ -87,7 +97,26 @@ export const OFFICIAL_PAYMENT_METHODS = [
     items: OFFICIAL_BANK_ACCOUNTS,
   },
   {
-    category: "E-Wallet (Dompet Digital)",
+    category: "E-Wallet",
     items: OFFICIAL_EWALLET_ACCOUNTS,
   },
+  {
+    category: "QRIS",
+    items: [OFFICIAL_QRIS_ACCOUNT],
+  },
 ];
+
+export const formatPaymentNumber = (accNum) => {
+  if (!accNum || accNum === "0123456789" || accNum === "XXX" || accNum.toLowerCase().includes("belum")) {
+    return "xxxx";
+  }
+  return accNum;
+};
+
+export const formatPaymentHolder = (holder) => {
+  if (!holder || holder === "0123456789" || holder === "Official Surade.co.id" || holder.toLowerCase().includes("belum")) {
+    return "xxxx";
+  }
+  return holder;
+};
+

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
+import PaymentMethodSelector from "./PaymentMethodSelector";
 import {
   X, Check, AlertCircle, Upload, Ticket,
   CreditCard, ShieldCheck, Loader2, Sparkles, FileText, Calendar,
@@ -33,8 +34,7 @@ export default function ContentPaymentModal({
   }, []);
   const [couponError, setCouponError] = useState("");
 
-  const [paymentCategory, setPaymentCategory] = useState("bank"); // 'bank' | 'ewallet'
-  const [paymentMethod, setPaymentMethod] = useState("Transfer Bank BCA");
+  const [paymentMethod, setPaymentMethod] = useState("Bank BCA");
   const [copiedAccount, setCopiedAccount] = useState(false);
 
   const [proofFile, setProofFile] = useState(null);
@@ -44,88 +44,7 @@ export default function ContentPaymentModal({
   const [error, setError] = useState("");
   const [successData, setSuccessData] = useState(null);
 
-  const BANK_ACCOUNTS = {
-    "Transfer Bank Mandiri": {
-      name: "Bank Mandiri",
-      accountNumber: "133-0011-409-331",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-blue-100 text-blue-900",
-    },
-    "Transfer Bank BNI": {
-      name: "Bank BNI",
-      accountNumber: "0973607008",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-orange-100 text-orange-800",
-    },
-    "Transfer Bank BCA": {
-      name: "Bank BCA",
-      accountNumber: "0954152045",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-sky-100 text-sky-800",
-    },
-    "Transfer Bank Maybank": {
-      name: "Maybank",
-      accountNumber: "2097000009",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-amber-100 text-amber-800",
-    },
-    "Transfer Bank BJB": {
-      name: "Bank BJB",
-      accountNumber: "0119213282001",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-cyan-100 text-cyan-800",
-    },
-    "OVO": {
-      name: "OVO",
-      accountNumber: "0811-1919-711",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-purple-100 text-purple-800",
-    },
-    "DANA": {
-      name: "DANA",
-      accountNumber: "XXX (Belum Terdaftar)",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-sky-100 text-sky-800",
-    },
-    "GoPay": {
-      name: "GoPay",
-      accountNumber: "XXX (Belum Terdaftar)",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-emerald-100 text-emerald-800",
-    },
-    "ShopeePay": {
-      name: "ShopeePay",
-      accountNumber: "XXX (Belum Terdaftar)",
-      accountName: "Triwala Mitra Bestari",
-      badgeColor: "bg-rose-100 text-rose-800",
-    },
-  };
 
-  const PAYMENT_GROUPS = [
-    {
-      category: "bank",
-      title: "Transfer Bank / Rekening Resmi",
-      icon: <Building2 size={16} />,
-      items: [
-        { id: "Transfer Bank Mandiri", name: "Mandiri", badgeColor: "bg-blue-100 text-blue-900" },
-        { id: "Transfer Bank BNI", name: "BNI", badgeColor: "bg-orange-100 text-orange-800" },
-        { id: "Transfer Bank BCA", name: "BCA", badgeColor: "bg-sky-100 text-sky-800" },
-        { id: "Transfer Bank Maybank", name: "Maybank", badgeColor: "bg-amber-100 text-amber-800" },
-        { id: "Transfer Bank BJB", name: "BJB", badgeColor: "bg-cyan-100 text-cyan-800" },
-      ],
-    },
-    {
-      category: "ewallet",
-      title: "E-Wallet",
-      icon: <Wallet size={16} />,
-      items: [
-        { id: "OVO", name: "OVO", badgeColor: "bg-purple-100 text-purple-800" },
-        { id: "DANA", name: "DANA", badgeColor: "bg-sky-100 text-sky-800" },
-        { id: "GoPay", name: "GoPay", badgeColor: "bg-emerald-100 text-emerald-800" },
-        { id: "ShopeePay", name: "ShopeePay", badgeColor: "bg-rose-100 text-rose-800" },
-      ],
-    },
-  ];
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
@@ -143,8 +62,7 @@ export default function ContentPaymentModal({
       setProofPreview(null);
       setError("");
       setSuccessData(null);
-      setPaymentCategory("bank");
-      setPaymentMethod("Transfer Bank BCA");
+      setPaymentMethod("Bank BCA");
     }
   }, [isOpen]);
 
@@ -189,16 +107,17 @@ export default function ContentPaymentModal({
   }
 
   const finalPrice = Math.max(0, basePrice - couponDiscount);
-  const currentAccount = BANK_ACCOUNTS[paymentMethod] || BANK_ACCOUNTS["Transfer Bank BCA"];
 
   // Apply Coupon
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
+  const handleApplyCoupon = async (targetCode = null) => {
+    const codeToUse = (typeof targetCode === "string" && targetCode ? targetCode : couponCode).trim().toUpperCase();
+    if (!codeToUse) return;
+    setCouponCode(codeToUse);
     setCouponLoading(true);
     setCouponError("");
     try {
       const res = await api.post("/coupons/validate", {
-        code: couponCode.trim().toUpperCase(),
+        code: codeToUse,
         product_type: contentType,
         amount: basePrice,
       });
@@ -486,6 +405,30 @@ export default function ContentPaymentModal({
                     <span>-Rp {couponDiscount.toLocaleString("id-ID")}</span>
                   </div>
                 )}
+
+                {!appliedCoupon && availableCoupons.length > 0 && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                      🔥 Rekomendasi Kupon Diskon (Klik untuk gunakan):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableCoupons.map((c) => (
+                        <button
+                          key={c.code}
+                          type="button"
+                          onClick={() => handleApplyCoupon(c.code)}
+                          className="px-2 py-1 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-[#007570] rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                        >
+                          <Tag size={11} />
+                          <span>{c.code}</span>
+                          <span className="text-[9px] text-teal-800 bg-teal-200/60 px-1 rounded">
+                            {c.discount_type === "percentage" ? `${c.discount_value}%` : `-Rp ${Number(c.discount_value).toLocaleString("id-ID")}`}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Ringkasan Total Tagihan */}
@@ -506,87 +449,11 @@ export default function ContentPaymentModal({
               {/* Payment Section */}
               {finalPrice > 0 ? (
                 <div className="space-y-4">
-                  {/* Category Switcher */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 block">
-                      Pilih Metode Pembayaran:
-                    </label>
-                    <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
-                      {PAYMENT_GROUPS.map((grp) => (
-                        <button
-                          key={grp.category}
-                          type="button"
-                          onClick={() => {
-                            setPaymentCategory(grp.category);
-                            setPaymentMethod(grp.items[0].id);
-                          }}
-                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                            paymentCategory === grp.category
-                              ? "bg-white text-[#007570] shadow-xs"
-                              : "text-slate-600 hover:text-slate-900"
-                          }`}
-                        >
-                          {grp.icon}
-                          <span>{grp.title}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Payment Methods Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {PAYMENT_GROUPS.find((g) => g.category === paymentCategory)?.items.map((item) => {
-                      const isSelected = paymentMethod === item.id;
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => setPaymentMethod(item.id)}
-                          className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
-                            isSelected
-                              ? "bg-teal-50/50 border-[#007570] shadow-xs"
-                              : "bg-white border-slate-200 hover:border-slate-300"
-                          }`}
-                        >
-                          <span className={`px-2 py-0.5 text-[11px] font-black rounded ${item.badgeColor}`}>
-                            {item.name}
-                          </span>
-                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? "border-[#007570] bg-[#007570]" : "border-slate-300"}`}>
-                            {isSelected && <Check size={10} className="text-white" />}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Transfer Account Instruction Box */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500 font-semibold">
-                        Instruksi Rekening Tujuan:
-                      </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${currentAccount.badgeColor}`}>
-                        {currentAccount.name}
-                      </span>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center justify-between gap-3">
-                      <div>
-                        <span className="font-mono text-base font-black text-slate-900 block">
-                          {currentAccount.accountNumber}
-                        </span>
-                        <span className="text-[11px] text-slate-500 block">
-                          a.n. {currentAccount.accountName}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(currentAccount.accountNumber.replace(/-/g, ""))}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                      >
-                        {copiedAccount ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                        <span>{copiedAccount ? "Tersalin!" : "Salin"}</span>
-                      </button>
-                    </div>
-                  </div>
+                  {/* Integrated Live Payment Method Selector synchronized with Kelola Pembayaran */}
+                  <PaymentMethodSelector
+                    selectedMethod={paymentMethod}
+                    onSelect={(method) => setPaymentMethod(method.id || method.name)}
+                  />
 
                   {/* Upload Bukti */}
                   <div className="space-y-1.5">

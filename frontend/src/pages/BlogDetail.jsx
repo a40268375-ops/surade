@@ -252,7 +252,12 @@ export default function BlogDetail() {
               {blog.type === "event" && blog.event_date ? (
                 <span className="bdg-hero__meta-item">
                   <Calendar size={15} />
-                  <span>Pelaksanaan: {formatDate(blog.event_date)}</span>
+                  <span>
+                    Pelaksanaan: {formatDate(blog.event_date)}
+                    {blog.event_end_date && formatDate(blog.event_end_date) !== formatDate(blog.event_date) && (
+                      <> &ndash; {formatDate(blog.event_end_date)}</>
+                    )}
+                  </span>
                 </span>
               ) : (
                 <span className="bdg-hero__meta-item">
@@ -396,6 +401,20 @@ export default function BlogDetail() {
                       <span className="bdg-info-label">Tanggal Pelaksanaan</span>
                       <span className="bdg-info-value" style={{ color: "#007570", fontWeight: "700" }}>
                         {formatDate(blog.event_date)}
+                        {blog.event_end_date && formatDate(blog.event_end_date) !== formatDate(blog.event_date) && (
+                          <> &ndash; {formatDate(blog.event_end_date)}</>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {blog.type === "event" && blog.event_end_date && formatDate(blog.event_end_date) !== formatDate(blog.event_date) && (
+                  <div className="bdg-info-item">
+                    <Calendar size={16} />
+                    <div>
+                      <span className="bdg-info-label">Tanggal Berakhir</span>
+                      <span className="bdg-info-value" style={{ color: "#e11d48", fontWeight: "700" }}>
+                        {formatDate(blog.event_end_date)}
                       </span>
                     </div>
                   </div>

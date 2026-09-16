@@ -7,6 +7,8 @@ import { BusinessGridSkeleton } from "../components/BusinessCardSkeleton";
 import { getStorageUrl } from "../utils/constants";
 import { requireAuth } from "../utils/authCheck";
 import api from "../services/api";
+import { getBusinessOpenStatus } from "../utils/businessHours";
+import { getSubcategoryIcon } from "../utils/subcategoryIcons";
 import {
   Search,
   MapPin,
@@ -42,9 +44,16 @@ import {
   Scissors,
   Leaf,
   Award,
+  Crown,
+  Star,
+  Package,
+  Utensils,
+  Palette,
+  ShoppingBag,
 } from "lucide-react";
 import heroImg from "../assets/category_hero_illustration.png";
 import "./Category.css";
+import "./Home.css";
 
 const HERO_IMAGE = heroImg;
 
@@ -64,6 +73,15 @@ const SORT_OPTIONS = [
   { id: "price_desc", label: "Harga Tertinggi" },
   { id: "views", label: "Paling Populer" },
 ];
+
+const getPriceTierLabel = (price) => {
+  if (!price || price <= 0) return null;
+  if (price <= 50000) return "Ekonomis & Terjangkau";
+  if (price <= 150000) return "Menengah";
+  if (price <= 500000) return "Standar";
+  if (price <= 1000000) return "Premium";
+  return "1 Juta ke atas";
+};
 
 /* ── Categories loaded dynamically from API ── */
 
@@ -247,7 +265,7 @@ export default function Category() {
       }
 
       const fetchCategories = fetch(`${import.meta.env.VITE_API_URL}/categories`)
-        .then(res => res.json())
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
         .then(catData => {
           const list = Array.isArray(catData) ? catData : (Array.isArray(catData?.data) ? catData.data : []);
           if (list.length > 0) {
@@ -269,7 +287,7 @@ export default function Category() {
         }).catch(err => console.error("Failed to fetch categories:", err));
 
       const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?all=true`)
-        .then(res => res.json())
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
         .then(bizJson => {
           const bizData = bizJson?.data || bizJson || [];
           if (Array.isArray(bizData)) {
@@ -279,17 +297,43 @@ export default function Category() {
               const maxPrice = b.products_max_price ? Number(b.products_max_price) : 0;
               const productsCount = Number(b.products_count || 0);
 
+              const mainCategory = b.category?.parent || b.category;
+              const subCategory = b.category?.parent ? b.category : null;
+              const categoryName = mainCategory?.name || b.category?.name || "Umum";
+              const subCategoryName = subCategory?.name || (b.sub_category?.name || null);
+              const openStatus = getBusinessOpenStatus(b.opening_days);
+
+              let bTags = [];
+              if (Array.isArray(b.tags) && b.tags.length > 0) {
+                bTags = b.tags;
+              } else if (typeof b.tags === "string") {
+                try {
+                  const p = JSON.parse(b.tags);
+                  if (Array.isArray(p)) bTags = p;
+                } catch {
+                  bTags = b.tags.split(",").map((t) => t.trim()).filter(Boolean);
+                }
+              }
+              if (bTags.length === 0) {
+                bTags = [categoryName, b.village || b.city].filter(Boolean);
+              }
+
               return {
                 id: b.id,
                 name: b.name,
-                category: b.category?.name || "Umum",
+                category: categoryName,
+                subCategory: subCategoryName,
+                categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
                 categorySlug: b.category?.slug || "umum",
                 parentCategorySlug: b.category?.parent?.slug || null,
                 parentCategoryName: b.category?.parent?.name || null,
-                tags: [b.name],
-                location: b.city || "Indonesia",
+                tags: bTags,
+                location: b.city ? (b.province ? `${b.city}, ${b.province}` : b.city) : (b.address || "Indonesia"),
                 views: b.views || 0,
-                status: "Buka Sekarang",
+                rating: b.rating || b.average_rating || "0.0",
+                rating_count: b.rating_count || 0,
+                status: openStatus.label,
+                open: openStatus.open,
                 img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
                 lat: b.lat || b.latitude,
                 lng: b.lng || b.longitude,
@@ -533,7 +577,7 @@ export default function Category() {
     return () => window.removeEventListener("bookmarkChanged", fetchUserFavoritesCategory);
   }, []);
 
-  const toggleSave = async (id) => {
+  const toggleSave = async (id, isPromo = false, itemName = "") => {
     if (!id) return;
     if (!requireAuth()) return;
     const isCurrentlySaved = !!saved[id];
@@ -547,7 +591,14 @@ export default function Category() {
       if (!localBiz.includes(id)) localBiz.push(id);
     }
     localStorage.setItem("saved_business_ids", JSON.stringify(localBiz));
+    localStorage.removeItem("cached_saved_items");
     window.dispatchEvent(new Event("bookmarkChanged"));
+
+    if (isCurrentlySaved) {
+      alert(`${itemName ? `"${itemName}"` : "Bisnis"} berhasil dihapus dari bookmark.`);
+    } else {
+      alert(`${itemName ? `"${itemName}"` : "Bisnis"} berhasil disimpan ke bookmark!`);
+    }
 
     const token = localStorage.getItem("token");
     if (token) {
@@ -859,7 +910,7 @@ export default function Category() {
                 {priceDropdownOpen && (
                   <div className="filter-dropdown-menu filter-dropdown-menu--price" role="menu">
                     <div className="filter-dropdown-header">
-                      <span className="filter-dropdown-title">Rentang Rata-rata Harga Produk</span>
+                      <span className="filter-dropdown-title">Rentang Harga Produk</span>
                     </div>
                     <ul className="filter-dropdown-list">
                       {PRICE_RANGES.map((range) => (
@@ -926,12 +977,25 @@ export default function Category() {
                 <>
                   <div className="reko-grid">
                     {paginatedBisnis.map((bisnis) => (
-                      <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
+                      <Link
+                        key={bisnis.id}
+                        to={`/business/${bisnis.id}`}
+                        className={`biz-card biz-card--link ${bisnis.is_premium ? "biz-card--premium" : "biz-card--free"}`}
+                      >
                         {/* Image */}
                         <div className="biz-card__img-wrap">
-                          <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
-                          {(bisnis.is_premium || bisnis.is_verified) && (
-                            <div className="biz-card__verified-badge" title="Bisnis Terverifikasi - Pengguna Premium">
+                          <img 
+                            src={bisnis.img} 
+                            alt={bisnis.name} 
+                            className="biz-card__img" 
+                            loading="lazy" 
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&h=350&fit=crop&q=80";
+                            }}
+                          />
+                          {bisnis.is_premium && (
+                            <div className="biz-card__verified-badge biz-card__verified-badge--premium" title="Bisnis Terverifikasi - Mitra Resmi">
                               <BadgeCheck size={14} className="biz-card__verified-icon" />
                               <span>Terverifikasi</span>
                             </div>
@@ -940,48 +1004,69 @@ export default function Category() {
                             <button
                               type="button"
                               className={`biz-card__save${saved[bisnis.id] ? " saved" : ""}`}
-                              onClick={(e) => { e.preventDefault(); toggleSave(bisnis.id); }}
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(bisnis.id, false, bisnis.name); }}
                               aria-label="Simpan"
                             >
                               <Bookmark size={13} fill={saved[bisnis.id] ? "currentColor" : "none"} />
-                              <span>Simpan</span>
+                              <span>{saved[bisnis.id] ? "Tersimpan" : "Simpan"}</span>
                             </button>
                             <span className="biz-card__views">
                               <Eye size={13} />
-                              <span>{bisnis.views}</span>
+                              <span>{bisnis.views || 0}</span>
                             </span>
                           </div>
                         </div>
 
                         {/* Body */}
                         <div className="biz-card__body">
-                          <h3 className="biz-card__name">{bisnis.name}</h3>
-                          <p className="biz-card__category">{bisnis.category}</p>
-                          
-                          {/* Price Range Badge */}
-                          {bisnis.avg_price > 0 && (
-                            <div className="biz-card__price-badge">
-                              <span className="biz-card__price-text">
-                                Rp {Math.round(bisnis.avg_price).toLocaleString("id-ID")}
+                          <div className="flex items-center gap-1.5">
+                            <h3 className={`biz-card__name flex-1 ${bisnis.is_premium ? "font-bold text-slate-900" : "font-semibold text-slate-800"}`}>{bisnis.name}</h3>
+                            {bisnis.is_premium && (
+                              <span className="biz-card__vip-pill" title="Mitra Terverifikasi">
+                                <Crown size={11} className="fill-amber-400 text-amber-500" />
+                                <span>Mitra</span>
                               </span>
-                              <span className="biz-card__price-sub">(rata-rata)</span>
-                            </div>
-                          )}
-
+                            )}
+                          </div>
+                          <div className="biz-card__categories">
+                            <p className="biz-card__category">
+                              <span className="biz-card__cat-dot" style={{ background: bisnis.categoryColor || "#007570" }} />
+                              {bisnis.category}
+                            </p>
+                            {bisnis.subCategory && (
+                              <p className={`biz-card__category biz-card__category--sub flex items-center gap-1 font-semibold ${bisnis.is_premium ? "text-[#007570] bg-[#f0faf8] px-2 py-0.5 rounded-md border border-[#ccebe8]" : "text-slate-600"}`}>
+                                <span className="shrink-0 flex items-center">{getSubcategoryIcon(bisnis.subCategory)}</span>
+                                <span>{bisnis.subCategory}</span>
+                              </p>
+                            )}
+                          </div>
                           <div className="biz-card__tags">
-                            {bisnis.tags.map((tag) => (
-                              <span key={tag} className="biz-card__tag">
-                                <Tag size={11} />
-                                {tag}
+                            {bisnis.tags.slice(0, 3).map((tag, idx) => (
+                              <span key={idx} className="biz-card__tag">
+                                <Tag size={11} />{tag}
                               </span>
                             ))}
+                            {bisnis.tags.length > 3 && (
+                              <span
+                                className="biz-card__tag biz-card__tag--more text-[#007570] font-bold bg-teal-50 border border-teal-200 cursor-pointer"
+                                title={`Semua tag: ${bisnis.tags.join(', ')}`}
+                              >
+                                +{bisnis.tags.length - 3} lainnya
+                              </span>
+                            )}
                           </div>
                           <div className="biz-card__footer">
-                            <span className="biz-card__location">
-                              <MapPin size={12} />
-                              {bisnis.location}
+                            <span className="biz-card__rating">
+                              <Star size={13} className="fill-amber-400 text-amber-400" />
+                              <span>{Number(bisnis.rating || 0).toFixed(1)}</span>
+                              {bisnis.rating_count > 0 && <span className="text-slate-400">({bisnis.rating_count})</span>}
                             </span>
-                            <span className="biz-card__cta">{bisnis.status} →</span>
+                            <span className="biz-card__location">
+                              <MapPin size={12} />{bisnis.location}
+                            </span>
+                            <span className={`biz-card__cta${bisnis.open ? "" : " closed"}${bisnis.is_premium ? " biz-card__cta--premium" : ""}`}>
+                              {bisnis.open ? "Buka Sekarang →" : "Tutup Sekarang!"}
+                            </span>
                           </div>
                         </div>
                       </Link>

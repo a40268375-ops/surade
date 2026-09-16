@@ -2,130 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../utils/api";
 import Navbar from "../components/Navbar";
+import PaymentMethodSelector from "../components/PaymentMethodSelector";
 import { Check, X, Crown, ArrowLeft, ArrowRight, Upload, Copy } from "lucide-react";
 import "./Pricing.css";
-
-// Payment Method Selector Component - Same as Dashboard
-function PaymentMethodSelector({ onSelectMethod, selectedMethod, onClose, orderSummary, onConfirm }) {
-  const [selectedCategory, setSelectedCategory] = useState("E-wallet");
-  
-  const paymentMethods = {
-    "E-wallet": [
-      { id: "dana", name: "DANA", icon: "💰", color: "#00B8D4" },
-      { id: "unipin", name: "UniPin Credits (IDR)", icon: "🎮", color: "#9C27B0" },
-      { id: "shopeepay", name: "ShopeePay", icon: "🛒", color: "#EE4D2D" },
-      { id: "gopay", name: "GoPay", icon: "🏍️", color: "#00AA5B" },
-      { id: "gopay_token", name: "GoPay Token", icon: "🎫", color: "#00AA5B" },
-      { id: "qris", name: "QRIS", icon: "📱", color: "#2C3E50" },
-      { id: "ovo", name: "OVO", icon: "💜", color: "#5D2D91" },
-      { id: "linkaja", name: "LinkAja", icon: "🔗", color: "#DC143C" },
-      { id: "isaku", name: "i.saku", icon: "💳", color: "#2196F3" },
-      { id: "jenius", name: "Jenius Pay", icon: "💎", color: "#2196F3" },
-      { id: "indodana", name: "indodana", icon: "💰", color: "#4CAF50" },
-      { id: "sakuku", name: "Sakuku", icon: "💼", color: "#FF9800" },
-      { id: "doku", name: "Doku Wallet", icon: "💰", color: "#4CAF50" }
-    ],
-    "Transfer Bank": [
-      { id: "bca", name: "BCA", icon: "🏦", color: "#003D7A" },
-      { id: "bni", name: "BNI", icon: "🏦", color: "#E67E22" },
-      { id: "bri", name: "BRI", icon: "🏦", color: "#003F7F" },
-      { id: "mandiri", name: "Mandiri", icon: "🏦", color: "#003D7A" },
-      { id: "permata", name: "Permata", icon: "🏦", color: "#00A651" },
-      { id: "danamon", name: "Danamon", icon: "🏦", color: "#0066CC" }
-    ],
-    "SMS & Seluler": [
-      { id: "telkomsel", name: "Telkomsel", icon: "📱", color: "#E74C3C" },
-      { id: "xl", name: "XL Axiata", icon: "📱", color: "#0066CC" },
-      { id: "indosat", name: "Indosat Ooredoo", icon: "📱", color: "#FFCC00" },
-      { id: "three", name: "3 (Tri)", icon: "📱", color: "#FF6B35" }
-    ],
-    "OTC non-Bank": [
-      { id: "indomaret", name: "Indomaret", icon: "🏪", color: "#0066CC" },
-      { id: "alfamart", name: "Alfamart", icon: "🏪", color: "#E74C3C" },
-      { id: "pos", name: "Kantor Pos", icon: "📮", color: "#FF9800" }
-    ],
-    "Perbankan online": [
-      { id: "bca_klikpay", name: "BCA KlikPay", icon: "💻", color: "#003D7A" },
-      { id: "bca_klikbca", name: "BCA KlikBCA", icon: "💻", color: "#003D7A" },
-      { id: "mandiri_clickpay", name: "Mandiri ClickPay", icon: "💻", color: "#003D7A" },
-      { id: "cimb_clicks", name: "CIMB Clicks", icon: "💻", color: "#D32F2F" }
-    ],
-    "Kartu Debit / Kredit": [
-      { id: "visa", name: "Visa", icon: "💳", color: "#1A1F71" },
-      { id: "mastercard", name: "Mastercard", icon: "💳", color: "#EB001B" },
-      { id: "jcb", name: "JCB", icon: "💳", color: "#0E4C96" },
-      { id: "amex", name: "American Express", icon: "💳", color: "#006FCF" }
-    ]
-  };
-
-  const categories = Object.keys(paymentMethods);
-
-  return (
-    <div className="payment-method-modal-v2">
-      <div className="payment-method-modal__backdrop" onClick={onClose} />
-      <div className="payment-method-modal__content-v2">
-        <div className="payment-method-modal__header-v2">
-          <h2>Semua Saluran Pembayaran</h2>
-          <button className="payment-method-modal__close" onClick={onClose}>
-            <X size={24} />
-          </button>
-        </div>
-
-        <div className="payment-method-modal__body-v2">
-          {/* Sidebar Categories */}
-          <div className="payment-categories-sidebar">
-            {categories.map((category) => (
-              <button
-                key={category}
-                className={`payment-category-btn ${selectedCategory === category ? 'active' : ''}`}
-                onClick={() => setSelectedCategory(category)}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-
-          {/* Payment Methods Grid */}
-          <div className="payment-methods-main">
-            <div className="payment-methods-grid-v2">
-              {paymentMethods[selectedCategory]?.map((method) => (
-                <button
-                  key={method.id}
-                  className={`payment-method-card-v2 ${selectedMethod === method.id ? 'selected' : ''}`}
-                  onClick={() => onSelectMethod(method.id, method.name)}
-                >
-                  <div className="payment-method-icon-v2" style={{ backgroundColor: method.color }}>
-                    {method.icon}
-                  </div>
-                  <span className="payment-method-name-v2">{method.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {orderSummary && (
-          <div className="payment-method-modal__footer-v2">
-            <div className="payment-summary-inline">
-              <div className="payment-summary-info">
-                <span className="payment-summary-business">{orderSummary.businessName}</span>
-                <span className="payment-summary-package">{orderSummary.packageName}</span>
-                <span className="payment-summary-amount">Rp {Number(orderSummary.amount || 0).toLocaleString('id-ID')}</span>
-              </div>
-              <button 
-                className="payment-confirm-btn"
-                disabled={!selectedMethod}
-                onClick={() => onConfirm && onConfirm(selectedMethod)}
-              >
-                Bayar Sekarang
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 const FEATURES_COMPARISON = [
   { name: "Lamanya : Tidak ada batas hari", free: false, premium: true },
@@ -156,9 +35,10 @@ const FEATURES_COMPARISON = [
 // Sekarang halaman ini fetch harga asli dari backend dan minta metode +
 // bukti bayar seperti yang backend butuhkan.
 const PAYMENT_METHODS = [
-  { id: "dana", label: "DANA", account: "0812-3456-7890 a.n. Surade.co.id" },
-  { id: "bni", label: "Transfer BNI", account: "0123456789 a.n. Surade.co.id" },
-  { id: "bca", label: "Transfer BCA", account: "0987654321 a.n. Surade.co.id" },
+  { id: "bca", label: "Transfer BCA", account: "0954152045 a.n. Triwala Mitra Bestari" },
+  { id: "bni", label: "Transfer BNI", account: "0973607008 a.n. Triwala Mitra Bestari" },
+  { id: "mandiri", label: "Transfer Mandiri", account: "133-0011-409-331 a.n. Triwala Mitra Bestari" },
+  { id: "dana", label: "DANA", account: "xxxx a.n. xxxx" },
 ];
 
 function formatRupiah(amount) {
@@ -597,17 +477,27 @@ export default function Pricing() {
 
       {/* Payment Method Modal */}
       {showPaymentModal && (
-        <PaymentMethodSelector
-          selectedMethod={formData.paymentMethod}
-          onSelectMethod={handleSelectPaymentMethod}
-          onClose={() => setShowPaymentModal(false)}
-          orderSummary={{
-            businessName: business?.title || "",
-            packageName: selectedPlanInfo?.label || "",
-            amount: selectedPlanInfo?.amount || 0
-          }}
-          onConfirm={handleSelectPaymentMethod}
-        />
+        <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setShowPaymentModal(false)}>
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100 p-6 space-y-4 my-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Pilih Metode Pembayaran</h3>
+                <p className="text-xs text-slate-500">Silakan pilih saluran pembayaran resmi yang Anda inginkan</p>
+              </div>
+              <button onClick={() => setShowPaymentModal(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer border-0">
+                <X size={16} />
+              </button>
+            </div>
+
+            <PaymentMethodSelector
+              selectedMethod={formData.paymentMethod}
+              onSelect={(m) => {
+                handleSelectPaymentMethod(m.id || m.name, m.name);
+                setShowPaymentModal(false);
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

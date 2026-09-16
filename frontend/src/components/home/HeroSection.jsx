@@ -126,7 +126,7 @@ export default function HeroSection({
                 </defs>
               </svg>
             </div>
-            <span>Direktori Bisnis &amp; Informasi</span>
+            <span>Direktori UMKM (Usaha Mikro, Kecil Dan Menengah)</span>
           </div>
 
           {/* Title & Subtitle */}
@@ -134,8 +134,7 @@ export default function HeroSection({
             Surade<span className="home-hero__title-accent">.co.id</span>
           </h1>
           <p className="home-hero__subtitle">
-            Temukan berbagai informasi, bisnis, dan layanan<br />
-            terpercaya di <span style={{ color: "#34D399", fontWeight: 700 }}>Surade</span>.
+            Semua UMKM ada di <span style={{ color: "#34D399", fontWeight: 700 }}>Surade</span>.
           </p>
 
           {/* Search Bar */}
@@ -248,11 +247,12 @@ export default function HeroSection({
                               key={cat.id}
                               className="home-keyword-dropdown__item home-keyword-dropdown__item--category"
                               onClick={() => {
+                                const kw = cat.id === "all" ? "" : cat.label;
+                                setSearchKeyword(kw);
                                 setSelectedSearchCategory(cat.id);
                                 setKeywordDropdownOpen(false);
                               }}
                             >
-                              <span className="home-keyword-dropdown__cat-icon">{cat.icon}</span>
                               <span className="home-keyword-dropdown__cat-label">{cat.label}</span>
                             </li>
                           ))}

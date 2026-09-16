@@ -28,9 +28,9 @@ export default function VisionMission() {
         <div className="vm-hero__bg" />
         <div className="vm-hero__overlay" />
         <div className="vm-hero__content">
-          <h1 className="vm-hero__title">Visi & Misi</h1>
+          <h1 className="vm-hero__title">Visi &amp; Misi</h1>
           <p className="vm-hero__subtitle">
-            Membangun masa depan digital Indonesia yang lebih baik
+            Mendorong kemandirian ekonomi UMKM dan kemajuan digital di 12 Desa Kecamatan Surade
           </p>
         </div>
       </section>
@@ -43,7 +43,7 @@ export default function VisionMission() {
           </div>
           <h2 className="vm-section__title">Visi Kami</h2>
           <p className="vm-section__text">
-            Menjadi platform informasi digital terdepan di Indonesia yang menghubungkan masyarakat dengan berbagai layanan dan usaha, serta mendukung terwujudnya Smart City dan Smart Village di seluruh Indonesia melalui inovasi teknologi dan kolaborasi yang berkelanjutan.
+            Menjadi portal digital terdepan di Kecamatan Surade yang menghubungkan masyarakat, wisatawan, dan pelaku usaha lokal di 12 desa/kelurahan, serta mendorong kemandirian ekonomi daerah melalui integrasi teknologi informasi yang mudah, inklusif, dan berkelanjutan.
           </p>
         </div>
       </section>
@@ -61,9 +61,9 @@ export default function VisionMission() {
                 <Globe size={24} />
               </div>
               <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Jangkauan Luas</h4>
+                <h4 className="vm-mission-item__title">Integrasi 12 Desa</h4>
                 <p className="vm-mission-item__text">
-                  Menyediakan akses informasi yang komprehensif dan mudah diakses bagi seluruh masyarakat Indonesia, dari perkotaan hingga pedesaan.
+                  Menyediakan direktori dan akses informasi terpadu untuk seluruh desa dan kelurahan di Kecamatan Surade tanpa terkecuali.
                 </p>
               </div>
             </div>
@@ -73,9 +73,9 @@ export default function VisionMission() {
                 <Users size={24} />
               </div>
               <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Pemberdayaan UMKM</h4>
+                <h4 className="vm-mission-item__title">Pemberdayaan UMKM Lokal</h4>
                 <p className="vm-mission-item__text">
-                  Mendukung pengembangan usaha mikro, kecil, dan menengah melalui platform digital yang terjangkau dan efektif.
+                  Mendampingi pedagang, pengrajin, dan pelaku jasa lokal agar memiliki profil bisnis digital, katalog produk, dan akses pasar yang lebih luas.
                 </p>
               </div>
             </div>
@@ -85,9 +85,9 @@ export default function VisionMission() {
                 <Zap size={24} />
               </div>
               <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Inovasi Teknologi</h4>
+                <h4 className="vm-mission-item__title">Kemudahan Akses Digital</h4>
                 <p className="vm-mission-item__text">
-                  Terus berinovasi dalam pengembangan teknologi untuk memberikan pengalaman pengguna yang terbaik dan relevan dengan kebutuhan zaman.
+                  Mengembangkan platform yang cepat, ringan, dan ramah pengguna smartphone (One Click Service) untuk seluruh lapisan masyarakat.
                 </p>
               </div>
             </div>
@@ -97,9 +97,9 @@ export default function VisionMission() {
                 <Heart size={24} />
               </div>
               <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Kontribusi Sosial</h4>
+                <h4 className="vm-mission-item__title">Dampak Sosial &amp; Komunitas</h4>
                 <p className="vm-mission-item__text">
-                  Berkontribusi dalam pembangunan sosial melalui program donasi yang mendukung pendidikan, kesehatan, dan lingkungan.
+                  Membangun kepedulian sosial yang saling menguatkan antarwarga Surade melalui dukungan kegiatan kemasyarakatan dan kepedulian sosial.
                 </p>
               </div>
             </div>
@@ -109,9 +109,9 @@ export default function VisionMission() {
                 <Award size={24} />
               </div>
               <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Kualitas Terpercaya</h4>
+                <h4 className="vm-mission-item__title">Informasi Valid &amp; Terpercaya</h4>
                 <p className="vm-mission-item__text">
-                  Menyajikan informasi yang akurat, terpercaya, dan berkualitas dari berbagai sumber resmi di seluruh Indonesia.
+                  Menyajikan data usaha, lokasi, dan kontak yang terverifikasi demi keamanan bertransaksi warga dan para pengunjung.
                 </p>
               </div>
             </div>

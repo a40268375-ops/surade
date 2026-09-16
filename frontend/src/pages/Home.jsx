@@ -61,15 +61,40 @@ import {
   Leaf,
   Car,
   Crown,
+  Utensils,
+  Palette,
+  HeartPulse,
+  ShoppingBag,
+  Package,
+  Bed,
 } from "lucide-react";
+
+/* Helper to get contextual icons for every subcategory */
+const getSubcategoryIcon = (name) => {
+  const n = (name || "").toLowerCase();
+  if (n.includes("kayu") || n.includes("mebel")) return <Wrench size={13} className="text-amber-600 shrink-0" />;
+  if (n.includes("pertanian") || n.includes("tani") || n.includes("kebun")) return <Leaf size={13} className="text-emerald-600 shrink-0" />;
+  if (n.includes("kerajinan") || n.includes("anyaman") || n.includes("tikar") || n.includes("bambu")) return <Palette size={13} className="text-purple-600 shrink-0" />;
+  if (n.includes("roti") || n.includes("bakery") || n.includes("kue")) return <Utensils size={13} className="text-amber-500 shrink-0" />;
+  if (n.includes("warung") || n.includes("makan") || n.includes("kuliner") || n.includes("seblak") || n.includes("resto")) return <Utensils size={13} className="text-orange-500 shrink-0" />;
+  if (n.includes("apotek") || n.includes("obat") || n.includes("dokter") || n.includes("sehat") || n.includes("klinik")) return <HeartPulse size={13} className="text-rose-500 shrink-0" />;
+  if (n.includes("bengkel") || n.includes("motor") || n.includes("mobil") || n.includes("otomotif")) return <Car size={13} className="text-blue-600 shrink-0" />;
+  if (n.includes("baju") || n.includes("busana") || n.includes("fashion") || n.includes("muslim")) return <Shirt size={13} className="text-indigo-600 shrink-0" />;
+  if (n.includes("minimarket") || n.includes("yomart") || n.includes("sembako") || n.includes("retail")) return <ShoppingBag size={13} className="text-emerald-600 shrink-0" />;
+  if (n.includes("cat") || n.includes("bangunan") || n.includes("properti")) return <Building2 size={13} className="text-cyan-600 shrink-0" />;
+  if (n.includes("wisata") || n.includes("penginapan") || n.includes("hotel") || n.includes("pantai")) return <Bed size={13} className="text-teal-600 shrink-0" />;
+  if (n.includes("olahan") || n.includes("gula") || n.includes("ikan") || n.includes("madu") || n.includes("keripik") || n.includes("opak")) return <Package size={13} className="text-amber-700 shrink-0" />;
+  if (n.includes("elektronik") || n.includes("komputer") || n.includes("hp")) return <Smartphone size={13} className="text-blue-500 shrink-0" />;
+  return <Tag size={13} className="text-[#007570] shrink-0" />;
+};
 
 /* ── Categories loaded dynamically from API ── */
 
 /* ── How it works steps ── */
 const QUICK_STEPS = [
   { num: "1", title: "Ketik Kata Kunci", desc: "Pemilihan kata kunci akan mempercepat dalam pencarian." },
-  { num: "2", title: "Ketik Lokasi", desc: "Anda dapat menemukan lokasi secara mudah dengan mengetik daerah yang Anda cari." },
-  { num: "3", title: "Temukan Pencarian", desc: "Penuhi semua keperluan dan kebutuhan Anda." },
+  { num: "2", title: "Temutambahkan UMKM", desc: "Hingga skala terkecil UMKM." },
+  { num: "3", title: "Temukan UMKM Secara Kategori", desc: "Hubungi pelaku usaha." },
 ];
 
 /* ── Key Features data ── */
@@ -111,59 +136,45 @@ function getVillageImage(city) {
 /* ── Testimonials data ── */
 const TESTIMONIALS_DATA = [
   {
-    id: 1,
-    avatar: irmanImg,
-    name: "Irman Firmansyah",
-    role: "Direktur Triwala",
-    text: "Dengan adanya Surade.co.id, masyarakat jadi lebih mudah menemukan berbagai informasi dan layanan yang ada di daerah mereka.",
-  },
-  {
     id: 2,
     avatar: sriImg,
     name: "Sri Budiati",
-    role: "Staff Ahli Lingkungan",
     text: "Surade.co.id membantu menyajikan informasi daerah dalam satu platform yang lebih mudah diakses dan dipahami oleh semua kalangan.",
   },
   {
     id: 3,
     avatar: rajaImg,
     name: "M. Raja Fakhri",
-    role: "Programer",
     text: "Platform ini punya potensi besar untuk membuat informasi lokal lebih mudah ditemukan. Tampilannya pun cukup bersih dan nyaman dipakai.",
   },
   {
     id: 4,
     avatar: farhanImg,
     name: "Farhan M",
-    role: "Perencanaan Wilayah",
     text: "Surade.co.id jadi salah satu platform yang membantu menghubungkan masyarakat dengan berbagai informasi dan potensi bisnis di daerahnya.",
   },
   {
     id: 5,
     avatar: yogaImg,
     name: "Yoga Hepta G",
-    role: "Pemetaan Wilayah",
     text: "Saya senang ada platform seperti ini. Digitalisasi informasi daerah itu penting banget, terutama untuk mendukung program Smart Village.",
   },
   {
     id: 6,
     avatar: naufalImg,
     name: "Naufal Handoko",
-    role: "Analis",
     text: "Dari sisi teknis, Surade.co.id sudah cukup solid. Integrasi data bisnis lokal dengan sistem pencariannya terasa responsif dan mudah digunakan.",
   },
   {
     id: 7,
     avatar: husnulImg,
     name: "Husnul Hotimah",
-    role: "Staff Admin",
     text: "Koordinasi antar tim dalam pengembangan platform ini cukup terstruktur. Roadmap-nya jelas dan fokus pada kebutuhan pengguna di daerah.",
   },
   {
     id: 8,
     avatar: diniImg,
     name: "Dini Hawariw",
-    role: "Direktur Envitech",
     text: "Surade.co.id membantu UMKM di daerah untuk lebih mudah ditemukan. Ini langkah nyata menuju ekosistem digital yang lebih merata di Indonesia.",
   },
 ];
@@ -225,6 +236,14 @@ const getCategoryIconByLabel = (label) => {
   return <Store size={26} strokeWidth={1.7} />;
 };
 
+const getCategoryTheme = (label) => {
+  return { 
+    bg: "linear-gradient(135deg, #ecfdf5, #d1fae5)", 
+    color: "#047857", 
+    border: "#a7f3d0" 
+  };
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const [selectedKota, setSelectedKota] = useState("Semua");
@@ -239,6 +258,17 @@ export default function Home() {
       return fallback;
     }
   };
+
+  // Bersihkan cache iklan lama jika masih berisi iklan mockup
+  if (typeof window !== "undefined") {
+    try {
+      const adCache = sessionStorage.getItem("cached_home_ads_obj");
+      if (adCache && (adCache.includes("JOTUN") || adCache.includes("Hero Banner"))) {
+        sessionStorage.removeItem("cached_home_ads_obj");
+        sessionStorage.removeItem("cached_home_businesses");
+      }
+    } catch (e) {}
+  }
 
   const cachedBisnis = getInitialCache("cached_home_businesses", []);
   const cachedAds = getInitialCache("cached_home_ads_obj", null);
@@ -410,19 +440,42 @@ export default function Home() {
 
           // Blogs & Events
           if (Array.isArray(summary.blogs)) {
-            const mappedBlogs = summary.blogs.map(b => ({
-              id: b.id,
-              slug: b.slug,
-              title: b.title,
-              category: b.blog_category || b.category?.name || (b.type === "event" ? "Event" : "Artikel"),
-              author: b.user?.name || "Admin Surade.co.id",
-              date: b.published_at
+            const mappedBlogs = summary.blogs.map(b => {
+              const isEvent = b.type === "event";
+              const startDate = b.event_date ? new Date(b.event_date) : (b.published_at ? new Date(b.published_at) : null);
+              const endDate = b.event_end_date ? new Date(b.event_end_date) : null;
+              
+              let eventDateRange = null;
+              let eventDateBadge = null;
+              if (isEvent && startDate) {
+                const sStr = startDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+                if (endDate) {
+                  const eStr = endDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+                  eventDateRange = `${sStr} - ${eStr}`;
+                  eventDateBadge = `${startDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" })} - ${endDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`;
+                } else {
+                  eventDateRange = sStr;
+                  eventDateBadge = sStr;
+                }
+              }
+
+              const pubDate = b.published_at
                 ? new Date(b.published_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
-                : "Terbaru",
-              thumbnail: b.thumbnail,
-              img: getStorageUrl(b.thumbnail) || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop",
-              type: b.type || "blog",
-            }));
+                : "Terbaru";
+
+              return {
+                id: b.id,
+                slug: b.slug,
+                title: b.title,
+                category: b.blog_category || b.category?.name || (isEvent ? "Event" : "Artikel"),
+                author: b.user?.name || "Admin Surade.co.id",
+                date: isEvent ? (eventDateRange || pubDate) : pubDate,
+                eventDateBadge: isEvent ? eventDateBadge : null,
+                thumbnail: b.thumbnail,
+                img: getStorageUrl(b.thumbnail) || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop",
+                type: b.type || "blog",
+              };
+            });
             setBlogsData(mappedBlogs);
             try {
               sessionStorage.setItem("cached_home_blogs", JSON.stringify(mappedBlogs));
@@ -440,7 +493,7 @@ export default function Home() {
 
       // Fallback: Individual requests
       const fetchCategories = fetch(`${import.meta.env.VITE_API_URL}/categories`)
-        .then(res => res.json())
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
         .then(catData => {
           const list = Array.isArray(catData) ? catData : (Array.isArray(catData?.data) ? catData.data : []);
           if (list.length > 0) {
@@ -452,7 +505,7 @@ export default function Home() {
         }).catch(err => console.error(err));
 
       const fetchBusinesses = fetch(`${import.meta.env.VITE_API_URL}/businesses?limit=24`)
-        .then(res => res.json())
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
         .then(bizJson => {
           const bizData = bizJson?.data || bizJson || [];
           if (Array.isArray(bizData)) {
@@ -544,20 +597,38 @@ export default function Home() {
     return (b.id || 0) - (a.id || 0);
   });
 
-  // Filter TEMUKAN_DATA based on search and sort Premium first
-  const filteredTemukanData = temukanData.filter((b) => {
-    const matchesSearch = !searchKeyword ||
-      b.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-      b.category.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-      b.tags.some(tag => tag.toLowerCase().includes(searchKeyword.toLowerCase())) ||
-      b.location.toLowerCase().includes(searchKeyword.toLowerCase());
-    
-    return matchesSearch;
-  }).sort((a, b) => {
-    if (a.is_premium && !b.is_premium) return -1;
-    if (!a.is_premium && b.is_premium) return 1;
-    return (b.id || 0) - (a.id || 0);
-  });
+  // Filter TEMUKAN_DATA based on search and organize Free vs Premium
+  const filteredTemukanData = useMemo(() => {
+    const filtered = temukanData.filter((b) => {
+      const matchesSearch = !searchKeyword ||
+        b.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        b.category.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        b.tags.some(tag => tag.toLowerCase().includes(searchKeyword.toLowerCase())) ||
+        b.location.toLowerCase().includes(searchKeyword.toLowerCase());
+      return matchesSearch;
+    });
+
+    if (searchKeyword.trim()) {
+      return [...filtered].sort((a, b) => {
+        if (a.is_premium && !b.is_premium) return -1;
+        if (!a.is_premium && b.is_premium) return 1;
+        return (b.id || 0) - (a.id || 0);
+      });
+    }
+
+    // Default view: 3 Premium (row 1) + 3 Free (row 2) per page so contrast is clearly visible
+    const prem = filtered.filter(b => b.is_premium).sort((a, b) => (b.id || 0) - (a.id || 0));
+    const free = filtered.filter(b => !b.is_premium).sort((a, b) => (b.id || 0) - (a.id || 0));
+
+    const result = [];
+    const totalPages = Math.ceil((prem.length + free.length) / 6) || 1;
+    for (let p = 0; p < totalPages; p++) {
+      const pPrem = prem.slice(p * 3, (p + 1) * 3);
+      const pFree = p === totalPages - 1 ? free.slice(p * 3) : free.slice(p * 3, (p + 1) * 3);
+      result.push(...pPrem, ...pFree);
+    }
+    return result;
+  }, [temukanData, searchKeyword]);
 
   const fetchUserSavedState = async () => {
     const token = localStorage.getItem("token");
@@ -803,21 +874,36 @@ export default function Home() {
       {/* ── 3. KATEGORI SECTION ── */}
       <section className="category-section reveal-on-scroll">
         <div className="category-inner">
-          {/* Grid kategori — 6 kolom, tanpa "Semua" (chip "Semua" tidak
-              relevan di grid ini, filter kategori tetap bisa diakses lewat
-              halaman /category). Class CSS "home-cat-*" dibikin khusus milik
-              Home (sebelumnya numpang class "reko-tabs" milik Category.css,
-              makanya stylenya suka ketuker/berubah kalau Category.css ikut
-              berubah). */}
           <div className="home-cat-grid" ref={categoryScrollRef}>
-            {categories
-              .filter((cat) => cat.id !== "all")
-              .map((cat) => (
-                <Link key={cat.id} to={`/category/${cat.id}`} className="home-cat-card">
-                  <span className="home-cat-card__icon">{cat.icon}</span>
-                  <span className="home-cat-card__label">{cat.label}</span>
-                </Link>
-              ))}
+            {(() => {
+              const rawCats = categories.filter((cat) => cat.id !== "all");
+              const items = [...rawCats];
+              // Pastikan jumlah kartu genap 10 agar grid 5x2 terisi sempurna tanpa ada yang bolong!
+              if (items.length % 5 !== 0) {
+                items.push({
+                  id: "wisata",
+                  label: "Wisata & Budaya",
+                  icon: <Landmark size={26} strokeWidth={1.7} />
+                });
+              }
+              return items.map((cat) => {
+                const theme = getCategoryTheme(cat.label || cat.id);
+                return (
+                  <Link key={cat.id} to={`/category/${cat.id}`} className="home-cat-card">
+                    <span 
+                      className="home-cat-card__icon" 
+                      style={{ background: theme.bg, color: theme.color, border: `1px solid ${theme.border}` }}
+                    >
+                      {cat.icon}
+                    </span>
+                    <span className="home-cat-card__label">{cat.label}</span>
+                    <span className="home-cat-card__cta" style={{ color: theme.color }}>
+                      Jelajahi &rarr;
+                    </span>
+                  </Link>
+                );
+              });
+            })()}
           </div>
         </div>
       </section>
@@ -985,12 +1071,25 @@ export default function Home() {
                     : `temukan-grid--entering-${slideAnim.direction}`
                 }`}>
                   {paginatedBusinesses.map((bisnis) => (
-                    <Link key={bisnis.id} to={`/business/${bisnis.id}`} className="biz-card biz-card--link">
+                    <Link
+                      key={bisnis.id}
+                      to={`/business/${bisnis.id}`}
+                      className={`biz-card biz-card--link ${bisnis.is_premium ? "biz-card--premium" : "biz-card--free"}`}
+                    >
                       {/* Image */}
                       <div className="biz-card__img-wrap">
-                        <img src={bisnis.img} alt={bisnis.name} className="biz-card__img" loading="lazy" />
-                        {(bisnis.is_premium || bisnis.is_verified) && (
-                          <div className="biz-card__verified-badge" title="Bisnis Terverifikasi - Pengguna Premium">
+                        <img 
+                          src={bisnis.img} 
+                          alt={bisnis.name} 
+                          className="biz-card__img" 
+                          loading="lazy" 
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&h=350&fit=crop&q=80";
+                          }}
+                        />
+                        {bisnis.is_premium && (
+                          <div className="biz-card__verified-badge biz-card__verified-badge--premium" title="Bisnis Terverifikasi - Mitra Resmi">
                             <BadgeCheck size={14} className="biz-card__verified-icon" />
                             <span>Terverifikasi</span>
                           </div>
@@ -1014,12 +1113,12 @@ export default function Home() {
 
                       {/* Body */}
                       <div className="biz-card__body">
-                        <div className="flex items-center gap-2">
-                          <h3 className="biz-card__name flex-1">{bisnis.name}</h3>
-                          {bisnis.has_premium_badge && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-amber-400 to-amber-500 text-white text-[10px] font-bold rounded-full shadow-sm">
-                              <Crown size={10} />
-                              Premium
+                        <div className="flex items-center gap-1.5">
+                          <h3 className={`biz-card__name flex-1 ${bisnis.is_premium ? "font-bold text-slate-900" : "font-semibold text-slate-800"}`}>{bisnis.name}</h3>
+                          {bisnis.is_premium && (
+                            <span className="biz-card__vip-pill" title="Mitra Terverifikasi">
+                              <Crown size={11} className="fill-amber-400 text-amber-500" />
+                              <span>Mitra</span>
                             </span>
                           )}
                         </div>
@@ -1029,18 +1128,26 @@ export default function Home() {
                             {bisnis.category}
                           </p>
                           {bisnis.subCategory && (
-                            <p className="biz-card__category biz-card__category--sub">
-                              <span className="biz-card__cat-separator">›</span>
-                              {bisnis.subCategory}
+                            <p className={`biz-card__category biz-card__category--sub flex items-center gap-1 font-semibold ${bisnis.is_premium ? "text-[#007570] bg-[#f0faf8] px-2 py-0.5 rounded-md border border-[#ccebe8]" : "text-slate-600"}`}>
+                              <span className="shrink-0 flex items-center">{getSubcategoryIcon(bisnis.subCategory)}</span>
+                              <span>{bisnis.subCategory}</span>
                             </p>
                           )}
                         </div>
                         <div className="biz-card__tags">
-                          {bisnis.tags.map((tag) => (
-                            <span key={tag} className="biz-card__tag">
+                          {bisnis.tags.slice(0, 3).map((tag, idx) => (
+                            <span key={idx} className="biz-card__tag">
                               <Tag size={11} />{tag}
                             </span>
                           ))}
+                          {bisnis.tags.length > 3 && (
+                            <span
+                              className="biz-card__tag biz-card__tag--more text-[#007570] font-bold bg-teal-50 border border-teal-200 cursor-pointer"
+                              title={`Semua tag: ${bisnis.tags.join(', ')}`}
+                            >
+                              +{bisnis.tags.length - 3} lainnya
+                            </span>
+                          )}
                         </div>
                         <div className="biz-card__footer">
                           <span className="biz-card__rating">
@@ -1051,7 +1158,7 @@ export default function Home() {
                           <span className="biz-card__location">
                             <MapPin size={12} />{bisnis.location}
                           </span>
-                          <span className={`biz-card__cta${bisnis.open ? "" : " closed"}`}>
+                          <span className={`biz-card__cta${bisnis.open ? "" : " closed"}${bisnis.is_premium ? " biz-card__cta--premium" : ""}`}>
                             {bisnis.open ? "Buka Sekarang →" : "Tutup Sekarang!"}
                           </span>
                         </div>
@@ -1182,12 +1289,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── BERBAGI PENGALAMAN SECTION ── */}
+      {/* ── BERBAGAI ACARA DAN BERITA SECTION ── */}
       <section className="blog-section reveal-on-scroll" id="blog-section">
         <div className="blog-inner">
           <div className="text-center reveal-on-scroll">
-            <h2 className="blog-title">Berbagi Pengalaman Mereka</h2>
-            <p className="blog-subtitle">Bagikan Pengalaman Dan Info Anda Di Surade.co.id.</p>
+            <h2 className="blog-title">Berbagai Acara Dan Berita</h2>
+            <p className="blog-subtitle">Bagikan kegiatan dan berita Anda di surade.co.id</p>
           </div>
 
           <div className="blog-grid reveal-stagger">
@@ -1207,7 +1314,18 @@ export default function Home() {
                       <span>Simpan</span>
                     </button>
                     {post.type === "event" ? (
-                      <span className="blog-badge-tag blog-badge-tag--event">Event</span>
+                      <>
+                        <span className="blog-badge-tag blog-badge-tag--event">Event</span>
+                        {post.eventDateBadge && (
+                          <span
+                            className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-slate-950/85 backdrop-blur-md text-amber-300 border border-amber-400/40 text-[11px] font-extrabold shadow-md flex items-center gap-1.5 z-10"
+                            title="Tanggal Pelaksanaan Event"
+                          >
+                            <Calendar size={12} className="text-amber-400" />
+                            <span>{post.eventDateBadge}</span>
+                          </span>
+                        )}
+                      </>
                     ) : (
                       <span className="blog-badge-tag blog-badge-tag--blog">Blog</span>
                     )}
@@ -1220,7 +1338,7 @@ export default function Home() {
                         <span>{post.author}</span>
                       </span>
                       <span className="blog-card__meta">
-                        <Calendar size={13} />
+                        <Calendar size={13} className={post.type === "event" ? "text-amber-500" : ""} />
                         <span>{post.date}</span>
                       </span>
                     </div>

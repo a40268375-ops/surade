@@ -10,7 +10,7 @@ export default function LoadingScreen({
   isLoading,
   progress: externalProgress,
   text = "Surade.co.id",
-  subtext = "Direktori UMKM & Potensi Wisata Kecamatan Surade",
+  subtext = "Direktori UMKM Surade",
 }) {
   const [show, setShow] = useState(isLoading);
   const [percent, setPercent] = useState(externalProgress !== undefined ? externalProgress : (isLoading ? 18 : 100));

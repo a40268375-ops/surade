@@ -10,6 +10,7 @@ import FAQ from "../pages/FAQ";
 import PartnershipCareer from "../pages/PartnershipCareer";
 import BusinessDetail from "../pages/BusinessDetail";
 import Category from "../pages/Category";
+import Panduan from "../pages/Panduan";
 import Login from "../pages/Login";
 import ForgotPassword from "../pages/ForgotPassword";
 import Profile from "../pages/Profile";
@@ -108,6 +109,7 @@ function AppRouter() {
         <Route path="/profile/:id" element={<Profile />} />
         <Route path="/smart-city/:id" element={<SmartCity />} />
         <Route path="/location/:slug" element={<SmartCity />} />
+        <Route path="/panduan" element={<Panduan />} />
 
         {/* User Routes (accessible by role 'user', 'admin', or 'super_admin') */}
         <Route

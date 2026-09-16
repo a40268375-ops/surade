@@ -29,7 +29,7 @@ class AdminMiddleware
             ], 403);
         }
 
-        if (!$user->is_active) {
+        if (isset($user->is_active) && !$user->is_active) {
             return response()->json([
                 'message' => 'Account is inactive',
                 'error' => 'ACCOUNT_INACTIVE'

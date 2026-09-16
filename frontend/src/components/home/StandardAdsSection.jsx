@@ -80,6 +80,10 @@ export default function StandardAdsSection({ ads = [], loading = false }) {
                       alt={ad.name || "Business"}
                       className="standard-ad-card__img"
                       loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = DEFAULT_STANDARD_IMG;
+                      }}
                     />
                     <div className="standard-ad-card__tag">Iklan</div>
                   </div>

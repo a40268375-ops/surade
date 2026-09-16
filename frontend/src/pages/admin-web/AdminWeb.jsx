@@ -69,7 +69,14 @@ import {
   Store,
 } from "lucide-react";
 import api from "../../services/api";
-import { DEFAULT_AVATAR, getStorageUrl } from "../../utils/constants";
+import {
+  DEFAULT_AVATAR,
+  getStorageUrl,
+  OFFICIAL_ACCOUNT_HOLDER,
+  OFFICIAL_BANK_ACCOUNTS,
+  OFFICIAL_EWALLET_ACCOUNTS,
+  OFFICIAL_QRIS_ACCOUNT,
+} from "../../utils/constants";
 
 // ── Badge & Style Helper Maps ──
 const getBadgeClass = (status) => {
@@ -228,6 +235,7 @@ const NAV_ITEMS = [
   { id: "referrals", label: "Kelola Referral", icon: <Share2 size={20} strokeWidth={1.7} /> },
   { id: "blogs", label: "Blog & Event", icon: <FileText size={20} strokeWidth={1.7} /> },
   { id: "reports", label: "Laporan Report", icon: <AlertTriangle size={20} strokeWidth={1.7} /> },
+  { id: "payment-settings", label: "Kelola Pembayaran", icon: <CreditCard size={20} strokeWidth={1.7} /> },
   { id: "whatsapp", label: "Kelola WhatsApp", icon: <MessageSquare size={20} strokeWidth={1.7} /> },
 ];
 
@@ -409,12 +417,48 @@ export default function AdminWeb() {
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // ── Official Bank & Payment Management States ──
+  const getInitialPaymentMethods = () => {
+    try {
+      const cached = localStorage.getItem("official_payment_methods_custom");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [
+      ...OFFICIAL_BANK_ACCOUNTS.map(b => ({ ...b, category: "bank", isActive: true })),
+      ...OFFICIAL_EWALLET_ACCOUNTS.map(e => ({ ...e, category: "ewallet", isActive: true })),
+      { ...OFFICIAL_QRIS_ACCOUNT, category: "qris", isActive: true },
+    ];
+  };
+
+  const [paymentMethodsList, setPaymentMethodsList] = useState(getInitialPaymentMethods);
+  const [paymentOfficialHolder, setPaymentOfficialHolder] = useState(() => {
+    return localStorage.getItem("official_account_holder") || OFFICIAL_ACCOUNT_HOLDER || "Triwala Mitra Bestari";
+  });
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState(null);
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const [newPaymentForm, setNewPaymentForm] = useState({
+    id: "",
+    name: "",
+    accountNumber: "",
+    accountName: "Triwala Mitra Bestari",
+    category: "bank",
+    badgeColor: "bg-[#007570] text-white",
+    logoUrl: "",
+    isActive: true,
+  });
+  const [paymentCategoryFilter, setPaymentCategoryFilter] = useState("all");
+  const [waLogSearch, setWaLogSearch] = useState("");
+  const [waLogStatusFilter, setWaLogStatusFilter] = useState("all");
+
   // ── WhatsApp Payment Wall States ──
   const [waAdminSettings, setWaAdminSettings] = useState({
     enabled: true,
     amount: 2000,
-    bank_name: "BCA / QRIS",
-    account_number: "0954152045",
+    bank_name: "Bank Mandiri",
+    account_number: "133-0011-409-331",
     account_holder: "Triwala Mitra Bestari",
     instruction: "Akses kontak langsung WhatsApp penjual dikenakan biaya administrasi resmi untuk keamanan dan pencegahan spam.",
     qris_image: null,
@@ -894,8 +938,26 @@ export default function AdminWeb() {
   };
 
   // ── WhatsApp Management Functions ──
+  // ── Payment & WhatsApp Management Functions ──
   const fetchWaSettings = async () => {
     try {
+      // 1. Fetch Payment Methods List
+      try {
+        const payRes = await api.get("/admin/payment-methods");
+        const payData = payRes.data?.data;
+        if (payData?.methods && Array.isArray(payData.methods) && payData.methods.length > 0) {
+          setPaymentMethodsList(payData.methods);
+          localStorage.setItem("official_payment_methods_custom", JSON.stringify(payData.methods));
+        }
+        if (payData?.official_account_holder) {
+          setPaymentOfficialHolder(payData.official_account_holder);
+          localStorage.setItem("official_account_holder", payData.official_account_holder);
+        }
+      } catch (err) {
+        console.warn("Using local payment methods cache:", err);
+      }
+
+      // 2. Fetch WhatsApp Fee Settings
       const res = await api.get("/admin/whatsapp-settings");
       const data = res.data?.data;
       if (data) {
@@ -903,16 +965,138 @@ export default function AdminWeb() {
         setWaAdminSettingsForm({
           enabled: data.enabled,
           amount: data.amount,
-          bank_name: data.bank_name,
-          account_number: data.account_number,
-          account_holder: data.account_holder,
+          bank_name: data.bank_name || "Bank Mandiri",
+          account_number: !data.account_number || data.account_number === "0123456789" || data.account_number === "XXX" ? "133-0011-409-331" : data.account_number,
+          account_holder: !data.account_holder || data.account_holder === "Official Surade.co.id" ? "Triwala Mitra Bestari" : data.account_holder,
           instruction: data.instruction,
-          selected_bank: data.selected_bank || "BCA",
+          selected_bank: data.selected_bank || "Mandiri",
         });
       }
     } catch (err) {
-      console.error("Failed to fetch WA settings:", err);
+      console.error("Failed to fetch payment / WA settings:", err);
     }
+  };
+
+  const saveWaSettings = async () => {
+    setSavingWaSettings(true);
+    try {
+      // 1. Save payment methods to backend
+      try {
+        const payRes = await api.post("/admin/payment-methods", {
+          methods: paymentMethodsList,
+          official_account_holder: paymentOfficialHolder,
+        });
+        if (payRes.data?.data?.methods) {
+          setPaymentMethodsList(payRes.data.data.methods);
+        }
+      } catch (err) {
+        console.warn("Payment methods save to API:", err);
+      }
+      localStorage.setItem("official_payment_methods_custom", JSON.stringify(paymentMethodsList));
+      localStorage.setItem("official_account_holder", paymentOfficialHolder);
+
+      // 2. Save WhatsApp fee settings and QRIS image
+      const formData = new FormData();
+      formData.append("enabled", waAdminSettingsForm.enabled ? "1" : "0");
+      formData.append("amount", waAdminSettingsForm.amount);
+      formData.append("bank_name", waAdminSettingsForm.bank_name);
+      formData.append("account_number", waAdminSettingsForm.account_number);
+      formData.append("account_holder", waAdminSettingsForm.account_holder || paymentOfficialHolder);
+      formData.append("instruction", waAdminSettingsForm.instruction);
+      if (waQrisFile) {
+        formData.append("qris_image", waQrisFile);
+      }
+      const res = await api.post("/admin/whatsapp-settings", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const data = res.data?.data;
+      if (data) {
+        setWaAdminSettings(data);
+      }
+      alert("Pengaturan semua rekening bank, e-wallet, QRIS & WhatsApp berhasil disimpan!");
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menyimpan pengaturan pembayaran.");
+    } finally {
+      setSavingWaSettings(false);
+    }
+  };
+
+  // Auto-sync payment methods to Backend API and Local Storage
+  const savePaymentMethodsToApi = async (updatedList, holder = paymentOfficialHolder) => {
+    try {
+      localStorage.setItem("official_payment_methods_custom", JSON.stringify(updatedList));
+      localStorage.setItem("official_account_holder", holder);
+      await api.post("/admin/payment-methods", {
+        methods: updatedList,
+        official_account_holder: holder,
+      });
+    } catch (err) {
+      console.warn("Auto-sync payment methods to API:", err);
+    }
+  };
+
+  // Toggle Aktif / Nonaktif Payment Method
+  const togglePaymentMethodActive = (index) => {
+    setPaymentMethodsList(prev => {
+      const updated = [...prev];
+      if (updated[index]) {
+        updated[index] = { ...updated[index], isActive: !updated[index].isActive };
+      }
+      savePaymentMethodsToApi(updated);
+      return updated;
+    });
+  };
+
+  // Save Edit Payment Method
+  const handleSaveEditPaymentMethod = (updatedItem) => {
+    setPaymentMethodsList(prev => {
+      const updated = prev.map(item => item.id === updatedItem.id ? { ...item, ...updatedItem } : item);
+      savePaymentMethodsToApi(updated);
+      return updated;
+    });
+    setEditingPaymentMethod(null);
+  };
+
+  // Add New Custom Payment Method
+  const handleAddNewPaymentMethod = () => {
+    if (!newPaymentForm.name || !newPaymentForm.accountNumber) {
+      alert("Nama Bank / E-Wallet dan Nomor Rekening wajib diisi!");
+      return;
+    }
+    const newId = newPaymentForm.name.replace(/\s+/g, "_").toLowerCase() + "_" + Date.now();
+    const newItem = {
+      ...newPaymentForm,
+      id: newId,
+      logo: newPaymentForm.category === "ewallet" ? "/logos/dana.png" : newPaymentForm.category === "qris" ? "/logos/qris.png" : "/logos/mandiri.png",
+      logoText: newPaymentForm.name,
+      isActive: true,
+    };
+    setPaymentMethodsList(prev => {
+      const updated = [...prev, newItem];
+      savePaymentMethodsToApi(updated);
+      return updated;
+    });
+    setShowAddPaymentModal(false);
+    setNewPaymentForm({
+      id: "",
+      name: "",
+      accountNumber: "",
+      accountName: paymentOfficialHolder || "Triwala Mitra Bestari",
+      category: "bank",
+      badgeColor: "bg-[#007570] text-white",
+      logoUrl: "",
+      isActive: true,
+    });
+  };
+
+  // Delete Custom Payment Method
+  const handleDeletePaymentMethod = (id) => {
+    if (!window.confirm("Hapus metode pembayaran ini?")) return;
+    setPaymentMethodsList(prev => {
+      const updated = prev.filter(item => item.id !== id);
+      savePaymentMethodsToApi(updated);
+      return updated;
+    });
   };
 
   const fetchWaLogs = async (page = 1) => {
@@ -933,33 +1117,6 @@ export default function AdminWeb() {
     }
   };
 
-  const saveWaSettings = async () => {
-    setSavingWaSettings(true);
-    try {
-      const formData = new FormData();
-      formData.append("enabled", waAdminSettingsForm.enabled ? "1" : "0");
-      formData.append("amount", waAdminSettingsForm.amount);
-      formData.append("bank_name", waAdminSettingsForm.bank_name);
-      formData.append("account_number", waAdminSettingsForm.account_number);
-      formData.append("account_holder", waAdminSettingsForm.account_holder);
-      formData.append("instruction", waAdminSettingsForm.instruction);
-      if (waQrisFile) {
-        formData.append("qris_image", waQrisFile);
-      }
-      const res = await api.post("/admin/whatsapp-settings", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const data = res.data?.data;
-      if (data) {
-        setWaAdminSettings(data);
-        alert("Pengaturan WhatsApp berhasil disimpan!");
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || "Gagal menyimpan pengaturan WhatsApp.");
-    } finally {
-      setSavingWaSettings(false);
-    }
-  };
   const approveWaLog = async (logId) => {
     if (!window.confirm("Setujui pembayaran & buka akses WhatsApp ini?")) return;
     try {
@@ -1008,8 +1165,31 @@ export default function AdminWeb() {
     const loadUser = () => {
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
-        try { setUser(JSON.parse(storedUser)); } catch { }
+        try {
+          const parsed = JSON.parse(storedUser);
+          setUser(parsed);
+          if (parsed && parsed.role !== "admin") {
+            // Verify with server in case role was updated to admin in database
+            api.get('/user').then((res) => {
+              if (res.data?.role === "admin") {
+                localStorage.setItem("user", JSON.stringify(res.data));
+                setUser(res.data);
+                window.dispatchEvent(new Event("userAuthChanged"));
+                fetchAllData();
+              } else {
+                navigate("/dashboard", { replace: true });
+              }
+            }).catch(() => {
+              navigate("/dashboard", { replace: true });
+            });
+            return false;
+          }
+        } catch { }
+      } else {
+        navigate("/login", { replace: true });
+        return false;
       }
+      return true;
     };
 
     // Force clear stale cache on mount
@@ -1025,12 +1205,19 @@ export default function AdminWeb() {
     };
 
     clearStaleCache();
-    loadUser();
-    fetchAllData();
+    const isAdmin = loadUser();
+    if (isAdmin) {
+      fetchAllData();
+    }
 
-    // Auto polling notifications and stats every 30 seconds
+    // Auto polling notifications and stats every 30 seconds only if admin
     const interval = setInterval(() => {
-      fetchNotificationsAndStats();
+      const u = localStorage.getItem("user");
+      try {
+        if (JSON.parse(u)?.role === "admin") {
+          fetchNotificationsAndStats();
+        }
+      } catch (_) {}
     }, 30000);
 
     // Listen for user auth changes
@@ -1065,7 +1252,7 @@ export default function AdminWeb() {
         fetchContentTransactions(contentTxPage || 1);
       }
     }
-    if (activeTab === "whatsapp") {
+    if (activeTab === "whatsapp" || activeTab === "payment-settings") {
       fetchWaSettings();
       fetchWaLogs(1);
     }
@@ -1310,7 +1497,14 @@ export default function AdminWeb() {
         }).catch(err => console.error("Failed settings fetch:", err)),
       ];
 
-      await Promise.allSettled(fetchers);
+      const results = await Promise.allSettled(fetchers);
+      const isForbidden = results.some(
+        (r) => r.status === "rejected" && r.reason?.response?.status === 403
+      );
+      if (isForbidden) {
+        navigate("/dashboard", { replace: true });
+        return;
+      }
     } catch (err) {
       console.error("Failed to fetch admin data:", err);
     } finally {
@@ -8294,325 +8488,859 @@ export default function AdminWeb() {
     );
   };
 
-  // ── WhatsApp Management Section ──
-  const renderWhatsApp = () => {
+  // ── Payment & Bank Accounts Management Section (Kelola Pembayaran) ──
+  const renderPaymentSettings = () => {
+    const filteredPaymentMethods = paymentMethodsList.filter(item => {
+      if (paymentCategoryFilter === "all") return true;
+      if (paymentCategoryFilter === "bank") return item.category === "bank";
+      if (paymentCategoryFilter === "ewallet") return item.category === "ewallet";
+      if (paymentCategoryFilter === "qris") return item.category === "qris" || item.isQRIS;
+      return true;
+    });
+
     return (
-      <div className="space-y-6 mb-8">
+      <div className="space-y-8 mb-12">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
           <div>
-            <h2 className="text-[18px] font-bold text-[#0f172a] relative pl-[14px] before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[20px] before:bg-[#007570] before:rounded-[2px]">
-              Kelola WhatsApp
-            </h2>
-            <p className="text-xs text-slate-500 mt-1 ml-[14px]">Atur biaya akses kontak WhatsApp penjual &amp; pantau log transaksi</p>
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-teal-50 text-[#007570]">
+                <CreditCard size={22} strokeWidth={2} />
+              </span>
+              <h2 className="text-xl font-bold text-[#0f172a]">
+                Kelola Pembayaran &amp; Rekening Bank (Seluruh Fitur Website)
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1 ml-10">
+              Kelola nomor rekening resmi Bank, E-Wallet, dan QRIS yang terhubung secara otomatis ke seluruh modal transaksi di platform (Akses Kontak WA, Fitur Bisnis, Premium, Blog &amp; Event, Iklan).
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowAddPaymentModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-[#007570] font-bold text-xs transition-all border border-teal-200 cursor-pointer shadow-2xs"
+            >
+              <Plus size={16} strokeWidth={2.5} />
+              <span>Tambah Rekening / E-Wallet</span>
+            </button>
+            <button
+              type="button"
+              onClick={saveWaSettings}
+              disabled={savingWaSettings}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs transition-all border-0 cursor-pointer shadow-sm disabled:opacity-50"
+            >
+              {savingWaSettings ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={2.5} />}
+              <span>{savingWaSettings ? "Menyimpan..." : "Simpan Pengaturan Rekening"}</span>
+            </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007570] flex items-center justify-center mx-auto mb-2">
-              <MessageSquare size={20} />
+        {/* ── SECTION 1: DAFTAR REKENING BANK & E-WALLET RESMI ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-white">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <h3 className="text-base font-bold text-slate-800">Daftar Rekening Bank &amp; E-Wallet Resmi Website</h3>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Semua rekening yang berstatus aktif di bawah ini otomatis tampil pada pemilih metode pembayaran website.
+              </p>
             </div>
-            <p className="text-2xl font-black text-[#007570]">{waLogStats.total_access?.toLocaleString("id-ID") || 0}</p>
-            <p className="text-xs text-slate-500 font-semibold mt-1">Total Akses WA</p>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 self-start md:self-auto text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setPaymentCategoryFilter("all")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  paymentCategoryFilter === "all" ? "bg-white text-[#007570] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Semua ({paymentMethodsList.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentCategoryFilter("bank")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  paymentCategoryFilter === "bank" ? "bg-white text-[#007570] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Bank ({paymentMethodsList.filter(p => p.category === "bank").length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentCategoryFilter("ewallet")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  paymentCategoryFilter === "ewallet" ? "bg-white text-[#007570] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                E-Wallet ({paymentMethodsList.filter(p => p.category === "ewallet").length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentCategoryFilter("qris")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  paymentCategoryFilter === "qris" ? "bg-white text-[#007570] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                QRIS ({paymentMethodsList.filter(p => p.category === "qris" || p.isQRIS).length})
+              </button>
+            </div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center mx-auto mb-2">
-              <DollarSign size={20} />
+
+          {/* Global Official Account Holder Info */}
+          <div className="px-6 py-4 bg-emerald-50/60 border-b border-emerald-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800">
+                <Shield size={16} />
+              </span>
+              <div>
+                <span className="text-xs font-bold text-emerald-900 block">Nama Pemilik Resmi Platform (Atas Nama):</span>
+                <span className="text-xs text-emerald-700">Nama rekening acuan resmi yang ditampilkan kepada seluruh pengguna</span>
+              </div>
             </div>
-            <p className="text-2xl font-black text-green-600">
-              Rp {Number(waLogStats.total_revenue || 0).toLocaleString("id-ID")}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={paymentOfficialHolder}
+                onChange={(e) => setPaymentOfficialHolder(e.target.value)}
+                className="px-3 py-1.5 text-xs font-bold text-emerald-950 bg-white border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 w-56 shadow-2xs"
+                placeholder="Triwala Mitra Bestari"
+              />
+            </div>
+          </div>
+
+          {/* Cards Grid */}
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredPaymentMethods.map((method, idx) => {
+              const realIndex = paymentMethodsList.findIndex(m => m.id === method.id);
+              return (
+                <div
+                  key={method.id || idx}
+                  className={`p-4 rounded-2xl border transition-all duration-200 relative flex flex-col justify-between ${
+                    method.isActive !== false
+                      ? "bg-white border-slate-200 hover:border-teal-400 hover:shadow-md"
+                      : "bg-slate-50 border-slate-200 opacity-60"
+                  }`}
+                >
+                  <div>
+                    {/* Card Top */}
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center p-1 overflow-hidden shrink-0 shadow-2xs">
+                          {method.logoUrl ? (
+                            <img
+                              src={method.logoUrl}
+                              alt={method.name}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <span className="text-base">{method.logo || "🏦"}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-slate-800 truncate">{method.name}</h4>
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                            {method.category === "ewallet" ? "E-Wallet" : method.category === "qris" ? "QRIS Code" : "Transfer Bank"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Status Toggle Switch */}
+                      <button
+                        type="button"
+                        onClick={() => togglePaymentMethodActive(realIndex)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          method.isActive !== false ? "bg-[#007570]" : "bg-slate-300"
+                        }`}
+                        title={method.isActive !== false ? "Klik untuk Nonaktifkan" : "Klik untuk Aktifkan"}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            method.isActive !== false ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Account Details */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5 mb-3 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">No. Rekening / HP:</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono font-bold text-slate-800 select-all">{method.accountNumber || "xxxx"}</span>
+                          {method.accountNumber && method.accountNumber !== "Scan QR Code" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(method.accountNumber);
+                                alert(`Nomor ${method.name} berhasil disalin!`);
+                              }}
+                              className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
+                              title="Salin Nomor"
+                            >
+                              <Copy size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Atas Nama:</span>
+                        <span className="font-semibold text-slate-700 truncate max-w-[140px]" title={method.accountName || paymentOfficialHolder}>
+                          {method.accountName || paymentOfficialHolder}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Bottom Actions */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                    <span className={`inline-flex items-center gap-1 font-bold text-[11px] ${method.isActive !== false ? "text-emerald-600" : "text-slate-400"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${method.isActive !== false ? "bg-emerald-500" : "bg-slate-300"}`}></span>
+                      {method.isActive !== false ? "Aktif di Website" : "Nonaktif"}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditingPaymentMethod(method)}
+                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Edit size={12} />
+                        <span>Edit</span>
+                      </button>
+                      {String(method.id).includes("_") && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePaymentMethod(method.id)}
+                          className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer transition-colors"
+                          title="Hapus Metode Pembayaran"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── SECTION 2: QRIS CODE MANAGEMENT CARD ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="p-1.5 rounded-lg bg-teal-50 text-[#007570]">
+              <Zap size={18} />
+            </span>
+            <h3 className="text-sm font-bold text-slate-800">Pengaturan Gambar QRIS Resmi Platform</h3>
+          </div>
+          <p className="text-xs text-slate-500 mb-4">
+            QRIS ini ditampilkan pada checkout ketika pembeli/pelaku usaha memilih metode pembayaran QRIS Instan.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center bg-slate-50 p-6 rounded-2xl border border-slate-100">
+            <div className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-slate-200">
+              {waAdminSettings.qris_image ? (
+                <div className="text-center space-y-2">
+                  <img
+                    src={waAdminSettings.qris_image}
+                    alt="QRIS Resmi"
+                    className="w-48 h-48 object-contain rounded-lg border border-slate-200 bg-white p-2 shadow-xs mx-auto"
+                  />
+                  <span className="text-xs font-bold text-emerald-600 block">✓ Gambar QRIS Resmi Aktif</span>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-400 space-y-2">
+                  <img src="/logos/qris.png" alt="QRIS" className="w-28 h-auto mx-auto opacity-70" />
+                  <p className="text-xs text-slate-500 font-medium">QRIS Standar Sistem Aktif</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Unggah / Ganti Gambar QRIS Baru (PNG/JPG):</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setWaQrisFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-[#007570] hover:file:bg-teal-100 cursor-pointer"
+                />
+              </div>
+              <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-600 leading-relaxed">
+                <strong>Tips QRIS:</strong> Pastikan QRIS yang diunggah berupa QR Dinamis/Statis resmi atas nama platform ({paymentOfficialHolder}) dengan kontras tajam agar mudah dipindai oleh semua aplikasi m-Banking dan E-Wallet.
+              </div>
+              <button
+                type="button"
+                onClick={saveWaSettings}
+                disabled={savingWaSettings}
+                className="px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+              >
+                {savingWaSettings ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                <span>Simpan Gambar QRIS</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── MODAL: EDIT PAYMENT METHOD ── */}
+        {editingPaymentMethod && (
+          <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={18} className="text-[#007570]" />
+                  <h3 className="text-sm font-bold text-slate-800">Edit Metode Pembayaran</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingPaymentMethod(null)}
+                  className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nama Bank / E-Wallet</label>
+                  <input
+                    type="text"
+                    value={editingPaymentMethod.name}
+                    onChange={(e) => setEditingPaymentMethod(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#007570]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nomor Rekening / No. HP</label>
+                  <input
+                    type="text"
+                    value={editingPaymentMethod.accountNumber}
+                    onChange={(e) => setEditingPaymentMethod(prev => ({ ...prev, accountNumber: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-[#007570]"
+                    placeholder="Contoh: 133-0011-409-331"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nama Pemilik Rekening (Atas Nama)</label>
+                  <input
+                    type="text"
+                    value={editingPaymentMethod.accountName || paymentOfficialHolder}
+                    onChange={(e) => setEditingPaymentMethod(prev => ({ ...prev, accountName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#007570]"
+                    placeholder="Triwala Mitra Bestari"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <span className="text-xs font-bold text-slate-700">Status Pembayaran Aktif:</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editingPaymentMethod.isActive !== false}
+                      onChange={(e) => setEditingPaymentMethod(prev => ({ ...prev, isActive: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#007570]"></div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingPaymentMethod(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveEditPaymentMethod(editingPaymentMethod)}
+                  className="px-4 py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs cursor-pointer shadow-xs"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: TAMBAH REKENING / E-WALLET BARU ── */}
+        {showAddPaymentModal && (
+          <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <Plus size={18} className="text-[#007570]" />
+                  <h3 className="text-sm font-bold text-slate-800">Tambah Rekening / E-Wallet Baru</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddPaymentModal(false)}
+                  className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Kategori Metode Pembayaran</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewPaymentForm(prev => ({ ...prev, category: "bank" }))}
+                      className={`p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                        newPaymentForm.category === "bank" ? "bg-teal-50 border-[#007570] text-[#007570]" : "bg-white border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      🏦 Rekening Bank
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewPaymentForm(prev => ({ ...prev, category: "ewallet" }))}
+                      className={`p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                        newPaymentForm.category === "ewallet" ? "bg-teal-50 border-[#007570] text-[#007570]" : "bg-white border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      💜 E-Wallet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewPaymentForm(prev => ({ ...prev, category: "qris" }))}
+                      className={`p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                        newPaymentForm.category === "qris" ? "bg-teal-50 border-[#007570] text-[#007570]" : "bg-white border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      📱 QRIS
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nama Bank / Metode Pembayaran</label>
+                  <input
+                    type="text"
+                    value={newPaymentForm.name}
+                    onChange={(e) => setNewPaymentForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#007570]"
+                    placeholder="Contoh: Bank BRI / Bank Jago / ShopeePay"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nomor Rekening / No. HP</label>
+                  <input
+                    type="text"
+                    value={newPaymentForm.accountNumber}
+                    onChange={(e) => setNewPaymentForm(prev => ({ ...prev, accountNumber: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-[#007570]"
+                    placeholder="Contoh: 0123-456-789"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nama Pemilik Rekening (Atas Nama)</label>
+                  <input
+                    type="text"
+                    value={newPaymentForm.accountName}
+                    onChange={(e) => setNewPaymentForm(prev => ({ ...prev, accountName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#007570]"
+                    placeholder="Triwala Mitra Bestari"
+                  />
+                </div>
+              </div>
+
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddPaymentModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddNewPaymentMethod}
+                  className="px-4 py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs cursor-pointer shadow-xs"
+                >
+                  + Tambahkan Rekening
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── WhatsApp Management Section ──
+  const renderWhatsApp = () => {
+    const filteredWaLogs = waLogs.filter(log => {
+      const matchSearch = !waLogSearch || 
+        (log.customer_name && log.customer_name.toLowerCase().includes(waLogSearch.toLowerCase())) ||
+        (log.business_name && log.business_name.toLowerCase().includes(waLogSearch.toLowerCase())) ||
+        (log.payment_method && log.payment_method.toLowerCase().includes(waLogSearch.toLowerCase()));
+      
+      const matchStatus = waLogStatusFilter === "all" ||
+        (waLogStatusFilter === "pending" && log.status === "pending") ||
+        (waLogStatusFilter === "approved" && (log.status === "completed" || log.status === "approved")) ||
+        (waLogStatusFilter === "rejected" && log.status === "rejected");
+
+      return matchSearch && matchStatus;
+    });
+
+    return (
+      <div className="space-y-8 mb-12">
+        {/* Page Header */}
+        <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-teal-50 text-[#007570]">
+                <MessageSquare size={22} strokeWidth={2} />
+              </span>
+              <h2 className="text-xl font-bold text-[#0f172a]">
+                Kelola WhatsApp &amp; Biaya Akses Kontak
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1 ml-10">
+              Atur tarif administrasi untuk akses kontak WhatsApp penjual di website &amp; verifikasi bukti transfer customer
             </p>
-            <p className="text-xs text-slate-500 font-semibold mt-1">Total Pendapatan</p>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-2">
-              <TrendingUp size={20} />
-            </div>
-            <p className="text-2xl font-black text-blue-600">{waLogStats.today_access || 0}</p>
-            <p className="text-xs text-slate-500 font-semibold mt-1">Akses Hari Ini</p>
           </div>
         </div>
 
         {/* Settings Panel */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Pengaturan Biaya Akses WhatsApp</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Konfigurasi biaya pembayaran untuk setiap metode akses</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={waAdminSettingsForm.enabled}
-                onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, enabled: e.target.checked }))}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#007570]"></div>
-              <span className="ml-2 text-xs font-semibold text-slate-700">{waAdminSettingsForm.enabled ? "Aktif" : "Nonaktif"}</span>
-            </label>
-          </div>
-          
-          {/* General Settings */}
-          <div className="p-6 border-b border-slate-100 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">Biaya Akses Umum (Rp)</label>
-              <input
-                type="number"
-                value={waAdminSettingsForm.amount}
-                onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, amount: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
-                placeholder="2000"
-                min="0"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">Instruksi Pembayaran</label>
-              <textarea
-                value={waAdminSettingsForm.instruction}
-                onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, instruction: e.target.value }))}
-                rows={2}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20 resize-none"
-                placeholder="Deskripsi alasan kenapa ada biaya..."
-              />
-            </div>
-          </div>
-
-          {/* Bank Settings - Separated */}
-          <div className="p-6 space-y-6 bg-slate-50/50 border-b border-slate-100">
-            <h4 className="text-sm font-bold text-slate-800 mb-4">Pengaturan Rekening Bank</h4>
-            
-            {/* Bank Selection Tabs */}
-            <div className="flex gap-2 flex-wrap">
-              {[
-                { id: "BCA", name: "Bank BCA" },
-                { id: "Mandiri", name: "Bank Mandiri" },
-                { id: "BNI", name: "Bank BNI" },
-                { id: "Maybank", name: "Maybank" },
-                { id: "BJB", name: "Bank BJB" }
-              ].map(bank => (
-                <button
-                  key={bank.id}
-                  type="button"
-                  onClick={() => setWaAdminSettingsForm(prev => ({ ...prev, selected_bank: bank.id }))}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    (waAdminSettingsForm.selected_bank || "BCA") === bank.id
-                      ? "bg-[#007570] text-white"
-                      : "bg-white border border-slate-200 text-slate-700 hover:border-[#007570]"
-                  }`}
-                >
-                  {bank.name}
-                </button>
-              ))}
-            </div>
-
-            {/* Bank Details Form */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-white rounded-xl border border-slate-200">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Bank</label>
-                <input
-                  type="text"
-                  value={waAdminSettingsForm.bank_name}
-                  onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, bank_name: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
-                  placeholder="BCA / QRIS"
-                />
+                <h3 className="text-sm font-bold text-slate-800">Pengaturan Biaya Akses Kontak WhatsApp</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Atur saklar aktif/nonaktif tarif administrasi ketika pengunjung membuka nomor WhatsApp penjual</p>
               </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={waAdminSettingsForm.enabled}
+                  onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, enabled: e.target.checked }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#007570]"></div>
+                <span className="ml-2 text-xs font-bold text-slate-700">{waAdminSettingsForm.enabled ? "Aktif" : "Nonaktif"}</span>
+              </label>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Tarif Biaya Akses Kontak (Rp)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                    <input
+                      type="number"
+                      value={waAdminSettingsForm.amount}
+                      onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, amount: e.target.value }))}
+                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
+                      placeholder="2000"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Pilih Rekening Penerima Default</label>
+                  <select
+                    value={waAdminSettingsForm.bank_name}
+                    onChange={(e) => {
+                      const selectedName = e.target.value;
+                      const match = paymentMethodsList.find(m => m.name === selectedName);
+                      setWaAdminSettingsForm(prev => ({
+                        ...prev,
+                        bank_name: selectedName,
+                        account_number: match?.accountNumber || prev.account_number,
+                        account_holder: match?.accountName || paymentOfficialHolder,
+                      }));
+                    }}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20 bg-white"
+                  >
+                    {paymentMethodsList.filter(m => m.isActive !== false).map(m => (
+                      <option key={m.id} value={m.name}>
+                        {m.name} ({m.accountNumber})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Nomor Rekening</label>
-                <input
-                  type="text"
-                  value={waAdminSettingsForm.account_number}
-                  onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, account_number: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
-                  placeholder="0123456789"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Pemilik Rekening</label>
-                <input
-                  type="text"
-                  value={waAdminSettingsForm.account_holder}
-                  onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, account_holder: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20"
-                  placeholder="Triwala Mitra Bestari"
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Teks Instruksi Pembayaran Customer</label>
+                <textarea
+                  value={waAdminSettingsForm.instruction}
+                  onChange={(e) => setWaAdminSettingsForm(prev => ({ ...prev, instruction: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20 resize-none"
+                  placeholder="Instruksi pembayaran yang muncul di dialog customer..."
                 />
               </div>
             </div>
           </div>
 
-          {/* QRIS Upload */}
-          <div className="p-6">
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">Upload Gambar QRIS (opsional)</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setWaQrisFile(e.target.files?.[0] || null)}
-                className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-[#007570] hover:file:bg-teal-100"
-              />
-              {waAdminSettings.qris_image && (
-                <img src={waAdminSettings.qris_image} alt="QRIS" className="w-16 h-16 object-contain rounded-lg border border-slate-200" />
-              )}
-            </div>
-          </div>
-
-          <div className="px-6 pb-5 flex justify-end">
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs text-slate-500">
+              Pembaruan akan langsung aktif pada dialog akses nomor kontak UMKM di website.
+            </span>
             <button
+              type="button"
               onClick={saveWaSettings}
               disabled={savingWaSettings}
-              className="px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-sm cursor-pointer border-0 disabled:opacity-50 flex items-center gap-2 transition-all"
+              className="px-5 py-2 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs cursor-pointer border-0 disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-2xs"
             >
-              {savingWaSettings ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              {savingWaSettings ? "Menyimpan..." : "Simpan Pengaturan"}
+              {savingWaSettings ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              <span>Simpan Pengaturan WhatsApp</span>
             </button>
           </div>
         </div>
 
-        {/* Access Logs Table */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Log Akses WhatsApp</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Riwayat pengguna yang mengakses kontak WhatsApp penjual</p>
-            </div>
-            <button
-              onClick={() => fetchWaLogs(waLogPage)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
-            >
-              <RefreshCw size={12} />
-              Refresh
-            </button>
-          </div>
-          {loadingWaLogs ? (
-            <div className="flex items-center justify-center py-16 text-slate-400">
-              <Loader2 size={24} className="animate-spin mr-2" />
-              <span className="text-sm">Memuat log...</span>
-            </div>
-          ) : waLogs.length === 0 ? (
-            <div className="py-16 text-center text-slate-400">
-              <MessageSquare size={40} strokeWidth={1} className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm font-medium text-slate-500">Belum ada log akses WhatsApp.</p>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50">
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Nama Customer</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Bisnis</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Biaya</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Metode</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Bukti Transfer</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Waktu</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {waLogs.map((log, idx) => (
-                      <tr key={log.id || idx} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-semibold text-slate-800">{log.customer_name || "Pengunjung"}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600">{log.business_name || "-"}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-[#007570]">
-                          Rp {Number(log.fee_amount || 0).toLocaleString("id-ID")}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 font-semibold">{log.payment_method || "-"}</td>
-                        <td className="px-4 py-3 text-xs">
-                          {log.proof_url || log.proof_image ? (
-                            <a
-                              href={log.proof_url || getStorageUrlLocal(log.proof_image)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-50 text-[#007570] font-bold hover:bg-teal-100 border border-teal-200 cursor-pointer transition-all no-underline"
-                            >
-                              <Eye size={13} />
-                              <span>Lihat Bukti</span>
-                            </a>
-                          ) : (
-                            <span className="text-slate-400 italic text-[11px]">Tanpa Bukti</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-400">
-                          {log.created_at ? new Date(log.created_at).toLocaleString("id-ID") : "-"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={getBadgeClass(log.status === "completed" || log.status === "approved" ? "approved" : log.status === "rejected" ? "rejected" : "pending")}>
-                            {log.status === "completed" || log.status === "approved" ? "Disetujui" : log.status === "rejected" ? "Ditolak" : "Pending"}
-                          </span>
-                          {log.status === "rejected" && log.rejection_reason && (
-                            <p className="text-[10px] text-rose-500 mt-1 max-w-[140px] truncate font-medium" title={log.rejection_reason}>
-                              {log.rejection_reason}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {log.status === "pending" ? (
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => approveWaLog(log.id)}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 border-0 cursor-pointer shadow-2xs"
-                                title="Setujui Pembayaran"
-                              >
-                                <Check size={13} />
-                                <span>Setuju</span>
-                              </button>
-                              <button
-                                onClick={() => rejectWaLog(log.id)}
-                                className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1 border-0 cursor-pointer shadow-2xs"
-                                title="Tolak Pembayaran"
-                              >
-                                <X size={13} />
-                                <span>Tolak</span>
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => deleteWaLog(log.id)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-600 hover:text-white text-slate-500 font-bold text-xs flex items-center gap-1 border-0 cursor-pointer transition-colors"
-                              title="Hapus riwayat ini (sudah tidak dipakai)"
-                            >
-                              <Trash2 size={13} />
-                              <span>Hapus</span>
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* ── SECTION 2: LOG TRANSAKSI & PEMBAYARAN MASUK ── */}
+        <div className="space-y-4">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-xs">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007570] flex items-center justify-center mx-auto mb-2">
+                <CreditCard size={20} />
               </div>
-              {/* Pagination */}
-              {waLogPagination.last_page > 1 && (
-                <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100">
-                  <span className="text-xs text-slate-500">
-                    Total: {waLogPagination.total} log
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => fetchWaLogs(waLogPagination.current_page - 1)}
-                      disabled={waLogPagination.current_page === 1}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
-                    >
-                      ‹
-                    </button>
-                    <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-[#007570] text-white">
-                      {waLogPagination.current_page} / {waLogPagination.last_page}
-                    </span>
-                    <button
-                      onClick={() => fetchWaLogs(waLogPagination.current_page + 1)}
-                      disabled={waLogPagination.current_page === waLogPagination.last_page}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
-                    >
-                      ›
-                    </button>
-                  </div>
+              <p className="text-2xl font-black text-[#007570]">{waLogStats.total_access?.toLocaleString("id-ID") || 0}</p>
+              <p className="text-xs text-slate-500 font-semibold mt-0.5">Total Transaksi Akses</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-xs">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2">
+                <DollarSign size={20} />
+              </div>
+              <p className="text-2xl font-black text-emerald-600">
+                Rp {Number(waLogStats.total_revenue || 0).toLocaleString("id-ID")}
+              </p>
+              <p className="text-xs text-slate-500 font-semibold mt-0.5">Total Pendapatan Terverifikasi</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-xs">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-2">
+                <TrendingUp size={20} />
+              </div>
+              <p className="text-2xl font-black text-blue-600">{waLogStats.today_access || 0}</p>
+              <p className="text-xs text-slate-500 font-semibold mt-0.5">Transaksi Hari Ini</p>
+            </div>
+          </div>
+
+          {/* Access Logs Table Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">Riwayat Log Pembayaran &amp; Akses Kontak WhatsApp</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Daftar pengunjung yang melakukan pembayaran untuk mengakses nomor kontak penjual</p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Search */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={waLogSearch}
+                    onChange={(e) => setWaLogSearch(e.target.value)}
+                    placeholder="Cari customer / bisnis..."
+                    className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007570]/20 w-44"
+                  />
                 </div>
-              )}
-            </>
-          )}
+
+                {/* Filter */}
+                <select
+                  value={waLogStatusFilter}
+                  onChange={(e) => setWaLogStatusFilter(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium cursor-pointer"
+                >
+                  <option value="all">Semua Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Disetujui</option>
+                  <option value="rejected">Ditolak</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => fetchWaLogs(waLogPage)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  <RefreshCw size={12} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {loadingWaLogs ? (
+              <div className="flex items-center justify-center py-16 text-slate-400">
+                <Loader2 size={24} className="animate-spin mr-2" />
+                <span className="text-sm">Memuat log transaksi...</span>
+              </div>
+            ) : filteredWaLogs.length === 0 ? (
+              <div className="py-16 text-center text-slate-400">
+                <CreditCard size={40} strokeWidth={1} className="mx-auto mb-3 opacity-40" />
+                <p className="text-sm font-medium text-slate-500">Tidak ada data transaksi pembayaran yang cocok.</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/80">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Nama Customer</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Target Bisnis</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Nominal Biaya</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Metode Pembayaran</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Bukti Struk Transfer</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Waktu Transaksi</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Aksi Verifikasi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredWaLogs.map((log, idx) => (
+                        <tr key={log.id || idx} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800">
+                            <div>{log.customer_name || "Pengunjung Tamu"}</div>
+                            {log.customer_phone && (
+                              <span className="text-[11px] text-slate-400 font-mono">{log.customer_phone}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600">
+                            <div className="flex items-center gap-2.5">
+                              {log.business_image ? (
+                                <img
+                                  src={log.business_image.startsWith("http") ? log.business_image : getStorageUrlLocal(log.business_image)}
+                                  alt={log.business_name}
+                                  className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0"
+                                  onError={(e) => { e.target.style.display = "none"; }}
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center text-[#007570] font-bold text-xs shrink-0">
+                                  {(log.business_name || "B").charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <span className="font-semibold text-slate-800">{log.business_name || "-"}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-bold text-[#007570]">
+                            Rp {Number(log.fee_amount || 0).toLocaleString("id-ID")}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-700 font-semibold">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                              {log.payment_method || "QRIS Instant"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {log.proof_url || log.proof_image ? (
+                              <a
+                                href={log.proof_url || getStorageUrlLocal(log.proof_image)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-50 text-[#007570] font-bold hover:bg-teal-100 border border-teal-200 cursor-pointer transition-all no-underline"
+                              >
+                                <Eye size={13} />
+                                <span>Lihat Struk</span>
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 italic text-[11px]">Tanpa Bukti</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-400">
+                            {log.created_at ? new Date(log.created_at).toLocaleString("id-ID") : "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={getBadgeClass(log.status === "completed" || log.status === "approved" ? "approved" : log.status === "rejected" ? "rejected" : "pending")}>
+                              {log.status === "completed" || log.status === "approved" ? "Disetujui" : log.status === "rejected" ? "Ditolak" : "Pending"}
+                            </span>
+                            {log.status === "rejected" && log.rejection_reason && (
+                              <p className="text-[10px] text-rose-500 mt-1 max-w-[140px] truncate font-medium" title={log.rejection_reason}>
+                                {log.rejection_reason}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {log.status === "pending" ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => approveWaLog(log.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 border-0 cursor-pointer shadow-2xs"
+                                  title="Setujui Pembayaran & Buka Akses"
+                                >
+                                  <Check size={13} />
+                                  <span>Setuju</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => rejectWaLog(log.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1 border-0 cursor-pointer shadow-2xs"
+                                  title="Tolak Pembayaran"
+                                >
+                                  <X size={13} />
+                                  <span>Tolak</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => deleteWaLog(log.id)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-600 hover:text-white text-slate-500 font-bold text-xs flex items-center gap-1 border-0 cursor-pointer transition-colors"
+                                title="Hapus riwayat ini"
+                              >
+                                <Trash2 size={13} />
+                                <span>Hapus</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {waLogPagination.last_page > 1 && (
+                  <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100">
+                    <span className="text-xs text-slate-500">
+                      Total: {waLogPagination.total} log transaksi
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => fetchWaLogs(waLogPagination.current_page - 1)}
+                        disabled={waLogPagination.current_page === 1}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                      >
+                        ‹
+                      </button>
+                      <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-[#007570] text-white">
+                        {waLogPagination.current_page} / {waLogPagination.last_page}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => fetchWaLogs(waLogPagination.current_page + 1)}
+                        disabled={waLogPagination.current_page === waLogPagination.last_page}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                      >
+                        ›
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -9415,8 +10143,26 @@ export default function AdminWeb() {
                   )}
                 </div>
               </div>
-            ) : (modal.type.includes("delete") || modal.type.includes("reject")) && modal.type !== "rejectItem" && modal.type !== "rejectContentTx" && modal.type !== "rejectReferralTrx" && modal.type !== "rejectReferralCom" ? (
-              <p>Apakah Anda yakin ingin menghapus/menolak item ini?</p>
+            ) : (modal.type.includes("delete") || modal.type.includes("reject")) && modal.type !== "rejectItem" && modal.type !== "rejectContentTx" && modal.type !== "rejectReferralTrx" && modal.type !== "rejectReferralCom" && modal.type !== "rejectReferralWithdrawal" ? (
+              <div className="space-y-4 text-center py-2">
+                <p className="text-sm font-medium text-slate-700">Apakah Anda yakin ingin menghapus/menolak item ini?</p>
+                <div className="flex items-center justify-center gap-3 pt-3 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveModal}
+                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Ya, Lanjutkan
+                  </button>
+                </div>
+              </div>
             ) : modal.type === "approvePayment" ? (
               <p>Apakah Anda yakin ingin menyetujui pembayaran ini?</p>
             ) : modal.type === "downloadReport" ? (
@@ -11521,6 +12267,7 @@ export default function AdminWeb() {
           {(activeTab === "content_pricing" || activeTab === "content_packages") && renderBlogs()}
           {activeTab === "reports"          && renderReports()}
           {activeTab === "notifications" && renderNotifications()}
+          {activeTab === "payment-settings" && renderPaymentSettings()}
           {activeTab === "whatsapp"      && renderWhatsApp()}
         </div>
       </main>

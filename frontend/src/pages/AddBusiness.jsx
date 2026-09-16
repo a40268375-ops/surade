@@ -6,6 +6,7 @@ import CategorySelector from "../components/CategorySelector";
 import RichTextEditor, { isYouTubeUrl } from "../components/RichTextEditor";
 import DiscountCodeInput from "../components/DiscountCodeInput";
 import api from "../services/api";
+import PaymentMethodSelector from "../components/PaymentMethodSelector";
 import { getStorageUrl } from "../utils/constants";
 import {
   Store, MapPin, ImageIcon, Video, Tag, Phone, Mail,
@@ -144,8 +145,8 @@ const PAYMENT_METHODS = [
     category: "E-Wallet",
     items: [
       { id: "OVO", name: "OVO", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#4c2a86] text-white" },
-      { id: "DANA", name: "DANA", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#008cff] text-white" },
-      { id: "GoPay", name: "GoPay", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#00a5cf] text-white" },
+      { id: "DANA", name: "DANA", accountName: "xxxx", accountNumber: "xxxx", badgeColor: "bg-[#008cff] text-white" },
+      { id: "GoPay", name: "GoPay", accountName: "xxxx", accountNumber: "xxxx", badgeColor: "bg-[#00a5cf] text-white" },
     ]
   },
   {
@@ -638,13 +639,35 @@ export default function AddBusiness() {
     setGeocoding(true);
     setError(""); // Clear previous error
     
+    const fetchWithTimeout = async (searchQuery, timeoutMs = 6000) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`,
+          { 
+            headers: { "Accept-Language": "id,en" },
+            signal: controller.signal 
+          }
+        );
+        clearTimeout(timer);
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (err) {
+        clearTimeout(timer);
+        return null;
+      }
+    };
+
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
-        { headers: { "Accept-Language": "id" } }
-      );
-      const data = await res.json();
-      
+      // First attempt with original query
+      let data = await fetchWithTimeout(query);
+
+      // Second attempt with ", Sukabumi, Jawa Barat" appended if first attempt returned nothing
+      if ((!data || data.length === 0) && !query.toLowerCase().includes("sukabumi")) {
+        data = await fetchWithTimeout(`${query}, Sukabumi, Jawa Barat`);
+      }
+
       if (data?.[0]) {
         const newCoords = { 
           lat: parseFloat(data[0].lat), 
@@ -656,15 +679,18 @@ export default function AddBusiness() {
         // Show success message
         toast.success(`Lokasi ditemukan: ${data[0].display_name.split(',').slice(0, 3).join(',')}`);
       } else {
-        setError("Alamat tidak ditemukan. Coba gunakan format: Nama Tempat, Kota, Provinsi");
-        setTimeout(() => setError(""), 5000);
-        toast.error("Alamat tidak ditemukan");
+        // Fallback to Surade default coordinates
+        const defaultSurade = { lat: -7.3467, lng: 106.5861 };
+        setCoords(defaultSurade);
+        setMapKey((k) => k + 1);
+        toast.error("Alamat tidak ditemukan di layanan peta. Titik diset ke pusat Surade, silakan sesuaikan posisi pin.", { duration: 5000 });
       }
     } catch (err) {
-      console.error("Geocoding error:", err);
-      setError("Gagal mencari lokasi. Periksa koneksi internet Anda.");
-      setTimeout(() => setError(""), 4000);
-      toast.error("Gagal mencari lokasi");
+      // Geocoding network or timeout error fallback
+      const defaultSurade = { lat: -7.3467, lng: 106.5861 };
+      setCoords(defaultSurade);
+      setMapKey((k) => k + 1);
+      toast.error("Layanan pencarian alamat mengalami timeout. Lokasi diset ke pusat Surade.", { duration: 4000 });
     } finally {
       setGeocoding(false);
     }
@@ -2832,171 +2858,10 @@ export default function AddBusiness() {
               </div>
             </div>
 
-            <div className="space-y-6">
-              {PAYMENT_METHODS.map((group) => (
-                <div key={group.category} className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">{group.category}</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {group.items.map((item) => {
-                      const isSelected = selectedPaymentMethod === item.id;
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => setSelectedPaymentMethod(item.id)}
-                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
-                            isSelected
-                              ? "bg-[#f0fffe] border-[#007570] shadow-sm"
-                              : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            {/* Logo Images from local/CDN */}
-                            <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-white border border-slate-200 p-2 overflow-hidden">
-                              <img 
-                                src={`/logos/${item.id.toLowerCase()}.png`}
-                                alt={item.name}
-                                className="w-full h-full object-contain"
-                                onError={(e) => {
-                                  // Fallback to colored badge if image fails
-                                  e.target.style.display = 'none';
-                                  e.target.parentElement.innerHTML = `<div class="w-full h-full flex items-center justify-center ${item.badgeColor} rounded"><span class="text-white text-xs font-bold">${item.id}</span></div>`;
-                                }}
-                              />
-                            </div>
-                            <span className="text-sm font-bold text-slate-800">{item.name}</span>
-                          </div>
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#007570] bg-[#007570]" : "border-slate-300"}`}>
-                            {isSelected && <Check size={12} className="text-white" />}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Instruction Card */}
-            <div className="mt-8 bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-              <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <ShieldCheck size={18} className="text-[#007570]" /> Instruksi Pembayaran {currentAccount.name}
-              </h4>
-              <p className="text-xs text-slate-600">
-                {currentAccount.isQRIS 
-                  ? "Scan QR Code di bawah menggunakan aplikasi e-wallet atau mobile banking kamu:"
-                  : "Silakan lakukan transfer sebesar total tagihan ke rekening / Virtual Account berikut:"}
-              </p>
-              
-              {currentAccount.isQRIS ? (
-                /* QRIS QR Code Display */
-                <div className="bg-white border-2 border-slate-200 rounded-xl p-6 flex flex-col items-center space-y-4">
-                  <div className="w-64 h-64 bg-white border-4 border-[#007570] rounded-2xl p-4 flex items-center justify-center shadow-lg">
-                    {/* QR Code SVG - Dummy/Placeholder */}
-                    <svg viewBox="0 0 200 200" className="w-full h-full">
-                      {/* QR Code Pattern - Simplified representation */}
-                      <rect width="200" height="200" fill="white"/>
-                      
-                      {/* Top-left corner square */}
-                      <rect x="10" y="10" width="60" height="60" fill="black"/>
-                      <rect x="20" y="20" width="40" height="40" fill="white"/>
-                      <rect x="30" y="30" width="20" height="20" fill="black"/>
-                      
-                      {/* Top-right corner square */}
-                      <rect x="130" y="10" width="60" height="60" fill="black"/>
-                      <rect x="140" y="20" width="40" height="40" fill="white"/>
-                      <rect x="150" y="30" width="20" height="20" fill="black"/>
-                      
-                      {/* Bottom-left corner square */}
-                      <rect x="10" y="130" width="60" height="60" fill="black"/>
-                      <rect x="20" y="140" width="40" height="40" fill="white"/>
-                      <rect x="30" y="150" width="20" height="20" fill="black"/>
-                      
-                      {/* QR Code data pattern (simplified) */}
-                      <rect x="80" y="20" width="10" height="10" fill="black"/>
-                      <rect x="95" y="20" width="10" height="10" fill="black"/>
-                      <rect x="110" y="20" width="10" height="10" fill="black"/>
-                      
-                      <rect x="20" y="80" width="10" height="10" fill="black"/>
-                      <rect x="35" y="80" width="10" height="10" fill="black"/>
-                      <rect x="50" y="80" width="10" height="10" fill="black"/>
-                      <rect x="80" y="80" width="10" height="10" fill="black"/>
-                      <rect x="95" y="80" width="10" height="10" fill="black"/>
-                      <rect x="110" y="80" width="10" height="10" fill="black"/>
-                      <rect x="140" y="80" width="10" height="10" fill="black"/>
-                      <rect x="155" y="80" width="10" height="10" fill="black"/>
-                      <rect x="170" y="80" width="10" height="10" fill="black"/>
-                      
-                      <rect x="80" y="95" width="10" height="10" fill="black"/>
-                      <rect x="110" y="95" width="10" height="10" fill="black"/>
-                      <rect x="140" y="95" width="10" height="10" fill="black"/>
-                      <rect x="170" y="95" width="10" height="10" fill="black"/>
-                      
-                      <rect x="20" y="110" width="10" height="10" fill="black"/>
-                      <rect x="50" y="110" width="10" height="10" fill="black"/>
-                      <rect x="80" y="110" width="10" height="10" fill="black"/>
-                      <rect x="110" y="110" width="10" height="10" fill="black"/>
-                      <rect x="140" y="110" width="10" height="10" fill="black"/>
-                      <rect x="170" y="110" width="10" height="10" fill="black"/>
-                      
-                      <rect x="80" y="140" width="10" height="10" fill="black"/>
-                      <rect x="95" y="140" width="10" height="10" fill="black"/>
-                      <rect x="110" y="140" width="10" height="10" fill="black"/>
-                      <rect x="140" y="140" width="10" height="10" fill="black"/>
-                      <rect x="155" y="140" width="10" height="10" fill="black"/>
-                      <rect x="170" y="140" width="10" height="10" fill="black"/>
-                      
-                      <rect x="80" y="155" width="10" height="10" fill="black"/>
-                      <rect x="110" y="155" width="10" height="10" fill="black"/>
-                      <rect x="140" y="155" width="10" height="10" fill="black"/>
-                      <rect x="170" y="155" width="10" height="10" fill="black"/>
-                      
-                      <rect x="80" y="170" width="10" height="10" fill="black"/>
-                      <rect x="95" y="170" width="10" height="10" fill="black"/>
-                      <rect x="110" y="170" width="10" height="10" fill="black"/>
-                      <rect x="140" y="170" width="10" height="10" fill="black"/>
-                      <rect x="155" y="170" width="10" height="10" fill="black"/>
-                      <rect x="170" y="170" width="10" height="10" fill="black"/>
-                      
-                      <rect x="35" y="95" width="10" height="10" fill="black"/>
-                      <rect x="50" y="95" width="10" height="10" fill="black"/>
-                      <rect x="35" y="110" width="10" height="10" fill="black"/>
-                    </svg>
-                  </div>
-                  <div className="text-center space-y-2">
-                    <p className="text-sm font-bold text-slate-800">Scan QRIS untuk Pembayaran</p>
-                    <p className="text-xs text-slate-500">Kompatibel dengan semua e-wallet & mobile banking</p>
-                    <div className="flex items-center justify-center gap-2 pt-2">
-                      <span className="px-2 py-1 bg-[#4c2a86] text-white text-[10px] font-bold rounded">OVO</span>
-                      <span className="px-2 py-1 bg-[#008cff] text-white text-[10px] font-bold rounded">DANA</span>
-                      <span className="px-2 py-1 bg-[#00a5cf] text-white text-[10px] font-bold rounded">GoPay</span>
-                      <span className="px-2 py-1 bg-[#003d79] text-white text-[10px] font-bold rounded">BCA</span>
-                      <span className="px-2 py-1 bg-[#f15a24] text-white text-[10px] font-bold rounded">BNI</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Bank Transfer / E-Wallet Account Number Display */
-                <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-slate-400 font-medium block">Nomor Rekening / Virtual Account</span>
-                    <span className="text-lg font-black text-[#0f172a]">{currentAccount.accountNumber}</span>
-                    <span className="text-xs text-slate-500 block mt-0.5">a.n {currentAccount.accountName}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(currentAccount.accountNumber.replace(/-/g, ''));
-                      setCopiedAccount(true);
-                      setTimeout(() => setCopiedAccount(false), 2500);
-                    }}
-                    className="px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5"
-                  >
-                    {copiedAccount ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                    <span>{copiedAccount ? "Tersalin!" : "Salin No"}</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <PaymentMethodSelector
+              selectedMethod={selectedPaymentMethod}
+              onSelect={(method) => setSelectedPaymentMethod(method.id || method.name)}
+            />
           </div>
         )}
 

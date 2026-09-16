@@ -2,200 +2,329 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Star, MapPin, ChevronLeft, ChevronRight, Sparkles, ArrowUpRight } from "lucide-react";
 import { getStorageUrl } from "../../utils/constants";
+import "./PremiumAdsSection.css";
 
-const DEFAULT_PREMIUM_IMG = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&h=800&fit=crop&q=80";
+/* ── Fallback images (beda2 per slot agar tidak monoton) ── */
+const FALLBACK_MAIN =
+  "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=900&h=500&fit=crop&q=80";
+const FALLBACK_SIDE = [
+  "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=420&h=300&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=420&h=300&fit=crop&q=80",
+];
 
+function getAdImg(ad, fallback) {
+  return (
+    getStorageUrl(ad.image || ad.banner || ad.logo) ||
+    getStorageUrl(ad.business?.banner || ad.business?.logo) ||
+    fallback
+  );
+}
+
+function getAdLogoImg(ad) {
+  return getStorageUrl(ad.logo) || getStorageUrl(ad.business?.logo) || null;
+}
+
+function StarIcon({ filled = true }) {
+  return (
+    <Star size={14} className={filled ? "fill-amber-400 text-amber-400" : "text-slate-400"} />
+  );
+}
+
+/* ═══════════════════════════════════════════
+   MAIN EXPORT
+═══════════════════════════════════════════ */
 export default function PremiumAdsSection({ ads = [], loading = false }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
+  const timerRef = useRef(null);
 
+  /* ── Only show premium/hero ads ── */
   const activeAds = ads.length > 0 ? ads : [];
+  const mainAd = activeAds[currentIndex] || null;
+  /* Side thumbnails: pick OTHER ads that are not currently main.
+     If total ≤ 2, just show the remaining.
+     If only 1 ad, show 2 placeholder slots. */
+  const sideAds = activeAds.filter((_, i) => i !== currentIndex).slice(0, 2);
 
-  // Autoplay (5s interval)
-  useEffect(() => {
-    if (loading || activeAds.length <= 1 || isHovered) return;
-
-    const timer = setInterval(() => {
+  /* ── Autoplay every 5 s ── */
+  const startTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (activeAds.length <= 1) return;
+    timerRef.current = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % activeAds.length);
     }, 5000);
+  };
 
-    return () => clearInterval(timer);
+  useEffect(() => {
+    if (!loading && !isHovered) startTimer();
+    return () => clearInterval(timerRef.current);
   }, [activeAds.length, loading, isHovered]);
 
   const handlePrev = (e) => {
-    e?.preventDefault();
     e?.stopPropagation();
     setCurrentIndex((prev) => (prev - 1 + activeAds.length) % activeAds.length);
   };
 
   const handleNext = (e) => {
-    e?.preventDefault();
     e?.stopPropagation();
     setCurrentIndex((prev) => (prev + 1) % activeAds.length);
   };
 
-  const handleTouchStart = (e) => {
-    touchStartX.current = e.targetTouches[0].clientX;
-  };
-
-  const handleTouchMove = (e) => {
-    touchEndX.current = e.targetTouches[0].clientX;
-  };
-
+  const handleTouchStart = (e) => (touchStartX.current = e.targetTouches[0].clientX);
+  const handleTouchMove = (e) => (touchEndX.current = e.targetTouches[0].clientX);
   const handleTouchEnd = () => {
-    if (!touchStartX.current || !touchEndX.current) return;
     const diff = touchStartX.current - touchEndX.current;
-    if (diff > 50) {
-      handleNext();
-    } else if (diff < -50) {
-      handlePrev();
-    }
+    if (diff > 50) handleNext();
+    else if (diff < -50) handlePrev();
     touchStartX.current = 0;
     touchEndX.current = 0;
   };
 
+  /* ── SKELETON ── */
   if (loading) {
     return (
-      <section className="premium-ads-section">
-        <div className="premium-ads-container">
-          <div className="w-full h-[400px] sm:h-[450px] md:h-[500px] bg-gradient-to-br from-slate-800/90 to-slate-900/90 rounded-3xl overflow-hidden animate-pulse">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="space-y-4 w-full max-w-2xl px-8">
-                <div className="h-6 w-32 bg-slate-700/60 rounded-full mx-auto" />
-                <div className="h-12 w-3/4 bg-slate-700/60 rounded-lg mx-auto" />
-                <div className="flex items-center justify-center gap-6">
-                  <div className="h-5 w-24 bg-slate-700/60 rounded" />
-                  <div className="h-5 w-32 bg-slate-700/60 rounded" />
-                </div>
-              </div>
-            </div>
+      <div className="prem-ads-wrap">
+        <div className="prem-ads-grid">
+          <div className="prem-ads-skeleton-main" />
+          <div className="prem-ads-side">
+            <div className="prem-ads-skeleton-thumb" />
+            <div className="prem-ads-skeleton-thumb" />
           </div>
         </div>
-      </section>
+      </div>
     );
   }
 
+  /* ── Empty ── */
   if (activeAds.length === 0) return null;
 
   return (
-    <section 
-      className="premium-ads-section" 
-      aria-label="Premium Advertisements"
+    <section
+      className="prem-ads-wrap"
+      aria-label="Iklan Premium"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="premium-ads-container">
-        <div className="premium-ads-slider">
-          {activeAds.map((ad, idx) => {
-            const isActive = idx === currentIndex;
-            const targetUrl = `/business/${ad.business_id || ad.businessId || ad.id}`;
-            const bgImage = getStorageUrl(ad.image || ad.banner || ad.logo || ad.business?.banner || ad.business?.logo) || DEFAULT_PREMIUM_IMG;
-            const ratingValue = ad.rating ? Number(ad.rating).toFixed(1) : "0.0";
-            const locationText = ad.location || (ad.city ? (ad.province ? `${ad.city}, ${ad.province}` : ad.city) : "Indonesia");
+      {/* ── HEADER ── */}
+      <div className="prem-ads-header">
+        <div className="prem-ads-header__left">
+          <span className="prem-ads-header__dot" />
+          <span className="prem-ads-header__label">Iklan Premium</span>
+        </div>
+        <span className="prem-ads-header__badge">
+          <Sparkles size={11} />
+          Sponsored
+        </span>
+      </div>
+
+      {/* ── GRID: MAIN + SIDE ── */}
+      <div className="prem-ads-grid">
+        {/* ─── LEFT: MAIN SLIDER ─── */}
+        <div className="prem-ads-main">
+          <div className="prem-ads-main__track">
+            {activeAds.map((ad, idx) => {
+              const isActive = idx === currentIndex;
+              const bgImg = getAdImg(ad, FALLBACK_MAIN);
+              const logoImg = getAdLogoImg(ad);
+              const rating = ad.rating ? Number(ad.rating).toFixed(1) : "0.0";
+              const loc =
+                ad.location ||
+                (ad.city ? (ad.province ? `${ad.city}, ${ad.province}` : ad.city) : "Surade");
+              const target = `/business/${ad.business_id || ad.businessId || ad.id}`;
+
+              return (
+                <div
+                  key={`main-${ad.id}-${idx}`}
+                  className={`prem-ads-main__slide${isActive ? " active" : ""}`}
+                  aria-hidden={!isActive}
+                >
+                  <Link to={target} tabIndex={isActive ? 0 : -1}>
+                    {/* BG image */}
+                    <img
+                      src={bgImg}
+                      alt={ad.name || "Premium Ad"}
+                      className="prem-ads-main__img"
+                      loading={idx === 0 ? "eager" : "lazy"}
+                      onError={(e) => { e.currentTarget.src = FALLBACK_MAIN; }}
+                    />
+
+                    {/* Overlay */}
+                    <div className="prem-ads-main__overlay" />
+
+                    {/* Content */}
+                    <div className="prem-ads-main__content">
+                      {/* Logo row */}
+                      {logoImg && (
+                        <div className="prem-ads-main__logo-row">
+                          <img
+                            src={logoImg}
+                            alt={ad.name}
+                            className="prem-ads-main__logo"
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
+                          />
+                          <span className="prem-ads-main__source">{ad.name}</span>
+                        </div>
+                      )}
+
+                      {/* Badge row */}
+                      <div className="prem-ads-main__badge-row">
+                        <span className="prem-ads-main__tag prem-ads-main__tag--sponsored">
+                          Special Offer
+                        </span>
+                        <span className="prem-ads-main__tag prem-ads-main__tag--premium">
+                          ✦ Premium
+                        </span>
+                      </div>
+
+                      {/* Title */}
+                      <h2 className="prem-ads-main__title">{ad.name}</h2>
+
+                      {/* Description */}
+                      {ad.description && (
+                        <p className="prem-ads-main__desc">{ad.description}</p>
+                      )}
+
+                      {/* Meta */}
+                      <div className="prem-ads-main__meta">
+                        <div className="prem-ads-main__rating">
+                          <StarIcon />
+                          <span>{rating}</span>
+                          {ad.rating_count ? (
+                            <span style={{ color: "rgba(255,255,255,0.6)", fontWeight: 400 }}>
+                              ({ad.rating_count} ulasan)
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="prem-ads-main__location">
+                          <MapPin size={14} />
+                          <span>{loc}</span>
+                        </div>
+                      </div>
+
+                      {/* CTA */}
+                      <div className="prem-ads-main__cta">
+                        <span>Lihat Profil Usaha</span>
+                        <ArrowUpRight size={15} />
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Nav Arrows */}
+          {activeAds.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="prem-ads-main__nav prem-ads-main__nav--prev"
+                onClick={handlePrev}
+                aria-label="Sebelumnya"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                type="button"
+                className="prem-ads-main__nav prem-ads-main__nav--next"
+                onClick={handleNext}
+                aria-label="Berikutnya"
+              >
+                <ChevronRight size={20} />
+              </button>
+
+              {/* Dots */}
+              <div className="prem-ads-main__dots">
+                {activeAds.map((_, dotIdx) => (
+                  <button
+                    key={`dot-${dotIdx}`}
+                    type="button"
+                    className={`prem-ads-main__dot${dotIdx === currentIndex ? " active" : ""}`}
+                    onClick={(e) => { e.stopPropagation(); setCurrentIndex(dotIdx); }}
+                    aria-label={`Slide ${dotIdx + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ─── RIGHT: THUMBNAIL GRID ─── */}
+        <div className="prem-ads-side">
+          {/* Show up to 2 side thumbnails */}
+          {Array.from({ length: 2 }).map((_, sIdx) => {
+            const sAd = sideAds[sIdx] || null;
+
+            if (!sAd) {
+              /* Empty slot → show "Pasang Iklan" placeholder */
+              return (
+                <Link
+                  key={`side-empty-${sIdx}`}
+                  to="/dashboard?tab=iklan"
+                  className="prem-ads-empty"
+                  style={{ textDecoration: "none" }}
+                >
+                  + Pasang Iklan Premium
+                </Link>
+              );
+            }
+
+            const sImg = getAdImg(sAd, FALLBACK_SIDE[sIdx] || FALLBACK_MAIN);
+            const sLogo = getAdLogoImg(sAd);
+            const sRating = sAd.rating ? Number(sAd.rating).toFixed(1) : "0.0";
+            const sLoc =
+              sAd.location ||
+              (sAd.city ? (sAd.province ? `${sAd.city}, ${sAd.province}` : sAd.city) : "Surade");
+            const sTarget = `/business/${sAd.business_id || sAd.businessId || sAd.id}`;
 
             return (
-              <div
-                key={`prem-ad-${ad.id}-${idx}`}
-                className={`premium-ad-slide ${isActive ? "active" : ""}`}
-                aria-hidden={!isActive}
-              >
-                <Link to={targetUrl} className="premium-ad-link" tabIndex={isActive ? 0 : -1}>
-                  {/* Full-bleed Background Image */}
+              <div key={`side-${sAd.id}-${sIdx}`} className="prem-ads-thumb">
+                <Link to={sTarget}>
                   <img
-                    src={bgImage}
-                    alt={ad.name || "Premium Business"}
-                    className="premium-ad-bg"
-                    loading={idx === 0 ? "eager" : "lazy"}
+                    src={sImg}
+                    alt={sAd.name || "Premium Ad"}
+                    className="prem-ads-thumb__img"
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.src = FALLBACK_SIDE[sIdx] || FALLBACK_MAIN; }}
                   />
+                  <div className="prem-ads-thumb__overlay" />
+                  <div className="prem-ads-thumb__content">
+                    <span className="prem-ads-thumb__tag">Special Offer</span>
 
-                  {/* Sleek Gradient Overlay */}
-                  <div className="premium-ad-overlay" />
-
-                  {/* Minimalist Content */}
-                  <div className="premium-ad-content">
-                    {/* Sponsored / Premium Badge */}
-                    <div className="premium-ad-badge">
-                      <Sparkles size={13} className="text-amber-300" />
-                      <span>Sponsored</span>
-                      <span className="premium-ad-badge__dot">•</span>
-                      <span className="text-amber-200 font-semibold">Premium</span>
-                    </div>
-
-                    {/* Nama Usaha */}
-                    <h2 className="premium-ad-title">
-                      {ad.name}
-                    </h2>
-
-                    {/* Rating & Lokasi Minimalis */}
-                    <div className="premium-ad-meta">
-                      <div className="premium-ad-rating">
-                        <Star size={17} className="fill-amber-400 text-amber-400" />
-                        <span className="premium-ad-rating__val">{ratingValue}</span>
-                        {ad.rating_count ? (
-                          <span className="premium-ad-rating__count">({ad.rating_count} ulasan)</span>
-                        ) : null}
+                    {sLogo && (
+                      <div className="prem-ads-thumb__logo-row">
+                        <img
+                          src={sLogo}
+                          alt={sAd.name}
+                          className="prem-ads-thumb__logo"
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                        />
+                        <span className="prem-ads-thumb__source">{sAd.name}</span>
                       </div>
+                    )}
 
-                      <div className="premium-ad-location">
-                        <MapPin size={16} className="text-teal-300 flex-shrink-0" />
-                        <span>{locationText}</span>
+                    <div className="prem-ads-thumb__title">{sAd.name}</div>
+
+                    <div className="prem-ads-thumb__meta">
+                      <div className="prem-ads-thumb__rating">
+                        <Star size={11} className="fill-amber-400 text-amber-400" />
+                        <span>{sRating}</span>
                       </div>
-                    </div>
-
-                    {/* Subtle Action Pill */}
-                    <div className="premium-ad-action">
-                      <span>Lihat Profil Usaha</span>
-                      <ArrowUpRight size={16} />
+                      <div className="prem-ads-thumb__location">
+                        <MapPin size={11} />
+                        <span>{sLoc}</span>
+                      </div>
                     </div>
                   </div>
                 </Link>
               </div>
             );
           })}
-
-          {/* Navigation Arrows (discreet on desktop) */}
-          {activeAds.length > 1 && (
-            <>
-              <button
-                type="button"
-                className="premium-ad-nav premium-ad-nav--prev"
-                onClick={handlePrev}
-                aria-label="Previous Slide"
-              >
-                <ChevronLeft size={22} />
-              </button>
-              <button
-                type="button"
-                className="premium-ad-nav premium-ad-nav--next"
-                onClick={handleNext}
-                aria-label="Next Slide"
-              >
-                <ChevronRight size={22} />
-              </button>
-
-              {/* Minimal Pagination Dots */}
-              <div className="premium-ad-dots">
-                {activeAds.map((_, dotIdx) => (
-                  <button
-                    key={`dot-${dotIdx}`}
-                    type="button"
-                    className={`premium-ad-dot ${dotIdx === currentIndex ? "active" : ""}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setCurrentIndex(dotIdx);
-                    }}
-                    aria-label={`Go to slide ${dotIdx + 1}`}
-                  />
-                ))}
-              </div>
-            </>
-          )}
         </div>
       </div>
     </section>

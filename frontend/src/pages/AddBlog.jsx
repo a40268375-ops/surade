@@ -9,6 +9,7 @@ import {
   ChevronRight, ChevronLeft, Copy, Wallet
 } from "lucide-react";
 import { getStorageUrl } from "../utils/constants";
+import PaymentMethodSelector from "../components/PaymentMethodSelector";
 import "./AddBlog.css";
 
 const DEFAULT_BLOG_CATEGORIES = [
@@ -51,8 +52,8 @@ const PAYMENT_METHODS = [
     category: "E-Wallet",
     items: [
       { id: "OVO", name: "OVO", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#4c2a86] text-white" },
-      { id: "DANA", name: "DANA", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#008cff] text-white" },
-      { id: "GoPay", name: "GoPay", accountName: "Triwala Mitra Bestari", accountNumber: "0811-1919-711", badgeColor: "bg-[#00a5cf] text-white" },
+      { id: "DANA", name: "DANA", accountName: "xxxx", accountNumber: "xxxx", badgeColor: "bg-[#008cff] text-white" },
+      { id: "GoPay", name: "GoPay", accountName: "xxxx", accountNumber: "xxxx", badgeColor: "bg-[#00a5cf] text-white" },
     ]
   },
   {
@@ -92,6 +93,16 @@ export default function AddBlog() {
   const [couponError, setCouponError] = useState("");
   const [couponSuccessMsg, setCouponSuccessMsg] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [publicCoupons, setPublicCoupons] = useState([]);
+
+  useEffect(() => {
+    api.get("/coupons/public-codes")
+      .then((res) => {
+        const data = res.data?.data || res.data || [];
+        if (Array.isArray(data)) setPublicCoupons(data);
+      })
+      .catch((err) => console.warn("Failed to fetch public coupons:", err));
+  }, []);
 
   // ── Payment Method State ──
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("DANA");
@@ -410,14 +421,16 @@ export default function AddBlog() {
   };
 
   // ── Coupon Logic ──
-  const handleApplyCoupon = async () => {
-    if (!couponInput.trim()) return;
+  const handleApplyCoupon = async (targetCode = null) => {
+    const codeToUse = (typeof targetCode === "string" && targetCode ? targetCode : couponInput).trim().toUpperCase();
+    if (!codeToUse) return;
+    setCouponInput(codeToUse);
     setCouponLoading(true);
     setCouponError("");
     setCouponSuccessMsg("");
     try {
       const res = await api.post("/coupons/validate", {
-        code: couponInput.trim().toUpperCase(),
+        code: codeToUse,
         product_type: contentType,
         amount: currentFee,
       });
@@ -436,10 +449,10 @@ export default function AddBlog() {
         discount = Math.min(discount, currentFee);
 
         setAppliedCoupon({
-          code: couponObj.code || couponInput.trim().toUpperCase(),
+          code: couponObj.code || codeToUse,
           discount_amount: discount,
         });
-        setCouponSuccessMsg(`Kupon ${couponObj.code || couponInput} berhasil digunakan!`);
+        setCouponSuccessMsg(`Kupon ${couponObj.code || codeToUse} berhasil digunakan!`);
       } else {
         setCouponError(data?.message || "Kupon tidak valid.");
       }
@@ -498,7 +511,7 @@ export default function AddBlog() {
       if (appliedCoupon && !isResubmit) {
         formData.append("coupon_code", appliedCoupon.code);
       }
-      formData.append("payment_method", isResubmit ? "Revisi Pembayaran" : currentAccount.name);
+      formData.append("payment_method", isResubmit ? "Revisi Pembayaran" : (selectedPaymentMethod || "Bank BCA"));
       if (proofFile) {
         formData.append("payment_proof", proofFile);
       }
@@ -1153,6 +1166,33 @@ export default function AddBlog() {
                       <CheckCircle2 size={13} /> {couponSuccessMsg}
                     </p>
                   )}
+
+                  {/* Recommendations */}
+                  {publicCoupons.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                        🔥 Rekomendasi Kode Kupon Diskon Aktif (Klik untuk gunakan):
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {publicCoupons.map((c) => (
+                          <button
+                            key={c.code}
+                            type="button"
+                            onClick={() => handleApplyCoupon(c.code)}
+                            className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-[#007570] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Tag size={13} className="text-[#007570]" />
+                            <span>{c.code}</span>
+                            <span className="text-[10px] font-normal text-teal-900 bg-teal-200/70 px-1.5 py-0.5 rounded-md">
+                              {c.discount_type === "percentage"
+                                ? `Diskon ${c.discount_value}%`
+                                : `Potongan Rp ${Number(c.discount_value).toLocaleString("id-ID")}`}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1223,97 +1263,11 @@ export default function AddBlog() {
               </div>
             </div>
 
-            <div className="space-y-6">
-              {PAYMENT_METHODS.map((group) => (
-                <div key={group.category} className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">{group.category}</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {group.items.map((item) => {
-                      const isSelected = selectedPaymentMethod === item.id;
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => setSelectedPaymentMethod(item.id)}
-                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
-                            isSelected
-                              ? "bg-[#f0fffe] border-[#007570] shadow-sm"
-                              : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-white border border-slate-200 p-1.5 overflow-hidden shrink-0">
-                              <img 
-                                src={`/logos/${item.id.toLowerCase()}.png`}
-                                alt={item.name}
-                                className="w-full h-full object-contain"
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                                }}
-                              />
-                              <div className={`w-full h-full hidden items-center justify-center ${item.badgeColor} rounded`}>
-                                <span className="text-white text-[10px] font-bold">{item.id}</span>
-                              </div>
-                            </div>
-                            <span className="text-sm font-bold text-slate-800">{item.name}</span>
-                          </div>
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#007570] bg-[#007570]" : "border-slate-300"}`}>
-                            {isSelected && <Check size={12} className="text-white" />}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Instruction Card */}
-            <div className="mt-8 bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-              <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <ShieldCheck size={18} className="text-[#007570]" /> Instruksi Pembayaran {currentAccount.name}
-              </h4>
-              <p className="text-xs text-slate-600">
-                {currentAccount.isQRIS 
-                  ? "Scan QR Code di bawah menggunakan aplikasi e-wallet atau mobile banking kamu:"
-                  : "Silakan lakukan transfer sesuai total tagihan ke nomor rekening / Virtual Account berikut:"}
-              </p>
-
-              {currentAccount.isQRIS ? (
-                <div className="bg-white border-2 border-slate-200 rounded-xl p-6 flex flex-col items-center space-y-4">
-                  <div className="w-56 h-56 bg-white border-4 border-[#007570] rounded-2xl p-3 flex items-center justify-center shadow-md">
-                    <img src="/logos/qris.png" alt="QRIS Code" className="w-full h-full object-contain" onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=QRIS_SURADE_PAYMENT";
-                    }} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-bold text-slate-800">QRIS Triwala Mitra Bestari</p>
-                    <p className="text-[11px] text-slate-500">Mendukung BCA, Mandiri, BNI, BRI, DANA, OVO, GoPay, ShopeePay, dsb.</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-slate-400 font-medium block">Nomor Rekening / Virtual Account</span>
-                    <span className="text-lg font-black text-[#0f172a]">{currentAccount.accountNumber}</span>
-                    <span className="text-xs text-slate-500 block mt-0.5">a.n {currentAccount.accountName}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(currentAccount.accountNumber.replace(/-/g, ""));
-                      setCopiedAccount(true);
-                      setTimeout(() => setCopiedAccount(false), 2500);
-                    }}
-                    className="px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer flex items-center gap-1.5"
-                  >
-                    {copiedAccount ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                    <span>{copiedAccount ? "Tersalin!" : "Salin No"}</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Dynamic Payment Method Selector (Synchronized with Kelola Pembayaran) */}
+            <PaymentMethodSelector
+              selectedMethod={selectedPaymentMethod}
+              onSelect={(method) => setSelectedPaymentMethod(method.name || method.id)}
+            />
 
             {/* Navigation Buttons (Step 3) */}
             <div className="flex items-center gap-3 mt-8">

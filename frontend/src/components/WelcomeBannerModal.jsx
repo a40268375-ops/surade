@@ -24,6 +24,14 @@ export default function WelcomeBannerModal() {
     } catch (e) {}
   };
 
+  const handleBannerClick = (e) => {
+    e.preventDefault();
+    close();
+    if (window.location.pathname !== "/") {
+      window.location.href = "/";
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -37,7 +45,7 @@ export default function WelcomeBannerModal() {
         >
           <X size={20} />
         </button>
-        <a href="/add-business" className="welcome-banner-modal__image-btn" onClick={close}>
+        <a href="/" className="welcome-banner-modal__image-btn" onClick={handleBannerClick}>
           <img src={welcomeBanner} alt="Surade.co.id - Temukan Bisnis, Produk, Jasa & Informasi di Surade" className="welcome-banner-modal__image" />
         </a>
       </div>

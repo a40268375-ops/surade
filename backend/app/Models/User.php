@@ -22,6 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'location',
         'banner',
         'role',
+        'is_active',
         'account_type',
         'password',
         'referral_code',
@@ -37,6 +38,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -100,6 +102,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function businesses()
     {
         return $this->hasMany(Business::class);
+    }
+
+    public function blogs()
+    {
+        return $this->hasMany(Blog::class);
     }
 
     public function subscription()

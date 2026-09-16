@@ -4987,16 +4987,25 @@ export default function Dashboard() {
                             className="biz-form-btn-search"
                             onClick={async () => {
                               if (bizAddressFull) {
+                                const controller = new AbortController();
+                                const timer = setTimeout(() => controller.abort(), 6000);
                                 try {
-                                  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(bizAddressFull)}`);
+                                  const res = await fetch(
+                                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(bizAddressFull)}`,
+                                    { signal: controller.signal }
+                                  );
+                                  clearTimeout(timer);
                                   const data = await res.json();
                                   if (data && data.length > 0) {
                                     setBizCoordinates(`${parseFloat(data[0].lat).toFixed(5)}, ${parseFloat(data[0].lon).toFixed(5)}`);
                                   } else {
-                                    alert("Alamat tidak ditemukan di peta");
+                                    alert("Alamat tidak ditemukan di peta. Menggunakan koordinat pusat Surade.");
+                                    setBizCoordinates("-7.34670, 106.58610");
                                   }
                                 } catch (error) {
-                                  alert("Gagal mencari alamat");
+                                  clearTimeout(timer);
+                                  alert("Pencarian lokasi mengalami timeout/keterbatasan jaringan. Koordinat diset ke pusat Surade.");
+                                  setBizCoordinates("-7.34670, 106.58610");
                                 }
                               }
                             }}

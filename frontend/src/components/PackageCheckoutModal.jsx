@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../services/api";
+import PaymentMethodSelector from "./PaymentMethodSelector";
 import {
   X, Check, AlertCircle, ArrowLeft, Upload, Ticket, Share2,
   Building2, CreditCard, ShieldCheck, Loader2, Sparkles
@@ -17,6 +18,16 @@ export default function PackageCheckoutModal({
   const [couponLoading, setCouponLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState("");
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+
+  useEffect(() => {
+    api.get("/coupons/public-codes")
+      .then((res) => {
+        const data = res.data?.data || res.data || [];
+        if (Array.isArray(data)) setAvailableCoupons(data);
+      })
+      .catch((err) => console.warn("PackageCheckoutModal: failed to fetch public coupons:", err));
+  }, []);
 
   const [referralCode, setReferralCode] = useState("");
   const [referralLoading, setReferralLoading] = useState(false);
@@ -59,14 +70,16 @@ export default function PackageCheckoutModal({
   const finalPrice = Math.max(0, basePrice - totalDiscount);
 
   // Handle Apply Coupon
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
+  const handleApplyCoupon = async (targetCode = null) => {
+    const codeToUse = (typeof targetCode === "string" && targetCode ? targetCode : couponCode).trim().toUpperCase();
+    if (!codeToUse) return;
+    setCouponCode(codeToUse);
     setCouponLoading(true);
     setCouponError("");
     try {
       // Validate via coupon API
       const res = await api.post("/coupons/validate", {
-        code: couponCode.trim().toUpperCase(),
+        code: codeToUse,
         product_type: packageData.type,
         amount: basePrice,
       });
@@ -309,53 +322,6 @@ export default function PackageCheckoutModal({
                 </div>
               </div>
 
-              {/* Bank Transfer Instructions */}
-              <div style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: "0.75rem",
-                padding: "1rem",
-                marginBottom: "1.25rem",
-                background: "#ffffff",
-              }}>
-                <h5 style={{ margin: "0 0 0.75rem", fontSize: "0.875rem", fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <Building2 size={16} color="#0b4f8a" />
-                  Rekening Resmi Surade.co.id (a.n Triwala Mitra Bestari)
-                </h5>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
-                  <div style={{ background: "#f8fafc", padding: "0.625rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
-                    <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>Bank Mandiri</span>
-                    <p style={{ margin: "0.25rem 0 0", fontSize: "0.9375rem", fontWeight: 700, color: "#0f172a", letterSpacing: "0.025em" }}>133-0011-409-331</p>
-                    <span style={{ fontSize: "0.6875rem", color: "#64748b" }}>a.n Triwala Mitra Bestari</span>
-                  </div>
-                  <div style={{ background: "#f8fafc", padding: "0.625rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
-                    <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>Bank BNI</span>
-                    <p style={{ margin: "0.25rem 0 0", fontSize: "0.9375rem", fontWeight: 700, color: "#0f172a", letterSpacing: "0.025em" }}>0973607008</p>
-                    <span style={{ fontSize: "0.6875rem", color: "#64748b" }}>a.n Triwala Mitra Bestari</span>
-                  </div>
-                  <div style={{ background: "#f8fafc", padding: "0.625rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
-                    <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>Bank BCA</span>
-                    <p style={{ margin: "0.25rem 0 0", fontSize: "0.9375rem", fontWeight: 700, color: "#0f172a", letterSpacing: "0.025em" }}>0954152045</p>
-                    <span style={{ fontSize: "0.6875rem", color: "#64748b" }}>a.n Triwala Mitra Bestari</span>
-                  </div>
-                  <div style={{ background: "#f8fafc", padding: "0.625rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
-                    <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>Maybank</span>
-                    <p style={{ margin: "0.25rem 0 0", fontSize: "0.9375rem", fontWeight: 700, color: "#0f172a", letterSpacing: "0.025em" }}>2097000009</p>
-                    <span style={{ fontSize: "0.6875rem", color: "#64748b" }}>a.n Triwala Mitra Bestari</span>
-                  </div>
-                  <div style={{ background: "#f8fafc", padding: "0.625rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
-                    <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>Bank BJB</span>
-                    <p style={{ margin: "0.25rem 0 0", fontSize: "0.9375rem", fontWeight: 700, color: "#0f172a", letterSpacing: "0.025em" }}>0119213282001</p>
-                    <span style={{ fontSize: "0.6875rem", color: "#64748b" }}>a.n Triwala Mitra Bestari</span>
-                  </div>
-                  <div style={{ background: "#f8fafc", padding: "0.625rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
-                    <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>E-Wallet OVO</span>
-                    <p style={{ margin: "0.25rem 0 0", fontSize: "0.9375rem", fontWeight: 700, color: "#0f172a", letterSpacing: "0.025em" }}>0811-1919-711</p>
-                    <span style={{ fontSize: "0.6875rem", color: "#64748b" }}>a.n Triwala Mitra Bestari</span>
-                  </div>
-                </div>
-              </div>
-
               {/* Coupon & Referral Section */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.75rem", marginBottom: "1.25rem" }}>
                 {/* Coupon */}
@@ -425,6 +391,38 @@ export default function PackageCheckoutModal({
                     <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
                       {couponError}
                     </span>
+                  )}
+                  {!appliedCoupon && availableCoupons.length > 0 && (
+                    <div style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px solid #f1f5f9" }}>
+                      <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "0.35rem" }}>
+                        🔥 Rekomendasi Kupon Diskon (Klik):
+                      </span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                        {availableCoupons.map((c) => (
+                          <button
+                            key={c.code}
+                            type="button"
+                            onClick={() => handleApplyCoupon(c.code)}
+                            style={{
+                              padding: "0.25rem 0.5rem",
+                              background: "#f0fdf4",
+                              border: "1px solid #bbf7d0",
+                              color: "#15803d",
+                              borderRadius: "0.375rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                            }}
+                          >
+                            <Ticket size={12} />
+                            <span>{c.code}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -499,34 +497,13 @@ export default function PackageCheckoutModal({
                 </div>
               </div>
 
-              {/* Payment Method & Proof */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
-                    Metode Pembayaran
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "0.625rem 0.75rem",
-                      fontSize: "0.875rem",
-                      border: "1px solid #cbd5e1",
-                      borderRadius: "0.5rem",
-                      background: "#ffffff",
-                    }}
-                  >
-                    <option value="Transfer Bank Mandiri">Transfer Bank Mandiri (133-0011-409-331)</option>
-                    <option value="Transfer Bank BNI">Transfer Bank BNI (0973607008)</option>
-                    <option value="Transfer Bank BCA">Transfer Bank BCA (0954152045)</option>
-                    <option value="Transfer Bank Maybank">Transfer Bank Maybank (2097000009)</option>
-                    <option value="Transfer Bank BJB">Transfer Bank BJB (0119213282001)</option>
-                    <option value="E-Wallet OVO">E-Wallet OVO (0811-1919-711)</option>
-                    <option value="E-Wallet DANA">E-Wallet DANA (XXX - Belum Terdaftar)</option>
-                    <option value="E-Wallet GoPay">E-Wallet GoPay (XXX - Belum Terdaftar)</option>
-                  </select>
-                </div>
+              {/* Payment Method Selector (Synchronized with Kelola Pembayaran) */}
+              <div style={{ marginBottom: "1.25rem" }}>
+                <PaymentMethodSelector
+                  selectedMethod={paymentMethod}
+                  onSelect={(method) => setPaymentMethod(method.id || method.name)}
+                />
+              </div>
 
                 <div>
                   <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
@@ -579,7 +556,6 @@ export default function PackageCheckoutModal({
                     </div>
                   )}
                 </div>
-              </div>
 
               {/* Price Breakdown */}
               <div style={{

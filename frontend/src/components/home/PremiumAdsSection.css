@@ -1,0 +1,523 @@
+/* =========================================================
+   PREMIUM ADS SECTION — Gramedia-Style Layout
+   1 main banner (kiri) + thumbnail grid (kanan)
+   ========================================================= */
+
+.prem-ads-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 20px 8px;
+}
+
+/* ── SECTION HEADER ── */
+.prem-ads-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.prem-ads-header__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.prem-ads-header__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #007570;
+  animation: prem-dot-blink 2s ease-in-out infinite;
+}
+
+@keyframes prem-dot-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.prem-ads-header__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #007570;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.prem-ads-header__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #f59e0b44;
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #92400e;
+}
+
+/* ── MAIN LAYOUT GRID ── */
+.prem-ads-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* ── LEFT: MAIN SLIDER ── */
+.prem-ads-main {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0f172a;
+  min-height: 280px;
+  cursor: pointer;
+}
+
+.prem-ads-main__track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+}
+
+.prem-ads-main__slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.55s ease;
+  pointer-events: none;
+}
+
+.prem-ads-main__slide.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.prem-ads-main__slide a {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-decoration: none;
+}
+
+.prem-ads-main__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  min-height: 280px;
+  transition: transform 0.6s ease;
+}
+
+.prem-ads-main:hover .prem-ads-main__img {
+  transform: scale(1.03);
+}
+
+/* Gradient overlay */
+.prem-ads-main__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.5) 40%,
+    rgba(0, 0, 0, 0.1) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Content at bottom */
+.prem-ads-main__content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 22px 22px;
+  color: #fff;
+  z-index: 2;
+}
+
+.prem-ads-main__logo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.prem-ads-main__logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255,255,255,0.1);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+
+.prem-ads-main__source {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+}
+
+.prem-ads-main__badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.prem-ads-main__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.prem-ads-main__tag--sponsored {
+  background: #007570;
+  color: #fff;
+}
+
+.prem-ads-main__tag--premium {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+}
+
+.prem-ads-main__title {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.25;
+  margin-bottom: 10px;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.prem-ads-main__desc {
+  font-size: 0.83rem;
+  color: rgba(255,255,255,0.78);
+  line-height: 1.5;
+  margin-bottom: 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.prem-ads-main__meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.prem-ads-main__rating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: #fcd34d;
+  font-weight: 600;
+}
+
+.prem-ads-main__location {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.75);
+}
+
+.prem-ads-main__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.3);
+  backdrop-filter: blur(12px);
+  border-radius: 9px;
+  padding: 9px 18px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.prem-ads-main:hover .prem-ads-main__cta {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.5);
+}
+
+/* Navigation */
+.prem-ads-main__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.prem-ads-main__nav:hover {
+  background: rgba(255,255,255,0.3);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.prem-ads-main__nav--prev { left: 12px; }
+.prem-ads-main__nav--next { right: 12px; }
+
+/* Dots */
+.prem-ads-main__dots {
+  position: absolute;
+  bottom: 14px;
+  right: 18px;
+  display: flex;
+  gap: 5px;
+  z-index: 10;
+}
+
+.prem-ads-main__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.4);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.prem-ads-main__dot.active {
+  background: #fff;
+  width: 22px;
+  border-radius: 3px;
+}
+
+/* ── RIGHT: THUMBNAIL GRID ── */
+.prem-ads-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prem-ads-thumb {
+  flex: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  min-height: 120px;
+  background: #0f172a;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.prem-ads-thumb:hover {
+  transform: scale(1.015);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.prem-ads-thumb a {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-decoration: none;
+}
+
+.prem-ads-thumb__img {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.prem-ads-thumb:hover .prem-ads-thumb__img {
+  transform: scale(1.06);
+}
+
+.prem-ads-thumb__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.8) 0%,
+    rgba(0,0,0,0.3) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.prem-ads-thumb__content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 12px;
+  z-index: 2;
+}
+
+.prem-ads-thumb__tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  background: #007570;
+  color: #fff;
+  margin-bottom: 5px;
+}
+
+.prem-ads-thumb__logo-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.prem-ads-thumb__logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+
+.prem-ads-thumb__source {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+}
+
+.prem-ads-thumb__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.prem-ads-thumb__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.prem-ads-thumb__rating {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  color: #fcd34d;
+  font-weight: 600;
+}
+
+.prem-ads-thumb__location {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.7);
+}
+
+/* ── PLACEHOLDER EMPTY STATE ── */
+.prem-ads-empty {
+  width: 100%;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+  border-radius: 12px;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  flex: 1;
+  border: 1.5px dashed #cbd5e1;
+}
+
+/* ── SKELETON LOADING ── */
+.prem-ads-skeleton-main {
+  border-radius: 16px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: prem-shimmer 1.5s infinite;
+  min-height: 280px;
+}
+
+.prem-ads-skeleton-thumb {
+  border-radius: 12px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: prem-shimmer 1.5s infinite;
+  min-height: 120px;
+  flex: 1;
+}
+
+@keyframes prem-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .prem-ads-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prem-ads-side {
+    flex-direction: row;
+  }
+
+  .prem-ads-thumb {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 600px) {
+  .prem-ads-wrap {
+    padding: 18px 12px 4px;
+  }
+
+  .prem-ads-side {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 8px;
+    padding-bottom: 4px;
+  }
+
+  .prem-ads-side::-webkit-scrollbar { display: none; }
+
+  .prem-ads-thumb {
+    min-width: 200px;
+    flex: 0 0 200px;
+  }
+
+  .prem-ads-main__title {
+    font-size: 1.1rem;
+  }
+}
