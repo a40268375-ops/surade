@@ -23,9 +23,26 @@ export const BANK_LOGOS = {
  */
 export async function getOfficialPaymentMethods(apiClient) {
   try {
-    // Fetch from settings API
-    const response = await apiClient.get("/admin/settings");
-    const settings = response.data;
+    // 1. Try public payment methods endpoint
+    try {
+      const pmRes = await apiClient.get("/payment-methods");
+      const list = pmRes.data?.data?.methods;
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map(m => ({
+          ...m,
+          account_number: m.accountNumber || m.account_number,
+          account_holder: m.accountName || m.account_holder,
+          logo: BANK_LOGOS[m.name] || m.logoUrl || m.logo,
+        }));
+      }
+    } catch (_) {}
+
+    // 2. Fallback to settings API if user has admin privileges
+    let settings = null;
+    try {
+      const response = await apiClient.get("/admin/settings");
+      settings = response.data;
+    } catch (_) {}
 
     const methods = [
       {

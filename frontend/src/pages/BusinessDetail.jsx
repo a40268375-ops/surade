@@ -208,7 +208,7 @@ export default function BusinessDetail() {
   const getStorageUrlLocal = (path) => {
     if (!path) return "";
     if (path.startsWith("http")) return path;
-    const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/i, "");
+    const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:8000/api").replace(/\/api$/i, "");
     return `${baseUrl}/storage/${path}`;
   };
 
