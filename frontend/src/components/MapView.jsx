@@ -6,33 +6,27 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, Navigation, Eye } from 'lucide-react';
 import './MapView.css';
 
-// Fix untuk marker icon default Leaflet yang hilang di Vite/Webpack
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+// Zero-network-request inline SVG markers (Prevents browser Tracking Prevention warnings)
+const createSvgMarkerIcon = (color = '#007570') => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="30" height="42">
+    <path fill="${color}" stroke="#FFFFFF" stroke-width="1.8" d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24c0-6.627-5.373-12-12-12z"/>
+    <circle cx="12" cy="12" r="4.5" fill="#FFFFFF"/>
+  </svg>`;
 
-// Custom green marker icon (untuk semua bisnis)
-const greenIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+  return L.divIcon({
+    className: 'custom-leaflet-marker-wrapper',
+    html: `<div style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3)); display: flex; align-items: center; justify-content: center;">${svg}</div>`,
+    iconSize: [30, 42],
+    iconAnchor: [15, 42],
+    popupAnchor: [0, -40]
+  });
+};
 
-// Teal/Cyan marker for single business detail (lebih cerah)
-const tealIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// Green marker icon for general businesses
+const greenIcon = createSvgMarkerIcon('#007570');
+
+// Teal/Cyan marker for single business detail
+const tealIcon = createSvgMarkerIcon('#0284c7');
 
 // Component untuk auto-fit bounds ketika businesses berubah
 function FitBounds({ businesses }) {

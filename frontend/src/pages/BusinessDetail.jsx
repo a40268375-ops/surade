@@ -6,7 +6,7 @@ import { InlineSpinner } from "../components/LoadingScreen";
 import api from "../services/api";
 import { getStorageUrl, DEFAULT_AVATAR, OFFICIAL_BANK_ACCOUNTS, OFFICIAL_EWALLET_ACCOUNTS, OFFICIAL_ACCOUNT_HOLDER } from "../utils/constants";
 import { requireAuth, isUserLoggedIn } from "../utils/authCheck";
-import { isOpenNow } from "../utils/businessHours";
+import { isOpenNow, getTodayName, getScheduleForDay } from "../utils/businessHours";
 import WhatsAppIcon from "../components/icons/WhatsAppIcon";
 import PaymentMethodSelector from "../components/PaymentMethodSelector";
 import toast from "react-hot-toast";
@@ -107,10 +107,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-function getTodayName() {
-  const today = new Date().toLocaleDateString("id-ID", { weekday: "long" });
-  return today;
-}
 
 function getYouTubeEmbedUrl(url) {
   if (!url || typeof url !== "string") return null;
@@ -1076,7 +1072,7 @@ const handleWaPaymentConfirm = async () => {
   // titik/warna status menunjukkan tutup, karena null dianggap falsy).
   const openDays = business.opening_days;
   const todayName = getTodayName();
-  const todaySchedule = Array.isArray(openDays) ? openDays.find((d) => d.day === todayName) : null;
+  const todaySchedule = getScheduleForDay(openDays, todayName);
   const isOpenRaw = isOpenNow(openDays);
   const isOpen = isOpenRaw === null ? true : isOpenRaw;
   const displayStatus = isOpen ? "Buka Sekarang" : "Tutup";
@@ -2060,7 +2056,7 @@ const handleWaPaymentConfirm = async () => {
                 openDays && Array.isArray(openDays) && openDays.length > 0 ? (
                   <div className="space-y-1 text-xs">
                     {["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"].map((dayName) => {
-                      const d = openDays.find((od) => od.day === dayName);
+                      const d = getScheduleForDay(openDays, dayName);
                       const isToday = dayName === todayName;
                       const dayIsOpen = !!d;
                       return (
