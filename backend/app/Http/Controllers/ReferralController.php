@@ -17,65 +17,7 @@ class ReferralController extends Controller
      */
     public function myReferralStats(Request $request)
     {
-        $user = $request->user();
-
-        $baseQuery = ReferralCommission::where('referrer_id', $user->id);
-
-        $totalUsage = (clone $baseQuery)->distinct()->count('referred_user_id');
-        $totalTransaksi = (clone $baseQuery)->count();
-
-        $commissionByStatus = (clone $baseQuery)
-            ->selectRaw('status, COUNT(*) as total, SUM(COALESCE(final_commission_amount, commission_amount)) as amount')
-            ->groupBy('status')
-            ->get()
-            ->keyBy('status');
-
-        $statuses = ['pending', 'approved', 'paid', 'rejected', 'cancelled'];
-        $commissionSummary = [];
-        foreach ($statuses as $status) {
-            $row = $commissionByStatus->get($status);
-            $commissionSummary[$status] = [
-                'total_transaksi' => $row ? (int) $row->total : 0,
-                'total_komisi' => $row ? (float) $row->amount : 0,
-            ];
-        }
-
-        $totalKomisiDiterima = $commissionSummary['approved']['total_komisi'] + $commissionSummary['paid']['total_komisi'];
-        $totalKomisiDibayar = $commissionSummary['paid']['total_komisi'];
-
-        $riwayatTerbaru = (clone $baseQuery)
-            ->with(['referredUser:id,name,email', 'business:id,name'])
-            ->latest()
-            ->take(10)
-            ->get()
-            ->map(function ($c) {
-                return [
-                    'id' => $c->id,
-                    'transaction_id' => $c->transaction_id,
-                    'referred_user' => $c->referredUser?->name,
-                    'business' => $c->business?->name,
-                    'discount_amount' => (float) $c->discount_amount,
-                    'commission_amount' => (float) ($c->final_commission_amount ?? $c->commission_amount),
-                    'status' => $c->status,
-                    'created_at' => $c->created_at,
-                ];
-            });
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'referral_code' => $user->referral_code,
-                'has_referral_code' => (bool) $user->referral_code,
-                'discount_percent' => 5,
-                'commission_percent' => 15,
-                'total_penggunaan' => $totalUsage,
-                'total_transaksi' => $totalTransaksi,
-                'total_komisi_diterima' => $totalKomisiDiterima,
-                'total_komisi_dibayar' => $totalKomisiDibayar,
-                'komisi_per_status' => $commissionSummary,
-                'riwayat_terbaru' => $riwayatTerbaru,
-            ],
-        ]);
+        return app(\App\Http\Controllers\Api\ReferralController::class)->myStats($request);
     }
 
     public function checkReferralCode(Request $request)
@@ -214,11 +156,50 @@ class ReferralController extends Controller
         ]);
     }
 
+    public function updateCustomReferralCode(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'referral_code' => [
+                'required',
+                'string',
+                'min:4',
+                'max:30',
+                'regex:/^[A-Za-z0-9\-_]+$/',
+                'unique:users,referral_code,' . $user->id,
+            ],
+        ], [
+            'referral_code.required' => 'Kode referral wajib diisi.',
+            'referral_code.min' => 'Kode referral minimal 4 karakter.',
+            'referral_code.max' => 'Kode referral maksimal 30 karakter.',
+            'referral_code.regex' => 'Kode referral hanya boleh angka, huruf, dan tanda hubung.',
+            'referral_code.unique' => 'Kode referral ini sudah digunakan oleh pengguna lain. Silakan pilih kode unik lain.',
+        ]);
+
+        $newCode = strtoupper(trim($request->referral_code));
+        $user->referral_code = $newCode;
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Kode referral Anda berhasil diperbarui!',
+            'referral_code' => $newCode,
+        ]);
+    }
+
     public function generateReferralCode(User $user)
     {
-        // Generate unique 8-character referral code
+        $words = preg_split('/\s+/', trim($user->name ?? ''));
+        $firstName = !empty($words[0]) ? $words[0] : 'SRD';
+        $clean = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $firstName));
+        $threeLetters = strtoupper(substr($clean, 0, 3));
+        if (strlen($threeLetters) < 3) {
+            $threeLetters = str_pad($threeLetters, 3, 'X');
+        }
+
         do {
-            $code = 'REF' . strtoupper(substr(md5(uniqid()), 0, 5));
+            $code = "SURADE-{$threeLetters}-" . rand(100, 999);
         } while (User::where('referral_code', $code)->exists());
 
         return $code;

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../utils/api";
+import { sendOfflineSignal } from "../utils/userPresence";
 
 const AuthContext = createContext(null);
 
@@ -7,9 +8,21 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const unwrapUser = (res) => {
+    if (!res || typeof res !== "object") return null;
+    if (res.data && typeof res.data === "object" && (res.data.role || res.data.email || res.data.id)) {
+      return res.data;
+    }
+    if (res.user && typeof res.user === "object" && (res.user.role || res.user.email || res.user.id)) {
+      return res.user;
+    }
+    return res;
+  };
+
   const fetchProfile = async () => {
     try {
-      const userData = await api.get("/profile");
+      const res = await api.get("/profile");
+      const userData = unwrapUser(res);
       setUser(userData);
       localStorage.setItem("user", JSON.stringify(userData));
     } catch (err) {
@@ -29,7 +42,16 @@ export function AuthProvider({ children }) {
 
     if (token) {
       if (cachedUser) {
-        setUser(JSON.parse(cachedUser));
+        try {
+          const parsed = JSON.parse(cachedUser);
+          const unwrapped = unwrapUser(parsed);
+          setUser(unwrapped);
+          if (parsed?.data?.role || parsed?.user?.role) {
+            localStorage.setItem("user", JSON.stringify(unwrapped));
+          }
+        } catch {
+          setUser(null);
+        }
         setLoading(false);
         // Refresh profile in background
         fetchProfile();
@@ -63,8 +85,15 @@ export function AuthProvider({ children }) {
       }
       
       localStorage.setItem("token", data.access_token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      setUser(data.user);
+      const userObj = unwrapUser(data.user) || data.user;
+      localStorage.setItem("user", JSON.stringify(userObj));
+      if (data.user.role === 'user' && (!data.user.businesses || data.user.businesses.length === 0)) {
+        localStorage.removeItem('is_seller');
+        localStorage.removeItem('user_mode');
+        localStorage.removeItem('dashboard_mode');
+        localStorage.removeItem('is_seller_mode');
+      }
+      setUser(userObj);
       
       // Dispatch auth change event to notify other components
       window.dispatchEvent(new Event("auth-change"));
@@ -80,8 +109,16 @@ export function AuthProvider({ children }) {
   const setAuth = (authData) => {
     if (authData.token && authData.user) {
       localStorage.setItem("token", authData.token);
-      localStorage.setItem("user", JSON.stringify(authData.user));
-      setUser(authData.user);
+      const userObj = unwrapUser(authData.user) || authData.user;
+      localStorage.setItem("user", JSON.stringify(userObj));
+      if (authData.user.role === 'user' && authData.user.account_type !== 'business' && (!authData.user.businesses || authData.user.businesses.length === 0)) {
+        localStorage.removeItem('is_seller');
+        localStorage.removeItem('user_mode');
+        localStorage.removeItem('dashboard_mode');
+        localStorage.removeItem('is_seller_mode');
+        localStorage.removeItem('cached_my_businesses');
+      }
+      setUser(userObj);
       
       // Dispatch auth change event to notify other components
       window.dispatchEvent(new Event("auth-change"));
@@ -96,8 +133,17 @@ export function AuthProvider({ children }) {
   };
 
   const logoutLocal = () => {
+    try {
+      sendOfflineSignal();
+    } catch (_) {}
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("is_seller");
+    localStorage.removeItem("user_mode");
+    localStorage.removeItem("dashboard_mode");
+    localStorage.removeItem("is_seller_mode");
+    localStorage.removeItem("cached_my_businesses");
+    localStorage.removeItem("displayName");
     setUser(null);
   };
 

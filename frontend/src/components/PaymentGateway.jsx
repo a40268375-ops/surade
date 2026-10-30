@@ -5,34 +5,10 @@ import api from '../utils/api';
 const PaymentGateway = ({ business, plan, onSuccess, onError, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [selectedGateway, setSelectedGateway] = useState(null);
-  const [midtransLoaded, setMidtransLoaded] = useState(false);
   const [referralCode, setReferralCode] = useState('');
-  const [discount, setDiscount] = useState(0);
-  const [validatingReferral, setValidatingReferral] = useState(false);
-  const [referralError, setReferralError] = useState('');
-  const [referralApplied, setReferralApplied] = useState(false);
-
-  useEffect(() => {
-    // Load Midtrans Snap script dynamically
-    const loadMidtransScript = () => {
-      if (window.snap) {
-        setMidtransLoaded(true);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
-      script.setAttribute('data-client-key', import.meta.env.VITE_MIDTRANS_CLIENT_KEY || 'SB-Mid-client-YOUR_CLIENT_KEY_HERE');
-      script.onload = () => setMidtransLoaded(true);
-      script.onerror = () => console.error('Failed to load Midtrans Snap');
-      document.head.appendChild(script);
-    };
-
-    loadMidtransScript();
-  }, []);
 
   const plans = {
-    monthly: { label: '1 Bulan Premium', amount: 49000, days: 30 },
+    monthly: { label: '1 Bulan Premium', amount: 35000, days: 30 },
     quarterly: { label: '3 Bulan Premium', amount: 129000, days: 90 },
     yearly: { label: '12 Bulan Premium', amount: 449000, days: 365 },
   };
@@ -85,11 +61,6 @@ const PaymentGateway = ({ business, plan, onSuccess, onError, onCancel }) => {
   const finalAmount = Math.max(0, planData.amount - discount);
 
   const handleMidtransPayment = async () => {
-    if (!midtransLoaded) {
-      onError('Midtrans belum siap. Silakan tunggu sebentar dan coba lagi.');
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await api.post('/payment/midtrans/create', {
@@ -99,42 +70,81 @@ const PaymentGateway = ({ business, plan, onSuccess, onError, onCancel }) => {
         discount: discount
       });
 
-      if (response.success) {
-        if (response.mock_mode) {
-          alert('Pembayaran Berhasil! (Mode Simulasi - Tidak ada API Key asli)');
+      const resData = response?.data || response;
+
+      if (resData?.success) {
+        if (resData.mock_mode) {
+          try {
+            await api.post('/payment/midtrans/finish', {
+              order_id: resData.order_id,
+              subscription_id: resData.subscription_id,
+              transaction_status: 'settlement'
+            });
+          } catch (e) {}
+          alert('Pembayaran Berhasil! Paket Premium Anda telah aktif.');
           onSuccess({
             gateway: 'midtrans',
-            transaction_id: 'mock_trx',
-            subscription_id: response.subscription_id
+            transaction_id: resData.order_id || 'mock_trx',
+            subscription_id: resData.subscription_id
           });
           setLoading(false);
           return;
         }
 
-        // Load Midtrans Snap
-        window.snap.pay(response.snap_token, {
-          onSuccess: function(result) {
-            console.log('Payment success:', result);
-            onSuccess({
-              gateway: 'midtrans',
-              transaction_id: result.order_id,
-              subscription_id: response.subscription_id
-            });
-          },
-          onPending: function(result) {
-            console.log('Payment pending:', result);
-            alert('Pembayaran sedang diproses. Silakan cek status pembayaran secara berkala.');
-          },
-          onError: function(result) {
-            console.log('Payment error:', result);
-            onError('Pembayaran gagal. Silakan coba lagi.');
-          },
-          onClose: function() {
-            console.log('Payment popup closed');
+        const triggerSnapPay = (token) => {
+          if (!window.snap) return false;
+          window.snap.pay(token, {
+            onSuccess: async function(result) {
+              console.log('Payment success:', result);
+              try {
+                await api.post('/payment/midtrans/finish', {
+                  order_id: result?.order_id || resData.order_id,
+                  subscription_id: resData.subscription_id,
+                  transaction_status: result?.transaction_status || 'settlement'
+                });
+              } catch (e) {}
+              onSuccess({
+                gateway: 'midtrans',
+                transaction_id: result?.order_id || resData.order_id,
+                subscription_id: resData.subscription_id
+              });
+            },
+            onPending: function(result) {
+              console.log('Payment pending:', result);
+              alert('Pembayaran sedang diproses. Silakan cek status pembayaran secara berkala.');
+            },
+            onError: function(result) {
+              console.log('Payment error:', result);
+              onError('Pembayaran gagal. Silakan coba lagi.');
+            },
+            onClose: function() {
+              console.log('Payment popup closed');
+            }
+          });
+          return true;
+        };
+
+        if (resData.snap_token) {
+          if (window.snap) {
+            triggerSnapPay(resData.snap_token);
+          } else {
+            const clientKey = resData.client_key || import.meta.env.VITE_MIDTRANS_CLIENT_KEY || 'Mid-client-rOpZcxkOmIfQUXfR';
+            const isProd = resData.is_production !== undefined ? resData.is_production : !clientKey.startsWith('SB-');
+            const snapJsUrl = isProd ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js';
+
+            const script = document.createElement('script');
+            script.src = snapJsUrl;
+            script.setAttribute('data-client-key', clientKey);
+            script.onload = () => {
+              triggerSnapPay(resData.snap_token);
+            };
+            document.head.appendChild(script);
           }
-        });
+        } else {
+          onError('Gagal mendapatkan token pembayaran Midtrans.');
+        }
       } else {
-        onError(response.message || 'Gagal membuat pembayaran');
+        onError(resData?.message || 'Gagal membuat pembayaran');
       }
     } catch (error) {
       console.error('Midtrans payment error:', error);

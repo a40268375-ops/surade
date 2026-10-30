@@ -2,13 +2,15 @@ import { useParams, Link } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
 import Navbar from "../components/Navbar";
 import MapView from "../components/MapView";
+import SuradeLoader from "../components/SuradeLoader";
 import api from "../services/api";
 import { requireAuth } from "../utils/authCheck";
 import { getStorageUrl } from "../utils/constants";
-import { SMART_CITY_IMAGE_BY_SLUG } from "../data/smartVillageData";
+import { SMART_CITIES, SMART_CITY_IMAGE_BY_SLUG } from "../data/smartVillageData";
 import { getBusinessOpenStatus } from "../utils/businessHours";
 import { getSubcategoryIcon } from "../utils/subcategoryIcons";
 import BusinessCardSkeleton from "../components/BusinessCardSkeleton";
+import GooglePagination from "../components/GooglePagination";
 import {
   MapPin,
   Building2,
@@ -34,6 +36,10 @@ import {
   Bookmark,
   Eye,
   Crown,
+  CircleDollarSign,
+  ThumbsUp,
+  TrendingUp,
+  Diamond,
 } from "lucide-react";
 import "./Category.css";
 import "./Home.css";
@@ -111,21 +117,21 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const PRICE_RANGES = [
-  { id: "all", label: "Semua Rentang Harga", min: null, max: null },
-  { id: "under_50k", label: "Rp 0 - Rp 50.000", min: 0, max: 50000, desc: "Ekonomis & Terjangkau" },
-  { id: "50k_150k", label: "Rp 50.000 - Rp 150.000", min: 50000, max: 150000, desc: "Menengah" },
-  { id: "150k_500k", label: "Rp 150.000 - Rp 500.000", min: 150000, max: 500000, desc: "Standar" },
-  { id: "500k_1m", label: "Rp 500.000 - Rp 1.000.000", min: 500000, max: 1000000, desc: "Premium" },
-  { id: "above_1m", label: "> Rp 1.000.000", min: 1000000, max: null, desc: "1 Juta ke atas" },
+  { id: "all", label: "Semua Rentang Harga", min: null, max: null, desc: "" },
+  { id: "under_20k", label: "Rp 0 - Rp 20.000", min: 0, max: 20000, desc: "Murah Banget", icon: CircleDollarSign },
+  { id: "20k_75k", label: "Rp 20.000 - Rp 75.000", min: 20000, max: 75000, desc: "Terjangkau", icon: ThumbsUp },
+  { id: "75k_300k", label: "Rp 75.000 - Rp 300.000", min: 75000, max: 300000, desc: "Sedang", icon: TrendingUp },
+  { id: "300k_1m", label: "Rp 300.000 - Rp 1.000.000", min: 300000, max: 1000000, desc: "Premium", icon: Star },
+  { id: "above_1m", label: "> Rp 1.000.000", min: 1000000, max: null, desc: "Eksklusif", icon: Diamond },
 ];
 
 const getPriceTierLabel = (price) => {
   if (!price || price <= 0) return null;
-  if (price <= 50000) return "Ekonomis & Terjangkau";
-  if (price <= 150000) return "Menengah";
-  if (price <= 500000) return "Standar";
-  if (price <= 1000000) return "Premium";
-  return "1 Juta ke atas";
+  if (price <= 20000) return { label: "Murah", color: "#059669", bg: "#d1fae5" };
+  if (price <= 75000) return { label: "Terjangkau", color: "#0891b2", bg: "#cffafe" };
+  if (price <= 300000) return { label: "Sedang", color: "#d97706", bg: "#fef3c7" };
+  if (price <= 1000000) return { label: "Premium", color: "#7c3aed", bg: "#ede9fe" };
+  return { label: "Eksklusif", color: "#b91c1c", bg: "#fee2e2" };
 };
 
 const SORT_OPTIONS = [
@@ -137,7 +143,7 @@ const SORT_OPTIONS = [
 
 export default function SmartCity() {
   const { id, slug } = useParams();
-  const cityKey = id || slug || "bogor";
+  const cityKey = id || slug || "kecamatan surade";
 
   const [city, setCity] = useState(null);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
@@ -153,10 +159,38 @@ export default function SmartCity() {
   const [sortOption, setSortOption] = useState("relevance");
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
 
-  // Pagination (4 per page)
-  const ITEMS_PER_PAGE = 4;
+  const ITEMS_PER_PAGE = 6;
   const [currentPage, setCurrentPage] = useState(1);
   const listTopRef = useRef(null);
+  const [gridHeight, setGridHeight] = useState(null);
+
+  const tabsRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScroll = () => {
+    if (tabsRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  const scrollTabs = (direction) => {
+    if (tabsRef.current) {
+      const scrollAmount = direction === "left" ? -280 : 280;
+      tabsRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+      setTimeout(checkScroll, 300);
+    }
+  };
+
+  useEffect(() => {
+    if (city?.name) {
+      document.title = `${city.name} - Smart Village Surade - Surade.com`;
+    } else {
+      document.title = "Smart Village Surade - Surade.com";
+    }
+  }, [city?.name]);
 
   const priceDropdownRef = useRef(null);
   const sortDropdownRef = useRef(null);
@@ -172,22 +206,13 @@ export default function SmartCity() {
       (Array.isArray(localBiz) ? localBiz : []).forEach(id => { bizSavedMap[id] = true; });
     } catch (e) {}
 
-    // PERBAIKAN: /my-favorites dibatasi backend cuma buat role "user" -
-    // dulu dipanggil untuk semua akun login termasuk admin, jadi admin
-    // selalu dapat error 403 di sini. Sekarang dilewati kalau bukan
-    // role "user".
-    let isRegularUser = false;
-    try {
-      isRegularUser = JSON.parse(localStorage.getItem("user") || "null")?.role === "user";
-    } catch (e) {}
-
-    if (token && isRegularUser) {
+    if (token) {
       try {
         const resBiz = await api.get("/my-favorites");
         const bizData = resBiz.data?.data || resBiz.data || [];
         const bizArr = Array.isArray(bizData) ? bizData : (bizData?.data || []);
         bizArr.forEach(fav => {
-          const bId = fav.business_id || fav.business?.id;
+          const bId = fav.business_id || fav.business?.id || fav.id;
           if (bId) bizSavedMap[bId] = true;
         });
       } catch (err) {
@@ -256,10 +281,54 @@ export default function SmartCity() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    checkScroll();
+    const el = tabsRef.current;
+    if (el) {
+      el.addEventListener("scroll", checkScroll, { passive: true });
+      window.addEventListener("resize", checkScroll);
+      return () => {
+        el.removeEventListener("scroll", checkScroll);
+        window.removeEventListener("resize", checkScroll);
+      };
+    }
+  }, [categories]);
+
+  useEffect(() => {
+    if (tabsRef.current && selectedCategory) {
+      setTimeout(() => {
+        const activeEl = tabsRef.current?.querySelector(".reko-tab.active");
+        if (activeEl) {
+          activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+        checkScroll();
+      }, 100);
+    }
+  }, [selectedCategory, categories]);
+
+  const isAllSurade = !id && !slug;
+
   // Fetch Smart Village by id/slug
   useEffect(() => {
     const fetchSmartCityData = async () => {
       try {
+        if (isAllSurade) {
+          setCity({
+            id: "all",
+            slug: "all",
+            name: "Kecamatan Surade",
+            type: "smart_village",
+            description: "Pusat UMKM Terpadu & Ekosistem Digital 12 Desa/Kelurahan se-Kecamatan Surade.",
+            image: SMART_CITY_IMAGE_BY_SLUG["kelurahan-surade"] || "/images/businesses/pasar.jpg",
+            img: SMART_CITY_IMAGE_BY_SLUG["kelurahan-surade"] || "/images/businesses/pasar.jpg",
+            population: 85200,
+            area: 119.5,
+            bisnis: 153,
+          });
+          setLoading(false);
+          return;
+        }
+
         // Fetch from /home-summary instead
         const res = await fetch(`${import.meta.env.VITE_API_URL}/home-summary`);
         if (!res.ok) throw new Error("Failed to fetch smart cities");
@@ -276,26 +345,35 @@ export default function SmartCity() {
           );
 
           if (!current) {
-            const cityName = cityKey ? (cityKey.charAt(0).toUpperCase() + cityKey.slice(1).replace(/-/g, " ")) : "Kelurahan Surade";
-            current = {
-              id: cityKey || "kelurahan-surade",
-              slug: cityKey || "kelurahan-surade",
-              name: cityName.includes("Desa") || cityName.includes("Kelurahan") ? cityName : `Desa ${cityName}`,
-              type: "smart_village",
-              description:
-                "Desa/Kelurahan dengan potensi UMKM dan ekonomi lokal yang terintegrasi dalam program Smart Village.",
-              image: "https://picsum.photos/seed/surade-default/800/600",
-              img: "https://picsum.photos/seed/surade-default/800/600",
-              population: 0,
-              area: 0,
-              bisnis: 0,
-            };
+            const localMatch = SMART_CITIES.find(
+              (c) =>
+                String(c.id) === String(cityKey) ||
+                c.slug === cityKey ||
+                c.slug === String(cityKey).toLowerCase() ||
+                c.name?.toLowerCase().includes(String(cityKey).toLowerCase())
+            );
+
+            if (localMatch) {
+              current = { ...localMatch, type: "smart_village" };
+            } else {
+              const cityName = cityKey ? (cityKey.charAt(0).toUpperCase() + cityKey.slice(1).replace(/-/g, " ")) : "Kelurahan Surade";
+              current = {
+                id: cityKey || "kelurahan-surade",
+                slug: cityKey || "kelurahan-surade",
+                name: cityName.includes("Desa") || cityName.includes("Kelurahan") ? cityName : `Desa ${cityName}`,
+                type: "smart_village",
+                description:
+                  "Desa/Kelurahan dengan potensi UMKM dan ekonomi lokal yang terintegrasi dalam program Smart Village.",
+                image: "https://picsum.photos/seed/surade-default/800/600",
+                img: "https://picsum.photos/seed/surade-default/800/600",
+                population: 0,
+                area: 0,
+                bisnis: 12,
+              };
+            }
           }
 
-          // Selalu pakai foto asli lokal berdasarkan slug (kalau tersedia),
-          // supaya background halaman detail ini SAMA dengan foto di grid
-          // Smart Village halaman utama — tidak tergantung field image/img
-          // dari API yang kadang kosong.
+          // Selalu pakai foto asli lokal berdasarkan slug (kalau tersedia)
           const realPhoto = SMART_CITY_IMAGE_BY_SLUG[current.slug];
           if (realPhoto) {
             current = { ...current, image: realPhoto, img: realPhoto };
@@ -305,26 +383,31 @@ export default function SmartCity() {
         }
       } catch (err) {
         console.error("Error fetching smart cities:", err);
-        setCity({
+        const fallbackVillage = SMART_CITIES.find(
+          (c) =>
+            String(c.id) === String(cityKey) ||
+            c.slug === cityKey ||
+            c.slug === String(cityKey).toLowerCase()
+        ) || {
           id: cityKey || "kelurahan-surade",
           slug: cityKey || "kelurahan-surade",
           name: "Kelurahan Surade",
           type: "smart_village",
-          description:
-            "Pusat pemerintahan dan ekonomi Kecamatan Surade.",
-          image: "https://picsum.photos/seed/surade-default/800/600",
-          img: "https://picsum.photos/seed/surade-default/800/600",
+          description: "Pusat pemerintahan dan ekonomi Kecamatan Surade.",
+          image: SMART_CITY_IMAGE_BY_SLUG["kelurahan-surade"],
+          img: SMART_CITY_IMAGE_BY_SLUG["kelurahan-surade"],
           population: 0,
           area: 0,
-          bisnis: 0,
-        });
+          bisnis: 21,
+        };
+        setCity(fallbackVillage);
       } finally {
         setLoading(false);
       }
     };
 
     fetchSmartCityData();
-  }, [cityKey]);
+  }, [cityKey, isAllSurade]);
 
   // Fetch Categories from API or fallback
   useEffect(() => {
@@ -362,14 +445,19 @@ export default function SmartCity() {
         // Gunakan nama city yang EXACT sama dengan database
         // city.name sudah dalam format "Kelurahan Surade", "Desa Jagamukti", dll
         const locationParam = city.name;
-        console.log('Fetching businesses for location:', locationParam);
+        const isAll = isAllSurade || city.id === "all" || city.slug === "all";
+        const endpoint = isAll
+          ? `${import.meta.env.VITE_API_URL}/businesses?all=true`
+          : `${import.meta.env.VITE_API_URL}/businesses?location=${encodeURIComponent(locationParam)}&all=true`;
         
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/businesses?location=${encodeURIComponent(locationParam)}&all=true`);
+        console.log('Fetching businesses for location:', isAll ? 'ALL SURADE' : locationParam);
+        const res = await fetch(endpoint);
         const data = await res.json();
-        console.log('API Response for', locationParam, ':', data);
         
         const list = Array.isArray(data) ? data : (data?.data || []);
-        const mapped = list.map((b) => {
+        const defaultCoords = getCityCoords(city);
+
+        const mapped = list.map((b, idx) => {
           const avgPrice = b.products_avg_price ? Number(b.products_avg_price) : 0;
           const minPrice = b.products_min_price ? Number(b.products_min_price) : 0;
           const maxPrice = b.products_max_price ? Number(b.products_max_price) : 0;
@@ -392,9 +480,16 @@ export default function SmartCity() {
               bTags = b.tags.split(",").map((t) => t.trim()).filter(Boolean);
             }
           }
-          if (bTags.length === 0) {
-            bTags = [categoryName, b.village || b.city].filter(Boolean);
-          }
+          // Filter out city/location noise tags
+          const bCityLower = (b.city || "").toLowerCase();
+          bTags = bTags.map(t => typeof t === "object" ? (t?.name || String(t)) : String(t))
+            .filter(t => t && t.toLowerCase() !== bCityLower && !t.toLowerCase().startsWith("desa/") && !t.toLowerCase().startsWith("kelurahan"));
+
+          const [fallbackLat, fallbackLng] = getBusinessCoords(b, defaultCoords, idx);
+          const rawLat = b.latitude || b.lat;
+          const rawLng = b.longitude || b.lng;
+          const finalLat = rawLat && !isNaN(parseFloat(rawLat)) ? parseFloat(rawLat) : fallbackLat;
+          const finalLng = rawLng && !isNaN(parseFloat(rawLng)) ? parseFloat(rawLng) : fallbackLng;
 
           return {
             ...b,
@@ -404,13 +499,19 @@ export default function SmartCity() {
             categoryColor: b.category?.icon === "store" ? "#007570" : b.category?.icon === "coffee" ? "#0ea5e9" : "#f59e0b",
             tags: bTags,
             location: b.city ? (b.province ? `${b.city}, ${b.province}` : b.city) : (b.address || "Indonesia"),
+            address: b.address || b.city || "Kecamatan Surade",
             views: b.views || 0,
             rating: b.rating || b.average_rating || "0.0",
             rating_count: b.rating_count || 0,
             status: openStatus.label,
             open: openStatus.open,
-            img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+            img: getStorageUrl(b.banner || b.logo) || "/images/businesses/pasar.jpg",
+            lat: finalLat,
+            lng: finalLng,
+            latitude: finalLat,
+            longitude: finalLng,
             is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
+            is_verified: Boolean(b.is_verified),
             avg_price: avgPrice,
             min_price: minPrice,
             max_price: maxPrice,
@@ -532,15 +633,35 @@ export default function SmartCity() {
     }
   };
 
+  useEffect(() => {
+    if (!listTopRef.current) return;
+    const updateHeight = () => {
+      if (listTopRef.current) {
+        const h = Math.round(listTopRef.current.getBoundingClientRect().height);
+        if (h > 0) {
+          setGridHeight((prev) => (prev === h ? prev : h));
+        }
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(listTopRef.current);
+    return () => observer.disconnect();
+  }, [paginatedBusinesses, loadingBusinesses]);
+
   const cityCenterCoords = getCityCoords(city);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans">
         <Navbar />
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
-          <Loader2 className="w-10 h-10 text-[#00b074] animate-spin" />
-          <p className="text-slate-600 font-medium text-sm">Memuat Data Smart Village...</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-6">
+          <SuradeLoader
+            variant="section"
+            text="Memuat Data Smart Village"
+            subtext="Menyiapkan data potensi, layanan publik, dan direktori UMKM desa di Surade"
+            showBrand
+          />
         </div>
       </div>
     );
@@ -654,42 +775,62 @@ export default function SmartCity() {
         </div>
       </section>
 
-      {/* ── CATEGORY HORIZONTAL PILLS ── */}
-      <section className="bg-white border-b border-slate-100 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 overflow-x-auto overflow-y-hidden whitespace-nowrap pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden">
-            {categories.map((cat) => {
-              const isActive = selectedCategory === cat.id;
+      {/* ── CATEGORY HORIZONTAL PILLS (Matching Category.jsx Modern UI/UX) ── */}
+      <section className="category-tabs-section">
+        <div className="category-tabs-inner">
+          <div className="category-tabs-wrapper">
+            {canScrollLeft && (
+              <button
+                type="button"
+                className="category-scroll-arrow category-scroll-arrow--left"
+                onClick={() => scrollTabs("left")}
+                aria-label="Geser Kiri"
+                title="Geser Kategori ke Kiri"
+              >
+                <ChevronLeft size={18} strokeWidth={2.5} />
+              </button>
+            )}
 
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`shrink-0 inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer shadow-sm min-w-fit ${
-                    isActive
-                      ? "bg-[#059669] text-white font-bold text-sm border-[#059669]"
-                      : "bg-white border border-slate-200 text-slate-700 hover:border-[#059669] hover:bg-[#f0fdf4] hover:text-[#059669]"
-                  }`}
-                  style={{
-                    boxShadow: isActive ? '0 2px 8px rgba(5, 150, 105, 0.2)' : '0 1px 3px rgba(0, 0, 0, 0.05)'
-                  }}
-                >
-                  <span className={`inline-flex items-center justify-center ${isActive ? "text-white" : "text-slate-500"}`}>
-                    {cat.icon}
-                  </span>
-                  <span className={`${isActive ? "text-white" : ""}`} style={{ lineHeight: '1.3', maxWidth: '140px', textAlign: 'left' }}>
-                    {cat.label}
-                  </span>
-                </button>
-              );
-            })}
+            <div className="reko-tabs" ref={tabsRef}>
+              {categories.map((cat) => {
+                const isActive = selectedCategory === cat.id;
+
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      setCurrentPage(1);
+                    }}
+                    className={`reko-tab reko-tab--link${isActive ? " active" : ""}`}
+                  >
+                    <span className="reko-tab__icon-wrap">
+                      <span className="reko-tab__icon">{cat.icon}</span>
+                    </span>
+                    <span className="reko-tab__label">{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {canScrollRight && (
+              <button
+                type="button"
+                className="category-scroll-arrow category-scroll-arrow--right"
+                onClick={() => scrollTabs("right")}
+                aria-label="Geser Kanan"
+                title="Geser Kategori ke Kanan"
+              >
+                <ChevronRight size={18} strokeWidth={2.5} />
+              </button>
+            )}
           </div>
         </div>
       </section>
 
       {/* ── MAIN BUSINESS DIRECTORY & MAP SECTION ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14" ref={listTopRef}>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
         {/* Section Header & Toolbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
@@ -827,7 +968,12 @@ export default function SmartCity() {
                       >
                         <div>
                           <div>{range.label}</div>
-                          {range.desc && <div className="text-[10px] text-slate-400 font-normal">{range.desc}</div>}
+                          {range.desc && (
+                            <div className="text-[10px] text-slate-400 font-normal flex items-center gap-1 mt-0.5">
+                              {range.icon && <range.icon size={12} className="text-slate-400" />}
+                              {range.desc}
+                            </div>
+                          )}
                         </div>
                         {selectedPriceRange === range.id && <Check size={14} className="text-[#059669]" />}
                       </li>
@@ -876,10 +1022,10 @@ export default function SmartCity() {
           </div>
         </div>
 
-        {/* 2-Column Grid (Cards & Map) */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 items-start">
+        {/* 2-Column Split Layout (Cards & Map - exact match to Category page) */}
+        <div className="category-business-split">
           {/* Left Column: Business Cards & Pagination */}
-          <div>
+          <div className="category-business-left" ref={listTopRef}>
             {loadingBusinesses ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 {[1, 2, 3, 4].map((n) => (
@@ -904,13 +1050,16 @@ export default function SmartCity() {
                           loading="lazy" 
                           onError={(e) => {
                             e.currentTarget.onerror = null;
-                            e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&h=350&fit=crop&q=80";
+                            e.currentTarget.src = "/images/businesses/pasar.jpg";
                           }}
                         />
-                        {bisnis.is_premium && (
-                          <div className="biz-card__verified-badge biz-card__verified-badge--premium" title="Bisnis Terverifikasi - Mitra Resmi">
-                            <BadgeCheck size={14} className="biz-card__verified-icon" />
-                            <span>Terverifikasi</span>
+                        {/* Verified badge (Rosette icon only matching Image 3) */}
+                        {Boolean(bisnis.is_premium) && (
+                          <div className="biz-card__verified-badge" title="Bisnis Terverifikasi - Mitra Resmi">
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6 drop-shadow-[0_2px_8px_rgba(16,185,129,0.5)]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M12 1L9.27 3.47L5.64 3.78L4.69 7.31L1.77 9.5L2.83 13L1.77 16.5L4.69 18.69L5.64 22.22L9.27 22.53L12 25L14.73 22.53L18.36 22.22L19.31 18.69L22.23 16.5L21.17 13L22.23 9.5L19.31 7.31L18.36 3.78L14.73 3.47L12 1Z" fill="#10B981" />
+                              <path d="M10.2 14.8L7.4 12L6 13.4L10.2 17.6L18 9.8L16.6 8.4L10.2 14.8Z" fill="white" />
+                            </svg>
                           </div>
                         )}
                         <div className="biz-card__img-overlay">
@@ -953,6 +1102,30 @@ export default function SmartCity() {
                             </p>
                           )}
                         </div>
+                        {/* Price Tag - only show if price data exists, show min-max range with tier */}
+                        {(bisnis.min_price > 0 || bisnis.avg_price > 0) && (() => {
+                          const tier = getPriceTierLabel(bisnis.min_price || bisnis.avg_price);
+                          return (
+                            <div className="flex items-center gap-1.5 flex-wrap my-1.5">
+                              <div className="biz-card__price-tag flex items-center gap-1.5 text-[12px] font-bold text-emerald-800 bg-emerald-50/90 px-2.5 py-1 rounded-lg border border-emerald-200/90 w-fit">
+                                <Tag size={12} className="text-emerald-600 shrink-0" />
+                                <span>
+                                  {bisnis.min_price > 0 && bisnis.max_price > 0 && bisnis.min_price !== bisnis.max_price
+                                    ? `Rp ${Number(bisnis.min_price).toLocaleString("id-ID")} - Rp ${Number(bisnis.max_price).toLocaleString("id-ID")}`
+                                    : `Rp ${Number(bisnis.min_price || bisnis.avg_price).toLocaleString("id-ID")}`}
+                                </span>
+                              </div>
+                              {tier && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+                                  style={{ color: tier.color, background: tier.bg, borderColor: tier.color + "40" }}>
+                                  {tier.label}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {/* Tags - only show if real tags exist */}
+                        {bisnis.tags && bisnis.tags.length > 0 && (
                         <div className="biz-card__tags">
                           {bisnis.tags.slice(0, 3).map((tag, idx) => (
                             <span key={idx} className="biz-card__tag">
@@ -968,6 +1141,7 @@ export default function SmartCity() {
                             </span>
                           )}
                         </div>
+                        )}
                         <div className="biz-card__footer">
                           <span className="biz-card__rating">
                             <Star size={13} className="fill-amber-400 text-amber-400" />
@@ -986,62 +1160,20 @@ export default function SmartCity() {
                   ))}
                 </div>
 
-                {/* ── Responsive Pagination Controls ── */}
+                {/* ── Responsive Pagination Controls (Google Style Gooooooogle) ── */}
                 {totalPages > 1 && (
                   <div className="category-pagination">
                     <div className="category-pagination__info">
-                      Menampilkan <strong>{startIndex + 1}</strong>–<strong>{Math.min(startIndex + ITEMS_PER_PAGE, totalItems)}</strong> dari <strong>{totalItems}</strong> bisnis
+                      Menampilkan <strong>{startIndex + 1}</strong>–<strong>{Math.min(startIndex + ITEMS_PER_PAGE, totalItems)}</strong> dari <strong>{totalItems}</strong> usaha
                     </div>
 
-                    <div className="category-pagination__controls">
-                      {/* Prev Button */}
-                      <button
-                        type="button"
-                        className="category-pagination__nav-btn"
-                        onClick={() => handlePageChange(safeCurrentPage - 1)}
-                        disabled={safeCurrentPage === 1}
-                        aria-label="Halaman Sebelumnya"
-                      >
-                        <ChevronLeft size={16} />
-                        <span className="category-pagination__nav-label">Sebelumnya</span>
-                      </button>
-
-                      {/* Numbered Pages */}
-                      <div className="category-pagination__pages">
-                        {pageNumbers.map((page, idx) =>
-                          page === "..." ? (
-                            <span key={`dots-${idx}`} className="category-pagination__dots">
-                              …
-                            </span>
-                          ) : (
-                            <button
-                              key={`page-${page}`}
-                              type="button"
-                              className={`category-pagination__page-btn ${
-                                page === safeCurrentPage ? "active" : ""
-                              }`}
-                              onClick={() => handlePageChange(page)}
-                              aria-label={`Ke Halaman ${page}`}
-                              aria-current={page === safeCurrentPage ? "page" : undefined}
-                            >
-                              {page}
-                            </button>
-                          )
-                        )}
-                      </div>
-
-                      {/* Next Button */}
-                      <button
-                        type="button"
-                        className="category-pagination__nav-btn"
-                        onClick={() => handlePageChange(safeCurrentPage + 1)}
-                        disabled={safeCurrentPage === totalPages}
-                        aria-label="Halaman Selanjutnya"
-                      >
-                        <span className="category-pagination__nav-label">Selanjutnya</span>
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
+                    <GooglePagination
+                      currentPage={safeCurrentPage}
+                      totalPages={totalPages}
+                      onPageChange={handlePageChange}
+                      prevLabel="Sebelumnya"
+                      nextLabel="Berikutnya"
+                    />
                   </div>
                 )}
               </>
@@ -1057,11 +1189,18 @@ export default function SmartCity() {
             )}
           </div>
 
-          {/* Right Column: Interactive Map */}
-          <div className="sticky top-24 w-full">
+          {/* Right Column: Interactive Map (matches Category page) */}
+          <div 
+            className="category-business-right"
+            style={{
+              height: gridHeight ? `${gridHeight}px` : '100%',
+              minHeight: gridHeight ? `${gridHeight}px` : '450px',
+              maxHeight: gridHeight ? `${gridHeight}px` : 'none'
+            }}
+          >
             <MapView 
-              businesses={filteredBusinesses} 
-              height="480px"
+              businesses={paginatedBusinesses} 
+              height={gridHeight ? `${gridHeight}px` : '100%'}
             />
           </div>
         </div>

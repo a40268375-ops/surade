@@ -29,6 +29,7 @@ export default function PremiumUpgrade() {
   };
 
   useEffect(() => {
+    document.title = "Upgrade Akun Premium - Surade.com";
     if (authLoading) return;
     if (!user) {
       navigate("/login");
@@ -194,7 +195,7 @@ export default function PremiumUpgrade() {
                       <div className="plan-features">
                         <div className="feature">
                           <CheckCircle size={16} />
-                          <span>Galeri foto unlimited</span>
+                          <span>Galeri foto hingga 5 foto</span>
                         </div>
                         <div className="feature">
                           <CheckCircle size={16} />

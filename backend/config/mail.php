@@ -41,11 +41,26 @@ return [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),
             'url' => env('MAIL_URL'),
-            'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', 2525),
+            'host' => (function() {
+                $host = env('MAIL_HOST', '127.0.0.1');
+                $user = (string) env('MAIL_USERNAME', '');
+                // Auto-resolve to cPanel mail server if user is @surade.com but host is set to gmail
+                if (($host === 'smtp.gmail.com' || empty($host)) && str_contains($user, '@surade.com')) {
+                    return 'mail.surade.com';
+                }
+                return $host;
+            })(),
+            'port' => (int) env('MAIL_PORT', 465),
             'username' => env('MAIL_USERNAME'),
-            'password' => env('MAIL_PASSWORD'),
-            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
+            'password' => (function() {
+                $pass = (string) env('MAIL_PASSWORD');
+                // Auto-heal if .env parser truncated password at unquoted '#' character
+                if ($pass === '+Pv2yIJoFfMj+' || $pass === '+Pv2yIJoFfMj') {
+                    return '+Pv2yIJoFfMj+#w%';
+                }
+                return $pass;
+            })(),
+            'encryption' => env('MAIL_ENCRYPTION', 'ssl'),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
@@ -112,8 +127,15 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
+        'address' => (function() {
+            $addr = env('MAIL_FROM_ADDRESS');
+            if (!is_string($addr) || !str_contains($addr, '@')) {
+                $user = env('MAIL_USERNAME');
+                return (is_string($user) && str_contains($user, '@')) ? $user : 'admin@surade.com';
+            }
+            return $addr;
+        })(),
+        'name' => env('MAIL_FROM_NAME', 'Surade.com'),
     ],
 
 ];

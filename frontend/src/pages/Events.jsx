@@ -26,6 +26,7 @@ export default function Events() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.title = "Agenda Event - Surade.com";
 
     async function loadData() {
       setLoading(true);
@@ -93,7 +94,7 @@ export default function Events() {
           </div>
           <h1 className="blog-hero__title">Event</h1>
           <p className="blog-hero__subtitle">
-            Jangan Lewatkan Berbagai Event Menarik dari Surade.co.id
+            Jangan Lewatkan Berbagai Event Menarik dari Surade.com
           </p>
         </div>
       </section>
@@ -172,17 +173,17 @@ export default function Events() {
           <div className="footer-cols">
             <div className="footer-col footer-col--brand">
               <Link to="/" className="footer-logo">
-                <img src={logoImg} alt="Surade.co.id" className="footer-logo__img" />
+                <img src={logoImg} alt="Surade.com" className="footer-logo__img" />
               </Link>
               <p className="footer-desc">
-                Surade.co.id adalah portal informasi yang menyajikan data dan berita terpercaya dari berbagai sumber resmi di Indonesia.
+                Surade.com adalah portal informasi yang menyajikan data dan berita terpercaya dari berbagai sumber resmi di Indonesia.
               </p>
             </div>
 
             <div className="footer-col">
               <h4 className="footer-heading">Tentang Kami</h4>
               <ul className="footer-links">
-                <li><Link to="/about">Tentang Surade.co.id</Link></li>
+                <li><Link to="/about">Tentang Surade.com</Link></li>
                 <li><Link to="/vision-mission">Visi &amp; Misi</Link></li>
                 <li><Link to="/partnership-career">Kerjasama &amp; Karir</Link></li>
               </ul>
@@ -200,7 +201,7 @@ export default function Events() {
             <div className="footer-col">
               <h4 className="footer-heading">Kontak Kami</h4>
               <ul className="footer-links">
-                <li><a href="mailto:admin@Surade.co.id">admin@Surade.co.id</a></li>
+                <li><a href="mailto:admin@Surade.com">admin@Surade.com</a></li>
                 <li><span className="footer-text">Call Center 0807 - 100 - 1500</span></li>
                   <li><span className="footer-text">WhatsApp: +62 811-1919-711</span></li>
                 
@@ -212,7 +213,7 @@ export default function Events() {
 
         <div className="footer-bottom">
           <div className="footer-bottom__inner">
-            <p className="footer-copyright">&copy; 2026 Surade.co.id. All rights reserved.</p>
+            <p className="footer-copyright">&copy; 2026 Surade.com. All rights reserved.</p>
           </div>
         </div>
       </footer>

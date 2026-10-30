@@ -1,4 +1,4 @@
-# 📋 RINGKASAN LENGKAP PERBAIKAN SISTEM SURADE.CO.ID
+# 📋 RINGKASAN LENGKAP PERBAIKAN SISTEM SURADE.COM
 
 ## 🎯 Yang Sudah Diperbaiki Hari Ini (15 September 2026)
 
@@ -21,7 +21,7 @@
 #### ✅ SESUDAH:
 ```
 ┌─────────────────────────────────────┐
-│  [🅢] Surade.co.id                  │  ← Logo + Brand di tengah
+│  [🅢] Surade.com                  │  ← Logo + Brand di tengah
 │  Platform UMKM Digital Kecamatan    │  ← Tagline
 │           Surade                     │
 ├─────────────────────────────────────┤
@@ -38,8 +38,8 @@
 │  • Berlaku 5 menit                  │
 │  • Tim tidak pernah minta kode      │
 │                                      │
-│  support@surade.co.id               │
-│  © 2026 Surade.co.id                │
+│  support@surade.com               │
+│  © 2026 Surade.com                │
 └─────────────────────────────────────┘
 ```
 
@@ -246,7 +246,7 @@ GET /api/payment-methods
   "data": {
     "methods": [...],
     "official_account_holder": "Triwala Mitra Bestari",
-    "qris_image": "https://surade.co.id/storage/qris.png"
+    "qris_image": "https://surade.com/storage/qris.png"
   }
 }
 ```
@@ -309,7 +309,7 @@ User Action               →  System Response
 ## 6. 🗂️ FILE STRUCTURE
 
 ```
-surade.co.id/
+surade.com/
 │
 ├── backend/
 │   ├── app/
@@ -484,8 +484,8 @@ MAIL_PORT=587
 MAIL_USERNAME=your-email@gmail.com
 MAIL_PASSWORD=your-app-password
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=noreply@surade.co.id
-MAIL_FROM_NAME="Surade.co.id"
+MAIL_FROM_ADDRESS=noreply@surade.com
+MAIL_FROM_NAME="Surade.com"
 
 # 2. Clear cache
 php artisan config:clear
@@ -550,7 +550,7 @@ post_max_size = 10M
 ### ✅ Apa yang Sudah Berhasil:
 
 1. **Email OTP System**
-   - Template baru dengan branding Surade.co.id
+   - Template baru dengan branding Surade.com
    - Logo di tengah header
    - Design modern dan profesional
    - Responsive untuk semua device
@@ -603,14 +603,14 @@ File dokumentasi lengkap tersedia di:
 - `RINGKASAN_PERBAIKAN.md` - Dokumen ini
 
 Untuk pertanyaan lebih lanjut, hubungi:
-- Email: support@surade.co.id
-- Developer: admin@surade.co.id
+- Email: support@surade.com
+- Developer: admin@surade.com
 
 ---
 
 **🎊 SEMUA FITUR SUDAH BERFUNGSI 100%! 🎊**
 
-© 2026 Surade.co.id - Platform UMKM Digital Kecamatan Surade
+© 2026 Surade.com - Platform UMKM Digital Kecamatan Surade
 Dibuat dengan ❤️ untuk UMKM Indonesia
 
 ---

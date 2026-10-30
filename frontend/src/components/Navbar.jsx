@@ -1,28 +1,25 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronDown, ChevronRight, Plus, LogOut,
-  User, Settings, Loader2, Menu, X, LayoutDashboard, Mail,
+  User, Settings, Loader2, Menu, X, LayoutDashboard, Mail, Sparkles,
 } from "lucide-react";
 import logoImg from "../assets/logo-surade.png";
 import { DEFAULT_AVATAR, getStorageUrl } from "../utils/constants";
 import MobileMenu from "./MobileMenu";
+import MobileBottomNav from "./MobileBottomNav";
+import { getSubcategoryIcon } from "../utils/subcategoryIcons";
+import { getCompleteNavbarCategories } from "../utils/categoryIcons";
 
-// Helper to ensure 'Jasa' is at the very top, 'Hiburan' is at the very bottom, and UMKM is excluded
+// Helper to sort categories strictly by their configured order
 const sortCategoriesList = (list) => {
   if (!Array.isArray(list)) return [];
   return list
     .filter((c) => {
       const slug = String(c.slug || c.name || "").toLowerCase();
-      return slug !== "umkm";
+      return slug !== "umkm" && slug !== "nomor-penting" && !slug.includes("nomor penting") && !slug.includes("darurat");
     })
     .sort((a, b) => {
-      const aSlug = String(a.slug || a.name || "").toLowerCase();
-      const bSlug = String(b.slug || b.name || "").toLowerCase();
-      if (aSlug === "jasa" && bSlug !== "jasa") return -1; // Jasa always top
-      if (aSlug !== "jasa" && bSlug === "jasa") return 1;
-      if (aSlug === "hiburan" && bSlug !== "hiburan") return 1; // Hiburan always bottom
-      if (aSlug !== "hiburan" && bSlug === "hiburan") return -1;
       return (a.order || 0) - (b.order || 0);
     });
 };
@@ -31,18 +28,21 @@ const sortCategoriesList = (list) => {
 let memoryCategoriesCache = null;
 
 const getCachedCategories = () => {
-  if (memoryCategoriesCache && memoryCategoriesCache.length > 0) {
+  if (memoryCategoriesCache && memoryCategoriesCache.length >= 15) {
     return memoryCategoriesCache;
   }
   try {
-    // Clear old cache first
+    // Clear legacy caches
+    localStorage.removeItem("cached_navbar_categories");
     localStorage.removeItem("cached_navbar_blog_categories");
+    localStorage.removeItem("cached_navbar_categories_v3");
+    localStorage.removeItem("cached_navbar_categories_v4");
     
-    // Load navbar categories cache (untuk navbar informasi dengan subcategories)
-    const raw = localStorage.getItem("cached_navbar_categories");
+    // Load navbar categories cache v5
+    const raw = localStorage.getItem("cached_navbar_categories_v5");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed) && parsed.length >= 15) {
         const sorted = sortCategoriesList(parsed);
         memoryCategoriesCache = sorted;
         return sorted;
@@ -51,11 +51,28 @@ const getCachedCategories = () => {
   } catch (e) {
     console.warn("Navbar category cache read error:", e);
   }
-  return [];
+  
+  const fallback = getCompleteNavbarCategories();
+  memoryCategoriesCache = fallback;
+  return fallback;
 };
 
-export default function Navbar() {
+export default function Navbar({ forceSolid = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isHomePage = location.pathname === "/";
+
+  // Automatic detection for pages with light backgrounds (e.g. Login, Register, Forgot Password, Dashboard)
+  const isLightPage = forceSolid || [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/verify-otp",
+    "/dashboard",
+    "/admin-user",
+    "/admin",
+  ].some((path) => location.pathname.startsWith(path));
 
   const initialCats = getCachedCategories();
   const [categories,       setCategories]       = useState(initialCats);
@@ -66,12 +83,14 @@ export default function Navbar() {
   const [mobileOpen,       setMobileOpen]       = useState(false);
   const [infoOpen,         setInfoOpen]         = useState(false);
   const [inboxUnread,      setInboxUnread]      = useState(0);
-  const [isScrolled,       setIsScrolled]       = useState(false);
+  const [isScrolledState,  setIsScrolledState]  = useState(false);
   const prevInboxUnread    = useRef(0);
+
+  const isScrolled = isScrolledState || isLightPage;
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 15);
+      setIsScrolledState(window.scrollY > 15);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
@@ -105,26 +124,34 @@ export default function Navbar() {
   useEffect(() => {
     let isMounted = true;
     const fetchCategories = async () => {
-      if (categories.length === 0) {
-        setLoadingCategories(true);
-      }
       try {
-        // Navbar Informasi menggunakan NAVBAR CATEGORIES (10 parent + 95 subcategories)
         const res  = await fetch(`${import.meta.env.VITE_API_URL}/navbar-categories`);
         const data = await res.json();
-        if (isMounted && Array.isArray(data) && data.length > 0) {
+        if (isMounted && Array.isArray(data) && data.length >= 15) {
           const sorted = sortCategoriesList(data);
           setCategories(sorted);
           memoryCategoriesCache = sorted;
           try {
-            localStorage.setItem("cached_navbar_categories", JSON.stringify(sorted));
+            localStorage.setItem("cached_navbar_categories_v5", JSON.stringify(sorted));
           } catch (_) {}
-          if (!activeCategory) {
-            setActiveCategory(sorted[0].slug);
+          if (!activeCategory || !sorted.some(c => c.slug === activeCategory)) {
+            setActiveCategory(sorted[0]?.slug || null);
+          }
+        } else if (isMounted && (!categories || categories.length < 15)) {
+          const complete = getCompleteNavbarCategories();
+          setCategories(complete);
+          if (!activeCategory || !complete.some(c => c.slug === activeCategory)) {
+            setActiveCategory(complete[0]?.slug || null);
           }
         }
       } catch (e) {
-        console.error("fetch blog categories:", e);
+        if (isMounted && (!categories || categories.length < 15)) {
+          const complete = getCompleteNavbarCategories();
+          setCategories(complete);
+          if (!activeCategory) {
+            setActiveCategory(complete[0]?.slug || null);
+          }
+        }
       } finally {
         if (isMounted) setLoadingCategories(false);
       }
@@ -138,7 +165,15 @@ export default function Navbar() {
     const load = () => {
       const token = localStorage.getItem("token");
       const str   = localStorage.getItem("user");
-      if (token && str) { try { setUser(JSON.parse(str)); } catch { setUser(null); } }
+      if (token && str) {
+        try {
+          const parsed = JSON.parse(str);
+          const u = (parsed && parsed.data && (parsed.data.role || parsed.data.email)) ? parsed.data : parsed;
+          setUser(u);
+        } catch {
+          setUser(null);
+        }
+      }
       else setUser(null);
     };
     load();
@@ -158,7 +193,7 @@ export default function Navbar() {
     // dipanggil untuk SEMUA akun yang login termasuk admin, jadi admin
     // selalu dapat error 403 berulang-ulang (tiap 15 detik) di console.
     // Sekarang dilewati sama sekali kalau bukan role "user".
-    if (!token || user?.role !== "user") return;
+    if (!token || user?.role === "admin" || user?.role === "super_admin") return;
 
     const fetchUnread = async () => {
       try {
@@ -172,7 +207,7 @@ export default function Navbar() {
         // show browser notification if count increased
         if (count > prevInboxUnread.current && prevInboxUnread.current !== null) {
           if (typeof window !== "undefined" && 'Notification' in window && Notification.permission === 'granted') {
-            new Notification('Pesan Baru - Surade.co.id', {
+            new Notification('Pesan Baru - Surade.com', {
               body: `Anda memiliki ${count} pesan belum dibaca`,
               icon: '/favicon.ico',
             });
@@ -211,7 +246,21 @@ export default function Navbar() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api').replace("localhost", "127.0.0.1");
+      const token = localStorage.getItem("token");
+      if (token) {
+        await fetch(`${apiBase}/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": `Bearer ${token}`
+          }
+        });
+      }
+    } catch (_) {}
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
@@ -233,8 +282,14 @@ export default function Navbar() {
 
   const handleImgError  = (e) => { e.target.src = DEFAULT_AVATAR; };
   const getDisplayName  = ()  => user ? (user.username || user.name || user.email || "User") : "";
-  const getDashboardLink = () => user?.role === "admin" ? "/admin/dashboard" : "/admin-user";
-  const getProfileLink  = ()  => user?.role === "admin" ? "/admin/settings" : "/admin-user?tab=profile";
+  const getDashboardLink = () => {
+    const role = (user?.role || "").toLowerCase();
+    return (role === "admin" || role === "super_admin") ? "/admin/dashboard" : "/admin-user";
+  };
+  const getProfileLink = () => {
+    const role = (user?.role || "").toLowerCase();
+    return (role === "admin" || role === "super_admin") ? "/admin/settings" : "/admin-user?tab=profile";
+  };
 
   /* ── NavLink class — pixel-matched to original CSS with transparent support ── */
   const navLinkClass = ({ isActive }) => [
@@ -283,14 +338,14 @@ export default function Navbar() {
         {/* inner container — 1240px, 68px tall, 28px side padding */}
         <div className="relative z-10 max-w-[1240px] mx-auto px-7 h-[68px] flex items-center justify-between gap-5">
 
-          {/* ── Logo with surade.co.id Title ── */}
+          {/* ── Logo with surade.com Title ── */}
           <Link
             to="/"
             className="inline-flex items-center gap-2.5 shrink-0 no-underline transition-opacity duration-[250ms] hover:opacity-90 group"
           >
             <img
               src={logoImg}
-              alt="Surade.co.id"
+              alt="Surade.com"
               className="h-[38px] w-auto block transition-transform duration-[250ms] group-hover:scale-[1.03]"
             />
             <span className="text-[1.3rem] font-black tracking-tight flex items-center select-none leading-none">
@@ -298,7 +353,7 @@ export default function Navbar() {
                 Surade
               </span>
               <span className={isScrolled ? "text-slate-800" : "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"}>
-                .co.id
+                .com
               </span>
             </span>
           </Link>
@@ -346,7 +401,7 @@ export default function Navbar() {
                   "before:block before:absolute before:-top-4 before:left-0 before:w-full before:h-5",
                   "bg-white rounded-2xl overflow-hidden",
                   "border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.18),0_4px_12px_rgba(0,0,0,0.06)]",
-                  "min-w-[520px] max-w-[600px] z-[1000]",
+                  "min-w-[620px] max-w-[680px] z-[1000]",
                   "transition-all duration-200 ease-out origin-top",
                   infoOpen
                     ? "opacity-100 visible pointer-events-auto translate-y-0 scale-100"
@@ -366,7 +421,7 @@ export default function Navbar() {
                   </span>
                 </div>
 
-                <div className="flex min-h-[340px] max-h-[400px]">
+                <div className="flex min-h-[360px] max-h-[440px]">
                   {loadingCategories ? (
                     <div className="flex items-center justify-center gap-3 p-10 text-slate-500 text-[0.9rem] w-full">
                       <Loader2 size={20} className="animate-spin text-[#059669]" />
@@ -375,7 +430,7 @@ export default function Navbar() {
                   ) : categories.length > 0 ? (
                     <>
                       {/* Main Category Column — scrollable */}
-                      <div className="flex flex-col py-2 min-w-[250px] max-w-[260px] border-r border-slate-100 overflow-y-auto max-h-[350px]">
+                      <div className="flex flex-col py-2 min-w-[260px] max-w-[280px] border-r border-slate-100 overflow-y-auto max-h-[400px]">
                         {categories.map((item) => {
                           const isSelected = (activeItem?.slug || activeCategory) === item.slug;
                           return (
@@ -410,21 +465,22 @@ export default function Navbar() {
                       </div>
 
                       {/* Sub Category Column — scrollable */}
-                      <div className="flex flex-col py-2 flex-1 min-w-[240px] overflow-y-auto max-h-[350px] bg-slate-50/40">
+                      <div className="flex flex-col py-2 flex-1 min-w-[340px] max-w-[420px] overflow-y-auto max-h-[400px] bg-slate-50/40">
                         {activeItem?.children?.length > 0 ? (
                           <>
                             <div className="px-4 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                              Sub Kategori {activeItem.name}
+                              Sub Kategori {activeItem.name} ({activeItem.children.length})
                             </div>
                             <div className="flex flex-col gap-0.5 px-2">
                               {activeItem.children.map((child) => (
                                 <Link
-                                  key={child.id}
+                                  key={child.id || child.slug}
                                   to={`/category/${child.slug}`}
                                   onClick={() => setInfoOpen(false)}
-                                  className="flex items-center px-3.5 py-2 rounded-lg text-[13px] font-medium text-slate-600 no-underline transition-colors hover:bg-white hover:text-[#059669] hover:shadow-xs"
+                                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-slate-700 no-underline transition-colors hover:bg-white hover:text-[#059669] hover:shadow-xs"
                                 >
-                                  <span>{child.name}</span>
+                                  <span className="shrink-0">{getSubcategoryIcon(child.name)}</span>
+                                  <span className="leading-snug text-left">{child.name}</span>
                                 </Link>
                               ))}
                             </div>
@@ -443,10 +499,12 @@ export default function Navbar() {
                     </div>
                   )}
                 </div>
+
               </div>
             </div>
 
-            <NavLink to="/blog"    className={navLinkClass}>Blog</NavLink>
+            <NavLink to="/nomor-penting" className={navLinkClass}>Nomor Penting</NavLink>
+            <NavLink to="/blog"    className={navLinkClass}>Berita</NavLink>
             <NavLink to="/contact" className={navLinkClass}>Hubungi Kami</NavLink>
 
             {/* ── Auth ── */}
@@ -523,20 +581,22 @@ export default function Navbar() {
                       >
                         <LayoutDashboard size={15} /><span>Dashboard Saya</span>
                       </Link>
-                      <Link
-                        to="/dashboard?tab=inbox"
-                        onClick={() => { setShowUserMenu(false); setInboxUnread(0); }}
-                        className="flex items-center justify-between gap-[10px] w-full px-4 py-[10px] text-[0.875rem] font-medium text-slate-600 no-underline transition-[background,color] duration-150 hover:bg-slate-50 hover:text-[#059669]"
-                      >
-                        <span className="flex items-center gap-[10px]">
-                          <Mail size={15} /><span>Inbox Pesan</span>
-                        </span>
-                        {inboxUnread > 0 && (
-                          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                            {inboxUnread > 99 ? '99+' : inboxUnread}
+                      {(user?.role !== "admin" && user?.role !== "super_admin") && (
+                        <Link
+                          to="/dashboard?tab=inbox"
+                          onClick={() => { setShowUserMenu(false); setInboxUnread(0); }}
+                          className="flex items-center justify-between gap-[10px] w-full px-4 py-[10px] text-[0.875rem] font-medium text-slate-600 no-underline transition-[background,color] duration-150 hover:bg-slate-50 hover:text-[#059669]"
+                        >
+                          <span className="flex items-center gap-[10px]">
+                            <Mail size={15} /><span>Pesan</span>
                           </span>
-                        )}
-                      </Link>
+                          {inboxUnread > 0 && (
+                            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                              {inboxUnread > 99 ? '99+' : inboxUnread}
+                            </span>
+                          )}
+                        </Link>
+                      )}
                       <Link
                         to={getProfileLink()}
                         onClick={() => setShowUserMenu(false)}
@@ -575,12 +635,12 @@ export default function Navbar() {
             )}
           </nav>
 
-          {/* ── Mobile Right Actions (< 900px) ── */}
+          {/* ── Mobile Right Actions (< 900px) — Masuk button or User Avatar ── */}
           <div className="min-[900px]:hidden ml-auto flex items-center gap-2">
             {user ? (
               <Link
                 to={getDashboardLink()}
-                className="relative inline-flex items-center justify-center p-0.5 rounded-full border-2 border-emerald-400 transition-transform active:scale-95"
+                className="relative inline-flex items-center justify-center p-0.5 rounded-full border-2 border-emerald-400 transition-transform active:scale-95 shadow-sm"
                 title={getDisplayName()}
                 aria-label="Dashboard"
               >
@@ -591,7 +651,7 @@ export default function Navbar() {
                   className="w-8 h-8 rounded-full object-cover"
                 />
                 {inboxUnread > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white">
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white animate-pulse">
                     {inboxUnread > 9 ? "9+" : inboxUnread}
                   </span>
                 )}
@@ -599,22 +659,18 @@ export default function Navbar() {
             ) : (
               <Link
                 to="/login"
-                className="text-[0.78rem] font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200/80 transition-all hover:bg-emerald-100"
+                className={`text-[0.8rem] font-bold px-3.5 py-1.5 rounded-full transition-all border shadow-sm ${
+                  isScrolled
+                    ? "bg-[#059669] text-white border-[#059669] hover:bg-[#047857]"
+                    : "bg-emerald-600/90 text-white border-emerald-400/50 hover:bg-emerald-600 backdrop-blur-md"
+                }`}
+                aria-label="Masuk Akun"
               >
                 Masuk
               </Link>
             )}
-
-            <button
-              type="button"
-              onClick={() => setMobileOpen((v) => !v)}
-              className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-700 bg-slate-100 border border-slate-200 transition-all active:scale-95 hover:bg-slate-200 focus:outline-none"
-              aria-label={mobileOpen ? "Tutup menu" : "Buka menu"}
-              aria-expanded={mobileOpen}
-            >
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
           </div>
+
         </div>
       </header>
 
@@ -633,6 +689,13 @@ export default function Navbar() {
         getDashboardLink={getDashboardLink}
         getProfileLink={getProfileLink}
         handleImgError={handleImgError}
+      />
+
+      {/* Persistent Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        user={user}
+        inboxUnread={inboxUnread}
+        onOpenMobileMenu={() => setMobileOpen(true)}
       />
     </>
   );

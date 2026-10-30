@@ -69,6 +69,11 @@ class AdvertisementController extends Controller
 
     public function store(AdvertisementStoreRequest $request)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, 
+            ['title', 'description', 'company_name', 'location', 'phone', 'website'], 
+            ['image', 'payment_proof']
+        );
+
         // Check premium permission using service
         $canCreateAd = $this->premiumService->canPerformAction($request->user(), 'create_advertisement');
         if (!$canCreateAd['allowed']) {
@@ -143,7 +148,7 @@ class AdvertisementController extends Controller
         // website itu bukan iklan kita". Sekarang disamakan jadi
         // 'approved' supaya konsisten dari ujung ke ujung.
         $advertisement->status = 'approved';
-        $advertisement->expires_at = now()->addDays(30); // Masa tayang 30 hari sejak disetujui
+        $advertisement->expires_at = now()->addDays($advertisement->duration_days ?? 30); // Masa tayang sesuai paket sejak disetujui
         $advertisement->save();
         self::clearCache();
 
@@ -163,7 +168,24 @@ class AdvertisementController extends Controller
             return response()->json(['message' => 'Advertisement not found'], 404);
         }
 
-        $advertisement->status = 'rejected';
+        $mode = $request->input('mode', 'reject');
+        $reason = $request->input('rejection_reason') ?? $request->input('notes') ?? $request->input('reason');
+
+        if ($mode === 'revision') {
+            $advertisement->status = 'needs_revision';
+        } else {
+            $advertisement->status = 'rejected';
+        }
+
+        if ($reason) {
+            // Save rejection_reason if column exists
+            try {
+                $advertisement->rejection_reason = $reason;
+            } catch (\Exception $e) {
+                // Column may not exist yet, skip silently
+            }
+        }
+
         $advertisement->save();
         self::clearCache();
 
@@ -172,6 +194,11 @@ class AdvertisementController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, 
+            ['title', 'description', 'company_name', 'location', 'phone', 'website'], 
+            ['image', 'payment_proof']
+        );
+
         $advertisement = Advertisement::find($id);
 
         if (!$advertisement) {
@@ -195,7 +222,7 @@ class AdvertisementController extends Controller
             // 'verified' tidak pernah valid (lihat penjelasan di verify()
             // di atas) dan 'approved' (nilai yang SEHARUSNYA dipakai)
             // malah tidak diizinkan sama sekali oleh validator ini.
-            'status' => 'nullable|string|in:pending,approved,rejected',
+            'status' => 'nullable|string|in:pending,approved,rejected,needs_revision,active,expired,cancelled',
         ]);
 
         if ($validator->fails()) {

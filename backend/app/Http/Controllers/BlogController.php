@@ -53,6 +53,11 @@ class BlogController extends Controller
 
     public function store(Request $request)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, 
+            ['title', 'content', 'excerpt', 'category'], 
+            ['image', 'banners', 'gallery']
+        );
+
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'content' => 'required|string',
@@ -115,6 +120,11 @@ class BlogController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, 
+            ['title', 'content', 'excerpt', 'category'], 
+            ['image', 'banners', 'gallery']
+        );
+
         $blog = Blog::find($id);
 
         if (!$blog) {

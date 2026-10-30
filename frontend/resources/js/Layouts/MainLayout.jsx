@@ -5,7 +5,7 @@ export default function MainLayout({ children }) {
         <div className="min-h-screen bg-gray-50 font-sans">
             <nav className="bg-teal-950 text-white p-4 flex justify-between items-center border-b-4 border-amber-400">
                 <div className="flex items-center space-x-2">
-                    <span className="font-black text-2xl text-amber-300">Surade<span className="text-white">.co.id</span></span>
+                    <span className="font-black text-2xl text-amber-300">Surade<span className="text-white">.com</span></span>
                 </div>
                 <div className="space-x-4 font-semibold text-sm">
                     <a href="#" className="hover:text-amber-300">Home</a>

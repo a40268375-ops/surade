@@ -79,14 +79,24 @@ export default function SearchBar({ categoriesList = [], initialKeyword = "", in
         <span className="home-search__label">Kata Kunci :</span>
         <input
           className="home-search__input"
-          type="text"
+          type="search"
+          inputMode="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck="false"
           placeholder="UMKM, Pelaku Usaha, Bisnis, dll"
           id="search-keyword"
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
           onFocus={() => setKeywordDropdownOpen(true)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSearchSubmit();
+            if (e.key === "Enter" || e.keyCode === 13) {
+              e.preventDefault();
+              e.currentTarget.blur?.();
+              setKeywordDropdownOpen(false);
+              handleSearchSubmit();
+            }
           }}
         />
 

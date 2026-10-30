@@ -17,8 +17,10 @@ import {
   User,
   Home,
 } from "lucide-react";
+import CaptchaInput from "../components/CaptchaInput";
 
 export default function Login({ initialRegister = false }) {
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref");
@@ -29,11 +31,19 @@ export default function Login({ initialRegister = false }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [userLoginCaptcha, setUserLoginCaptcha] = useState("");
+  const captchaRef = useRef(null);
+
+
 
   /* ── Register modal state ── */
   const [showRegister, setShowRegister] = useState(() => {
     return initialRegister || searchParams.get("register") === "true" || !!searchParams.get("ref");
   });
+
+  useEffect(() => {
+    document.title = showRegister ? "Daftar Akun - Surade.com" : "Masuk Akun - Surade.com";
+  }, [showRegister]);
   const [referralCode, setReferralCode] = useState(() => {
     return searchParams.get("ref") || localStorage.getItem("applied_referral_code") || "";
   });
@@ -42,7 +52,7 @@ export default function Login({ initialRegister = false }) {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regPasswordConfirmation, setRegPasswordConfirmation] = useState("");
-  const [regGender, setRegGender] = useState("");
+  const [regAccountType, setRegAccountType] = useState("personal"); // "personal" | "business"
   const [regError, setRegError] = useState("");
   const [regLoading, setRegLoading] = useState(false);
 
@@ -52,7 +62,6 @@ export default function Login({ initialRegister = false }) {
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
   const [otpError, setOtpError] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
-  const [otpDevCode, setOtpDevCode] = useState(null);
   const [resendCooldown, setResendCooldown] = useState(0); // seconds
   const otpRefs = useRef([]);
   const cooldownRef = useRef(null);
@@ -115,10 +124,16 @@ export default function Login({ initialRegister = false }) {
       return;
     }
 
+    if (!userLoginCaptcha) {
+      setError("Silakan selesaikan verifikasi keamanan (CAPTCHA) terlebih dahulu.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/login`, {
+      const baseUrl = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://127.0.0.1:8000/api' : 'https://surade.com/api');
+      const res = await fetch(`${baseUrl}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -127,6 +142,9 @@ export default function Login({ initialRegister = false }) {
         body: JSON.stringify({
           email: email.trim(),
           password: password,
+          captcha_token: userLoginCaptcha,
+          recaptcha_token: userLoginCaptcha,
+          "g-recaptcha-response": userLoginCaptcha,
         }),
       });
 
@@ -145,6 +163,8 @@ export default function Login({ initialRegister = false }) {
           errorMsg = data.message;
         }
         setError(errorMsg);
+        setUserLoginCaptcha("");
+        if (captchaRef.current?.reset) captchaRef.current.reset();
         return;
       }
 
@@ -158,14 +178,17 @@ export default function Login({ initialRegister = false }) {
       keysToRemove.forEach((k) => localStorage.removeItem(k));
       localStorage.removeItem("displayName");
 
-      localStorage.setItem("token", data.token);
+      const authToken = data.token || data.access_token;
+      if (authToken) {
+        localStorage.setItem("token", authToken);
+      }
       localStorage.setItem("user", JSON.stringify(data.user));
       window.dispatchEvent(new Event("userAuthChanged"));
 
       const role = data.user?.role;
       const redirectParam = searchParams.get("redirect");
       const defaultRedirect = role === "admin" ? "/admin/dashboard" : "/dashboard";
-      const redirectUrl = redirectParam || defaultRedirect;
+      const redirectUrl = (redirectParam && redirectParam !== "/add-business") ? redirectParam : defaultRedirect;
       navigate(redirectUrl);
     } catch (err) {
       setError("Terjadi kesalahan koneksi. Silakan coba lagi.");
@@ -197,15 +220,12 @@ export default function Login({ initialRegister = false }) {
       setRegError("Konfirmasi kata sandi tidak sesuai.");
       return;
     }
-    if (!regGender) {
-      setRegError("Jenis kelamin wajib dipilih.");
-      return;
-    }
 
     setRegLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/register/send-otp`, {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api').replace("localhost", "127.0.0.1");
+      const res = await fetch(`${apiBase}/register/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
@@ -213,7 +233,7 @@ export default function Login({ initialRegister = false }) {
           email: regEmail.trim(),
           password: regPassword,
           password_confirmation: regPasswordConfirmation,
-          gender: regGender,
+          account_type: regAccountType,
         }),
       });
 
@@ -228,7 +248,6 @@ export default function Login({ initialRegister = false }) {
       setRegStep("otp");
       setOtpError("");
       setOtpDigits(["", "", "", "", "", ""]);
-      setOtpDevCode(data?.dev_otp || null);
       startCooldown(60);
 
       // Auto-focus first input after render
@@ -287,23 +306,28 @@ export default function Login({ initialRegister = false }) {
     setOtpLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/register/verify-otp`, {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api').replace("localhost", "127.0.0.1");
+      const res = await fetch(`${apiBase}/register/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          name: `${regFirstName} ${regLastName}`.trim(),
+          name: `${regFirstName} ${regLastName}`.trim() || regFirstName.trim() || "Pengguna",
           email: regEmail.trim(),
           password: regPassword,
-          password_confirmation: regPasswordConfirmation,
-          gender: regGender,
+          password_confirmation: regPasswordConfirmation || regPassword,
+          account_type: regAccountType,
           otp: otp,
+          referral_code: referralCode || localStorage.getItem("applied_referral_code") || undefined,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setOtpError(data?.message || "Kode OTP tidak valid atau sudah kadaluarsa.");
+        const errorMsg = data?.errors
+          ? Object.values(data.errors).flat().join(" ")
+          : (data?.message || "Kode OTP tidak valid atau sudah kedaluwarsa. Silakan klik Kirim Ulang.");
+        setOtpError(errorMsg);
         return;
       }
 
@@ -321,8 +345,9 @@ export default function Login({ initialRegister = false }) {
       window.dispatchEvent(new Event("userAuthChanged"));
 
       setRegStep("success");
+      const targetRoute = "/dashboard";
       setTimeout(() => {
-        navigate("/dashboard");
+        navigate(targetRoute);
       }, 2000);
     } catch {
       setOtpError("Terjadi kesalahan koneksi. Silakan coba lagi.");
@@ -337,7 +362,8 @@ export default function Login({ initialRegister = false }) {
     setOtpError("");
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/register/resend-otp`, {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api').replace("localhost", "127.0.0.1");
+      const res = await fetch(`${apiBase}/register/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
@@ -351,7 +377,6 @@ export default function Login({ initialRegister = false }) {
         return;
       }
       setOtpDigits(["", "", "", "", "", ""]);
-      setOtpDevCode(data?.dev_otp || null);
       startCooldown(60);
       setTimeout(() => {
         otpRefs.current[0]?.focus();
@@ -373,29 +398,27 @@ export default function Login({ initialRegister = false }) {
     setRegError("");
     setOtpDigits(["", "", "", "", "", ""]);
     setOtpError("");
-    setOtpDevCode(null);
     if (cooldownRef.current) clearInterval(cooldownRef.current);
     setResendCooldown(0);
   };
 
   return (
     <div className="login-page login-page--split">
-      {/* ── Mobile Top Bar ── */}
-      <header className="login-mobile-topbar">
-        <Link to="/" className="login-mobile-logo-wrap">
-          <span className="login-mobile-brand-name">
-            Surade<span>.co.id</span>
-          </span>
+      {/* ── Mobile Header Topbar ── */}
+      <div className="login-mobile-topbar">
+        <Link to="/" className="login-mobile-brand-name">
+          Surade<span>.com</span>
         </Link>
         <Link to="/" className="login-mobile-home-btn">
-          <Home size={15} />
-          <span>Beranda</span>
+          <ArrowLeft size={16} />
+          <span>Ke Beranda</span>
         </Link>
-      </header>
+      </div>
 
       {/* ── Main Content ── */}
       <main className="login-main login-main--split">
         <div className="login-container login-container--split">
+
 
           {/* ── Left: Branding, panel solid hijau dengan pola gelombang tipis ── */}
           <div className="login-branding login-branding--split">
@@ -424,7 +447,7 @@ export default function Login({ initialRegister = false }) {
             <div className="login-branding__top">
               <div className="login-branding__header-row">
                 <span className="login-branding__brand-name--dark">
-                  Surade<span>.co.id</span>
+                  Surade<span>.com</span>
                 </span>
               </div>
 
@@ -454,16 +477,16 @@ export default function Login({ initialRegister = false }) {
               </ul>
             </div>
 
-            <p className="login-branding__copy">&copy; 2026 Surade.co.id — All rights reserved.</p>
+            <p className="login-branding__copy">&copy; 2026 Surade.com — All rights reserved.</p>
           </div>
 
           {/* ── Right: Login Card ── */}
           <div className="login-card login-card--split">
             {/* Logo dipindahkan di atas masuk (ditengah) dengan teksnya */}
             <div className="login-card__header-logo">
-              <img src={logoImg} alt="Surade.co.id" className="login-card__logo" />
+              <img src={logoImg} alt="Surade.com" className="login-card__logo" />
               <span className="login-card__brand-name">
-                Surade<span>.co.id</span>
+                Surade<span>.com</span>
               </span>
             </div>
 
@@ -533,6 +556,15 @@ export default function Login({ initialRegister = false }) {
                 <Link to="/forgot-password">Lupa kata sandi?</Link>
               </div>
 
+              {/* Google reCAPTCHA v2 Checkbox */}
+              <CaptchaInput
+                ref={captchaRef}
+                id="login-captcha"
+                label="Verifikasi Keamanan"
+                value={userLoginCaptcha}
+                onChange={setUserLoginCaptcha}
+              />
+
               {/* Login Button */}
               <button
                 id="login-submit"
@@ -558,21 +590,16 @@ export default function Login({ initialRegister = false }) {
             {/* Link ke pendaftaran */}
             <p className="login-info" style={{ textAlign: "center", marginTop: 20 }}>
               Belum punya akun?{" "}
-              <button
-                type="button"
-                onClick={() => setShowRegister(true)}
+              <Link
+                to="/register"
                 style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
                   color: "#0f6e46",
                   fontWeight: 600,
-                  cursor: "pointer",
                   textDecoration: "underline",
                 }}
               >
                 Daftar di sini
-              </button>
+              </Link>
             </p>
           </div>
         </div>
@@ -678,34 +705,116 @@ export default function Login({ initialRegister = false }) {
                     autoComplete="new-password"
                   />
 
-                  <span className="login-label">Jenis Kelamin</span>
-                  <div className="login-gender-group">
-                    <label className="login-gender-option">
-                      Perempuan
-                      <input
-                        type="radio"
-                        name="gender"
-                        value="female"
-                        checked={regGender === "female"}
-                        onChange={(e) => setRegGender(e.target.value)}
-                      />
-                    </label>
-                    <label className="login-gender-option">
-                      Laki-laki
-                      <input
-                        type="radio"
-                        name="gender"
-                        value="male"
-                        checked={regGender === "male"}
-                        onChange={(e) => setRegGender(e.target.value)}
-                      />
-                    </label>
+                  <div style={{ margin: "10px 0 6px 0" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <span className="login-label" style={{ margin: 0, fontSize: "0.72rem" }}>DAFTAR SEBAGAI</span>
+                      <span style={{ fontSize: "0.68rem", color: "#059669", fontWeight: 600 }}>Pilih salah satu</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => setRegAccountType("personal")}
+                        style={{
+                          padding: "10px 8px",
+                          borderRadius: 10,
+                          border: regAccountType === "personal" ? "2px solid #059669" : "1.5px solid #e2e8f0",
+                          background: regAccountType === "personal" ? "#ecfdf5" : "#ffffff",
+                          color: regAccountType === "personal" ? "#065f46" : "#334155",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 3,
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 6,
+                              background: regAccountType === "personal" ? "#059669" : "#f1f5f9",
+                              color: regAccountType === "personal" ? "#ffffff" : "#64748b",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}>
+                              <User size={14} />
+                            </span>
+                            <span style={{ fontWeight: 700, fontSize: "0.82rem" }}>User</span>
+                          </div>
+                          <span
+                            style={{
+                              width: 14,
+                              height: 14,
+                              borderRadius: "50%",
+                              border: regAccountType === "personal" ? "4px solid #059669" : "2px solid #cbd5e1",
+                              background: "#ffffff",
+                              display: "inline-block",
+                            }}
+                          />
+                        </div>
+                        <span style={{ fontSize: "0.65rem", color: regAccountType === "personal" ? "#047857" : "#64748b", lineHeight: 1.2 }}>
+                          Akses direktori & ulasan
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRegAccountType("business")}
+                        style={{
+                          padding: "10px 8px",
+                          borderRadius: 10,
+                          border: regAccountType === "business" ? "2px solid #059669" : "1.5px solid #e2e8f0",
+                          background: regAccountType === "business" ? "#ecfdf5" : "#ffffff",
+                          color: regAccountType === "business" ? "#065f46" : "#334155",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 3,
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 6,
+                              background: regAccountType === "business" ? "#059669" : "#f1f5f9",
+                              color: regAccountType === "business" ? "#ffffff" : "#64748b",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}>
+                              <Store size={14} />
+                            </span>
+                            <span style={{ fontWeight: 700, fontSize: "0.82rem" }}>Usaha</span>
+                          </div>
+                          <span
+                            style={{
+                              width: 14,
+                              height: 14,
+                              borderRadius: "50%",
+                              border: regAccountType === "business" ? "4px solid #059669" : "2px solid #cbd5e1",
+                              background: "#ffffff",
+                              display: "inline-block",
+                            }}
+                          />
+                        </div>
+                        <span style={{ fontSize: "0.65rem", color: regAccountType === "business" ? "#047857" : "#64748b", lineHeight: 1.2 }}>
+                          Daftarkan toko & produk
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   <p className="login-modal__terms">
                     Dengan mengklik tombol daftar, Anda menyetujui{" "}
                     <Link to="/terms">Ketentuan Layanan</Link> dan{" "}
-                    <a href="#">Kebijakan Privasi</a> Surade.co.id.
+                    <a href="#">Kebijakan Privasi</a> Surade.com.
                   </p>
 
                   <button
@@ -932,4 +1041,4 @@ export default function Login({ initialRegister = false }) {
       )}
     </div>
   );
-}
+}

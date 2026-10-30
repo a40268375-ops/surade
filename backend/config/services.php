@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'merchant_id' => env('MIDTRANS_MERCHANT_ID'),
+        'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
+        'is_3ds' => env('MIDTRANS_IS_3DS', true),
+    ],
+
+    'recaptcha' => [
+        'site_key' => env('RECAPTCHA_SITE_KEY', '6LcA-QcuAAAAAD44nH_o7QzPZO9CE88PkDbEGLRh'),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+    ],
+
 ];

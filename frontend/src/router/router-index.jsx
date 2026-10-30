@@ -1,4 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import api from "../services/api";
 import Home from "../pages/Home";
 import Blog from "../pages/Blog";
 import BlogDetail from "../pages/BlogDetail";
@@ -6,23 +8,40 @@ import Contact from "../pages/Contact";
 import About from "../pages/About";
 import VisionMission from "../pages/VisionMission";
 import Terms from "../pages/Terms";
+import PrivacyPolicy from "../pages/PrivacyPolicy";
+import Sitemap from "../pages/Sitemap";
 import FAQ from "../pages/FAQ";
 import PartnershipCareer from "../pages/PartnershipCareer";
 import BusinessDetail from "../pages/BusinessDetail";
+import BusinessProducts from "../pages/BusinessProducts";
+import ProductDetail from "../pages/ProductDetail";
 import Category from "../pages/Category";
 import Panduan from "../pages/Panduan";
+import NomorPenting from "../pages/NomorPenting";
 import Login from "../pages/Login";
+import Register from "../pages/Register";
 import ForgotPassword from "../pages/ForgotPassword";
 import Profile from "../pages/Profile";
 import SmartCity from "../pages/SmartCity";
+import Pricing from "../pages/Pricing";
+import SellerProfile from "../pages/SellerProfile";
+import PremiumWebsite from "../pages/PremiumWebsite";
+import PremiumUpgrade from "../pages/PremiumUpgrade";
+import OrderWebsite from "../pages/OrderWebsite";
+import PaymentSuccess from "../pages/PaymentSuccess";
+import PaymentFailed from "../pages/PaymentFailed";
 import AdminUser from "../pages/admin-user/AdminUser";
 import AddBusiness from "../pages/AddBusiness";
 import AddBlog from "../pages/AddBlog";
 import AddProduct from "../pages/AddProduct";
 import AdminWeb from "../pages/admin-web/AdminWeb";
 import NotFound from "../pages/NotFound";
+import LoadingDemo from "../pages/LoadingDemo";
 import FloatingWhatsApp from "../components/FloatingWhatsApp";
 import TopProgressBar from "../components/TopProgressBar";
+import WelcomeBannerModal from "../components/WelcomeBannerModal";
+import ScrollToTop from "../components/ScrollToTop";
+import ScrollToTopButton from "../components/ScrollToTopButton";
 
 /**
  * Get the currently authenticated user from localStorage.
@@ -64,29 +83,61 @@ function ProtectedRoute({ children, requiredRole }) {
     return <Navigate to="/login" replace />;
   }
 
-  const role = user.role;
+  const role = (user.role || "").toLowerCase();
 
   if (requiredRole === "admin") {
-    // Only strict admin role gets in
-    if (role !== "admin") {
+    // Only strict admin role gets into admin web portal
+    if (role !== "admin" && role !== "super_admin") {
       return <Navigate to="/dashboard" replace />;
     }
   } else if (requiredRole === "user") {
-    // Only strict user role gets in — admin must go to admin dashboard
-    if (role === "admin") {
+    // Admins must go to admin dashboard
+    if (role === "admin" || role === "super_admin") {
       return <Navigate to="/admin/dashboard" replace />;
     }
-    if (role !== "user") {
-      return <Navigate to="/login" replace />;
-    }
+    // All normal user roles (user, seller, reseller, merchant, etc.) are allowed
   }
 
   return children;
 }
 
+function PageVisitTracker() {
+  const location = useLocation();
+  const lastTrackedPath = useRef("");
+
+  useEffect(() => {
+    const currentPath = location.pathname;
+    if (lastTrackedPath.current === currentPath) return;
+    lastTrackedPath.current = currentPath;
+
+    // Do not track admin panels or static assets to keep visitor stats purely portal visitor oriented
+    if (currentPath.startsWith("/admin") || currentPath.startsWith("/admin-web")) {
+      return;
+    }
+
+    try {
+      // Extract business_id if on business detail page
+      let businessId = null;
+      const bizMatch = currentPath.match(/^\/business\/([^/?#]+)/);
+      if (bizMatch && !isNaN(bizMatch[1])) {
+        businessId = Number(bizMatch[1]);
+      }
+
+      api.post("/analytics/track", {
+        path: currentPath,
+        business_id: businessId,
+      }).catch(() => {});
+    } catch (e) {}
+  }, [location.pathname]);
+
+  return null;
+}
+
 function AppRouter() {
   return (
     <BrowserRouter>
+      <PageVisitTracker />
+      <ScrollToTop />
       <TopProgressBar />
       <Routes>
         {/* Public Routes */}
@@ -99,17 +150,43 @@ function AppRouter() {
         <Route path="/about" element={<About />} />
         <Route path="/vision-mission" element={<VisionMission />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/kebijakan-privasi" element={<PrivacyPolicy />} />
+        <Route path="/sitemap" element={<Sitemap />} />
+        <Route path="/peta-situs" element={<Sitemap />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/partnership-career" element={<PartnershipCareer />} />
         <Route path="/business/:id" element={<BusinessDetail />} />
+        <Route path="/business/:id/products" element={<BusinessProducts />} />
+        <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/business/:businessId/product/:id" element={<ProductDetail />} />
+        <Route path="/category" element={<Category />} />
         <Route path="/category/:categoryId" element={<Category />} />
+        <Route path="/categories" element={<Category />} />
+        <Route path="/categories/:categoryId" element={<Category />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Login initialRegister={true} />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/profile/:id" element={<Profile />} />
+        <Route path="/smart-city" element={<SmartCity />} />
         <Route path="/smart-city/:id" element={<SmartCity />} />
+        <Route path="/smart-village" element={<SmartCity />} />
+        <Route path="/smart-village/:id" element={<SmartCity />} />
         <Route path="/location/:slug" element={<SmartCity />} />
         <Route path="/panduan" element={<Panduan />} />
+        <Route path="/nomor-penting" element={<NomorPenting />} />
+        <Route path="/nomor-darurat" element={<NomorPenting />} />
+        <Route path="/darurat" element={<NomorPenting />} />
+        <Route path="/emergency" element={<NomorPenting />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/seller/:id" element={<SellerProfile />} />
+        <Route path="/premium-website" element={<PremiumWebsite />} />
+        <Route path="/premium-upgrade" element={<PremiumUpgrade />} />
+        <Route path="/order-website/:id" element={<OrderWebsite />} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/payment-failed" element={<PaymentFailed />} />
+        <Route path="/loading-demo" element={<LoadingDemo />} />
 
         {/* User Routes (accessible by role 'user', 'admin', or 'super_admin') */}
         <Route
@@ -235,6 +312,14 @@ function AppRouter() {
           }
         />
         <Route
+          path="/admin/add-business"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AddBusiness />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin-web"
           element={
             <ProtectedRoute requiredRole="admin">
@@ -246,6 +331,8 @@ function AppRouter() {
             yang tidak cocok dengan route mana pun di atas. */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <WelcomeBannerModal />
+      <ScrollToTopButton />
       <FloatingWhatsApp />
     </BrowserRouter>
   );

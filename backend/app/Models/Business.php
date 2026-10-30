@@ -14,6 +14,7 @@ class Business extends Model
         'title',
         'slug',
         'description',
+        'achievements',
         'address',
         'village',
         'city',
@@ -22,13 +23,16 @@ class Business extends Model
         'latitude',
         'longitude',
         'phone',
+        'whatsapp',
         'email',
+        'website',
+        'instagram',
+        'facebook',
         'operating_hours',
         'opening_days',
         'closed_days',
         'price_category',
         'tags',
-        'website',
         'logo',
         'banner',
         'banners',
@@ -48,12 +52,20 @@ class Business extends Model
         'rating',
         'rating_count',
         'referred_by',
+        'verified_at',
+        'verified_by',
+        'rejection_reason',
+        'suspend_reason',
+        'suspended_at',
+        'suspended_by',
     ];
 
     protected $casts = [
         'is_premium' => 'boolean',
         'is_active' => 'boolean',
         'premium_expires_at' => 'datetime',
+        'verified_at' => 'datetime',
+        'suspended_at' => 'datetime',
         'images' => 'array',
         'banners' => 'array',
         'gallery' => 'array',
@@ -91,11 +103,63 @@ class Business extends Model
 
     // Rating rata-rata & jumlah ulasan dihitung otomatis dari business_reviews,
     // supaya tidak lagi angka statis (dulu selalu rating 4.5 / 0 ulasan).
-    protected $appends = ['is_premium_active', 'starting_price', 'rating', 'reviews_count', 'is_open_now', 'premium_features', 'village'];
+    protected $appends = ['is_premium_active', 'starting_price', 'rating', 'reviews_count', 'is_open_now', 'premium_features', 'village', 'ad_info', 'has_active_ad', 'is_verified'];
+
+    public function getIsVerifiedAttribute(): bool
+    {
+        return (bool) $this->is_premium_active;
+    }
+
+    public function advertisements(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\Advertisement::class);
+    }
+
+    public function getAdInfoAttribute(): ?array
+    {
+        $ad = $this->relationLoaded('advertisements') 
+            ? $this->advertisements->first() 
+            : \App\Models\Advertisement::where('business_id', $this->id)->latest()->first();
+
+        if (!$ad) {
+            return null;
+        }
+
+        $isActive = ($ad->status === 'active') && (!$ad->end_date || $ad->end_date > now()) && (!$ad->expires_at || $ad->expires_at > now());
+
+        return [
+            'id' => $ad->id,
+            'status' => $isActive ? 'active' : ($ad->status === 'active' ? 'expired' : $ad->status),
+            'label' => $isActive ? 'Aktif' : ($ad->status === 'active' ? 'Kadaluarsa' : 'Tidak Aktif'),
+            'package_name' => $ad->package_name ?? 'Paket Iklan',
+            'package_type' => $ad->package_type ?? 'standard',
+            'duration_days' => $ad->duration_days,
+            'start_date' => $ad->start_date ? $ad->start_date->format('Y-m-d') : null,
+            'end_date' => $ad->end_date ? $ad->end_date->format('Y-m-d') : null,
+            'expired_at' => $ad->end_date ? $ad->end_date->format('d M Y') : null,
+        ];
+    }
+
+    public function getHasActiveAdAttribute(): bool
+    {
+        $info = $this->ad_info;
+        return $info && $info['status'] === 'active';
+    }
 
     public function getVillageAttribute(): ?string
     {
         return $this->city ?? null;
+    }
+
+    public function getIsPremiumAttribute($value): bool
+    {
+        if (!$value) {
+            return false;
+        }
+        if ($this->premium_expires_at && $this->premium_expires_at->isPast()) {
+            return false;
+        }
+        return true;
     }
 
     public function getIsPremiumActiveAttribute(): bool
@@ -119,9 +183,14 @@ class Business extends Model
         }
         if ($this->relationLoaded('reviews')) {
             $avg = $this->reviews->avg('rating');
-            return $avg ? round($avg, 1) : 0;
+            return $avg ? round((float) $avg, 1) : 0;
         }
-        return 0;
+        try {
+            $avg = $this->reviews()->avg('rating');
+            return $avg ? round((float) $avg, 1) : 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     public function getReviewsCountAttribute(): int
@@ -132,12 +201,16 @@ class Business extends Model
         if ($this->relationLoaded('reviews')) {
             return $this->reviews->count();
         }
-        return 0;
+        try {
+            return (int) $this->reviews()->count();
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     public function reviews(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(BusinessReview::class);
+        return $this->hasMany(Rating::class);
     }
 
     public function getStartingPriceAttribute(): ?int
@@ -284,6 +357,16 @@ class Business extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function verifiedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    public function suspendedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'suspended_by');
     }
 
     public function category(): BelongsTo

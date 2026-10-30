@@ -172,24 +172,33 @@ class ReferralManagementController extends Controller
     public function updateReferralCode(Request $request, $id)
     {
         $request->validate([
-            'referral_code' => 'required|string|max:20|unique:users,referral_code,' . $id,
-            'status' => 'required|in:active,inactive,suspended'
+            'referral_code' => 'sometimes|required|string|min:4|max:30|unique:users,referral_code,' . $id,
+            'status' => 'sometimes|nullable|string',
+            'is_active' => 'sometimes|nullable|boolean',
         ]);
 
         try {
             $user = User::findOrFail($id);
             
             $oldCode = $user->referral_code;
-            $user->referral_code = strtoupper($request->referral_code);
+            if ($request->filled('referral_code')) {
+                $user->referral_code = strtoupper(trim($request->referral_code));
+            }
             
-            if ($request->status === 'active') {
-                $user->status = 'active';
-                $user->is_active = true;
-            } elseif ($request->status === 'inactive') {
-                $user->is_active = false;
-            } elseif ($request->status === 'suspended') {
-                $user->status = 'suspended';
-                $user->is_active = false;
+            if ($request->has('is_active')) {
+                $user->is_active = (bool) $request->is_active;
+            }
+
+            if ($request->has('status')) {
+                if ($request->status === 'active') {
+                    $user->status = 'active';
+                    $user->is_active = true;
+                } elseif ($request->status === 'inactive') {
+                    $user->is_active = false;
+                } elseif ($request->status === 'suspended') {
+                    $user->status = 'suspended';
+                    $user->is_active = false;
+                }
             }
             
             $user->save();
@@ -229,9 +238,17 @@ class ReferralManagementController extends Controller
                 ], 400);
             }
 
-            // Generate unique referral code
+            $words = preg_split('/\s+/', trim($user->name ?? ''));
+            $firstName = !empty($words[0]) ? $words[0] : 'SRD';
+            $cleanFirstName = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $firstName));
+            $threeLetters = strtoupper(substr($cleanFirstName, 0, 3));
+            if (strlen($threeLetters) < 3) {
+                $threeLetters = str_pad($threeLetters, 3, 'X');
+            }
+
+            // Generate unique referral code with SURADE-[3LETTERS]-[RANDOM]
             do {
-                $code = 'REF' . strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 5));
+                $code = "SURADE-{$threeLetters}-" . rand(100, 999);
             } while (User::where('referral_code', $code)->exists());
 
             $user->referral_code = $code;
@@ -260,9 +277,17 @@ class ReferralManagementController extends Controller
             $user = User::findOrFail($id);
             $oldCode = $user->referral_code;
 
-            // Generate new unique referral code
+            $words = preg_split('/\s+/', trim($user->name ?? ''));
+            $firstName = !empty($words[0]) ? $words[0] : 'SRD';
+            $cleanFirstName = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $firstName));
+            $threeLetters = strtoupper(substr($cleanFirstName, 0, 3));
+            if (strlen($threeLetters) < 3) {
+                $threeLetters = str_pad($threeLetters, 3, 'X');
+            }
+
+            // Generate new unique referral code with SURADE-[3LETTERS]-[RANDOM]
             do {
-                $code = 'REF' . strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 5));
+                $code = "SURADE-{$threeLetters}-" . rand(100, 999);
             } while (User::where('referral_code', $code)->exists());
 
             $user->referral_code = $code;

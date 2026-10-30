@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Check, Copy, ShieldCheck } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Check, Copy, ShieldCheck, Download, Maximize2, X, ZoomIn } from "lucide-react";
 import api from "../services/api";
 
 /**
- * Logo resmi lokal Surade.co.id
+ * Logo resmi lokal Surade.com
  */
 export const PAYMENT_LOGOS = {
   "mandiri": "/logos/mandiri.png",
@@ -26,6 +27,7 @@ export const PAYMENT_LOGOS = {
 export const getPaymentLogo = (idOrName) => {
   if (!idOrName) return "/logos/qris.png";
   const raw = String(idOrName).toLowerCase().replace(/^transfer\s+/, "").replace(/^bank\s+/, "").trim();
+  if (raw.includes("midtrans")) return "/logos/midtrans.png";
   if (raw.includes("mandiri")) return "/logos/mandiri.png";
   if (raw.includes("bni")) return "/logos/bni.png";
   if (raw.includes("bca")) return "/logos/bca.png";
@@ -74,8 +76,16 @@ export default function PaymentMethodSelector({
   showInstruction = true,
   qrisImage = null,
   customAccount = null,
+  amount = null,
+  finalPrice = null,
+  allowPoints = false,
+  pointsCost = null,
+  pointsBalance = null,
+  onPayWithPoints = null,
+  payingWithPoints = false,
 }) {
   const [copiedAccount, setCopiedAccount] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
   const [apiMethods, setApiMethods] = useState(() => {
     try {
       const cached = localStorage.getItem("official_payment_methods_custom");
@@ -86,16 +96,60 @@ export default function PaymentMethodSelector({
     }
   });
 
-  // Fetch fresh live payment methods from backend API on mount
+  const [paymentRules, setPaymentRules] = useState(() => {
+    try {
+      const cached = localStorage.getItem("platform_payment_rules");
+      return cached ? JSON.parse(cached) : {
+        bank_transfer_enabled: true,
+        bank_transfer_min_amount: 10000,
+        qris_enabled: true,
+        points_enabled: true,
+        point_exchange_rate_idr: 1000,
+      };
+    } catch {
+      return {
+        bank_transfer_enabled: true,
+        bank_transfer_min_amount: 10000,
+        qris_enabled: true,
+        points_enabled: true,
+        point_exchange_rate_idr: 1000,
+      };
+    }
+  });
+
+  const [liveQrisImage, setLiveQrisImage] = useState(() => {
+    return qrisImage || localStorage.getItem("platform_qris_image") || null;
+  });
+
+  useEffect(() => {
+    if (qrisImage) {
+      setLiveQrisImage(qrisImage);
+    }
+  }, [qrisImage]);
+
+  // Fetch fresh live payment methods and official QRIS + Rules from backend API on mount
   useEffect(() => {
     let isMounted = true;
     const fetchMethods = async () => {
       try {
         const res = await api.get("/payment-methods");
         const data = res.data?.data?.methods;
-        if (isMounted && Array.isArray(data) && data.length > 0) {
-          setApiMethods(data);
-          localStorage.setItem("official_payment_methods_custom", JSON.stringify(data));
+        const fetchedQris = res.data?.data?.qris_image;
+        const fetchedRules = res.data?.data?.rules;
+
+        if (isMounted) {
+          if (Array.isArray(data) && data.length > 0) {
+            setApiMethods(data);
+            localStorage.setItem("official_payment_methods_custom", JSON.stringify(data));
+          }
+          if (fetchedQris) {
+            setLiveQrisImage(fetchedQris);
+            localStorage.setItem("platform_qris_image", fetchedQris);
+          }
+          if (fetchedRules) {
+            setPaymentRules(fetchedRules);
+            localStorage.setItem("platform_payment_rules", JSON.stringify(fetchedRules));
+          }
         }
       } catch (err) {
         console.warn("PaymentMethodSelector: failed to fetch live payment methods:", err);
@@ -130,7 +184,17 @@ export default function PaymentMethodSelector({
 
   // Clean helpers
   const cleanAccNum = (val) => (!val || val === "0123456789" || val === "XXX" || String(val).toLowerCase().includes("belum") ? "xxxx" : val);
-  const cleanAccName = (val) => (!val || val === "Official Surade.co.id" || String(val).toLowerCase().includes("belum") ? (customAccount?.accountName || "Triwala Mitra Bestari") : val);
+  const cleanAccName = (val) => (!val || val === "Official Surade.com" || String(val).toLowerCase().includes("belum") ? (customAccount?.accountName || "Triwala Mitra Bestari") : val);
+
+  // Calculation of effective transaction amount
+  const effectiveAmount = (amount !== null && amount !== undefined) 
+    ? Number(amount) 
+    : (finalPrice !== null && finalPrice !== undefined ? Number(finalPrice) : null);
+
+  const minBankAmount = Number(paymentRules?.bank_transfer_min_amount || 10000);
+  const isUnderMinBank = effectiveAmount !== null && effectiveAmount < minBankAmount;
+  const allowBank = paymentRules?.bank_transfer_enabled !== false && !isUnderMinBank;
+  const allowQris = paymentRules?.qris_enabled !== false;
 
   const rawList = methods || apiMethods;
   let groups = [];
@@ -138,18 +202,28 @@ export default function PaymentMethodSelector({
   if (Array.isArray(rawList) && rawList.length > 0) {
     if (rawList[0]?.category && Array.isArray(rawList[0]?.items)) {
       // Already grouped
-      groups = rawList.map(g => ({
-        ...g,
-        items: g.items.filter(isItemActive).map(item => ({
-          ...item,
-          logo: getPaymentLogo(item.name || item.id || item.logoUrl),
-          accountNumber: cleanAccNum(item.accountNumber || item.account_number),
-          accountName: cleanAccName(item.accountName || item.account_holder || customAccount?.accountName),
-          isQRIS: item.isQRIS || String(item.id || item.name).toLowerCase().includes("qris"),
-        }))
-      })).filter(g => g.items.length > 0);
+      groups = rawList.map(g => {
+        const catLower = String(g.category || "").toLowerCase();
+        const isBankCat = catLower.includes("bank") || catLower.includes("transfer");
+        const isQrisCat = catLower.includes("qris");
+
+        if (isBankCat && !allowBank) return null;
+        if (isQrisCat && !allowQris) return null;
+
+        return {
+          ...g,
+          items: g.items.filter(isItemActive).map(item => ({
+            ...item,
+            logo: getPaymentLogo(item.name || item.id || item.logoUrl),
+            accountNumber: cleanAccNum(item.accountNumber || item.account_number),
+            accountName: cleanAccName(item.accountName || item.account_holder || customAccount?.accountName),
+            isQRIS: item.isQRIS || String(item.id || item.name).toLowerCase().includes("qris"),
+          }))
+        };
+      }).filter(Boolean).filter(g => g.items.length > 0);
     } else {
-      // Flat list of methods -> group them
+      // Flat list of methods -> group them with rules
+      const gateWayList = [];
       const banks = [];
       const ewallets = [];
       const qrisList = [];
@@ -161,18 +235,32 @@ export default function PaymentMethodSelector({
           accountNumber: cleanAccNum(m.accountNumber || m.account_number),
           accountName: cleanAccName(m.accountName || m.account_holder || customAccount?.accountName),
           isQRIS: m.isQRIS || String(m.id || m.name).toLowerCase().includes("qris"),
+          isMidtrans: m.isMidtrans || String(m.id || m.name).toLowerCase().includes("midtrans"),
         };
         const n = String(m.name || m.id || "").toLowerCase();
         const cat = String(m.category || "").toLowerCase();
-        if (n.includes("qris") || cat === "qris") {
-          qrisList.push(itemObj);
+        if (n.includes("midtrans") || cat.includes("midtrans") || cat.includes("gateway")) {
+          // Midtrans gateway
+          if (allowBank || allowQris) {
+            gateWayList.push(itemObj);
+          }
+        } else if (n.includes("qris") || cat === "qris") {
+          if (allowQris) {
+            qrisList.push(itemObj);
+          }
         } else if (n.includes("ovo") || n.includes("dana") || n.includes("gopay") || n.includes("shopee") || cat === "ewallet") {
           ewallets.push(itemObj);
         } else {
-          banks.push(itemObj);
+          // Bank transfer
+          if (allowBank) {
+            banks.push(itemObj);
+          }
         }
       });
 
+      if (gateWayList.length > 0) {
+        groups.push({ category: "Payment Gateway (Otomatis & Instant)", items: gateWayList });
+      }
       if (banks.length > 0) {
         groups.push({ category: "Transfer Bank / Rekening Resmi", items: banks });
       }
@@ -185,15 +273,35 @@ export default function PaymentMethodSelector({
     }
   } else {
     // Fallback to default filtered methods
-    groups = DEFAULT_OFFICIAL_METHODS.map(g => ({
-      ...g,
-      items: g.items.filter(isItemActive)
-    })).filter(g => g.items.length > 0);
+    groups = DEFAULT_OFFICIAL_METHODS.map(g => {
+      const catLower = String(g.category || "").toLowerCase();
+      if ((catLower.includes("bank") || catLower.includes("transfer")) && !allowBank) return null;
+      if (catLower.includes("qris") && !allowQris) return null;
+      return {
+        ...g,
+        items: g.items.filter(isItemActive)
+      };
+    }).filter(Boolean).filter(g => g.items.length > 0);
   }
 
   // Find currently selected account object
   const allItems = groups.flatMap((g) => g.items);
   const currentAccount = allItems.find((item) => isMethodSelected(item)) || allItems[0];
+
+  // Auto fallback selection if currently selected method is hidden due to amount rules or disabled by admin
+  useEffect(() => {
+    if (allItems.length > 0 && onSelect) {
+      const hasSelectedInCurrent = allItems.some((item) => isMethodSelected(item));
+      if (!hasSelectedInCurrent) {
+        // Prioritize QRIS or first available
+        const qrisItem = allItems.find(i => i.isQRIS || String(i.name).toLowerCase().includes("qris"));
+        const fallback = qrisItem || allItems[0];
+        if (fallback) {
+          onSelect(fallback);
+        }
+      }
+    }
+  }, [allowBank, allowQris, allItems.length]);
 
   const handleCopy = (num) => {
     if (!num || !navigator.clipboard) return;
@@ -212,6 +320,19 @@ export default function PaymentMethodSelector({
         <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">
           {title}
         </h3>
+      )}
+
+      {/* Info Banner when bank transfer is automatically hidden (< Rp 10.000) */}
+      {isUnderMinBank && (
+        <div className="flex items-start gap-3 p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-xs text-amber-900 animate-in fade-in duration-200">
+          <div className="p-1 rounded-lg bg-amber-100 text-amber-700 shrink-0 mt-0.5">
+            <ShieldCheck size={16} />
+          </div>
+          <div className="leading-relaxed">
+            <span className="font-bold block text-amber-950 mb-0.5">Metode Pembayaran Khusus Transaksi Ringan:</span>
+            Untuk total tagihan akhir <strong>Rp {Number(effectiveAmount).toLocaleString("id-ID")}</strong> (di bawah batas minimal Transfer Bank Rp {minBankAmount.toLocaleString("id-ID")}), sistem otomatis mengalihkan pembayaran ke <strong>QRIS Instan</strong> atau <strong>Poin</strong> demi kecepatan verifikasi.
+          </div>
+        </div>
       )}
 
       {/* Grid of Payment Methods */}
@@ -287,76 +408,146 @@ export default function PaymentMethodSelector({
             Instruksi Pembayaran {currentAccount.name}
           </h4>
           <p className="text-xs text-slate-600">
-            {currentAccount.isQRIS
+            {currentAccount.isMidtrans
+              ? "Instruksi Otomatis via Midtrans Gateway:"
+              : currentAccount.isQRIS
               ? "Scan QR Code di bawah menggunakan aplikasi e-wallet atau mobile banking kamu:"
               : "Silakan lakukan transfer sebesar total tagihan ke rekening / Virtual Account berikut:"}
           </p>
 
-          {currentAccount.isQRIS ? (
+          {currentAccount.isMidtrans ? (
+            <div className="bg-[#f0fffe] border-2 border-[#007570] rounded-xl p-5 text-center space-y-2">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#007570] text-white text-xs font-bold rounded-full mb-1 shadow-sm">
+                ⚡ OTOMATIS &amp; INSTAN VIA MIDTRANS
+              </div>
+              <p className="text-sm font-bold text-slate-800">
+                Pembayaran Serba Bisa (Kartu Kredit, Virtual Account, QRIS, E-Wallet)
+              </p>
+              <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+                Popup pembayaran resmi Midtrans Snap akan langsung terbuka setelah Anda menekan tombol konfirmasi. Tidak perlu mengunggah bukti transfer manual.
+              </p>
+            </div>
+          ) : currentAccount.isQRIS ? (
             /* QRIS Display */
             <div className="bg-white border-2 border-slate-200 rounded-xl p-6 flex flex-col items-center space-y-4">
-              <div className="w-56 h-56 sm:w-64 sm:h-64 bg-white border-4 border-[#007570] rounded-2xl p-4 flex items-center justify-center shadow-lg">
-                {qrisImage ? (
-                  <img src={qrisImage} alt="QRIS Code" className="w-full h-full object-contain" />
-                ) : (
-                  <svg viewBox="0 0 200 200" className="w-full h-full">
-                    <rect width="200" height="200" fill="white"/>
-                    <rect x="10" y="10" width="60" height="60" fill="black"/>
-                    <rect x="20" y="20" width="40" height="40" fill="white"/>
-                    <rect x="30" y="30" width="20" height="20" fill="black"/>
-                    <rect x="130" y="10" width="60" height="60" fill="black"/>
-                    <rect x="140" y="20" width="40" height="40" fill="white"/>
-                    <rect x="150" y="30" width="20" height="20" fill="black"/>
-                    <rect x="10" y="130" width="60" height="60" fill="black"/>
-                    <rect x="20" y="140" width="40" height="40" fill="white"/>
-                    <rect x="30" y="150" width="20" height="20" fill="black"/>
-                    <rect x="80" y="20" width="10" height="10" fill="black"/>
-                    <rect x="95" y="20" width="10" height="10" fill="black"/>
-                    <rect x="110" y="20" width="10" height="10" fill="black"/>
-                    <rect x="20" y="80" width="10" height="10" fill="black"/>
-                    <rect x="35" y="80" width="10" height="10" fill="black"/>
-                    <rect x="50" y="80" width="10" height="10" fill="black"/>
-                    <rect x="80" y="80" width="10" height="10" fill="black"/>
-                    <rect x="95" y="80" width="10" height="10" fill="black"/>
-                    <rect x="110" y="80" width="10" height="10" fill="black"/>
-                    <rect x="140" y="80" width="10" height="10" fill="black"/>
-                    <rect x="155" y="80" width="10" height="10" fill="black"/>
-                    <rect x="170" y="80" width="10" height="10" fill="black"/>
-                    <rect x="80" y="95" width="10" height="10" fill="black"/>
-                    <rect x="110" y="95" width="10" height="10" fill="black"/>
-                    <rect x="140" y="95" width="10" height="10" fill="black"/>
-                    <rect x="170" y="95" width="10" height="10" fill="black"/>
-                    <rect x="20" y="110" width="10" height="10" fill="black"/>
-                    <rect x="50" y="110" width="10" height="10" fill="black"/>
-                    <rect x="80" y="110" width="10" height="10" fill="black"/>
-                    <rect x="110" y="110" width="10" height="10" fill="black"/>
-                    <rect x="140" y="110" width="10" height="10" fill="black"/>
-                    <rect x="170" y="110" width="10" height="10" fill="black"/>
-                    <rect x="80" y="140" width="10" height="10" fill="black"/>
-                    <rect x="95" y="140" width="10" height="10" fill="black"/>
-                    <rect x="110" y="140" width="10" height="10" fill="black"/>
-                    <rect x="140" y="140" width="10" height="10" fill="black"/>
-                    <rect x="155" y="140" width="10" height="10" fill="black"/>
-                    <rect x="170" y="140" width="10" height="10" fill="black"/>
-                    <rect x="80" y="155" width="10" height="10" fill="black"/>
-                    <rect x="110" y="155" width="10" height="10" fill="black"/>
-                    <rect x="140" y="155" width="10" height="10" fill="black"/>
-                    <rect x="170" y="155" width="10" height="10" fill="black"/>
-                    <rect x="80" y="170" width="10" height="10" fill="black"/>
-                    <rect x="95" y="170" width="10" height="10" fill="black"/>
-                    <rect x="110" y="170" width="10" height="10" fill="black"/>
-                    <rect x="140" y="170" width="10" height="10" fill="black"/>
-                    <rect x="155" y="170" width="10" height="10" fill="black"/>
-                    <rect x="170" y="170" width="10" height="10" fill="black"/>
-                    <rect x="35" y="95" width="10" height="10" fill="black"/>
-                    <rect x="50" y="95" width="10" height="10" fill="black"/>
-                    <rect x="35" y="110" width="10" height="10" fill="black"/>
-                  </svg>
-                )}
-              </div>
+              {(() => {
+                const effectiveQris = qrisImage || liveQrisImage || localStorage.getItem("platform_qris_image");
+                return (
+                  <div className="flex flex-col items-center gap-3">
+                    <div
+                      onClick={() => effectiveQris && setIsZoomed(true)}
+                      className="w-60 sm:w-72 bg-white border-4 border-[#007570] rounded-2xl p-3 flex flex-col items-center justify-center shadow-lg relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02]"
+                      title="Klik untuk memperbesar QRIS ke layar penuh"
+                    >
+                      {effectiveQris ? (
+                        <img 
+                          src={effectiveQris} 
+                          alt="QRIS Resmi Platform" 
+                          className="w-full h-auto max-h-72 object-contain rounded-xl bg-white" 
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-center p-4">
+                          <img src="/logos/qris.png" alt="QRIS" className="w-28 h-auto object-contain mb-2" />
+                          <span className="text-[11px] font-bold text-slate-600">Scan QRIS Resmi</span>
+                        </div>
+                      )}
+
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 p-3 text-center">
+                        <Maximize2 size={24} className="text-amber-400" />
+                        <span className="text-xs font-bold">Klik untuk Perbesar QRIS</span>
+                      </div>
+                    </div>
+
+                    {effectiveQris && (
+                      <div className="flex items-center gap-2 w-full max-w-72">
+                        <button
+                          type="button"
+                          onClick={() => setIsZoomed(true)}
+                          className="flex-1 py-1.5 px-3 rounded-xl bg-teal-50 hover:bg-teal-100 text-[#007570] font-bold text-xs border border-teal-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Maximize2 size={13} />
+                          <span>Perbesar QR</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const link = document.createElement("a");
+                            link.href = effectiveQris;
+                            link.download = "QRIS-Resmi-Surade.png";
+                            link.target = "_blank";
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                          className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs border-0"
+                          title="Unduh QRIS untuk discan lewat galeri HP"
+                        >
+                          <Download size={13} />
+                          <span>Unduh QR</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Lightbox Modal */}
+                    {isZoomed && typeof document !== "undefined" && createPortal(
+                      <div
+                        onClick={() => setIsZoomed(false)}
+                        className="fixed inset-0 z-[9999999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+                      >
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border-4 border-[#007570] flex flex-col items-center gap-4 text-center relative"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setIsZoomed(false)}
+                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer border border-slate-200"
+                          >
+                            <X size={16} />
+                          </button>
+                          <div className="space-y-1 w-full text-left">
+                            <h4 className="font-extrabold text-slate-900 text-base">QRIS Resmi Surade.com</h4>
+                            <p className="text-xs text-slate-500">Scan menggunakan aplikasi e-wallet atau perbankan Anda</p>
+                          </div>
+                          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 w-full flex items-center justify-center shadow-inner">
+                            <img src={effectiveQris} alt="QRIS Zoom" className="w-full max-h-[55vh] object-contain rounded-xl select-all" />
+                          </div>
+                          <div className="flex items-center gap-2 w-full">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const link = document.createElement("a");
+                                link.href = effectiveQris;
+                                link.download = "QRIS-Resmi-Surade.png";
+                                link.target = "_blank";
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="flex-1 py-2.5 px-4 rounded-xl bg-[#007570] hover:bg-[#005f5b] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer border-0 shadow-xs"
+                            >
+                              <Download size={14} />
+                              <span>Unduh Gambar</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsZoomed(false)}
+                              className="py-2.5 px-5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border border-slate-200"
+                            >
+                              Tutup
+                            </button>
+                          </div>
+                        </div>
+                      </div>,
+                      document.body
+                    )}
+                  </div>
+                );
+              })()}
               <div className="text-center space-y-2">
                 <p className="text-sm font-bold text-slate-800">Scan QRIS untuk Pembayaran</p>
-                <p className="text-xs text-slate-500">Kompatibel dengan semua e-wallet & mobile banking</p>
+                <p className="text-xs text-slate-500">Kompatibel dengan semua e-wallet &amp; mobile banking</p>
                 <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
                   <span className="px-2 py-1 bg-[#4c2a86] text-white text-[10px] font-bold rounded">OVO</span>
                   <span className="px-2 py-1 bg-[#008cff] text-white text-[10px] font-bold rounded">DANA</span>
@@ -378,7 +569,7 @@ export default function PaymentMethodSelector({
                   {(!currentAccount.accountNumber || currentAccount.accountNumber === "0123456789" || currentAccount.accountNumber === "XXX" || String(currentAccount.accountNumber).toLowerCase().includes("belum")) ? "xxxx" : (currentAccount.accountNumber || customAccount?.accountNumber || "xxxx")}
                 </span>
                 <span className="text-xs text-slate-500 block mt-0.5">
-                  a.n {(!currentAccount.accountName || currentAccount.accountName === "Official Surade.co.id" || String(currentAccount.accountName).toLowerCase().includes("belum")) ? (currentAccount.accountName || "xxxx") : (currentAccount.accountName || customAccount?.accountName || "xxxx")}
+                  a.n {(!currentAccount.accountName || currentAccount.accountName === "Official Surade.com" || String(currentAccount.accountName).toLowerCase().includes("belum")) ? (currentAccount.accountName || "xxxx") : (currentAccount.accountName || customAccount?.accountName || "xxxx")}
                 </span>
               </div>
               <button

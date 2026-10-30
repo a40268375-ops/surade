@@ -54,7 +54,7 @@ export default function PackageSelectionModal({
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
             <Sparkles size={20} color="#fbbf24" />
             <span style={{ fontSize: "0.8125rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#93c5fd" }}>
-              Paket Konten Surade.co.id
+              Paket Konten Surade.com
             </span>
           </div>
           <h2 style={{ fontSize: "1.375rem", fontWeight: 800, margin: 0, lineHeight: 1.2 }}>
@@ -148,7 +148,7 @@ export default function PackageSelectionModal({
                     )}
 
                     <h3 className="pkg-card-title">{pkg.name}</h3>
-                    <p className="pkg-card-desc">{pkg.description || `Paket publikasi ${pkg.type} berkualitas di Surade.co.id.`}</p>
+                    <p className="pkg-card-desc">{pkg.description || `Paket publikasi ${pkg.type} berkualitas di Surade.com.`}</p>
 
                     <div className="pkg-card-price-box">
                       <span className="pkg-card-price">{pkg.formatted_price || `Rp ${Number(pkg.price).toLocaleString("id-ID")}`}</span>

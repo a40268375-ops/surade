@@ -60,7 +60,7 @@
 /* ── MAIN LAYOUT GRID ── */
 .prem-ads-grid {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 340px;
   gap: 12px;
   align-items: stretch;
 }
@@ -68,31 +68,36 @@
 /* ── LEFT: MAIN SLIDER ── */
 .prem-ads-main {
   position: relative;
-  border-radius: 16px;
+  border-radius: 20px;
   overflow: hidden;
   background: #0f172a;
-  min-height: 280px;
+  height: 380px;
   cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
 }
 
 .prem-ads-main__track {
   position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 280px;
+  height: 380px;
 }
 
 .prem-ads-main__slide {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 0.55s ease;
+  visibility: hidden;
   pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.5s ease;
 }
 
 .prem-ads-main__slide.active {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
+  z-index: 5;
 }
 
 .prem-ads-main__slide a {
@@ -100,30 +105,30 @@
   width: 100%;
   height: 100%;
   text-decoration: none;
+  color: inherit;
 }
 
 .prem-ads-main__img {
   width: 100%;
-  height: 100%;
+  height: 380px;
   object-fit: cover;
   display: block;
-  min-height: 280px;
-  transition: transform 0.6s ease;
+  transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .prem-ads-main:hover .prem-ads-main__img {
-  transform: scale(1.03);
+  transform: scale(1.04);
 }
 
-/* Gradient overlay */
+/* Multi-stage rich gradient overlay */
 .prem-ads-main__overlay {
   position: absolute;
   inset: 0;
   background: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.85) 0%,
-    rgba(0, 0, 0, 0.5) 40%,
-    rgba(0, 0, 0, 0.1) 70%,
+    rgba(9, 26, 36, 0.92) 0%,
+    rgba(15, 23, 42, 0.55) 45%,
+    rgba(15, 23, 42, 0.15) 75%,
     transparent 100%
   );
   pointer-events: none;
@@ -256,59 +261,91 @@
   border-color: rgba(255,255,255,0.5);
 }
 
-/* Navigation */
+/* Navigation Floating Arrows (Prev/Next) */
+/* Navigation Floating Arrows (Prev/Next) */
 .prem-ads-main__nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 10;
-  width: 36px;
-  height: 36px;
+  z-index: 25;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  border: none;
-  background: rgba(255,255,255,0.15);
-  backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 .prem-ads-main__nav:hover {
-  background: rgba(255,255,255,0.3);
-  transform: translateY(-50%) scale(1.1);
+  background: rgba(0, 117, 112, 0.9);
+  border-color: rgba(255, 255, 255, 0.7);
+  transform: translateY(-50%) scale(1.08);
 }
 
-.prem-ads-main__nav--prev { left: 12px; }
-.prem-ads-main__nav--next { right: 12px; }
+.prem-ads-main__nav:active {
+  transform: translateY(-50%) scale(0.92);
+}
 
-/* Dots */
+.prem-ads-main__nav--prev { left: 14px; }
+.prem-ads-main__nav--next { right: 14px; }
+
+/* Dots Pagination at Bottom Right */
 .prem-ads-main__dots {
   position: absolute;
-  bottom: 14px;
-  right: 18px;
+  bottom: 16px;
+  right: 20px;
   display: flex;
-  gap: 5px;
+  align-items: center;
+  gap: 6px;
   z-index: 10;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 .prem-ads-main__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
   border: none;
-  background: rgba(255,255,255,0.4);
+  background: rgba(255, 255, 255, 0.4);
   cursor: pointer;
   padding: 0;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
 }
 
 .prem-ads-main__dot.active {
-  background: #fff;
-  width: 22px;
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  width: 28px;
+}
+
+.prem-ads-main__dot-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #007570, #10b981);
+  border-radius: 999px;
+  animation: dotFill 6.5s linear forwards;
+}
+
+@keyframes dotFill {
+  from { width: 0%; }
+  to   { width: 100%; }
 }
 
 /* ── RIGHT: THUMBNAIL GRID ── */
@@ -316,22 +353,29 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  height: 380px;
 }
 
 .prem-ads-thumb {
-  flex: 1;
-  border-radius: 12px;
+  display: block;
+  height: 185px;
+  flex: 0 0 185px;
+  border-radius: 16px;
   overflow: hidden;
   position: relative;
-  min-height: 120px;
   background: #0f172a;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-decoration: none;
+  color: inherit;
+  outline: none;
 }
 
 .prem-ads-thumb:hover {
-  transform: scale(1.015);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .prem-ads-thumb a {
@@ -339,15 +383,15 @@
   width: 100%;
   height: 100%;
   text-decoration: none;
+  color: inherit;
 }
 
 .prem-ads-thumb__img {
   width: 100%;
-  height: 100%;
-  min-height: 120px;
+  height: 185px;
   object-fit: cover;
   display: block;
-  transition: transform 0.4s ease;
+  transition: transform 0.45s ease;
 }
 
 .prem-ads-thumb:hover .prem-ads-thumb__img {
@@ -359,8 +403,8 @@
   inset: 0;
   background: linear-gradient(
     to top,
-    rgba(0,0,0,0.8) 0%,
-    rgba(0,0,0,0.3) 50%,
+    rgba(0,0,0,0.85) 0%,
+    rgba(0,0,0,0.35) 50%,
     transparent 100%
   );
   pointer-events: none;
@@ -373,6 +417,7 @@
   right: 0;
   padding: 10px 12px;
   z-index: 2;
+  pointer-events: none;
 }
 
 .prem-ads-thumb__tag {
@@ -444,37 +489,110 @@
   color: rgba(255,255,255,0.7);
 }
 
+/* ── HERO PROMO BANNER (WHEN NO CUSTOM ADS) ── */
+.prem-ads-hero-promo {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #091a24 0%, #06403d 55%, #032725 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 79, 76, 0.16);
+  height: 380px;
+  display: flex;
+  align-items: center;
+}
+
+.prem-ads-hero-promo__backdrop {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(circle at 85% 15%, rgba(20, 184, 166, 0.28), transparent 45%),
+    radial-gradient(circle at 10% 85%, rgba(245, 158, 11, 0.16), transparent 40%),
+    radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 24px 24px;
+  pointer-events: none;
+}
+
+.prem-ads-hero-promo__content {
+  position: relative;
+  z-index: 2;
+  padding: 32px 36px;
+  width: 100%;
+}
+
+.prem-ads-side-promo {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 18px 20px;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 185px;
+  flex: 0 0 185px;
+}
+
+.prem-ads-side-promo:hover {
+  transform: translateY(-4px);
+  border-color: #007570;
+  box-shadow: 0 12px 30px rgba(0, 117, 112, 0.15);
+}
+
+.prem-ads-side-promo--empty {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1.5px solid #e2e8f0;
+  height: 185px;
+  flex: 0 0 185px;
+}
+
+.prem-ads-side-promo--empty:hover {
+  background: #ffffff;
+  border-color: #007570;
+  box-shadow: 0 10px 25px rgba(0, 117, 112, 0.12);
+}
+
 /* ── PLACEHOLDER EMPTY STATE ── */
 .prem-ads-empty {
   width: 100%;
-  min-height: 120px;
+  height: 185px;
+  flex: 0 0 185px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
-  border-radius: 12px;
-  color: #94a3b8;
-  font-size: 0.8rem;
-  flex: 1;
-  border: 1.5px dashed #cbd5e1;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border-radius: 16px;
+  color: #64748b;
+  font-size: 0.85rem;
+  border: 1.5px solid #e2e8f0;
+  transition: all 0.25s ease;
+}
+
+.prem-ads-empty:hover {
+  background: #ffffff;
+  border-color: #007570;
+  color: #007570;
+  box-shadow: 0 8px 20px rgba(0, 117, 112, 0.1);
 }
 
 /* ── SKELETON LOADING ── */
 .prem-ads-skeleton-main {
+  border-radius: 20px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: prem-shimmer 1.5s infinite;
+  height: 380px;
+}
+
+.prem-ads-skeleton-thumb {
   border-radius: 16px;
   background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
   background-size: 200% 100%;
   animation: prem-shimmer 1.5s infinite;
-  min-height: 280px;
-}
-
-.prem-ads-skeleton-thumb {
-  border-radius: 12px;
-  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
-  background-size: 200% 100%;
-  animation: prem-shimmer 1.5s infinite;
-  min-height: 120px;
-  flex: 1;
+  height: 185px;
+  flex: 0 0 185px;
 }
 
 @keyframes prem-shimmer {
@@ -484,40 +602,201 @@
 
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) {
+  .prem-ads-wrap {
+    padding: 14px 16px 2px;
+  }
+
   .prem-ads-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+    height: auto;
+  }
+
+  .prem-ads-main,
+  .prem-ads-main__track,
+  .prem-ads-main__img {
+    height: 280px;
   }
 
   .prem-ads-side {
     flex-direction: row;
+    gap: 10px;
+    height: auto !important;
+    min-height: unset !important;
+    flex: none !important;
   }
 
   .prem-ads-thumb {
-    min-height: 150px;
+    min-height: 140px;
+    height: 140px;
+    flex: 1;
   }
 }
 
 @media (max-width: 600px) {
   .prem-ads-wrap {
-    padding: 18px 12px 4px;
+    padding: 10px 14px 2px;
+  }
+
+  .prem-ads-header {
+    margin-bottom: 8px;
+  }
+
+  .prem-ads-main,
+  .prem-ads-main__track,
+  .prem-ads-main__img {
+    height: 250px;
+    border-radius: 18px;
+  }
+
+  .prem-ads-main__content {
+    padding: 12px 14px 14px;
+  }
+
+  .prem-ads-main__title {
+    font-size: 1.05rem;
+    line-height: 1.25;
+    margin-bottom: 6px;
+    max-width: calc(100% - 65px);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .prem-ads-main__desc {
+    display: none;
+  }
+
+  .prem-ads-main__meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .prem-ads-main__rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+  }
+
+  .prem-ads-main__location {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.73rem;
+    max-width: 160px;
+  }
+
+  .prem-ads-main__cta {
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    border-radius: 8px;
+  }
+
+  /* Show enlarged side floating navigation arrows on mobile */
+  .prem-ads-main__nav {
+    display: flex !important;
+    width: 38px;
+    height: 38px;
+    z-index: 30;
+  }
+
+  .prem-ads-main__nav--prev {
+    left: 8px;
+  }
+
+  .prem-ads-main__nav--next {
+    right: 8px;
+  }
+
+  .prem-ads-main__dots {
+    bottom: 12px;
+    right: 12px;
+    padding: 4px 8px;
   }
 
   .prem-ads-side {
     flex-direction: row;
     overflow-x: auto;
     scrollbar-width: none;
-    gap: 8px;
-    padding-bottom: 4px;
+    gap: 10px;
+    padding-bottom: 0px;
+    height: auto !important;
+    min-height: unset !important;
+    flex: none !important;
   }
 
   .prem-ads-side::-webkit-scrollbar { display: none; }
 
   .prem-ads-thumb {
-    min-width: 200px;
-    flex: 0 0 200px;
+    min-width: 170px;
+    flex: 1 1 170px;
+    height: 140px;
+    border-radius: 14px;
   }
 
-  .prem-ads-main__title {
-    font-size: 1.1rem;
+  .prem-ads-thumb__content {
+    padding: 8px 10px 10px;
+  }
+
+  .prem-ads-thumb__title {
+    font-size: 0.8rem;
+    line-height: 1.25;
+    margin-bottom: 3px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .prem-ads-thumb__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .prem-ads-thumb__rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .prem-ads-thumb__location {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.68rem;
+    max-width: 105px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .prem-ads-side-promo,
+  .prem-ads-side-promo--empty,
+  .prem-ads-empty {
+    min-width: 170px;
+    flex: 1 1 170px;
+    height: 140px !important;
+    padding: 12px !important;
+    border-radius: 14px !important;
   }
 }

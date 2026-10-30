@@ -1,4 +1,4 @@
-# LOGIN CREDENTIALS - Surade.co.id
+# LOGIN CREDENTIALS - Surade.com
 
 ## 🔐 User Accounts
 
@@ -12,12 +12,12 @@ Semua user sekarang menggunakan password yang sama: **`password123`**
 - Role: `user`
 
 **2. Test User:**
-- Email: `test@surade.co.id`
+- Email: `test@surade.com`
 - Password: `password123`
 - Role: `user`
 
 **3. Admin:**
-- Email: `admin@surade.co.id`
+- Email: `admin@surade.com`
 - Password: `password123`
 - Role: `admin`
 

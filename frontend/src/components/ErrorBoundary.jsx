@@ -68,7 +68,7 @@ export default class ErrorBoundary extends Component {
               </button>
             </div>
 
-            <div className="nf-bottom-text">Surade.co.id</div>
+            <div className="nf-bottom-text">Surade.com</div>
           </div>
         </main>
       </div>

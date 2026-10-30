@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo   CLEAR ALL CACHE - SURADE.CO.ID
+echo   CLEAR ALL CACHE - SURADE.COM
 echo ========================================
 echo.
 

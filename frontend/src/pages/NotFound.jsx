@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import "./NotFound.css";
 
 /**
@@ -6,6 +7,9 @@ import "./NotFound.css";
  * route path="*" paling bawah).
  */
 export default function NotFound() {
+  useEffect(() => {
+    document.title = "Halaman Tidak Ditemukan - Surade.com";
+  }, []);
   return (
     <div className="nf-body">
       <div className="nf-background">
@@ -39,7 +43,7 @@ export default function NotFound() {
             </a>
           </div>
 
-          <div className="nf-bottom-text">Surade.co.id</div>
+          <div className="nf-bottom-text">Surade.com</div>
         </div>
       </main>
     </div>

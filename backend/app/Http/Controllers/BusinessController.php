@@ -276,6 +276,11 @@ class BusinessController extends Controller
 
     public function store(BusinessStoreRequest $request)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, 
+            ['title', 'description', 'address', 'village', 'phone', 'email', 'operating_hours', 'website', 'video_url'], 
+            ['image', 'images', 'video']
+        );
+
         // Check business creation limits using PremiumFeatureService
         $canCreate = $this->premiumService->canPerformAction($request->user(), 'create_business');
         if (!$canCreate['allowed']) {
@@ -356,8 +361,9 @@ class BusinessController extends Controller
         ]);
 
         // Create notification for admin about new business
-        if ($request->user()->role !== 'admin') {
-            \App\Http\Controllers\NotificationController::notifyAdminNewBusiness($business);
+        if ($request->user()->role !== 'admin' && $business->status === 'pending') {
+            // Gunakan method baru untuk notifikasi verifikasi bisnis
+            \App\Models\Notification::notifyAdminBusinessVerification($business);
         }
 
         // Add usage stats to response for free users
@@ -377,11 +383,32 @@ class BusinessController extends Controller
             return response()->json(['message' => 'Business not found'], 404);
         }
 
+        // Increment views count in real-time
+        $business->increment('views');
+
+        // Track page view if table exists
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('page_views')) {
+                \App\Models\PageView::create([
+                    'business_id' => $business->id,
+                    'path' => "/business/{$business->id}",
+                    'created_at' => \Carbon\Carbon::now(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Silently handle analytics log failure
+        }
+
         return response()->json($business);
     }
 
     public function update(BusinessUpdateRequest $request, $id)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, 
+            ['title', 'description', 'address', 'village', 'phone', 'email', 'operating_hours', 'website', 'video_url'], 
+            ['image', 'images', 'video']
+        );
+
         $business = Business::find($id);
         
         if (!$business) {
@@ -613,6 +640,8 @@ class BusinessController extends Controller
      */
     public function addReview(Request $request, $id)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, ['comment']);
+
         $business = Business::find($id);
         if (!$business) {
             return response()->json(['message' => 'Business not found'], 404);

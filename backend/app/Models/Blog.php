@@ -22,6 +22,9 @@ class Blog extends Model
         'payment_proof',
         'payment_method',
         'coupon_code',
+        'referral_code',
+        'referrer_id',
+        'referral_status',
         'original_price',
         'discount_amount',
         'final_price',
@@ -53,6 +56,16 @@ class Blog extends Model
     public function blogCategory(): BelongsTo
     {
         return $this->belongsTo(BlogCategory::class, 'blog_category_id');
+    }
+
+    public function transactions()
+    {
+        return $this->hasMany(ContentTransaction::class, 'content_id');
+    }
+
+    public function latestTransaction()
+    {
+        return $this->hasOne(ContentTransaction::class, 'content_id')->latestOfMany();
     }
 
     // Fallback accessors for backwards compatibility

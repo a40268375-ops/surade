@@ -1,0 +1,806 @@
+/* =========================================================
+   NomorPenting.css - Ultra Premium Design with Coastal & Wave Ribbons
+   No text cut-off, seamless alignment, and flawless responsive UI/UX
+   ========================================================= */
+
+.np-page-container {
+  min-height: 100vh;
+  background-color: #f8fafc;
+  color: #1e293b;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ── Hero Section with Background 2 (Coast + Wave Ribbons + Organic Waves) ── */
+.np-hero-section {
+  position: relative;
+  padding-top: 135px;
+  padding-bottom: 95px;
+  overflow: hidden;
+  color: #ffffff;
+  background-color: #064e3b;
+}
+
+.np-hero-bg-image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 35%;
+  transform: scale(1.03);
+  filter: brightness(0.92) contrast(1.05);
+  pointer-events: none;
+}
+
+.np-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(6, 78, 59, 0.92) 0%,
+    rgba(4, 120, 87, 0.84) 50%,
+    rgba(15, 23, 42, 0.86) 100%
+  );
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+/* ── Decorative Corner Wave Ribbons & Leaf Accents (Matching Image 2) ── */
+.np-decor-top-left {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(220px, 32vw, 440px);
+  height: clamp(150px, 24vw, 320px);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.np-decor-bottom-right {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: clamp(240px, 35vw, 460px);
+  height: clamp(160px, 25vw, 340px);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.np-dots-pattern-tl {
+  position: absolute;
+  top: 35px;
+  left: 25px;
+  display: grid;
+  grid-template-columns: repeat(6, 6px);
+  gap: 8px;
+  opacity: 0.65;
+  z-index: 6;
+}
+
+.np-dots-pattern-tr {
+  position: absolute;
+  top: 30px;
+  right: 40px;
+  display: grid;
+  grid-template-columns: repeat(6, 6px);
+  gap: 8px;
+  opacity: 0.6;
+  z-index: 6;
+}
+
+.np-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #fbbf24;
+}
+
+.np-dot-green {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #34d399;
+}
+
+/* ── Hero Content ── */
+.np-hero-content {
+  position: relative;
+  z-index: 10;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.np-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 6px 18px;
+  border-radius: 9999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ffffff;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.np-pulse-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8);
+  animation: npPulseAnim 1.8s infinite;
+}
+
+@keyframes npPulseAnim {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.np-hero-title {
+  font-size: clamp(2.1rem, 4.5vw, 3.2rem);
+  font-weight: 900;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px 0;
+  color: #ffffff;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+}
+
+.np-hero-title span {
+  background: linear-gradient(135deg, #34d399 0%, #6ee7b7 50%, #fef08a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.np-hero-desc {
+  max-width: 800px;
+  margin: 0 auto 36px auto;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: #ecfdf5;
+  font-weight: 400;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Hotlines Banner Grid — No Cut-Offs ── */
+.np-hotlines-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  max-width: 1140px;
+  margin: 0 auto;
+}
+
+.np-hotline-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  text-decoration: none;
+  color: #1e293b;
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  min-height: 90px;
+}
+
+.np-hotline-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.3);
+  border-color: #34d399;
+}
+
+.np-hotline-dial {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.np-hotline-info {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Fully visible title without truncate cut-offs */
+.np-hotline-name {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 3px 0;
+  line-height: 1.25;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.np-hotline-sub {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.np-hotline-badge {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #047857;
+}
+
+/* ── Smooth Organic Wave Divider at bottom of Hero ── */
+.np-hero-wave-divider {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+  line-height: 0;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.np-hero-wave-divider svg {
+  position: relative;
+  display: block;
+  width: calc(100% + 1.3px);
+  height: 65px;
+}
+
+/* ── Main Content Container with Proper Top Margin & Spacing ── */
+.np-main-content {
+  max-width: 1220px;
+  margin: 32px auto 80px auto;
+  position: relative;
+  z-index: 20;
+  padding: 0 24px;
+}
+
+/* ── Filter & Search Control Panel ── */
+.np-filter-panel {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 26px;
+  box-shadow: 0 14px 40px -10px rgba(0, 0, 0, 0.07), 0 4px 16px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e2e8f0;
+  margin-bottom: 28px;
+}
+
+.np-search-wrapper {
+  position: relative;
+  margin-bottom: 22px;
+}
+
+.np-search-icon {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.np-search-input {
+  width: 100%;
+  height: 54px;
+  padding: 0 50px 0 52px;
+  border-radius: 16px;
+  border: 1.5px solid #cbd5e1;
+  background-color: #f8fafc;
+  font-size: 0.98rem;
+  color: #0f172a;
+  transition: all 0.2s ease;
+  outline: none;
+  font-family: inherit;
+}
+
+.np-search-input:focus {
+  border-color: #059669;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.12);
+}
+
+.np-search-clear {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #e2e8f0;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #475569;
+  transition: all 0.15s ease;
+}
+
+.np-search-clear:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+/* ── 12 Villages Tabs Bar ── */
+.np-village-tabs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.np-village-tabs-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.np-village-scroll-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 6px 2px 14px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.np-village-scroll-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.np-village-scroll-container::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.np-village-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 10px;
+  border-radius: 9999px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.86rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.np-village-tab:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+.np-village-tab.active {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border-color: #059669;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+}
+
+.np-village-tab-img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid #ffffff;
+}
+
+.np-village-tab-badge {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.08);
+  font-weight: 800;
+}
+
+.np-village-tab.active .np-village-tab-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* ── Category Filter Pills ── */
+.np-category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.np-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.np-cat-pill:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.np-cat-pill.active {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+/* ── Result Info Bar ── */
+.np-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  padding: 0 4px;
+}
+
+.np-result-count {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.np-result-highlight {
+  color: #059669;
+  font-weight: 900;
+}
+
+/* ── Cards Grid — Clean Alignment & No Clipped Content ── */
+.np-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 22px;
+  margin-bottom: 48px;
+}
+
+@media (max-width: 640px) {
+  .np-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.np-card {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.np-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 18px 36px -8px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.04);
+  border-color: #cbd5e1;
+}
+
+.np-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.np-card-icon-wrap {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.np-card-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.np-card-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.np-card-village-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #d1fae5;
+  padding: 4px 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.np-card-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+  margin: 0 0 4px 0;
+  word-break: break-word;
+}
+
+.np-card-role {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #64748b;
+  margin: 0 0 10px 0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.np-card-desc {
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: #475569;
+  margin: 0 0 14px 0;
+  flex: 1;
+}
+
+.np-card-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-bottom: 18px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  line-height: 1.45;
+}
+
+/* ── Card Action Buttons ── */
+.np-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.np-btn-call {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+}
+
+.np-btn-call:hover {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+}
+
+.np-btn-wa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: #25d366;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(37, 211, 102, 0.25);
+}
+
+.np-btn-wa:hover {
+  background: #20ba5a;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
+}
+
+.np-btn-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.np-btn-copy:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.np-btn-copy.copied {
+  background: #059669;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+/* ── Guidelines Section with Rich Gradient ── */
+.np-guidelines-card {
+  background: linear-gradient(135deg, #064e3b 0%, #0f172a 100%);
+  border-radius: 26px;
+  padding: 36px;
+  color: #ffffff;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  align-items: center;
+  box-shadow: 0 24px 50px -12px rgba(6, 78, 59, 0.35);
+  margin-bottom: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+@media (max-width: 860px) {
+  .np-guidelines-card {
+    grid-template-columns: 1fr;
+    padding: 26px;
+  }
+}
+
+.np-guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.np-guide-num {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+/* ── Empty State ── */
+.np-empty-state {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 56px 24px;
+  text-align: center;
+  border: 1.5px dashed #cbd5e1;
+  color: #64748b;
+  margin-bottom: 48px;
+}
+
+/* ── Toast Notification ── */
+.np-toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 14px 22px;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 9999;
+  animation: npSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+@keyframes npSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

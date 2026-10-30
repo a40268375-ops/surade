@@ -205,7 +205,7 @@ body { background: #f5f6fa; }
   letter-spacing: -0.01em;
   /* PERBAIKAN BUG: sebelumnya display:block - karena h1 otomatis
      melebar penuh mengikuti lebar kontainer (bisa jauh lebih lebar
-     dari teks "Surade.co.id" itu sendiri, ada spasi kosong menggantung
+     dari teks "Surade.com" itu sendiri, ada spasi kosong menggantung
      di kanan), animasi cahaya di bawah jadi salah hitung: seolah-olah
      harus menyapu SELURUH lebar kotak (termasuk area kosongnya), jadi
      cahayanya cuma "kebagian" nongol pas berada di area teks ".co.id"
@@ -619,6 +619,15 @@ body { background: #f5f6fa; }
   flex-shrink: 0;
   transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   border: 1px solid #e2e8f0;
+  overflow: hidden;
+  position: relative;
+}
+
+.home-keyword-dropdown__business-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
 }
 
 .home-keyword-dropdown__item--business:hover .home-keyword-dropdown__business-icon {
@@ -1090,11 +1099,52 @@ body { background: #f5f6fa; }
 
 @media (max-width: 640px) {
   .standard-ads-container {
-    padding: 0 16px;
+    padding: 0 14px;
   }
   .standard-ads-section {
-    padding: 6px 0 18px 0;
+    padding: 0px 0 6px 0;
   }
+  .standard-ads-header {
+    margin-bottom: 6px;
+    padding: 0 2px;
+  }
+  .standard-ads-ticker-wrap {
+    padding: 2px 0 6px !important;
+  }
+}
+
+.standard-ads-promo-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 50%, #f0fdfa 100%);
+  border: 1.5px solid #ccfbf1;
+  border-radius: 20px;
+  padding: 16px 22px;
+  box-shadow: 0 4px 20px rgba(0, 117, 112, 0.05);
+  transition: all 0.3s ease;
+}
+
+.standard-ads-promo-strip:hover {
+  border-color: #99f6e4;
+  box-shadow: 0 8px 28px rgba(0, 117, 112, 0.08);
+}
+
+.standard-ads-promo-strip__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.standard-ads-promo-strip__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .standard-ads-header {
@@ -1134,39 +1184,26 @@ body { background: #f5f6fa; }
 
 .standard-ads-ticker-wrap {
   width: 100%;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto !important;
   position: relative;
   mask-image: linear-gradient(to right, transparent 0%, black 2.5%, black 97.5%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 2.5%, black 97.5%, transparent 100%);
   padding: 22px 0 26px;
-  /* BARU: perspective supaya transform 3D di tiap kartu (lihat
-     .standard-ad-card:hover di bawah) benar-benar kelihatan "berdimensi"
-     (ada rasa jarak/kedalaman), bukan cuma miring datar. Ini aman -
-     cuma memengaruhi TAMPILAN child 3D-nya, tidak mengganggu animasi
-     berjalan (translateX) punya .standard-ads-ticker-track sama sekali,
-     karena keduanya elemen yang beda (parent vs child). */
   perspective: 1400px;
+}
+
+.standard-ads-ticker-wrap::-webkit-scrollbar {
+  display: none;
 }
 
 .standard-ads-ticker-track {
   display: flex;
   gap: 16px;
   width: max-content;
-  animation: standardAdsTickerAnim 36s linear infinite;
-  will-change: transform;
-}
-
-.standard-ads-ticker-wrap:hover .standard-ads-ticker-track {
-  animation-play-state: paused;
-}
-
-@keyframes standardAdsTickerAnim {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
 }
 
 /* PERBAIKAN: kartu iklan dikasih tampilan 3D - dulu cuma naik dikit
@@ -1191,6 +1228,15 @@ body { background: #f5f6fa; }
   flex-direction: column;
   transform-style: preserve-3d;
   transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.standard-ad-card img,
+.home-cat-card-modern img {
+  -webkit-user-drag: none !important;
+  user-drag: none !important;
+  pointer-events: none !important;
 }
 
 .standard-ad-card:hover {
@@ -1205,16 +1251,38 @@ body { background: #f5f6fa; }
 
 @media (max-width: 640px) {
   .standard-ad-card {
-    flex: 0 0 210px;
-    width: 210px;
+    flex: 0 0 195px;
+    width: 195px;
+    border-radius: 12px;
   }
 
-  /* Efek tilt 3D dimatikan khusus di layar sentuh/kecil - "hover" di
-     touchscreen gampang nyangkut aktif terus & bikin tata letak ticker
-     yang rapat jadi kelihatan berantakan/miring permanen. Tetap ada
-     efek terangkat + shadow, cuma tanpa kemiringan 3D-nya. */
+  .standard-ad-card__img-wrap {
+    height: 115px;
+  }
+
+  .standard-ad-card__body {
+    padding: 8px 10px;
+    gap: 3px;
+  }
+
+  .standard-ad-card__name {
+    font-size: 0.82rem;
+  }
+
+  .standard-ad-card__meta {
+    font-size: 0.7rem;
+    gap: 4px;
+    margin-top: 1px;
+  }
+
+  .standard-ad-card__location {
+    font-size: 0.68rem;
+    max-width: 100px;
+  }
+
+  /* Efek tilt 3D dimatikan khusus di layar sentuh/kecil */
   .standard-ad-card:hover {
-    transform: translateY(-6px) scale(1.02);
+    transform: translateY(-4px) scale(1.02);
   }
 }
 
@@ -1313,6 +1381,17 @@ body { background: #f5f6fa; }
   max-width: 130px;
 }
 
+.standard-ad-card--slot {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  min-height: 250px;
+}
+
+.standard-ad-card--slot:hover {
+  border-color: #14b8a6;
+  box-shadow: 0 16px 32px -10px rgba(13, 148, 136, 0.22);
+}
+
 /* ── Category Section ── */
 .category-section {
   background: #f8fafc;
@@ -1359,125 +1438,7 @@ body { background: #f5f6fa; }
   .home-cat-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
 }
 
-.home-cat-card {
-  position: relative;
-  text-decoration: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 26px 18px 22px 18px;
-  background: #ffffff;
-  border: 1.5px solid #eef2f6;
-  border-radius: 24px;
-  color: #334155;
-  overflow: hidden;
-  isolation: isolate;
-  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.32s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.3s ease;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03), 0 1px 3px rgba(15, 23, 42, 0.04);
-}
-
-/* Glassmorphism ambient glow effect on hover */
-.home-cat-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: radial-gradient(circle at 50% 0%, rgba(5, 150, 105, 0.08), transparent 75%);
-  opacity: 0;
-  transition: opacity 0.32s ease;
-}
-
-/* Micro shimmer line effect */
-.home-cat-card::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.6),
-    transparent
-  );
-  transform: skewX(-20deg);
-  transition: none;
-}
-
-.home-cat-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  border-color: rgba(5, 150, 105, 0.3);
-  box-shadow: 0 20px 36px -12px rgba(15, 23, 42, 0.1), 0 8px 20px -6px rgba(5, 150, 105, 0.15);
-}
-
-.home-cat-card:hover::before {
-  opacity: 1;
-}
-
-.home-cat-card:hover::after {
-  animation: catCardShimmer 0.75s ease-in-out forwards;
-}
-
-@keyframes catCardShimmer {
-  100% {
-    left: 150%;
-  }
-}
-
-.home-cat-card__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 0.35s ease;
-}
-
-.home-cat-card:hover .home-cat-card__icon {
-  transform: scale(1.12) rotate(-3deg);
-  background: linear-gradient(135deg, #059669, #047857) !important;
-  color: #ffffff !important;
-  border-color: #059669 !important;
-  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.3);
-}
-
-.home-cat-card__label {
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  text-align: center;
-  line-height: 1.3;
-  color: #1e293b;
-  transition: color 0.25s ease;
-}
-
-.home-cat-card:hover .home-cat-card__label {
-  color: #047857;
-}
-
-.home-cat-card__cta {
-  font-size: 0.75rem;
-  font-weight: 700;
-  opacity: 0;
-  transform: translateY(6px);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.home-cat-card:hover .home-cat-card__cta {
-  opacity: 1;
-  transform: translateY(0);
-}
+/* Legacy home-cat-card rules removed - unified under enhanced 3D category grid system below */
 
 /* ── Business Cards Grid ── */
 .reko-grid {
@@ -1492,7 +1453,9 @@ body { background: #f5f6fa; }
   border-radius: 14px;
   overflow: hidden;
   cursor: pointer;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   text-decoration: none;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -1512,10 +1475,13 @@ body { background: #f5f6fa; }
 
 /* ── Premium / Terverifikasi Business Card: Elegant, Luxurious, Eye-Catching ── */
 .biz-card--premium {
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf9 100%) !important;
   border: 1.5px solid rgba(0, 117, 112, 0.45);
   box-shadow: 0 4px 22px -2px rgba(0, 117, 112, 0.12), 0 2px 8px -1px rgba(234, 179, 8, 0.1);
   position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Top luxury emerald & gold gradient highlight stripe */
@@ -1540,7 +1506,11 @@ body { background: #f5f6fa; }
 .biz-card--premium .biz-card__body {
   position: relative;
   z-index: 1;
-  background: linear-gradient(180deg, #ffffff 0%, #f0fdf9 100%);
+  background: transparent !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   overflow: hidden;
 }
 
@@ -1662,22 +1632,14 @@ body { background: #f5f6fa; }
   z-index: 3;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  color: #ffffff;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.4);
-  backdrop-filter: blur(4px);
+  justify-content: center;
   pointer-events: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+  transition: transform 0.2s ease;
 }
 
-.biz-card__verified-icon {
-  color: #ffffff;
-  fill: rgba(255, 255, 255, 0.3);
-  flex-shrink: 0;
+.biz-card__verified-badge:hover {
+  transform: scale(1.1);
 }
 
 /* Card body */
@@ -1800,7 +1762,7 @@ body { background: #f5f6fa; }
   .home-hero { min-height: 70vh; }
   .home-nav { gap: 14px; }
   .home-nav__link--login { display: none; }
-  .reko-grid { grid-template-columns: 1fr; }
+  .reko-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .reko-tabs { justify-content: flex-start; }
 }
 
@@ -1834,101 +1796,394 @@ body { background: #f5f6fa; }
   margin-bottom: 32px;
 }
 
-/* 4-column grid */
-.smart-grid {
+/* 4-column 3D grid */
+.smart-3d-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 1.5rem;
 }
 
-/* Individual city card */
-.smart-card-link {
-  text-decoration: none;
+@media (min-width: 640px) {
+  .smart-3d-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-.smart-card {
+@media (min-width: 1024px) {
+  .smart-3d-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.75rem;
+  }
+}
+
+/* 3D Perspective Container */
+.smart-3d-perspective {
+  perspective: 1200px;
+}
+
+/* 3D Card */
+.smart-3d-card {
   position: relative;
-  border-radius: 12px;
-  overflow: hidden;
-  cursor: pointer;
+  display: block;
   aspect-ratio: 4 / 3;
-  outline: none;
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background-color: #0b1329;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  transform-style: preserve-3d;
+  transform: translateZ(0);
+  transition: transform 0.45s cubic-bezier(0.2, 0.9, 0.3, 1),
+              box-shadow 0.45s cubic-bezier(0.2, 0.9, 0.3, 1),
+              border-color 0.35s ease;
+  box-shadow: 0 10px 24px -4px rgba(15, 23, 42, 0.2),
+              0 4px 8px -2px rgba(15, 23, 42, 0.1),
+              inset 0 1px 1px 0 rgba(255, 255, 255, 0.35);
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.smart-card.active {
-  box-shadow: 0 0 0 3px #007570, 0 8px 32px rgba(0, 117, 112, 0.3);
-  transform: scale(1.02);
+.smart-3d-card:hover {
+  transform: translateY(-8px) scale(1.02) rotateX(2.5deg);
+  border-color: rgba(52, 211, 153, 0.7);
+  box-shadow: 0 24px 44px -8px rgba(0, 117, 112, 0.45),
+              0 14px 20px -4px rgba(15, 23, 42, 0.3),
+              inset 0 1px 2px 0 rgba(255, 255, 255, 0.6);
 }
 
-.smart-card__img {
+/* Image with 3D Depth Zoom */
+.smart-3d-card__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
-  transition: transform 0.4s ease;
-}
-.smart-card:hover .smart-card__img,
-.smart-card:focus .smart-card__img {
-  transform: scale(1.07);
+  object-position: center;
+  filter: brightness(0.92) contrast(1.04);
+  transition: transform 0.75s cubic-bezier(0.2, 0.9, 0.3, 1), filter 0.5s ease;
+  will-change: transform;
 }
 
-/* permanent dark gradient overlay at bottom */
-.smart-card__overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.08) 55%, transparent 100%);
-  transition: background 0.3s ease;
-}
-.smart-card:hover .smart-card__overlay {
-  background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.35) 60%, rgba(0,0,0,0.10) 100%);
+.smart-3d-card:hover .smart-3d-card__img {
+  transform: scale(1.12);
+  filter: brightness(1) contrast(1.08);
 }
 
-/* City name always visible at bottom */
-.smart-card__name {
+/* Ambient 3D Shadows & Lighting Gradients */
+.smart-3d-card__top-shadow {
   position: absolute;
-  bottom: 12px;
-  left: 0; right: 0;
-  text-align: center;
-  color: #fff;
-  font-size: 0.88rem;
-  font-weight: 600;
-  padding: 0 10px;
-  transition: bottom 0.3s ease, opacity 0.3s ease;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0.2) 60%, transparent 100%);
+  pointer-events: none;
   z-index: 2;
 }
-.smart-card:hover .smart-card__name,
-.smart-card:focus .smart-card__name {
-  bottom: 38px;
+
+.smart-3d-card__bottom-shadow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background: linear-gradient(to top, rgba(2, 6, 23, 0.96) 0%, rgba(2, 6, 23, 0.7) 50%, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
 }
 
-/* Tooltip — business count */
-.smart-card__tooltip {
+/* 3D Gloss / Sheen Sweep across Card on Hover */
+.smart-3d-card__sheen {
   position: absolute;
-  bottom: 10px;
-  left: 0; right: 0;
-  text-align: center;
-  opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.22) 48%,
+    rgba(255, 255, 255, 0.08) 54%,
+    transparent 80%
+  );
+  transform: translateX(-160%);
+  transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.smart-3d-card:hover .smart-3d-card__sheen {
+  transform: translateX(160%);
+}
+
+/* Floating Top Bar (Badges & 3D Action Icon) */
+.smart-3d-card__top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 4;
   pointer-events: none;
 }
-.smart-card:hover .smart-card__tooltip,
-.smart-card:focus .smart-card__tooltip {
-  opacity: 1;
-  transform: translateY(0);
+
+.smart-3d-card__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
-.smart-card__tooltip-count {
-  font-size: 1rem;
-  font-weight: 800;
-  color: #00b3ab;
+.smart-3d-card__pulse-dot {
+  position: relative;
+  display: flex;
+  width: 7px;
+  height: 7px;
 }
-.smart-card__tooltip-label {
+
+.smart-3d-card__pulse-dot span:first-child {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #34d399;
+  opacity: 0.75;
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.smart-3d-card__pulse-dot span:last-child {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.smart-3d-card__action-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.3s ease;
+}
+
+.smart-3d-card:hover .smart-3d-card__action-btn {
+  transform: rotate(45deg) scale(1.12);
+  background: #007570;
+  border-color: #34d399;
+  box-shadow: 0 6px 16px rgba(0, 117, 112, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+}
+
+/* 3D Glass Bottom Deck */
+.smart-3d-card__deck {
+  position: absolute;
+  inset-x: 0;
+  bottom: 0;
+  padding: 12px 14px;
+  z-index: 4;
+}
+
+.smart-3d-card__deck-inner {
+  border-radius: 0.85rem;
+  padding: 8px 12px;
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 20px -2px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  transition: background 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+
+.smart-3d-card:hover .smart-3d-card__deck-inner {
+  background: rgba(2, 6, 23, 0.75);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.smart-3d-card__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.015em;
+  line-height: 1.25;
+  margin: 0;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  transition: color 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.smart-3d-card:hover .smart-3d-card__title {
+  color: #6ee7b7;
+}
+
+.smart-3d-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.smart-3d-card__count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #6ee7b7;
+  white-space: nowrap;
+}
+
+.smart-3d-card__count-num {
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.smart-3d-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 0.72rem;
-  font-weight: 500;
-  color: rgba(255,255,255,0.88);
+  font-weight: 600;
+  color: #cbd5e1;
+  white-space: nowrap;
+  transition: color 0.25s ease, transform 0.25s ease;
+}
+
+.smart-3d-card:hover .smart-3d-card__cta {
+  color: #34d399;
+  transform: translateX(2px);
+}
+
+/* ─────────────────────────────────────────────
+   3D SMART VILLAGE TEXT & KILATAN (FLASH) ON PRESS
+───────────────────────────────────────────── */
+.smart-village-3d-text-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  user-select: none;
+  padding: 2px 0;
+}
+
+.smart-village-3d-num-text {
+  color: #00f5b8;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 12px rgba(0, 245, 184, 0.75),
+               0 2px 4px rgba(0, 0, 0, 0.95);
+  transition: transform 0.2s ease, text-shadow 0.2s ease;
+}
+
+.smart-village-3d-label-text {
+  color: #f8fafc;
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.015em;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.95);
+  white-space: nowrap;
+}
+
+.group:active .smart-village-3d-num-text,
+.is-flashing .smart-village-3d-num-text {
+  transform: scale(1.15);
+  text-shadow: 0 0 18px rgba(0, 245, 184, 1), 0 2px 6px rgba(0, 0, 0, 0.95);
+}
+
+/* Kilatan Cahaya (Light Flash) on Press */
+.smart-card-kilatan-overlay {
+  position: absolute;
+  inset: -100%;
+  width: 300%;
+  height: 300%;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.25) 44%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(52, 211, 153, 0.85) 53%,
+    rgba(255, 255, 255, 0.35) 58%,
+    transparent 68%
+  );
+  transform: rotate(25deg) translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.smart-card-kilatan-burst {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.85) 0%, rgba(52, 211, 153, 0.45) 40%, transparent 75%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 29;
+}
+
+/* Trigger kilatan saat ditekan (active) atau dipencet (flashing) */
+.group:active .smart-card-kilatan-overlay,
+.is-flashing .smart-card-kilatan-overlay {
+  animation: smartCardKilatan 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.group:active .smart-card-kilatan-burst,
+.is-flashing .smart-card-kilatan-burst {
+  animation: smartCardBurst 0.45s ease-out forwards;
+}
+
+@keyframes smartCardKilatan {
+  0% {
+    opacity: 1;
+    transform: rotate(25deg) translateY(-80%);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(25deg) translateY(80%);
+  }
+}
+
+@keyframes smartCardBurst {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -1939,7 +2194,7 @@ body { background: #f5f6fa; }
   width: 100%;
   height: 420px;
   overflow: hidden;
-  background: #fff;
+  background: #123326;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1948,8 +2203,7 @@ body { background: #f5f6fa; }
 .sawah-wave-divider__img {
   position: absolute;
   inset: 0;
-  background: #1f4d2c url('../assets/sawah-bg.jpg') no-repeat center 60% / cover;
-  background-attachment: fixed;
+  background: #1f4d2c url('../assets/sawah-bg.jpg') no-repeat center 50% / cover;
 }
 
 .sawah-wave-divider__dim {
@@ -1957,51 +2211,54 @@ body { background: #f5f6fa; }
   inset: 0;
   z-index: 1;
   background:
-    radial-gradient(ellipse 60% 70% at center, rgba(3,15,10,0.55) 0%, rgba(3,15,10,0.15) 60%, rgba(3,15,10,0) 80%),
-    linear-gradient(180deg, rgba(4,20,12,0.30) 0%, rgba(4,20,12,0.05) 40%, rgba(4,20,12,0.32) 100%);
+    radial-gradient(ellipse 70% 70% at center, rgba(3,15,10,0.45) 0%, rgba(3,15,10,0.15) 60%, rgba(3,15,10,0.5) 100%),
+    linear-gradient(180deg, rgba(4,20,12,0.3) 0%, rgba(4,20,12,0.05) 50%, rgba(4,20,12,0.35) 100%);
 }
 
 .sawah-wave-divider__text {
   position: relative;
   z-index: 3;
-  max-width: 720px;
+  max-width: 840px;
   margin: 0 24px;
   text-align: center;
-  color: #ffffff;
+  color: #ffffff !important;
   padding: 0;
 }
 
 .sawah-wave-divider__eyebrow {
   display: inline-block;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #a7f3d0;
-  margin-bottom: 12px;
+  color: #a7f3d0 !important;
+  margin-bottom: 14px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
 .sawah-wave-divider__heading {
-  font-size: clamp(1.35rem, 3vw, 2rem);
-  font-weight: 800;
-  line-height: 1.4;
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 900;
+  line-height: 1.3;
   letter-spacing: -0.01em;
+  color: #ffffff !important;
   margin: 0;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.5), 0 8px 30px rgba(0,0,0,0.55);
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.75);
+}
+
+.sawah-wave-divider__accent {
+  color: #00c9b1 !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
 }
 
 .sawah-wave-divider__underline {
   display: block;
-  width: 56px;
-  height: 3px;
-  margin: 18px auto 0;
-  border-radius: 3px;
-  background: linear-gradient(90deg, #34d399, #00c9b1);
-  box-shadow: 0 0 10px rgba(52,211,153,0.6);
-}
-
-.sawah-wave-divider__accent {
-  color: #34d399;
+  width: 52px;
+  height: 4px;
+  margin: 8px auto 0;
+  border-radius: 4px;
+  background: #00c9b1;
+  box-shadow: 0 0 10px rgba(0, 201, 177, 0.8);
 }
 
 .sawah-wave-divider__br {
@@ -2010,7 +2267,6 @@ body { background: #f5f6fa; }
 
 @media (max-width: 640px) {
   .sawah-wave-divider__text {
-    padding: 24px 22px;
     margin: 0 16px;
   }
   .sawah-wave-divider__br { display: none; }
@@ -2020,9 +2276,10 @@ body { background: #f5f6fa; }
   position: absolute;
   left: 0;
   width: 100%;
-  height: 150px;
+  height: 125px;
   overflow: hidden;
   z-index: 2;
+  pointer-events: none;
 }
 
 .sawah-wave-edge--top {
@@ -2030,7 +2287,7 @@ body { background: #f5f6fa; }
 }
 
 .sawah-wave-edge--bottom {
-  bottom: -1px;
+  bottom: -2px;
   transform: scaleY(-1);
 }
 
@@ -2051,8 +2308,8 @@ body { background: #f5f6fa; }
 }
 
 @media (max-width: 768px) {
-  .sawah-wave-divider { height: 260px; }
-  .sawah-wave-edge { height: 90px; }
+  .sawah-wave-divider { height: 280px; }
+  .sawah-wave-edge { height: 75px; }
 }
 
 /* ─────────────────────────────────────────────
@@ -2184,12 +2441,20 @@ body { background: #f5f6fa; }
 
 .quick-img-frame {
   position: relative;
-  border-radius: 20px;
+  border-radius: 24px;
   overflow: hidden;
-  aspect-ratio: 4 / 3.1;
-  box-shadow: 0 24px 60px rgba(15,23,42,0.16), 0 2px 8px rgba(15,23,42,0.06);
-  border: 6px solid #ffffff;
-  outline: 1px solid #e8ecf0;
+  aspect-ratio: 16 / 11;
+  max-width: 520px;
+  margin: 0 auto;
+  box-shadow: 0 20px 50px rgba(15,23,42,0.18), 0 4px 12px rgba(15,23,42,0.08), 0 0 0 1px rgba(0,117,112,0.08);
+  border: 5px solid #ffffff;
+  outline: 1px solid #e2e8f0;
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s ease;
+}
+
+.quick-img-frame:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 32px 70px rgba(15,23,42,0.22), 0 8px 20px rgba(0,117,112,0.12);
 }
 
 .quick-img {
@@ -2197,6 +2462,11 @@ body { background: #f5f6fa; }
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.5s ease;
+}
+
+.quick-img-frame:hover .quick-img {
+  transform: scale(1.03);
 }
 
 .quick-img-glow {
@@ -2434,21 +2704,33 @@ body { background: #f5f6fa; }
 
 @media (max-width: 640px) {
   .temukan-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 }
 
 /* ── Temukan Pagination Wrap ── */
 .temukan-pagination-wrap {
-  margin-top: 36px;
-  padding-top: 24px;
+  margin-top: 24px;
+  padding-top: 12px;
+}
+
+.temukan-pagination-wrap .category-pagination__info {
+  margin-bottom: 4px;
+}
+
+@media (max-width: 640px) {
+  .temukan-pagination-wrap {
+    margin-top: 16px;
+    padding-top: 8px;
+  }
 }
 
 /* ── Lihat Semua Bisnis Button ── */
 .temukan-more-wrap {
   display: flex;
   justify-content: center;
-  margin-top: 28px;
+  margin-top: 20px;
 }
 
 .temukan-more-btn {
@@ -2623,13 +2905,14 @@ body { background: #f5f6fa; }
    KEY FEATURES SECTION
 ───────────────────────────────────────────── */
 .features-section {
-  background: #ffffff;
-  padding: 64px 0 72px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  padding: 76px 0 80px;
   border-top: 1px solid #e8ecf0;
+  position: relative;
 }
 
 .features-inner {
-  max-width: 1100px;
+  max-width: 1160px;
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -2637,7 +2920,8 @@ body { background: #f5f6fa; }
 .features-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  gap: 28px;
+  padding-top: 24px; /* Memberi ruang untuk icon melompat keluar kotaknya */
 }
 
 .feat-card {
@@ -2646,86 +2930,142 @@ body { background: #f5f6fa; }
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 32px 20px;
+  padding: 42px 22px 30px;
   background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid #e8ecf0;
-  box-shadow: 0 4px 20px rgba(15,23,42,0.03);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05), 0 4px 6px -2px rgba(15, 23, 42, 0.02);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible !important; /* CRITICAL: Memungkinkan icon melompat keluar batas kotak */
 }
 
+/* Badge Nomor (01, 02, 03, 04) di pojok kanan atas */
+.feat-card__badge {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #94a3b8;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  letter-spacing: 0.05em;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+/* Top Accent line bar */
 .feat-card::before {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0; left: 24px; right: 24px;
   height: 3px;
-  background: linear-gradient(90deg, #059669, #00c9b1);
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(90deg, #007570, #00c9b1);
   transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.35s ease;
+  transform-origin: center;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .feat-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 14px 34px rgba(5,150,105,0.14);
-  border-color: rgba(5,150,105,0.25);
+  transform: translateY(-10px);
+  box-shadow: 0 22px 45px -12px rgba(0, 117, 112, 0.22), 0 0 0 1.5px rgba(0, 117, 112, 0.4);
+  border-color: rgba(0, 117, 112, 0.25);
+  background: #ffffff;
 }
 
 .feat-card:hover::before {
   transform: scaleX(1);
 }
 
+.feat-card:hover .feat-card__badge {
+  background: rgba(0, 117, 112, 0.08);
+  color: #007570;
+  border-color: rgba(0, 117, 112, 0.3);
+}
+
+/* Container Ikon Keluar dari Kotak (Pop-Out Header Circle) */
 .feat-card__icon-wrap {
-  width: 54px;
-  height: 54px;
+  position: relative;
+  margin-top: -66px; /* Pops out of top border! */
+  margin-bottom: 22px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  background: #1e293b;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 12px rgba(30,41,59,0.15);
-  transition: background 0.35s ease, box-shadow 0.35s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 12px 25px -4px rgba(15, 23, 42, 0.25), 0 0 0 6px #ffffff;
+  z-index: 5;
+  transition: background 0.4s ease, box-shadow 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Kondisi awal sebelum animasi "pop up" jalan */
+  /* Kondisi awal reveal animation */
   opacity: 0;
   transform: translateY(46px) scale(0.4);
 }
 
-/* ── Animasi ikon "meloncat keluar ke atas" saat card terlihat ── */
+/* Glowing Pulse Ring animation behind icon */
+.feat-card__icon-wrap::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 117, 112, 0.4);
+  opacity: 0;
+  transform: scale(0.85);
+  transition: all 0.4s ease;
+  pointer-events: none;
+}
+
+/* Animasi ikon pop-up saat scrolling masuk view */
 @keyframes featIconPopUp {
   0%   { opacity: 0; transform: translateY(46px) scale(0.4) rotate(-12deg); }
-  55%  { opacity: 1; transform: translateY(-10px) scale(1.14) rotate(6deg); }
-  78%  { transform: translateY(4px) scale(0.95) rotate(-3deg); }
+  60%  { opacity: 1; transform: translateY(-14px) scale(1.18) rotate(6deg); }
+  80%  { transform: translateY(2px) scale(0.96) rotate(-3deg); }
   100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
 }
 
 .reveal-card.is-revealed .feat-card__icon-wrap {
-  animation: featIconPopUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: featIconPopUp 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-/* Selaraskan jeda animasi ikon dengan stagger fade tiap kartu */
-.reveal-stagger > *:nth-child(1) .feat-card__icon-wrap { animation-delay: 0.20s; }
-.reveal-stagger > *:nth-child(2) .feat-card__icon-wrap { animation-delay: 0.30s; }
-.reveal-stagger > *:nth-child(3) .feat-card__icon-wrap { animation-delay: 0.40s; }
-.reveal-stagger > *:nth-child(4) .feat-card__icon-wrap { animation-delay: 0.50s; }
+/* Selaraskan jeda animasi ikon dengan stagger */
+.reveal-stagger > *:nth-child(1) .feat-card__icon-wrap { animation-delay: 0.15s; }
+.reveal-stagger > *:nth-child(2) .feat-card__icon-wrap { animation-delay: 0.25s; }
+.reveal-stagger > *:nth-child(3) .feat-card__icon-wrap { animation-delay: 0.35s; }
+.reveal-stagger > *:nth-child(4) .feat-card__icon-wrap { animation-delay: 0.45s; }
 
-/* Hover: ikon melompat kecil + lingkaran berubah jadi gradasi hijau */
+/* Hover Effect: Icon POP OUT even higher with vibrant teal gradient & glowing ring */
 .feat-card:hover .feat-card__icon-wrap {
-  background: linear-gradient(135deg, #059669, #00997f);
-  box-shadow: 0 8px 22px rgba(5,150,105,0.35);
-  transform: translateY(-5px) scale(1.08) rotate(-4deg);
+  background: linear-gradient(135deg, #007570 0%, #00b3ab 100%);
+  box-shadow: 0 14px 30px rgba(0, 117, 112, 0.42), 0 0 0 6px #ffffff;
+  transform: translateY(-8px) scale(1.16) rotate(-6deg);
+}
+
+.feat-card:hover .feat-card__icon-wrap::after {
+  opacity: 1;
+  transform: scale(1.28);
+  animation: pulseGlowRing 2s infinite ease-out;
+}
+
+@keyframes pulseGlowRing {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.45); opacity: 0; }
 }
 
 .feat-card__title {
-  font-size: 0.95rem;
+  font-size: 1.02rem;
   font-weight: 700;
   color: #0f172a;
   margin-bottom: 10px;
-  transition: color 0.25s ease;
+  transition: color 0.3s ease;
+  letter-spacing: -0.01em;
 }
 
 .feat-card:hover .feat-card__title {
@@ -2733,9 +3073,9 @@ body { background: #f5f6fa; }
 }
 
 .feat-card__text {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   color: #64748b;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 /* ─────────────────────────────────────────────
@@ -2871,24 +3211,27 @@ body { background: #f5f6fa; }
 
 .blog-card {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid #e8ecf0;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(15,23,42,0.03);
+  box-shadow: 0 4px 20px rgba(15,23,42,0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
-  display: block;
+  display: flex;
+  flex-direction: column;
   text-decoration: none;
+  text-align: left;
 }
 
 .blog-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(15,23,42,0.08);
+  box-shadow: 0 12px 36px rgba(15,23,42,0.08);
 }
 
 .blog-card__img-wrap {
-  height: 200px;
+  height: 210px;
   overflow: hidden;
+  position: relative;
 }
 
 .blog-card__img {
@@ -2900,29 +3243,33 @@ body { background: #f5f6fa; }
 }
 
 .blog-card:hover .blog-card__img {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 .blog-card__body {
-  padding: 20px 24px;
-  text-align: center;
+  padding: 22px 24px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .blog-card__category {
   font-size: 0.78rem;
-  font-weight: 500;
-  color: #64748b;
+  font-weight: 700;
+  color: #007570;
   margin-bottom: 8px;
   text-transform: capitalize;
+  text-align: left;
 }
 
 .blog-card__title {
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #0f172a;
   line-height: 1.45;
-  margin-bottom: 16px;
-  min-height: 48px;
+  margin-bottom: 12px;
+  text-align: left;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -2934,18 +3281,20 @@ body { background: #f5f6fa; }
 .blog-card__footer {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 20px;
+  justify-content: space-between;
+  gap: 12px;
   border-top: 1px solid #f1f5f9;
   padding-top: 14px;
+  margin-top: auto;
 }
 
 .blog-card__meta {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.75rem;
-  color: #94a3b8;
+  font-size: 0.78rem;
+  color: #64748b;
+  text-align: left;
 }
 
 /* ─────────────────────────────────────────────
@@ -3235,3 +3584,608 @@ body { background: #f5f6fa; }
     border-right: none;
   }
 }
+
+/* ─────────────────────────────────────────────
+   HOME PAGE MOBILE RESPONSIVE ENHANCEMENTS
+───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .home-hero__search-bar,
+  .hero-search-bar {
+    flex-direction: column !important;
+    height: auto !important;
+    border-radius: 18px !important;
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+
+  .home-hero__search-input,
+  .home-hero__search-select,
+  .hero-search-input {
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    padding: 10px 12px !important;
+  }
+
+  .home-hero__search-btn,
+  .hero-search-btn {
+    width: 100% !important;
+    border-radius: 12px !important;
+    height: 48px !important;
+    justify-content: center !important;
+  }
+
+  .home-categories__grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .home-featured__grid,
+  .home-umkm-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .quick-steps-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-hero {
+    padding-top: 85px !important;
+    padding-bottom: 36px !important;
+    min-height: auto !important;
+  }
+
+  .home-hero__title {
+    font-size: 1.5rem !important;
+    line-height: 1.3 !important;
+  }
+
+  .home-hero__subtitle {
+    font-size: 0.88rem !important;
+  }
+
+  .home-section-title {
+    font-size: 1.25rem !important;
+  }
+
+  .home-section-subtitle {
+    font-size: 0.82rem !important;
+  }
+
+  /* Compact Card Rules for Mobile - Ultra Short & Sleek */
+  .home-featured__grid,
+  .home-umkm-grid,
+  .business-grid,
+  .product-grid,
+  .temukan-grid,
+  .reko-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .home-categories__grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Compact Card Image & Content */
+  .business-card,
+  .animated-card,
+  .umkm-card,
+  .biz-card {
+    border-radius: 12px !important;
+    padding: 0 !important;
+  }
+
+  .business-card__img-wrap,
+  .umkm-card__img-wrap,
+  .biz-card__img-wrap {
+    height: 105px !important;
+    max-height: 110px !important;
+  }
+
+  .biz-card__verified-badge {
+    top: 6px !important;
+    left: 6px !important;
+    padding: 3px 6px !important;
+    border-radius: 999px !important;
+    gap: 0 !important;
+  }
+
+  .biz-card__verified-badge span {
+    display: none !important;
+  }
+
+  .biz-card__verified-icon {
+    width: 13px !important;
+    height: 13px !important;
+  }
+
+  .biz-card__save {
+    position: absolute !important;
+    top: 6px !important;
+    right: 6px !important;
+    padding: 0 !important;
+    width: 25px !important;
+    height: 25px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+  }
+
+  .biz-card__save span {
+    display: none !important;
+  }
+
+  .biz-card__views {
+    padding: 2px 6px !important;
+    font-size: 0.62rem !important;
+  }
+
+  .business-card__content,
+  .umkm-card__content,
+  .biz-card__body {
+    padding: 7px 8px !important;
+  }
+
+  .business-card__title,
+  .umkm-card__title,
+  .biz-card__name {
+    font-size: 0.8rem !important;
+    line-height: 1.25 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    white-space: normal !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-height: 2em !important;
+  }
+
+  .biz-card__vip-pill {
+    padding: 1.5px 5px !important;
+    font-size: 0.58rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  .biz-card__categories {
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .business-card__category,
+  .umkm-card__category,
+  .biz-card__category {
+    font-size: 0.66rem !important;
+  }
+
+  .biz-card__category--sub {
+    font-size: 0.62rem !important;
+    padding: 1px 5px !important;
+    margin-top: 2px !important;
+  }
+
+  .biz-card__price-tag {
+    font-size: 0.62rem !important;
+    padding: 1.5px 5px !important;
+    border-radius: 6px !important;
+  }
+
+  /* Compact non-truncated tags with horizontal swipe on mobile cards */
+  .biz-card__tags {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    gap: 3px !important;
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .biz-card__tags::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .biz-card__tag {
+    font-size: 0.6rem !important;
+    padding: 1.5px 5px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    max-width: none !important;
+    border-radius: 4px !important;
+  }
+
+  .biz-card__tag--more {
+    font-size: 0.58rem !important;
+    padding: 1.5px 5px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  .biz-card__footer {
+    padding-top: 4px !important;
+    margin-top: 4px !important;
+    gap: 3px !important;
+    border-top: 1px solid #f1f5f9 !important;
+  }
+
+  .biz-card__rating {
+    font-size: 0.68rem !important;
+  }
+
+  .business-card__location,
+  .biz-card__location {
+    font-size: 0.66rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+
+  .biz-card__cta {
+    font-size: 0.65rem !important;
+    padding: 2.5px 7px !important;
+    border-radius: 5px !important;
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+
+  .business-card__badge,
+  .umkm-card__badge {
+    font-size: 0.62rem !important;
+    padding: 1.5px 5px !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .home-categories__grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   PREMIUM CUSTOM SCROLLBAR
+───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #007570, #00b3ab);
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #005e5a, #007570);
+}
+
+/* ─────────────────────────────────────────────
+   SMOOTH SCROLL FOR ALL SECTIONS
+───────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─────────────────────────────────────────────
+   STAGGERED SCROLL-REVEAL FOR CARDS
+───────────────────────────────────────────── */
+@keyframes cardReveal {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.biz-card {
+  animation: cardReveal 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.biz-card:nth-child(1) { animation-delay: 0.05s; }
+.biz-card:nth-child(2) { animation-delay: 0.12s; }
+.biz-card:nth-child(3) { animation-delay: 0.19s; }
+.biz-card:nth-child(4) { animation-delay: 0.26s; }
+.biz-card:nth-child(5) { animation-delay: 0.33s; }
+.biz-card:nth-child(6) { animation-delay: 0.40s; }
+
+/* ─────────────────────────────────────────────
+   PRICE TIER BADGE TRANSITION
+───────────────────────────────────────────── */
+.biz-card__price-tag {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.biz-card:hover .biz-card__price-tag {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(5,150,105,0.15);
+}
+
+/* ─────────────────────────────────────────────
+   ENHANCED BIZ CARD HOVER
+───────────────────────────────────────────── */
+.biz-card--link {
+  transition: transform 0.28s cubic-bezier(0.16,1,0.3,1), box-shadow 0.28s ease !important;
+}
+.biz-card--link:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 20px 45px rgba(15,23,42,0.13), 0 4px 10px rgba(0,117,112,0.08) !important;
+}
+
+/* ─────────────────────────────────────────────
+   SECTION ENTRY ANIMATIONS
+───────────────────────────────────────────── */
+@keyframes sectionFadeUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.quick-section,
+.sawah-wave-divider,
+.home-features-section {
+  animation: sectionFadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-play-state: paused;
+}
+
+.quick-section.is-in-view,
+.sawah-wave-divider.is-in-view,
+.home-features-section.is-in-view {
+  animation-play-state: running;
+}
+
+/* ─────────────────────────────────────────────
+   FLOATING BADGE PULSE
+───────────────────────────────────────────── */
+@keyframes softPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,179,171,0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(0,179,171,0); }
+}
+
+.biz-card__verified-badge--premium {
+  animation: softPulse 2.5s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────
+   CATEGORY CARDS GRID (CASCADING & ULTRA-PREMIUM ANIMATIONS)
+───────────────────────────────────────────── */
+.category-section {
+  padding: 36px 0 28px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.category-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+  position: relative;
+}
+
+/* ── 2-Row Dual-Direction Opposing Marquee (Elevated UI/UX) ── */
+.category-section {
+  padding: 40px 0 32px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.category-inner {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 16px;
+  position: relative;
+}
+
+.home-cat-dual-marquee {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.home-cat-row-wrapper {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto !important;
+  touch-action: pan-x pan-y;
+  cursor: grab;
+  padding: 8px 0;
+  /* Deep, natural left & right edge dissolve matching reference */
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.15) 20px, black 80px, black calc(100% - 80px), rgba(0, 0, 0, 0.15) calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.15) 20px, black 80px, black calc(100% - 80px), rgba(0, 0, 0, 0.15) calc(100% - 20px), transparent 100%);
+}
+
+.home-cat-row-wrapper:active {
+  cursor: grabbing;
+}
+
+.home-cat-row-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.home-cat-row-track {
+  display: flex;
+  width: max-content;
+  gap: 18px;
+  will-change: transform;
+}
+
+/* Row tracks are powered by InfiniteScroller for seamless endless drag & flow */
+.home-cat-row-track--left,
+.home-cat-row-track--right {
+  display: flex;
+  width: max-content;
+  gap: 18px;
+}
+
+.home-cat-single-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-shrink: 0;
+}
+
+/* Modern Category Card (Ultra-Premium UI/UX) */
+.home-cat-card-modern {
+  position: relative;
+  background: #ffffff;
+  border: 1.5px solid rgba(226, 232, 240, 0.85);
+  border-radius: 22px;
+  padding: 18px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  text-align: center;
+  width: 178px;
+  height: 140px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.035), 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.home-cat-card-modern:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 20px 38px -10px rgba(0, 117, 112, 0.18), 0 6px 14px -3px rgba(15, 23, 42, 0.06);
+  border-color: rgba(0, 117, 112, 0.45);
+}
+
+.home-cat-card-modern:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* Icon Box with Unified Surade Green Tint & 3D Morph Hover */
+.home-cat-card-modern__icon-box {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(0, 117, 112, 0.07) 0%, rgba(5, 150, 105, 0.11) 100%) !important;
+  border: 1.2px solid rgba(0, 117, 112, 0.14) !important;
+  color: #007570 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 11px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+}
+
+.home-cat-card-modern:hover .home-cat-card-modern__icon-box {
+  background: linear-gradient(135deg, #007570 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 10px 22px -3px rgba(0, 117, 112, 0.4);
+  transform: scale(1.09) rotate(2deg);
+}
+
+.home-cat-card-modern__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.home-cat-card-modern:hover .home-cat-card-modern__icon svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  transform: scale(1.05);
+}
+
+/* Category Label */
+.home-cat-card-modern__label {
+  font-size: 0.89rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.25s ease;
+  padding: 0 4px;
+}
+
+.home-cat-card-modern:hover .home-cat-card-modern__label {
+  color: #007570;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .category-section {
+    padding: 24px 0 18px;
+  }
+
+  .home-cat-dual-marquee {
+    gap: 12px;
+  }
+
+  .category-inner {
+    padding: 0 6px;
+  }
+
+  .home-cat-row-wrapper {
+    mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.25) 14px, black 40px, black calc(100% - 40px), rgba(0, 0, 0, 0.25) calc(100% - 14px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.25) 14px, black 40px, black calc(100% - 40px), rgba(0, 0, 0, 0.25) calc(100% - 14px), transparent 100%);
+  }
+
+  .home-cat-row-track {
+    gap: 12px;
+  }
+
+  .home-cat-single-row {
+    gap: 12px;
+  }
+
+  .home-cat-card-modern {
+    width: 152px;
+    height: 124px;
+    border-radius: 17px;
+    padding: 13px 8px 10px;
+  }
+
+  .home-cat-card-modern__icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    margin-bottom: 8px;
+  }
+
+  .home-cat-card-modern__label {
+    font-size: 0.82rem;
+  }
+}
+
+
+
+
+
+
+

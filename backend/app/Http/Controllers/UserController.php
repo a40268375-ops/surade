@@ -53,7 +53,35 @@ class UserController extends Controller
             });
         }
 
-        return response()->json($query->latest()->get());
+        $onlineThreshold = now()->subMinutes(5);
+        $activeUserIds = \DB::table('personal_access_tokens')
+            ->where('tokenable_type', User::class)
+            ->where(function ($q) use ($onlineThreshold) {
+                $q->where('last_used_at', '>=', $onlineThreshold)
+                  ->orWhere(function ($q2) use ($onlineThreshold) {
+                      $q2->whereNull('last_used_at')
+                         ->where('created_at', '>=', $onlineThreshold);
+                  });
+            })
+            ->pluck('tokenable_id')
+            ->unique()
+            ->toArray();
+
+        $latestTokens = \DB::table('personal_access_tokens')
+            ->where('tokenable_type', User::class)
+            ->select('tokenable_id', \DB::raw('MAX(COALESCE(last_used_at, created_at)) as latest_seen'))
+            ->groupBy('tokenable_id')
+            ->pluck('latest_seen', 'tokenable_id')
+            ->toArray();
+
+        $users = $query->latest()->get()->map(function ($u) use ($activeUserIds, $latestTokens, $onlineThreshold) {
+            $isOnline = (bool) $u->is_online || in_array($u->id, $activeUserIds) || ($u->last_seen_at && $u->last_seen_at >= $onlineThreshold);
+            $u->is_online = $isOnline;
+            $u->last_seen_at = $u->last_seen_at ?: ($latestTokens[$u->id] ?? null);
+            return $u;
+        });
+
+        return response()->json($users);
     }
 
     // Aktifkan/nonaktifkan akun. User yang dinonaktifkan tidak bisa login
@@ -100,26 +128,13 @@ class UserController extends Controller
         // Auto-generate referral code if not provided and user is reseller
         $referralCode = $request->referral_code;
         if (!$referralCode && $request->role === 'reseller') {
-            $referralCode = $this->generateUniqueReferralCode();
+            $referralCode = $this->generateUniqueReferralCode($request->name);
         } else if ($referralCode) {
             // Validate custom referral code format
-            if (!preg_match('/^[A-Z0-9]{3,20}$/', $referralCode)) {
+            if (!preg_match('/^[A-Z0-9\-_]{3,30}$/', $referralCode)) {
                 return response()->json([
                     'errors' => [
-                        'referral_code' => ['Kode referral harus 3-20 karakter, huruf besar dan angka saja']
-                    ]
-                ], 422);
-            }
-        }
-        $referralCode = $request->referral_code;
-        if (!$referralCode && $request->role === 'reseller') {
-            $referralCode = $this->generateUniqueReferralCode();
-        } else if ($referralCode) {
-            // Validate custom referral code format
-            if (!preg_match('/^[A-Z0-9]{3,20}$/', $referralCode)) {
-                return response()->json([
-                    'errors' => [
-                        'referral_code' => ['Kode referral harus 3-20 karakter, huruf besar dan angka saja']
+                        'referral_code' => ['Kode referral harus 3-30 karakter']
                     ]
                 ], 422);
             }
@@ -180,7 +195,7 @@ class UserController extends Controller
 
         // Auto-generate referral code if user becomes reseller and doesn't have one
         if ($request->role === 'reseller' && empty($data['referral_code']) && empty($user->referral_code)) {
-            $data['referral_code'] = $this->generateUniqueReferralCode();
+            $data['referral_code'] = $this->generateUniqueReferralCode($request->name ?? $user->name);
         }
 
         // Clear referral code if user is no longer reseller and no custom code was provided
@@ -214,12 +229,23 @@ class UserController extends Controller
         return response()->json(['message' => 'User deleted successfully']);
     }
 
-    private function generateUniqueReferralCode()
+    private function generateUniqueReferralCode($name = null)
     {
-        do {
-            // Generate 8-character code: REF + 5 random uppercase alphanumeric
-            $code = 'REF' . strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 5));
-        } while (User::where('referral_code', $code)->exists());
+        $words = preg_split('/\s+/', trim($name ?? ''));
+        $firstName = !empty($words[0]) ? $words[0] : 'SRD';
+        $clean = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $firstName));
+        $threeLetters = strtoupper(substr($clean, 0, 3));
+        if (strlen($threeLetters) < 3) {
+            $threeLetters = str_pad($threeLetters, 3, 'X');
+        }
+
+        $code = "{$threeLetters}001";
+        $counter = 1;
+        while (User::where('referral_code', $code)->exists()) {
+            $counter++;
+            $suffix = str_pad($counter, 3, '0', STR_PAD_LEFT);
+            $code = "{$threeLetters}{$suffix}";
+        }
 
         return $code;
     }

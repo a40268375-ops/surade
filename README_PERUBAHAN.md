@@ -44,7 +44,7 @@ CTRL + SHIFT + R
 
 **Terminal 1 - Clear Backend Cache:**
 ```bash
-cd c:\laragon\www\Surade.co.id\backend
+cd c:\laragon\www\Surade.com\backend
 php artisan cache:clear
 php artisan config:clear
 php artisan view:clear
@@ -54,7 +54,7 @@ php artisan serve
 
 **Terminal 2 - Restart Frontend:**
 ```bash
-cd c:\laragon\www\Surade.co.id\frontend
+cd c:\laragon\www\Surade.com\frontend
 npm run dev
 ```
 
@@ -117,7 +117,7 @@ Tekan Enter, lalu check Gmail inbox Anda!
 **SESUDAH:**
 ```
 ┌──────────────────────────┐
-│  [S] Surade.co.id       │  ← Logo + Text
+│  [S] Surade.com       │  ← Logo + Text
 │  Platform UMKM Digital   │  ← Tagline
 ├──────────────────────────┤
 │  Halo! 👋               │
@@ -152,7 +152,7 @@ Tekan Enter, lalu check Gmail inbox Anda!
 ```bash
 notepad backend\resources\views\emails\otp.blade.php
 ```
-**Cari:** `Surade.co.id` dan `Platform UMKM Digital` → Harus ada!
+**Cari:** `Surade.com` dan `Platform UMKM Digital` → Harus ada!
 
 **Check 2 - Payment Component:**
 ```bash
@@ -207,7 +207,7 @@ CTRL + SHIFT + R
 ## 📁 FILE HELPER YANG TERSEDIA:
 
 ```
-c:\laragon\www\Surade.co.id\
+c:\laragon\www\Surade.com\
 ├── clear-cache.bat                  ← Double-click untuk clear cache
 ├── test-email.bat                   ← Double-click untuk test email
 ├── README_PERUBAHAN.md              ← File ini
@@ -255,6 +255,6 @@ test-email.bat
 
 ---
 
-**Questions? Contact: support@surade.co.id**
+**Questions? Contact: support@surade.com**
 
-**© 2026 Surade.co.id - Platform UMKM Digital** 🇮🇩
+**© 2026 Surade.com - Platform UMKM Digital** 🇮🇩

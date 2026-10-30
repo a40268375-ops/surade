@@ -126,9 +126,23 @@ class ChatController extends Controller
      */
     public function sendMessage(Request $request, $chatId)
     {
+        if ($request->hasFile('image') || $request->hasFile('file')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengiriman file atau foto dinonaktifkan dalam percakapan chat.',
+            ], 422);
+        }
+
         $request->validate([
             'message' => 'required|string|max:5000',
         ]);
+
+        if (\App\Services\ChatModerationService::containsForbiddenContent($request->message)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesan tidak dapat dikirim karena mengandung link atau kontak media sosial.',
+            ], 422);
+        }
 
         $chat = Chat::findOrFail($chatId);
         $user = Auth::user();

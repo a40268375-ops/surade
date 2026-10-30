@@ -27,6 +27,16 @@ use App\Http\Controllers\Api\ContentPricingController;
 use App\Http\Controllers\Api\ContentTransactionController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\NavbarCategoryController;
+use App\Http\Controllers\Api\SuradeInformationController;
+use App\Http\Controllers\Api\ImportantNumberController;
+use App\Http\Controllers\Api\CoinController;
+use App\Http\Controllers\AnalyticsController;
+
+// Analytics tracker (called on frontend route changes)
+Route::post('/analytics/track', [AnalyticsController::class, 'track']);
+
+// User presence offline endpoint (callable via sendBeacon on unload/exit)
+Route::post('/presence/offline', [AuthController::class, 'offlinePresence']);
 
 // OTP-based registration (3-step flow)
 Route::post('/register/send-otp',     [AuthController::class, 'sendOtp']);
@@ -107,26 +117,90 @@ Route::post('/contact', [ContactController::class, 'submit']);
 Route::get('/users', [AdminController::class, 'users']);
 Route::get('/users/{id}', [ProfileController::class, 'showUser']);
 Route::get('/businesses/{business}/products', [ProductController::class, 'getByBusiness']);
+Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/plans', [AdminController::class, 'publicPlans']);
 
 // Public WhatsApp fee settings & Payment Methods (no auth needed)
 Route::get('/whatsapp-settings', [SettingController::class, 'getWhatsAppSettings']);
+Route::get('/chat-settings', [\App\Http\Controllers\Api\ChatAccessController::class, 'getChatSettings']);
 Route::get('/payment-methods', [SettingController::class, 'getPaymentMethods']);
 
 // Public Coupon routes (can be accessed by users & guests)
 Route::get('/coupons/public-codes', [CouponController::class, 'publicCodes']);
 Route::post('/coupons/validate', [CouponController::class, 'validateCoupon']);
 
+// Public Referral routes (validasi dan daftar kode agen premium untuk umum/checkout)
+Route::get('/referrals/public-codes', [ReferralController::class, 'publicCodes']);
+Route::post('/referrals/validate', [ReferralController::class, 'validateCode']);
+Route::get('/referrals/leaderboard', [ReferralController::class, 'leaderboard']);
+Route::get('/referrals/applied', [ReferralController::class, 'getAppliedReferral']);
+Route::post('/referrals/apply-global', [ReferralController::class, 'applyGlobal']);
+
+// Public Informasi Surade routes
+Route::get('/surade-informations', [SuradeInformationController::class, 'index']);
+Route::get('/surade-informations/{idOrSlug}', [SuradeInformationController::class, 'show']);
+
+// Public Nomor Penting & Panggilan Darurat routes
+Route::get('/important-numbers', [ImportantNumberController::class, 'index']);
+
+// Midtrans Webhook & Callback Notification Routes (Public, no CSRF/Auth)
+Route::post('/webhooks/midtrans', [App\Http\Controllers\PaymentGatewayController::class, 'midtransNotification']);
+Route::post('/midtrans-callback', [App\Http\Controllers\PaymentGatewayController::class, 'midtransNotification']);
+Route::post('/payment/midtrans/notification', [App\Http\Controllers\PaymentGatewayController::class, 'midtransNotification']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
+    // Payment Gateway endpoints
+    Route::post('/payment/midtrans/create', [App\Http\Controllers\PaymentGatewayController::class, 'createMidtransPayment']);
+    Route::post('/payment/midtrans/finish', [App\Http\Controllers\PaymentGatewayController::class, 'finishMidtransPayment']);
+    Route::post('/payment/xendit/create', [App\Http\Controllers\PaymentGatewayController::class, 'createXenditPayment']);
+    Route::get('/payment/status/{subscriptionId}', [App\Http\Controllers\PaymentGatewayController::class, 'getPaymentStatus']);
+
+    // ── SURADE COIN USER ROUTES ──
+    Route::get('/coins/balance', [CoinController::class, 'getBalance']);
+    Route::get('/coins/packages', [CoinController::class, 'getPackages']);
+    Route::get('/coins/services', [CoinController::class, 'getServices']);
+    Route::get('/coins/transactions', [CoinController::class, 'getTransactions']);
+    Route::get('/coins/my-purchases', [CoinController::class, 'getMyPurchases']);
+    Route::post('/coins/purchase', [CoinController::class, 'createPurchase']);
+    Route::post('/coins/finish-purchase', [CoinController::class, 'finishPurchase']);
+    Route::post('/coins/purchases/{id}/reupload', [CoinController::class, 'reuploadProof']);
+    Route::post('/coins/purchases/{id}/reupload-proof', [CoinController::class, 'reuploadProof']);
+    Route::post('/coins/pay', [CoinController::class, 'payService']);
+    Route::post('/coins/pay-service', [CoinController::class, 'payService']);
+    Route::post('/coins/unlock-whatsapp', [CoinController::class, 'unlockWhatsApp']);
+    Route::get('/coins/unlocked-whatsapp/{businessId}', [CoinController::class, 'checkWhatsAppUnlocked']);
+
+    // Reward Harian & Poin Silver/Gold Unlocking
+    Route::get('/coins/daily-reward/status', [CoinController::class, 'getDailyRewardStatus']);
+    Route::post('/coins/daily-reward/claim', [CoinController::class, 'claimDailyReward']);
+    Route::post('/whatsapp-access/unlock-points', [CoinController::class, 'unlockWhatsAppWithPoints']);
+    Route::post('/chat-access/unlock-points', [CoinController::class, 'unlockChatWithPoints']);
+    Route::post('/chat-access/request-qris', [\App\Http\Controllers\Api\ChatAccessController::class, 'requestQrisChatAccess']);
+    Route::get('/chat-access/status', [\App\Http\Controllers\Api\ChatAccessController::class, 'getChatAccessStatus']);
+    Route::post('/coins/gold/withdraw', [CoinController::class, 'requestGoldWithdrawal']);
+    Route::get('/coins/gold/withdrawals', [CoinController::class, 'getGoldWithdrawals']);
+    Route::delete('/coins/gold/withdrawals/{id}', [CoinController::class, 'deleteGoldWithdrawal']);
+    Route::delete('/coins/my-purchases/{id}', [CoinController::class, 'deletePurchase']);
+    Route::delete('/coins/purchases/{id}', [CoinController::class, 'deletePurchase']);
+    Route::delete('/coins/transactions/{id}', [CoinController::class, 'deleteTransaction']);
+
+
     Route::post('/logout', [AuthController::class, 'destroy']);
+    Route::post('/presence/ping', [AuthController::class, 'pingPresence']);
     Route::get('/user', function (Request $request) { return $request->user(); });
+    Route::get('/profile', [ProfileController::class, 'show']);
     Route::match(['put', 'post'], '/users/profile', [ProfileController::class, 'update']);
+    Route::post('/user/become-seller', [ProfileController::class, 'becomeSeller']);
     Route::get('/user/profile', [ProfileController::class, 'show']);
     Route::get('/users/profile', [ProfileController::class, 'show']); // Alias untuk frontend
     Route::match(['put', 'post'], '/user/profile', [ProfileController::class, 'update']);
     Route::get('/user/dashboard-stats', [ProfileController::class, 'dashboardStats']);
     Route::get('/user/analytics-stats', [ProfileController::class, 'analyticsStats']);
+    Route::get('/analytics/weekly', [AnalyticsController::class, 'weekly']);
+    Route::get('/analytics/my-business-views', [AnalyticsController::class, 'myBusinessViews']);
+    Route::get('/analytics/user-registrations', [AnalyticsController::class, 'userRegistrations']);
+    Route::get('/analytics/business-registrations', [AnalyticsController::class, 'businessRegistrations']);
     Route::get('/my-subscriptions', [PackageController::class, 'mySubscriptions']);
     Route::get('/my-package-transactions', [PackageController::class, 'myTransactions']);
     Route::post('/package-purchase', [PackageController::class, 'purchase']);
@@ -135,7 +209,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-content-transactions', [ContentTransactionController::class, 'myTransactions']);
     Route::post('/reports', [ReportController::class, 'store']);
     Route::post('/whatsapp-access-log', [SettingController::class, 'logWhatsAppAccess']);
+    Route::post('/whatsapp-click', [SettingController::class, 'recordWhatsAppClick']);
+    Route::post('/whatsapp-logs/{id}/reupload-proof', [SettingController::class, 'reuploadWhatsAppProof']);
+    Route::post('/whatsapp-access-logs/{id}/reupload', [SettingController::class, 'reuploadWhatsAppProof']);
     Route::get('/whatsapp-access-status', [SettingController::class, 'checkWhatsAppAccessStatus']);
+    Route::get('/my-whatsapp-access-logs', [SettingController::class, 'getUserWhatsAppLogs']);
+
+    // ── CHAT ACCESS ROUTES (STATUS, QRIS, & POIN UNLOCK) ──
+    Route::get('/chat-access/status', [\App\Http\Controllers\Api\ChatAccessController::class, 'getChatAccessStatus']);
+    Route::post('/chat-access/request-qris', [\App\Http\Controllers\Api\ChatAccessController::class, 'requestQrisChatAccess']);
+    Route::post('/chat-access/unlock-points', [\App\Http\Controllers\Api\ChatAccessController::class, 'unlockWithPoints']);
+    Route::get('/chat-logs', [\App\Http\Controllers\Api\ChatAccessController::class, 'getAdminChatLogs']);
+    Route::match(['post', 'put'], '/chat-logs/{id}/approve', [\App\Http\Controllers\Api\ChatAccessController::class, 'approveChatAccess']);
+    Route::match(['post', 'put'], '/chat-logs/{id}/reject', [\App\Http\Controllers\Api\ChatAccessController::class, 'rejectChatAccess']);
+    Route::delete('/chat-logs/{id}', [\App\Http\Controllers\Api\ChatAccessController::class, 'deleteChatLog']);
+    Route::match(['post', 'put'], '/chat-settings', [\App\Http\Controllers\Api\ChatAccessController::class, 'updateChatSettings']);
+
     Route::post('/products', [ProductController::class, 'store']);
     Route::get('/my-products', [ProductController::class, 'myProducts']);
     Route::match(['put', 'post'], '/products/{id}', [ProductController::class, 'update']);
@@ -196,6 +285,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::match(['put', 'post'], '/advertisements/{id}/pay', [AdvertisementController::class, 'pay']);
         Route::post('/referrals/validate', [ReferralController::class, 'validateCode']);
         Route::get('/referrals/my-stats', [ReferralController::class, 'myStats']);
+        Route::get('/my-referral-stats', [ReferralController::class, 'myStats']);
+        Route::match(['post', 'put'], '/referrals/custom-code', [\App\Http\Controllers\ReferralController::class, 'updateCustomReferralCode']);
         Route::post('/referrals/withdraw', [ReferralController::class, 'requestWithdrawal']);
         Route::delete('/referrals/transactions/{id}', [ReferralController::class, 'deleteTransaction']);
         Route::delete('/referrals/transactions', [ReferralController::class, 'clearTransactions']);
@@ -206,7 +297,17 @@ Route::middleware('auth:sanctum')->group(function () {
         // itu sebabnya frontend selalu dapat 404 Not Found waktu memanggilnya.
         Route::get('/referrals/public-codes', [ReferralController::class, 'publicCodes']);
         Route::get('/referrals/leaderboard', [ReferralController::class, 'leaderboard']);
+        Route::get('/referrals/applied', [ReferralController::class, 'getAppliedReferral']);
+        Route::get('/referrals/my-applied', [ReferralController::class, 'getAppliedReferral']);
+        Route::post('/referrals/apply-global', [ReferralController::class, 'applyGlobal']);
         Route::post('/subscriptions', [BusinessController::class, 'subscribeBusiness']);
+
+
+        // Seller / User Emergency & Important Numbers
+        Route::get('/user/important-numbers', [ImportantNumberController::class, 'userIndex']);
+        Route::post('/user/important-numbers', [ImportantNumberController::class, 'userStore']);
+        Route::match(['put', 'post'], '/user/important-numbers/{id}', [ImportantNumberController::class, 'userUpdate']);
+        Route::delete('/user/important-numbers/{id}', [ImportantNumberController::class, 'userDestroy']);
     });
 
     Route::middleware(\App\Http\Middleware\AdminMiddleware::class)->prefix('admin')->group(function () {
@@ -218,11 +319,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/users/{user}/toggle-status', [AdminController::class, 'toggleUserStatus']);
         Route::delete('/users/{user}', [AdminController::class, 'destroyUser']);
         Route::get('/businesses', [AdminController::class, 'allBusinesses']);
+        Route::post('/businesses', [AdminController::class, 'adminCreateBusiness']);
         Route::put('/businesses/{business}/approve', [AdminController::class, 'approveBusiness']);
         Route::post('/businesses/{business}/approve', [AdminController::class, 'approveBusiness']);
         Route::put('/businesses/{business}/reject', [AdminController::class, 'rejectBusiness']);
         Route::post('/businesses/{business}/reject', [AdminController::class, 'rejectBusiness']);
         Route::put('/businesses/{business}/suspend', [AdminController::class, 'suspendBusiness']);
+        Route::post('/businesses/{business}/toggle-ad', [AdminController::class, 'toggleBusinessAd']);
+        Route::put('/businesses/{business}/toggle-ad', [AdminController::class, 'toggleBusinessAd']);
         Route::put('/businesses/{business}', [AdminController::class, 'updateBusiness']);
         Route::delete('/businesses/{business}', [AdminController::class, 'destroyBusiness']);
         Route::get('/categories', [AdminController::class, 'allCategories']);
@@ -230,20 +334,53 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/categories/{category}', [AdminController::class, 'updateCategory']);
         Route::put('/categories/{category}/toggle-status', [AdminController::class, 'toggleCategoryStatus']);
         Route::delete('/categories/{category}', [AdminController::class, 'destroyCategory']);
+
+        // Admin Product Verification & Management
+        Route::get('/products', [AdminController::class, 'allProducts']);
+        Route::put('/products/{id}/approve', [AdminController::class, 'approveProduct']);
+        Route::post('/products/{id}/approve', [AdminController::class, 'approveProduct']);
+        Route::put('/products/{id}/reject', [AdminController::class, 'rejectProduct']);
+        Route::post('/products/{id}/reject', [AdminController::class, 'rejectProduct']);
+        Route::put('/products/{id}/toggle-status', [AdminController::class, 'toggleProductStatus']);
+        Route::delete('/products/{id}', [AdminController::class, 'destroyProduct']);
         
         // Navbar Categories (Informasi dropdown) Management
         Route::get('/navbar-categories', [NavbarCategoryController::class, 'adminGetAll']);
         Route::post('/navbar-categories', [NavbarCategoryController::class, 'store']);
         Route::get('/navbar-categories/{id}', [NavbarCategoryController::class, 'show']);
-        Route::put('/navbar-categories/{id}', [NavbarCategoryController::class, 'update']);
+        Route::match(['put', 'post'], '/navbar-categories/{id}', [NavbarCategoryController::class, 'update']);
         Route::delete('/navbar-categories/{id}', [NavbarCategoryController::class, 'destroy']);
         Route::put('/navbar-categories/{id}/toggle-status', [NavbarCategoryController::class, 'toggleStatus']);
         Route::post('/navbar-categories/reorder', [NavbarCategoryController::class, 'reorder']);
         Route::get('/navbar-categories/parents/list', [NavbarCategoryController::class, 'getParents']);
         
+        // Informasi Surade Management
+        Route::get('/surade-informations', [SuradeInformationController::class, 'adminIndex']);
+        Route::post('/surade-informations', [SuradeInformationController::class, 'store']);
+        Route::put('/surade-informations/{id}', [SuradeInformationController::class, 'update']);
+        Route::delete('/surade-informations/{id}', [SuradeInformationController::class, 'destroy']);
+        Route::put('/surade-informations/{id}/toggle-status', [SuradeInformationController::class, 'toggleStatus']);
+        
+        // Nomor Penting & Panggilan Darurat Management (Admin Only)
+        Route::get('/important-numbers', [ImportantNumberController::class, 'adminIndex']);
+        Route::post('/important-numbers', [ImportantNumberController::class, 'store']);
+        Route::get('/important-numbers/{id}', [ImportantNumberController::class, 'show']);
+        Route::put('/important-numbers/{id}', [ImportantNumberController::class, 'update']);
+        Route::delete('/important-numbers/{id}', [ImportantNumberController::class, 'destroy']);
+        Route::put('/important-numbers/{id}/toggle-status', [ImportantNumberController::class, 'toggleStatus']);
+        Route::post('/important-numbers/reorder', [ImportantNumberController::class, 'reorder']);
+        Route::put('/important-numbers/{id}/approve', [ImportantNumberController::class, 'approve']);
+        Route::post('/important-numbers/{id}/approve', [ImportantNumberController::class, 'approve']);
+        Route::put('/important-numbers/{id}/revision', [ImportantNumberController::class, 'requestRevision']);
+        Route::post('/important-numbers/{id}/revision', [ImportantNumberController::class, 'requestRevision']);
+        Route::put('/important-numbers/{id}/reject', [ImportantNumberController::class, 'reject']);
+        Route::post('/important-numbers/{id}/reject', [ImportantNumberController::class, 'reject']);
+        
         Route::get('/blogs', [AdminController::class, 'allBlogs']);
         Route::put('/blogs/{id}/approve', [AdminController::class, 'approveBlog']);
         Route::post('/blogs/{id}/approve', [AdminController::class, 'approveBlog']);
+        Route::put('/blogs/{id}/unapprove', [AdminController::class, 'unapproveBlog']);
+        Route::post('/blogs/{id}/unapprove', [AdminController::class, 'unapproveBlog']);
         Route::put('/blogs/{id}/reject', [AdminController::class, 'rejectBlog']);
         Route::post('/blogs/{id}/reject', [AdminController::class, 'rejectBlog']);
         Route::delete('/blogs/{id}', [AdminController::class, 'destroyBlog']);
@@ -278,17 +415,26 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/reports/{report}/content', [ReportController::class, 'destroyContent']);
         Route::get('/analytics-reports', [AdminController::class, 'reports']);
         Route::get('/notifications', [AdminController::class, 'notifications']);
+        Route::delete('/notifications/clear', [AdminController::class, 'clearNotifications']);
+        Route::post('/notifications/clear', [AdminController::class, 'clearNotifications']);
+        Route::delete('/notifications', [AdminController::class, 'clearNotifications']);
         Route::patch('/notifications/{id}/read', [AdminController::class, 'markNotificationRead']);
         Route::put('/notifications/{id}/read', [AdminController::class, 'markNotificationRead']);
         Route::patch('/notifications/read-all', [AdminController::class, 'markAllNotificationsRead']);
-        Route::put('/notifications/read-all', [AdminController::class, 'markAllNotificationsRead']);
         Route::get('/advertisements', [AdvertisementController::class, 'adminIndex']);
+        Route::get('/ads', [AdvertisementController::class, 'adminIndex']);
         Route::put('/advertisements/{id}', [AdvertisementController::class, 'adminUpdate']);
+        Route::put('/ads/{id}', [AdvertisementController::class, 'adminUpdate']);
         Route::delete('/advertisements/{id}', [AdvertisementController::class, 'adminDestroy']);
+        Route::delete('/ads/{id}', [AdvertisementController::class, 'adminDestroy']);
         Route::put('/advertisements/{id}/approve', [AdvertisementController::class, 'approve']);
+        Route::put('/ads/{id}/approve', [AdvertisementController::class, 'approve']);
         Route::put('/advertisements/{id}/reject', [AdvertisementController::class, 'reject']);
+        Route::put('/ads/{id}/reject', [AdvertisementController::class, 'reject']);
         Route::put('/advertisements/{id}/expire', [AdvertisementController::class, 'expire']);
+        Route::put('/ads/{id}/expire', [AdvertisementController::class, 'expire']);
         Route::put('/advertisements/{id}/toggle-status', [AdvertisementController::class, 'toggleStatus']);
+        Route::put('/ads/{id}/toggle-status', [AdvertisementController::class, 'toggleStatus']);
         Route::get('/ad-packages', [AdPackageController::class, 'index']);
         Route::post('/ad-packages', [AdPackageController::class, 'store']);
         Route::put('/ad-packages/{id}', [AdPackageController::class, 'update']);
@@ -365,5 +511,98 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/whatsapp-logs/{id}/approve', [SettingController::class, 'approveWhatsAppAccess']);
         Route::put('/whatsapp-logs/{id}/reject', [SettingController::class, 'rejectWhatsAppAccess']);
         Route::post('/whatsapp-logs/{id}/reject', [SettingController::class, 'rejectWhatsAppAccess']);
+
+        // ── ADMIN KELOLA CHAT (VERIFIKASI QRIS AKSES CHAT) ──
+        Route::get('/chat-settings', [\App\Http\Controllers\Api\ChatAccessController::class, 'getChatSettings']);
+        Route::post('/chat-settings', [\App\Http\Controllers\Api\ChatAccessController::class, 'updateChatSettings']);
+        Route::put('/chat-settings', [\App\Http\Controllers\Api\ChatAccessController::class, 'updateChatSettings']);
+        Route::get('/chat-logs', [\App\Http\Controllers\Api\ChatAccessController::class, 'getAdminChatLogs']);
+        Route::post('/chat-logs/{id}/approve', [\App\Http\Controllers\Api\ChatAccessController::class, 'approveChatAccess']);
+        Route::put('/chat-logs/{id}/approve', [\App\Http\Controllers\Api\ChatAccessController::class, 'approveChatAccess']);
+        Route::post('/chat-logs/{id}/reject', [\App\Http\Controllers\Api\ChatAccessController::class, 'rejectChatAccess']);
+        Route::put('/chat-logs/{id}/reject', [\App\Http\Controllers\Api\ChatAccessController::class, 'rejectChatAccess']);
+        Route::delete('/chat-logs/{id}', [\App\Http\Controllers\Api\ChatAccessController::class, 'deleteChatLog']);
+
+        // ── ADMIN SURADE COIN MANAGEMENT ──
+        Route::get('/coins/stats', [CoinController::class, 'getAdminStats']);
+        Route::get('/coins/purchases', [CoinController::class, 'getAdminPurchases']);
+        Route::put('/coins/purchases/{id}/approve', [CoinController::class, 'approvePurchase']);
+        Route::post('/coins/purchases/{id}/approve', [CoinController::class, 'approvePurchase']);
+        Route::put('/coins/purchases/{id}/reject', [CoinController::class, 'rejectPurchase']);
+        Route::post('/coins/purchases/{id}/reject', [CoinController::class, 'rejectPurchase']);
+        Route::get('/coins/packages', [CoinController::class, 'getAdminPackages']);
+        Route::post('/coins/packages', [CoinController::class, 'storePackage']);
+        Route::put('/coins/packages/{id}', [CoinController::class, 'updatePackage']);
+        Route::delete('/coins/packages/{id}', [CoinController::class, 'deletePackage']);
+        Route::get('/coins/services', [CoinController::class, 'getAdminServices']);
+        Route::post('/coins/services', [CoinController::class, 'storeService']);
+        Route::put('/coins/services/{id}', [CoinController::class, 'updateService']);
+        Route::delete('/coins/services/{id}', [CoinController::class, 'deleteService']);
+        Route::get('/coins/transactions', [CoinController::class, 'getAdminTransactions']);
+        Route::get('/coins/wallets', [CoinController::class, 'getAdminWallets']);
+        Route::post('/coins/adjust-balance', [CoinController::class, 'adjustWalletBalance']);
+        Route::delete('/coins/purchases/{id}', [CoinController::class, 'deletePurchase']);
+        Route::get('/coins/gold/withdrawals', [CoinController::class, 'getAdminGoldWithdrawals']);
+        Route::put('/coins/gold/withdrawals/{id}/approve', [CoinController::class, 'approveGoldWithdrawal']);
+        Route::post('/coins/gold/withdrawals/{id}/approve', [CoinController::class, 'approveGoldWithdrawal']);
+        Route::put('/coins/gold/withdrawals/{id}/reject', [CoinController::class, 'rejectGoldWithdrawal']);
+        Route::post('/coins/gold/withdrawals/{id}/reject', [CoinController::class, 'rejectGoldWithdrawal']);
+        Route::delete('/coins/gold/withdrawals/{id}', [CoinController::class, 'deleteGoldWithdrawal']);
+        Route::delete('/coins/transactions/{id}', [CoinController::class, 'deleteTransaction']);
     });
+});
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Admin\BusinessVerificationController;
+use App\Http\Controllers\Api\BusinessClaimController;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+
+    // Business Claim Routes (for sellers / logged-in users)
+    Route::post('/businesses/{businessId}/claims', [BusinessClaimController::class, 'store']);
+    Route::get('/my-claims', [BusinessClaimController::class, 'myClaimsIndex']);
+    Route::get('/businesses/{businessId}/my-claim-check', [BusinessClaimController::class, 'checkClaim']);
+
+    // Business Claim Admin Routes
+    Route::get('/admin/business-claims', [BusinessClaimController::class, 'adminIndex']);
+    Route::get('/admin/business-claims/pending-count', [BusinessClaimController::class, 'adminPendingCount']);
+    Route::get('/admin/business-claims/{id}', [BusinessClaimController::class, 'adminShow']);
+    Route::post('/admin/business-claims/{id}/start-review', [BusinessClaimController::class, 'adminStartReview']);
+    Route::post('/admin/business-claims/{id}/approve', [BusinessClaimController::class, 'adminApprove']);
+    Route::post('/admin/business-claims/{id}/reject', [BusinessClaimController::class, 'adminReject']);
+    Route::post('/admin/business-claims/{id}/note', [BusinessClaimController::class, 'adminNote']);
+
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/admin/notifications', [NotificationController::class, 'adminIndex']);
+        Route::delete('/admin/notifications/clear', [NotificationController::class, 'adminClear']);
+        Route::post('/admin/notifications/clear', [NotificationController::class, 'adminClear']);
+        Route::delete('/admin/notifications', [NotificationController::class, 'adminClear']);
+        Route::patch('/admin/notifications/read-all', [NotificationController::class, 'adminMarkAllRead']);
+        Route::put('/admin/notifications/read-all', [NotificationController::class, 'adminMarkAllRead']);
+        Route::patch('/admin/notifications/{id}/read', [NotificationController::class, 'adminMarkRead']);
+        Route::put('/admin/notifications/{id}/read', [NotificationController::class, 'adminMarkRead']);
+    });
+
+    // Admin Business Verification Routes (Commented until BusinessVerificationController is created)
+    /*
+    Route::middleware(\App\Http\Middleware\AdminMiddleware::class)->prefix('admin')->group(function () {
+        Route::get('/verification/stats', [BusinessVerificationController::class, 'getDashboardStats']);
+        Route::get('/verification/pending', [BusinessVerificationController::class, 'getPendingBusinesses']);
+        Route::get('/verification/businesses', [BusinessVerificationController::class, 'getAllBusinesses']);
+        Route::get('/verification/businesses/{id}', [BusinessVerificationController::class, 'getBusinessDetail']);
+        Route::post('/verification/businesses/{id}/approve', [BusinessVerificationController::class, 'approveBusiness']);
+        Route::put('/verification/businesses/{id}/approve', [BusinessVerificationController::class, 'approveBusiness']);
+        Route::post('/verification/businesses/{id}/reject', [BusinessVerificationController::class, 'rejectBusiness']);
+        Route::put('/verification/businesses/{id}/reject', [BusinessVerificationController::class, 'rejectBusiness']);
+        Route::post('/verification/businesses/{id}/suspend', [BusinessVerificationController::class, 'suspendBusiness']);
+        Route::put('/verification/businesses/{id}/suspend', [BusinessVerificationController::class, 'suspendBusiness']);
+        Route::post('/verification/businesses/{id}/unsuspend', [BusinessVerificationController::class, 'unsuspendBusiness']);
+        Route::put('/verification/businesses/{id}/unsuspend', [BusinessVerificationController::class, 'unsuspendBusiness']);
+        Route::post('/verification/businesses/batch-approve', [BusinessVerificationController::class, 'batchApprove']);
+        Route::get('/verification/log', [BusinessVerificationController::class, 'getVerificationLog']);
+    });
+    */
 });

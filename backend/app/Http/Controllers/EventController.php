@@ -52,6 +52,11 @@ class EventController extends Controller
 
     public function store(Request $request)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, 
+            ['title', 'description', 'location', 'category'], 
+            ['image', 'gallery']
+        );
+
         // PERBAIKAN: sebelumnya endpoint ini menolak (403) semua user yang
         // bukan admin. Tapi tab "Event" di Dashboard sekarang ditampilkan
         // untuk semua role (sama seperti tab "Blog", yang memang sudah bisa
@@ -109,6 +114,11 @@ class EventController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, 
+            ['title', 'description', 'location', 'category'], 
+            ['image', 'gallery']
+        );
+
         $event = Event::find($id);
         if (!$event) {
             return response()->json(['message' => 'Event not found'], 404);

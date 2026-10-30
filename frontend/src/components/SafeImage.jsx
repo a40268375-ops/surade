@@ -1,38 +1,71 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DEFAULT_AVATAR } from "../utils/constants";
+
+const isBlockedOrInvalid = (url) => {
+  if (!url || typeof url !== "string") return true;
+  const lower = url.trim().toLowerCase();
+  if (
+    lower === "" ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower.includes("ulastempat.com") ||
+    lower.includes("lokasiterdekat.com")
+  ) {
+    return true;
+  }
+  return false;
+};
 
 export default function SafeImage({ 
   src, 
-  alt, 
+  alt = "", 
   className = "", 
   fallback = DEFAULT_AVATAR,
   onError = null,
   onLoad = null,
   ...props 
 }) {
-  const [hasError, setHasError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(() => isBlockedOrInvalid(src));
+  const [imgSrc, setImgSrc] = useState(() => (isBlockedOrInvalid(src) ? fallback : src));
+
+  useEffect(() => {
+    if (isBlockedOrInvalid(src)) {
+      setHasError(true);
+      setImgSrc(fallback);
+    } else {
+      setHasError(false);
+      setImgSrc(src);
+    }
+  }, [src, fallback]);
 
   const handleError = (e) => {
-    console.warn("Image failed to load:", src);
-    setHasError(true);
-    setIsLoading(false);
-    if (onError) onError(e);
+    if (!hasError) {
+      setHasError(true);
+      setImgSrc(fallback);
+    }
+    if (onError) {
+      try {
+        onError(e);
+      } catch (err) {}
+    }
   };
 
   const handleLoad = (e) => {
-    setIsLoading(false);
-    setHasError(false);
-    if (onLoad) onLoad(e);
+    if (onLoad) {
+      try {
+        onLoad(e);
+      } catch (err) {}
+    }
   };
 
   return (
     <img
-      src={hasError ? fallback : src || fallback}
+      src={imgSrc || fallback}
       alt={alt}
       className={className}
       onError={handleError}
       onLoad={handleLoad}
+      loading="lazy"
       {...props}
     />
   );

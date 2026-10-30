@@ -8,19 +8,22 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
-        commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // API menggunakan token-based auth (tidak butuh stateful/CSRF)
-        
+        $middleware->validateCsrfTokens(except: [
+            'api/webhooks/midtrans',
+            'api/midtrans-callback',
+            'api/payment/midtrans/*',
+            'webhooks/*',
+            'midtrans-callback',
+        ]);
+
         $middleware->alias([
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);
-
-        //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

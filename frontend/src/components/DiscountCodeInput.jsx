@@ -36,15 +36,47 @@ const DiscountCodeInput = ({
     ? { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-[#007570]', hover: 'hover:bg-teal-100' }
     : { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', hover: 'hover:bg-emerald-100' };
 
+  const [isBound, setIsBound] = useState(false);
+  const [boundInfo, setBoundInfo] = useState(null);
+
+  // Cek keterikatan referral permanen pada pengguna saat ini
+  React.useEffect(() => {
+    if (isReferral) {
+      let currentUserId = null;
+      try {
+        const u = localStorage.getItem("user");
+        if (u) currentUserId = JSON.parse(u)?.id;
+      } catch (e) {}
+
+      api.get(`/referrals/public-codes${currentUserId ? `?user_id=${currentUserId}` : ''}`)
+        .then((res) => {
+          if (res?.data?.is_bound) {
+            setIsBound(true);
+            const boundCode = res.data.bound_code;
+            const boundName = res.data.bound_owner_name || res.data.bound_name;
+            setBoundInfo({
+              code: boundCode,
+              name: boundName,
+            });
+            // Otomatis terapkan kode yang mengikat jika belum diaplikasikan
+            if (boundCode && !appliedCode) {
+              handleApply(boundCode);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isReferral]);
+
   // Kalau parent kasih `prefillCode` baru (mis. user klik salah satu chip
   // "Kupon Tersedia"), isi kotak inputnya saja — TIDAK otomatis diterapkan,
-  // biar user yang klik tombol "Terapkan" sendiri.
+  // biar user yang klik tombol "Terapkan" sendiri (hanya jika belum terikat permanen).
   React.useEffect(() => {
-    if (prefillCode && prefillCode.trim()) {
+    if (!isBound && prefillCode && prefillCode.trim()) {
       setInput(prefillCode.trim().toUpperCase());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefillCode]);
+  }, [prefillCode, isBound]);
 
   const handleApply = async (codeOverride) => {
     const codeToApply = (codeOverride ?? input).trim();
@@ -58,12 +90,19 @@ const DiscountCodeInput = ({
     setSuccess('');
 
     try {
+      let currentUserId = null;
+      try {
+        const u = localStorage.getItem("user");
+        if (u) currentUserId = JSON.parse(u)?.id;
+      } catch (e) {}
+
       const res = await api.post(endpoint, {
         code: codeToApply,
         amount: amount || 0,
+        user_id: currentUserId,
       });
 
-      if (res.data?.valid) {
+      if (res.data?.valid === true || res.data?.is_valid === true) {
         setSuccess(res.data.message || `${label} berhasil diterapkan!`);
         if (onApplied) {
           onApplied(res.data);
@@ -88,6 +127,10 @@ const DiscountCodeInput = ({
   };
 
   const handleRemove = () => {
+    if (isBound && isReferral) {
+      setError("Kode referral terikat permanen dengan akun Anda dan tidak dapat dihapus.");
+      return;
+    }
     setInput('');
     setError('');
     setSuccess('');
@@ -105,7 +148,11 @@ const DiscountCodeInput = ({
       <label className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
         <Icon size={16} className="text-[#007570]" />
         {label}
-        {isReferral && <span className="text-xs font-normal text-slate-400">(Opsional - Potongan Rp 5.000)</span>}
+        {isReferral && (
+          <span className="text-xs font-normal text-slate-400">
+            (Opsional - Diskon 10%{amount > 0 ? ` / Hemat Rp ${Math.round(amount * 0.10).toLocaleString('id-ID')}` : ''})
+          </span>
+        )}
       </label>
 
       {appliedCode ? (
@@ -115,35 +162,56 @@ const DiscountCodeInput = ({
             <div>
               <span className={`text-xs font-bold ${colorScheme.text} uppercase block`}>
                 {isReferral ? 'Referral' : 'Kupon'} Terpasang: {appliedCode.code || appliedCode.referral_code}
+                {isBound && isReferral && <span className="ml-2 text-[10px] normal-case bg-teal-100 text-[#007570] px-2 py-0.5 rounded-full font-bold">Terikat Permanen</span>}
               </span>
               <span className="text-xs text-slate-600 font-medium">
                 Diskon Rp {Number(appliedCode.discount_amount || appliedCode.discount || 0).toLocaleString('id-ID')}
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleRemove}
-            className="text-xs font-semibold text-red-600 bg-white border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-1"
-          >
-            <X size={14} />
-            Hapus
-          </button>
+          {!isBound || !isReferral ? (
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="text-xs font-semibold text-red-600 bg-white border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-1"
+            >
+              <X size={14} />
+              Hapus
+            </button>
+          ) : (
+            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+              Terkunci
+            </span>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
+          {isBound && isReferral && (
+            <div className="text-xs text-[#007570] bg-teal-50 border border-teal-200 rounded-lg p-2.5 font-medium">
+              Akun Anda telah terikat permanen dengan agen <strong>{boundInfo?.name || 'Referral'}</strong>. Kode ini otomatis terkunci dan tidak dapat diganti dengan milik orang lain.
+            </div>
+          )}
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder={placeholder}
-              value={input}
-              onChange={(e) => setInput(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && handleApply()}
-              className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20 transition-all"
+              placeholder={isBound && isReferral ? `Terkunci: ${boundInfo?.code}` : placeholder}
+              value={isBound && isReferral ? (boundInfo?.code || '') : input}
+              onChange={(e) => {
+                if (!isBound || !isReferral) {
+                  setInput(e.target.value.toUpperCase());
+                }
+              }}
+              readOnly={isBound && isReferral}
+              onKeyDown={(e) => e.key === 'Enter' && handleApply(isBound && isReferral ? boundInfo?.code : undefined)}
+              className={`flex-1 px-4 py-2.5 border rounded-xl text-sm outline-none transition-all ${
+                isBound && isReferral
+                  ? 'bg-slate-100 border-slate-300 text-slate-700 cursor-not-allowed font-semibold'
+                  : 'border-slate-200 focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/20'
+              }`}
             />
             <button
               type="button"
-              onClick={() => handleApply()}
+              onClick={() => handleApply(isBound && isReferral ? boundInfo?.code : undefined)}
               disabled={loading}
               className="px-5 py-2.5 bg-[#007570] text-white rounded-xl text-sm font-semibold border-0 cursor-pointer hover:bg-[#005a58] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
             >

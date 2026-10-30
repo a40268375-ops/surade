@@ -7,6 +7,10 @@ export default function PaymentFailed() {
   const [searchParams] = useSearchParams();
   const reason = searchParams.get('reason') || 'Terjadi kesalahan dalam proses pembayaran';
 
+  useEffect(() => {
+    document.title = "Pembayaran Gagal - Surade.com";
+  }, []);
+
   return (
     <div style={{
       minHeight: '100vh',

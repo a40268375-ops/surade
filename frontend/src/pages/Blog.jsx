@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -20,9 +20,10 @@ import {
   Sparkles,
   Zap,
   CheckCircle,
+  ExternalLink,
 } from "lucide-react";
 import "./Blog.css";
-import { DEFAULT_AVATAR } from "../utils/constants";
+import { DEFAULT_AVATAR, getStorageUrl } from "../utils/constants";
 import blogHeroBg from "../assets/blog-hero-bg.jpg";
 
 export default function Blog() {
@@ -35,8 +36,23 @@ export default function Blog() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState({});
 
+  // Daftar kategori baku sesuai tabel blog_categories
+  const MASTER_CATEGORIES = [
+    "Bisnis & UMKM",
+    "Kuliner & Kafe",
+    "Teknologi & Digital",
+    "Kesehatan & Gaya Hidup",
+    "Event & Festival",
+    "Pendidikan & Edukasi",
+    "Travel & Wisata",
+    "Promo & Diskon",
+    "Tips & Tutorial",
+    "Berita & Informasi",
+  ];
+
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.title = "Berita & Kabar Daerah - Surade.com";
     fetchBlogs();
   }, []);
 
@@ -59,22 +75,13 @@ export default function Blog() {
       (Array.isArray(localBlogs) ? localBlogs : []).forEach(id => { blogSavedMap[id] = true; });
     } catch (e) {}
 
-    // PERBAIKAN: /my-blog-favorites dibatasi backend cuma buat role
-    // "user" - dulu dipanggil untuk semua akun login termasuk admin,
-    // jadi admin selalu dapat error 403 di sini. Sekarang dilewati kalau
-    // bukan role "user".
-    let isRegularUser = false;
-    try {
-      isRegularUser = JSON.parse(localStorage.getItem("user") || "null")?.role === "user";
-    } catch (e) {}
-
-    if (token && isRegularUser) {
+    if (token) {
       try {
         const resBlog = await api.get("/my-blog-favorites");
         const blogData = resBlog.data?.data || resBlog.data || [];
         const blogArr = Array.isArray(blogData) ? blogData : (blogData?.data || []);
         blogArr.forEach(fav => {
-          const bId = fav.blog_id || fav.blog?.id;
+          const bId = fav.blog_id || fav.blog?.id || fav.id;
           if (bId) blogSavedMap[bId] = true;
         });
       } catch (err) {
@@ -125,18 +132,19 @@ export default function Blog() {
     }
   };
 
+  const getCategoryName = (cat) => {
+    if (!cat) return "";
+    if (typeof cat === "object") return cat.name || cat.title || "";
+    return String(cat);
+  };
+
   const fetchBlogs = async () => {
     try {
       const res = await api.get("/blogs?status=published&all=true");
       const raw = res.data?.data || res.data || [];
       const data = Array.isArray(raw) ? raw : (raw?.data || []);
       setBlogs(data);
-
-      if (data.length > 0) {
-        const catNames = data.map(b => b.blog_category).filter(Boolean);
-        const uniqueCats = Array.from(new Set(catNames));
-        setCategories(uniqueCats);
-      }
+      // Kategori diambil dari MASTER_CATEGORIES, tidak dari data blog
     } catch (err) {
       console.error("Failed to fetch blogs:", err);
     } finally {
@@ -157,15 +165,12 @@ export default function Blog() {
     return min + " min";
   };
 
-  const getStorageUrl = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http")) return path;
-    const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:8000/api").replace(/\/api$/i, "");
-    return `${baseUrl}/storage/${path}`;
-  };
-
   const getThumbnailUrl = (blog) => {
-    if (blog.thumbnail) {
+    if (blog?.thumbnail) {
+      if (typeof blog.thumbnail === "string" && (blog.thumbnail.includes("real_images") || blog.thumbnail.includes("real_blogs"))) {
+        const fn = blog.thumbnail.split("/").pop();
+        return `/images/real_blogs/${fn}`;
+      }
       return getStorageUrl(blog.thumbnail);
     }
     return "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop";
@@ -183,27 +188,38 @@ export default function Blog() {
   const countBlog = blogs.filter(b => b.type === "blog" || !b.type).length;
   const countEvent = blogs.filter(b => b.type === "event").length;
 
-  // ── Filter logic: Type + Category + Search ──
-  const filteredPosts = blogs.filter((post) => {
-    // 1. Type filter
-    const postType = post.type || "blog";
-    const matchesType = activeType === "all" || postType === activeType;
+  // ── Filter & Sort logic: Type + Category + Search + Prioritas Hari-H Event & Info Baru ──
+  const filteredPosts = useMemo(() => {
+    const list = blogs.filter((post) => {
+      // 1. Type filter
+      const postType = post.type || "blog";
+      const matchesType = activeType === "all" || postType === activeType;
 
-    // 2. Category filter
-    const postCat = (post.blog_category || "").toLowerCase();
-    const matchesCategory = activeCategory === "all" || postCat === activeCategory.toLowerCase();
+      // 2. Category filter
+      const postCat = getCategoryName(post.blog_category || post.category).toLowerCase();
+      const matchesCategory = activeCategory === "all" || postCat === activeCategory.toLowerCase();
 
-    // 3. Search query
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch = !q ||
-      (post.title || "").toLowerCase().includes(q) ||
-      (post.excerpt || "").toLowerCase().includes(q) ||
-      (post.content || "").toLowerCase().includes(q) ||
-      (post.blog_category || "").toLowerCase().includes(q) ||
-      (post.event_location || "").toLowerCase().includes(q);
+      // 3. Search query
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = !q ||
+        (post.title || "").toLowerCase().includes(q) ||
+        (post.excerpt || "").toLowerCase().includes(q) ||
+        (post.content || "").toLowerCase().includes(q) ||
+        postCat.includes(q) ||
+        (post.event_location || "").toLowerCase().includes(q);
 
-    return matchesType && matchesCategory && matchesSearch;
-  });
+      return matchesType && matchesCategory && matchesSearch;
+    });
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    return [...list].sort((a, b) => {
+      const timeA = new Date(a.published_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.published_at || b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [blogs, activeType, activeCategory, searchQuery]);
 
   return (
     <div className="blog-page">
@@ -218,10 +234,10 @@ export default function Blog() {
           <div className="blog-hero__breadcrumb">
             <Link to="/">Home</Link>
             <span className="separator">/</span>
-            <span>Blog & Event</span>
+            <span>Info & Event</span>
           </div>
-          <h1 className="blog-hero__title">Blog & Event</h1>
-          <p className="blog-hero__subtitle">Jelajahi Wawasan Bisnis, Berita Terkini, dan Agenda Event Menarik di Indonesia</p>
+          <h1 className="blog-hero__title">Info & Event</h1>
+          <p className="blog-hero__subtitle">Jelajahi Wawasan Bisnis, Berita & Info Terkini, serta Agenda Event Menarik di Surade</p>
           
           {/* Action Buttons */}
           <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", marginTop: "1.25rem", flexWrap: "wrap" }}>
@@ -245,7 +261,7 @@ export default function Blog() {
               }}
             >
               <BookOpen size={16} />
-              <span>+ Buat Blog Baru</span>
+              <span>+ Buat Info Baru</span>
             </button>
 
             <button
@@ -327,7 +343,7 @@ export default function Blog() {
                   }}
                 >
                   <BookOpen size={16} />
-                  <span>Blog</span>
+                  <span>Info</span>
                   <span className="blog-type-count">{countBlog}</span>
                 </button>
 
@@ -345,104 +361,175 @@ export default function Blog() {
                 </button>
               </div>
 
-              {/* Topic Category Pills */}
-              {categories.length > 0 && (
-                <div className="blog-categories">
+              {/* Topic Category Pills - pakai daftar kategori baku */}
+              <div className="blog-categories">
+                <button
+                  type="button"
+                  className={`blog-category-btn${activeCategory === "all" ? " active" : ""}`}
+                  onClick={() => setActiveCategory("all")}
+                >
+                  Semua Kategori
+                </button>
+                {MASTER_CATEGORIES.filter((cat) => {
+                  // Hanya tampilkan kategori yang ada isinya
+                  return blogs.some((b) => {
+                    const bCat = getCategoryName(b.blog_category || b.category);
+                    return bCat.toLowerCase() === cat.toLowerCase();
+                  });
+                }).map((cat) => (
                   <button
+                    key={cat}
                     type="button"
-                    className={`blog-category-btn${activeCategory === "all" ? " active" : ""}`}
-                    onClick={() => setActiveCategory("all")}
+                    className={`blog-category-btn${activeCategory.toLowerCase() === cat.toLowerCase() ? " active" : ""}`}
+                    onClick={() => setActiveCategory(cat)}
                   >
-                    Semua Topik
+                    {cat}
                   </button>
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      className={`blog-category-btn${activeCategory.toLowerCase() === cat.toLowerCase() ? " active" : ""}`}
-                      onClick={() => setActiveCategory(cat)}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           </div>
 
+
           {/* Loading */}
           {loading && (
-            <InlineSpinner text="Memuat data blog & event..." />
+            <InlineSpinner text="Memuat data info & event..." />
           )}
 
-          {/* Blog & Event Grid */}
+          {/* Info & Event Grid */}
           {!loading && (
             <div className="blog-grid">
               {filteredPosts.map((post) => {
                 const isEvent = post.type === "event";
+                const eventDateFormatted = isEvent && post.event_date ? formatDate(post.event_date) : "";
+                const postDateFormatted = formatDate(post.published_at || post.created_at);
+                const categoryName = getCategoryName(post.blog_category || post.category);
+
                 return (
-                  <article key={post.id} className="blog-card">
-                    <div className="blog-card__img-wrap" style={{ position: "relative" }}>
-                      <Link to={`/blog/${post.slug || post.id}`} className="block w-full h-full">
-                        <img src={getThumbnailUrl(post)} alt={post.title} className="blog-card__img" loading="lazy" />
+                  <article key={post.id} className={`blog-card${isEvent ? " blog-card--event" : ""}`}>
+                    {/* Card Media Wrapper */}
+                    <div className="blog-card__img-wrap">
+                      <Link to={`/blog/${post.slug || post.id}`} className="blog-card__img-link">
+                        <img
+                          src={getThumbnailUrl(post)}
+                          alt={post.title}
+                          className="blog-card__img"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            const fn = post.thumbnail ? post.thumbnail.split("/").pop() : "";
+                            if (fn && (fn.startsWith("blog_") || fn.startsWith("event_"))) {
+                              e.currentTarget.src = `/images/real_blogs/${fn}`;
+                            } else {
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=500&fit=crop";
+                            }
+                          }}
+                        />
+                        <div className="blog-card__img-overlay" />
                       </Link>
-                      {isEvent ? (
-                        <span className="blog-badge-tag blog-badge-tag--event">EVENT</span>
-                      ) : (
-                        <span className="blog-badge-tag blog-badge-tag--blog">BLOG</span>
-                      )}
+
+                      {/* Type Badge */}
+                      <span className={`blog-badge-tag ${isEvent ? "blog-badge-tag--event" : "blog-badge-tag--blog"}`}>
+                        {isEvent ? (
+                          <>
+                            <Calendar size={12} className="shrink-0" />
+                            <span>EVENT</span>
+                          </>
+                        ) : (
+                          <>
+                            <BookOpen size={12} className="shrink-0" />
+                            <span>INFO</span>
+                          </>
+                        )}
+                      </span>
+
+                      {/* Bookmark Save Button */}
                       <button
                         type="button"
-                        className={`biz-card__save${saved[post.id] ? " saved" : ""}`}
-                        style={{ position: "absolute", top: "12px", right: "12px", zIndex: 5 }}
+                        className={`blog-card__save-btn biz-card__save${saved[post.id] ? " saved" : ""}`}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           toggleSave(post.id, post.title);
                         }}
-                        aria-label="Simpan Blog/Event"
+                        aria-label={saved[post.id] ? "Hapus dari Simpanan" : "Simpan Konten"}
+                        title={saved[post.id] ? "Hapus dari Simpanan" : "Simpan Konten"}
                       >
-                        <Bookmark size={13} fill={saved[post.id] ? "currentColor" : "none"} />
-                        <span>Simpan</span>
+                        <Bookmark size={15} className="shrink-0" fill={saved[post.id] ? "currentColor" : "none"} />
+                        <span className="blog-card__save-text">{saved[post.id] ? "Tersimpan" : "Simpan"}</span>
                       </button>
                     </div>
+
+                    {/* Card Content Body */}
                     <div className="blog-card__body">
-                      {post.blog_category && (
-                        <p className="blog-card__category">{post.blog_category}</p>
-                      )}
+                      {/* Top Category & Type Meta */}
+                      <div className="blog-card__top-meta">
+                        {categoryName && (
+                          <span className="blog-card__category-pill">
+                            {categoryName}
+                          </span>
+                        )}
+                        {isEvent && post.event_date && (
+                          <span className="blog-card__event-date-pill">
+                            <Calendar size={12} className="shrink-0 text-amber-600" />
+                            <span>{eventDateFormatted}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Title */}
                       <h2 className="blog-card__title">
-                        <Link to={`/blog/${post.slug || post.id}`} className="hover:text-[#007570] transition-colors">
+                        <Link to={`/blog/${post.slug || post.id}`}>
                           {post.title}
                         </Link>
                       </h2>
-                      <p className="blog-card__excerpt">{post.excerpt || post.content?.substring(0, 140)}</p>
 
+                      {/* Excerpt */}
+                      <p className="blog-card__excerpt">
+                        {post.excerpt || post.content?.substring(0, 140)}
+                      </p>
+
+                      {/* Event Specific: Location Pill with Google Maps link */}
                       {isEvent && post.event_location && (
-                        <div className="blog-card__event-loc">
-                          <MapPin size={13} />
-                          <span>{post.event_location}</span>
-                        </div>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.event_location)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="blog-card__event-loc"
+                          title="Buka Lokasi di Google Maps"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MapPin size={15} className="blog-card__event-loc-pin shrink-0" />
+                          <span className="blog-card__event-loc-text">{post.event_location}</span>
+                          <ExternalLink size={13} className="blog-card__event-loc-icon shrink-0" />
+                        </a>
                       )}
 
+                      {/* Meta Information (Author & Published Date) */}
                       <div className="blog-card__meta">
-                        <span className="blog-card__meta-item">
-                          <User size={14} />
-                          {post.user?.name || post.author || "Surade.co.id"}
-                        </span>
-                        <span className="blog-card__meta-item">
-                          <Calendar size={14} />
-                          {isEvent && post.event_date ? formatDate(post.event_date) : formatDate(post.published_at || post.created_at)}
-                        </span>
-                        <span className="blog-card__meta-item">
-                          <Clock size={14} />
-                          {getReadTime(post.content || post.excerpt)}
-                        </span>
+                        <div className="blog-card__author">
+                          <img
+                            src={getUserAvatar(post)}
+                            alt={post.user?.name || "Author"}
+                            className="blog-card__author-avatar"
+                          />
+                          <span className="blog-card__author-name">
+                            {post.user?.name || post.author || "Admin Surade"}
+                          </span>
+                        </div>
+                        <div className="blog-card__date">
+                          <Clock size={13} className="shrink-0 text-slate-400" />
+                          <span>{postDateFormatted}</span>
+                        </div>
                       </div>
 
-                      <Link to={`/blog/${post.slug || post.id}`} className="blog-card__link">
-                        Baca Selengkapnya
-                        <ArrowRight size={16} />
-                      </Link>
+                      {/* Card Action Link */}
+                      <div className="blog-card__footer-action">
+                        <Link to={`/blog/${post.slug || post.id}`} className="blog-card__link">
+                          <span>Baca Selengkapnya</span>
+                          <ArrowRight size={16} className="blog-card__link-arrow" />
+                        </Link>
+                      </div>
                     </div>
                   </article>
                 );
@@ -452,7 +539,13 @@ export default function Blog() {
 
           {!loading && filteredPosts.length === 0 && (
             <div className="blog-empty">
-              <p>Tidak ada blog atau event yang sesuai dengan pencarian/filter.</p>
+              <div className="blog-empty__icon-wrap">
+                <Search size={32} className="text-slate-400" />
+              </div>
+              <h3 className="blog-empty__title">Tidak Ada Konten Ditemukan</h3>
+              <p className="blog-empty__desc">
+                Coba sesuaikan kata kunci pencarian atau ganti kategori filter untuk menemukan kabar dan event menarik.
+              </p>
               {(searchQuery || activeCategory !== "all" || activeType !== "all") && (
                 <button
                   type="button"
@@ -463,7 +556,7 @@ export default function Blog() {
                     setActiveCategory("all");
                   }}
                 >
-                  Reset Semua Filter
+                  <span>Reset Semua Filter</span>
                 </button>
               )}
             </div>

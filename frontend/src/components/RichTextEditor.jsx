@@ -36,6 +36,8 @@ export default function RichTextEditor({
   placeholder = "Tuliskan deskripsi lengkap usaha di sini...",
   minHeight = "220px",
   disabled = false,
+  allowLinks = true,
+  allowCodeView = true,
 }) {
   const editorRef = useRef(null);
   const isUpdatingFromPropRef = useRef(false);
@@ -137,7 +139,7 @@ export default function RichTextEditor({
     checkActiveFormats();
   };
 
-  // Intercept Paste events to block YouTube URLs
+  // Intercept Paste events to block YouTube URLs and external/WA links if allowLinks is false
   const handlePaste = (e) => {
     const pasteText = e.clipboardData?.getData("text") || "";
     const pasteHtml = e.clipboardData?.getData("text/html") || "";
@@ -150,14 +152,42 @@ export default function RichTextEditor({
       });
 
       // Strip YouTube URLs from pasted text
-      const cleanText = pasteText
+      let cleanText = pasteText
         .replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/|youtube-nocookie\.com\/|m\.youtube\.com\/)[^\s]+/gi, "")
         .replace(/https?:\/\/[^\s]*youtu[^\s]*/gi, "");
+
+      if (!allowLinks) {
+        cleanText = cleanText
+          .replace(/https?:\/\/[^\s]+/gi, "")
+          .replace(/(?:wa\.me|api\.whatsapp\.com|whatsapp:\/\/)[^\s]+/gi, "");
+      }
 
       if (cleanText.trim()) {
         document.execCommand("insertText", false, cleanText);
       }
       handleContentChange();
+      return;
+    }
+
+    if (!allowLinks) {
+      const hasLinks = /https?:\/\/|wa\.me|api\.whatsapp\.com|whatsapp:\/\//i.test(pasteText) || /https?:\/\/|wa\.me|api\.whatsapp\.com|whatsapp:\/\//i.test(pasteHtml);
+      if (hasLinks) {
+        e.preventDefault();
+        toast.error("Tautan (Link) dan kontak WhatsApp dinonaktifkan di kolom deskripsi. Silakan isi nomor WhatsApp di kolom yang tersedia.", {
+          duration: 5000,
+          id: "link-prohibited-desc",
+        });
+
+        const cleanText = pasteText
+          .replace(/https?:\/\/[^\s]+/gi, "")
+          .replace(/(?:wa\.me|api\.whatsapp\.com|whatsapp:\/\/)[^\s]+/gi, "");
+
+        if (cleanText.trim()) {
+          document.execCommand("insertText", false, cleanText);
+        }
+        handleContentChange();
+        return;
+      }
     }
   };
 
@@ -441,25 +471,29 @@ export default function RichTextEditor({
           <div className="w-px h-5 bg-slate-200 mx-1 shrink-0" />
 
           {/* Link & Clear Format */}
-          <button
-            type="button"
-            disabled={disabled || isCodeView}
-            onClick={handleInsertLink}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer disabled:opacity-40"
-            title="Sisipkan Tautan"
-          >
-            <LinkIcon size={14} />
-          </button>
+          {allowLinks && (
+            <>
+              <button
+                type="button"
+                disabled={disabled || isCodeView}
+                onClick={handleInsertLink}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer disabled:opacity-40"
+                title="Sisipkan Tautan"
+              >
+                <LinkIcon size={14} />
+              </button>
 
-          <button
-            type="button"
-            disabled={disabled || isCodeView}
-            onClick={() => execCmd("unlink")}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer disabled:opacity-40"
-            title="Hapus Tautan"
-          >
-            <Unlink size={14} />
-          </button>
+              <button
+                type="button"
+                disabled={disabled || isCodeView}
+                onClick={() => execCmd("unlink")}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer disabled:opacity-40"
+                title="Hapus Tautan"
+              >
+                <Unlink size={14} />
+              </button>
+            </>
+          )}
 
           <button
             type="button"
@@ -494,23 +528,27 @@ export default function RichTextEditor({
             <Redo size={14} />
           </button>
 
-          <div className="w-px h-5 bg-slate-200 mx-1 shrink-0" />
+          {allowCodeView && (
+            <>
+              <div className="w-px h-5 bg-slate-200 mx-1 shrink-0" />
 
-          {/* HTML Source Toggle Button */}
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={toggleCodeView}
-            className={`h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-              isCodeView
-                ? "bg-[#007570] text-white"
-                : "bg-white border border-[#cbd5e1] text-slate-700 hover:bg-slate-100"
-            }`}
-            title={isCodeView ? "Beralih ke Tampilan Visual" : "Lihat Kode Sumber HTML"}
-          >
-            {isCodeView ? <Eye size={13} /> : <Code size={13} />}
-            <span>{isCodeView ? "Visual" : "HTML"}</span>
-          </button>
+              {/* HTML Source Toggle Button */}
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={toggleCodeView}
+                className={`h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  isCodeView
+                    ? "bg-[#007570] text-white"
+                    : "bg-white border border-[#cbd5e1] text-slate-700 hover:bg-slate-100"
+                }`}
+                title={isCodeView ? "Beralih ke Tampilan Visual" : "Lihat Kode Sumber HTML"}
+              >
+                {isCodeView ? <Eye size={13} /> : <Code size={13} />}
+                <span>{isCodeView ? "Visual" : "HTML"}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -549,7 +587,7 @@ export default function RichTextEditor({
       {/* ── TINYMCE STYLE STATUS BAR ── */}
       <div className="bg-[#f8fafc] border-t border-[#e2e8f0] px-3.5 py-1.5 flex items-center justify-between text-[11px] text-slate-500 font-medium select-none">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-600">Surade.co.id Editor</span>
+          <span className="font-semibold text-slate-600">Surade.com Editor</span>
           <span>&bull;</span>
           <span className="capitalize">{isCodeView ? "Mode Kode HTML" : `Tag: <${currentBlockTag}>`}</span>
         </div>

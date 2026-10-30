@@ -1,0 +1,273 @@
+/* =========================================================
+   Surade "Suuuuurade" Pagination CSS (Matching Gambar 2)
+   ========================================================= */
+
+.surade-pagination {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 4px 0 0;
+  width: 100%;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ── Top Row: The Surade Green Wordmark with Active Yellow ── */
+.surade-pagination__brand {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0px;
+  margin-bottom: 2px;
+}
+
+.surade-pagination__letter {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-block;
+  letter-spacing: -1.2px;
+  color: #007570; /* Base Surade Green */
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease, filter 0.2s ease;
+}
+
+/* Base Surade Green for S and tail letters */
+.surade-pagination__letter--S {
+  color: #007570;
+  margin-right: 0.5px;
+}
+
+.surade-pagination__u-group {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.surade-pagination__letter-btn {
+  background: transparent;
+  border: none;
+  padding: 0 0.5px;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  outline: none;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.surade-pagination__letter-btn:hover {
+  transform: translateY(-2.5px) scale(1.12);
+}
+
+/* Normal u: Surade Green */
+.surade-pagination__letter--u-page {
+  color: #007570;
+  opacity: 0.9;
+}
+
+/* Active u: Turns Yellow / Kuning with golden glow */
+.surade-pagination__letter--u-active {
+  color: #f59e0b; /* Golden Yellow */
+  text-shadow: 0 2px 10px rgba(245, 158, 11, 0.45);
+  transform: scale(1.06);
+}
+
+.surade-pagination__tail-letters {
+  display: inline-flex;
+  align-items: baseline;
+  margin-left: 0.5px;
+}
+
+/* Tail letters in Surade Green */
+.surade-pagination__letter--r,
+.surade-pagination__letter--a,
+.surade-pagination__letter--d,
+.surade-pagination__letter--e {
+  color: #007570;
+}
+
+/* ── Bottom Row: Pill Controls (Matching Gambar 2) ── */
+.surade-pagination__controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+/* Navigation Buttons: < Sebelumnya & Selanjutnya > */
+.surade-pagination__nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 46px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  color: #1e293b;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.surade-pagination__nav-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #007570;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+}
+
+.surade-pagination__nav-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.surade-pagination__nav-btn:disabled {
+  background: #ffffff;
+  border-color: #edf2f7;
+  color: #cbd5e1;
+  cursor: not-allowed;
+  opacity: 0.85;
+  box-shadow: none;
+}
+
+.surade-pagination__nav-btn:disabled .surade-pagination__nav-icon {
+  color: #cbd5e1;
+}
+
+.surade-pagination__nav-icon {
+  flex-shrink: 0;
+  color: inherit;
+}
+
+/* Page List Container */
+.surade-pagination__page-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Numbered Page Buttons */
+.surade-pagination__page-btn {
+  min-width: 46px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.surade-pagination__page-btn:hover:not(.is-active) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #007570;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+}
+
+.surade-pagination__page-btn:active:not(.is-active) {
+  transform: translateY(0);
+}
+
+/* Active Page Button (Teal Card - Exactly matching Gambar 2) */
+.surade-pagination__page-btn.is-active {
+  background: #007570;
+  border-color: #007570;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 117, 112, 0.32);
+  transform: translateY(-1px);
+  cursor: default;
+}
+
+/* Ellipsis Dots */
+.surade-pagination__dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 46px;
+  color: #94a3b8;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* =========================================================
+   Responsive Breakpoints
+   ========================================================= */
+@media (max-width: 640px) {
+  .surade-pagination {
+    gap: 12px;
+    margin: 24px 0 12px;
+  }
+
+  .surade-pagination__letter {
+    font-size: 28px;
+    letter-spacing: -0.8px;
+  }
+
+  .surade-pagination__controls {
+    gap: 6px;
+  }
+
+  .surade-pagination__page-list {
+    gap: 6px;
+  }
+
+  .surade-pagination__nav-btn {
+    height: 40px;
+    padding: 0 12px;
+    font-size: 13.5px;
+    border-radius: 10px;
+  }
+
+  .surade-pagination__nav-label {
+    display: none; /* Icon only on mobile to save space */
+  }
+
+  .surade-pagination__page-btn {
+    min-width: 40px;
+    height: 40px;
+    padding: 0 8px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+
+  .surade-pagination__dots {
+    min-width: 16px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 400px) {
+  .surade-pagination__letter {
+    font-size: 24px;
+  }
+
+  .surade-pagination__nav-btn {
+    height: 36px;
+    padding: 0 8px;
+    border-radius: 8px;
+  }
+
+  .surade-pagination__page-btn {
+    min-width: 36px;
+    height: 36px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+}

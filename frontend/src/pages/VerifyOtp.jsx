@@ -25,6 +25,11 @@ export default function VerifyOtp() {
   const [emailSent, setEmailSent] = useState(location.state?.emailSent !== false);
   const [debugOtpCode, setDebugOtpCode] = useState(location.state?.debugOtpCode || null);
 
+  // Set title
+  useEffect(() => {
+    document.title = "Verifikasi OTP - Surade.com";
+  }, []);
+
   // Redirect jika tidak ada email
   useEffect(() => {
     if (!email) {
@@ -174,7 +179,7 @@ export default function VerifyOtp() {
           <div className="login-visual">
             <img
               src={businessIllustration}
-              alt="Surade.co.id — Temukan toko yang kamu cari"
+              alt="Surade.com — Temukan toko yang kamu cari"
               className="login-visual__image"
             />
           </div>
@@ -195,18 +200,30 @@ export default function VerifyOtp() {
                 <strong>Email:</strong> {email}
               </div>
 
-              {/* Show debug OTP code in development */}
-              {debugOtpCode && (
-                <div className="login-error" style={{ backgroundColor: '#d1fae5', color: '#065f46', border: '1px solid #10b981' }}>
-                  <CheckCircle2 size={18} className="login-error__icon" />
-                  <strong>Kode verifikasi Anda:</strong> {debugOtpCode}
+              {/* Info Box Cek Kotak Masuk & Spam */}
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)",
+                  border: "1px solid #a7f3d0",
+                  borderRadius: 10,
+                  padding: "11px 14px",
+                  margin: "12px 0 14px 0",
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "flex-start",
+                  textAlign: "left",
+                }}
+              >
+                <Mail size={18} style={{ color: "#059669", flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: "0.8rem", color: "#065f46", lineHeight: 1.45 }}>
+                  <strong>Penting:</strong> Periksa folder <strong>Kotak Masuk (Inbox)</strong> email Anda. Jika belum muncul dalam beberapa detik, pastikan untuk mengecek folder <strong>Spam / Junk / Promosi</strong>.
                 </div>
-              )}
+              </div>
 
-              {!emailSent && !debugOtpCode && (
+              {!emailSent && (
                 <div className="login-error">
                   <AlertCircle size={18} className="login-error__icon" />
-                  Email verifikasi gagal dikirim. Silakan coba tombol 'Kirim ulang kode' di bawah.
+                  Email verifikasi gagal dikirim. Silakan periksa kembali alamat email Anda atau coba tombol 'Kirim ulang kode' di bawah.
                 </div>
               )}
 

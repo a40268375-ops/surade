@@ -24,6 +24,9 @@ import {
   Compass,
 } from "lucide-react";
 import logoImg from "../assets/logo-surade.png";
+import WhatsAppIcon from "./icons/WhatsAppIcon";
+import { SMART_CITIES } from "../data/smartCities";
+import { getCompleteNavbarCategories } from "../utils/categoryIcons";
 import "./MobileMenu.css";
 
 /**
@@ -48,6 +51,33 @@ export default function MobileMenu({
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [expandedCatId, setExpandedCatId] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [smartVillageExpanded, setSmartVillageExpanded] = useState(false);
+  const [villageCounts, setVillageCounts] = useState({});
+
+  // Fetch dynamic real business counts per village from API
+  useEffect(() => {
+    const fetchRealVillageCounts = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/home-summary`);
+        if (res.ok) {
+          const data = await res.json();
+          const cities = data?.smart_cities || [];
+          if (Array.isArray(cities) && cities.length > 0) {
+            const countsMap = {};
+            cities.forEach((c) => {
+              const bCount = Number(c.bisnis ?? c.businesses_count ?? 0);
+              if (c.name) countsMap[c.name.toLowerCase().trim()] = bCount;
+              if (c.slug) countsMap[c.slug.toLowerCase().trim()] = bCount;
+            });
+            setVillageCounts(countsMap);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch real village counts:", err);
+      }
+    };
+    fetchRealVillageCounts();
+  }, []);
 
   // Lock body scroll when drawer is active
   useEffect(() => {
@@ -87,18 +117,61 @@ export default function MobileMenu({
     setExpandedCatId((prev) => (prev === catId ? null : catId));
   };
 
+  const sanitizeCategories = (list) => {
+    if (!Array.isArray(list)) return [];
+    return list.filter((cat) => {
+      const slug = String(cat.slug || cat.name || "").toLowerCase();
+      return slug !== "umkm" && slug !== "nomor-penting" && !slug.includes("nomor penting") && !slug.includes("darurat");
+    });
+  };
+
+  const [menuCategories, setMenuCategories] = useState(() => {
+    const base = Array.isArray(categories) && categories.length >= 15
+      ? categories
+      : getCompleteNavbarCategories();
+    return sanitizeCategories(base);
+  });
+
+  // Sync menuCategories with categories prop or fetch from API fallback
+  useEffect(() => {
+    if (Array.isArray(categories) && categories.length >= 15) {
+      setMenuCategories(sanitizeCategories(categories));
+    } else {
+      const fetchCats = async () => {
+        try {
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/navbar-categories`);
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length >= 15) {
+              setMenuCategories(sanitizeCategories(data));
+            } else {
+              setMenuCategories(sanitizeCategories(getCompleteNavbarCategories()));
+            }
+          } else {
+            setMenuCategories(sanitizeCategories(getCompleteNavbarCategories()));
+          }
+        } catch (e) {
+          setMenuCategories(sanitizeCategories(getCompleteNavbarCategories()));
+        }
+      };
+      fetchCats();
+    }
+  }, [categories]);
+
   // Filter categories if user types inside category filter
-  const filteredCategories = categories.filter((cat) => {
+  const filteredCategories = menuCategories.filter((cat) => {
     if (!categoryFilter.trim()) return true;
     const q = categoryFilter.toLowerCase();
-    const matchParent = cat.name?.toLowerCase().includes(q);
-    const matchChild = cat.children?.some((ch) => ch.name?.toLowerCase().includes(q));
+    const catName = (cat.name || cat.label || "").toLowerCase();
+    const matchParent = catName.includes(q);
+    const subList = cat.children || cat.subcategories || [];
+    const matchChild = subList.some((ch) => (ch.name || ch.label || "").toLowerCase().includes(q));
     return matchParent || matchChild;
   });
 
   // WhatsApp CS contact link
   const waNumber = "628111919711";
-  const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent("Halo Admin Surade.co.id, saya ingin bertanya...")}`;
+  const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent("Halo Admin Surade.com, saya ingin bertanya...")}`;
 
   return (
     <>
@@ -119,9 +192,9 @@ export default function MobileMenu({
         {/* ── 1. Drawer Header ── */}
         <div className="surade-mobile-header">
           <Link to="/" onClick={onClose} className="surade-mobile-logo-wrap">
-            <img src={logoImg} alt="Surade.co.id" className="surade-mobile-logo" />
+            <img src={logoImg} alt="Surade.com" className="surade-mobile-logo" />
             <span className="surade-mobile-brand-title">
-              Surade<span>.co.id</span>
+              Surade<span>.com</span>
             </span>
           </Link>
           <button
@@ -137,13 +210,31 @@ export default function MobileMenu({
         {/* ── 2. Scrollable Body ── */}
         <div className="surade-mobile-body">
           {/* Quick Search Bar */}
-          <form onSubmit={handleSearchSubmit} className="surade-mobile-search-form">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              document.activeElement?.blur?.();
+              handleSearchSubmit(e);
+            }}
+            className="surade-mobile-search-form"
+          >
             <Search size={16} className="surade-mobile-search-icon" />
             <input
-              type="text"
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
               placeholder="Cari bisnis, jasa, atau produk..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.keyCode === 13) {
+                  e.currentTarget.blur?.();
+                  handleSearchSubmit(e);
+                }
+              }}
               className="surade-mobile-search-input"
             />
             {searchQuery && (
@@ -199,7 +290,7 @@ export default function MobileMenu({
                   className="surade-mobile-action-pill"
                 >
                   <Mail size={16} />
-                  <span>Inbox</span>
+                  <span>Pesan</span>
                   {inboxUnread > 0 && (
                     <span className="surade-mobile-badge">
                       {inboxUnread > 99 ? "99+" : inboxUnread}
@@ -220,7 +311,7 @@ export default function MobileMenu({
           ) : (
             <div className="surade-mobile-guest-card">
               <div>
-                <h4 className="surade-mobile-guest-title">Selamat Datang di Surade.co.id</h4>
+                <h4 className="surade-mobile-guest-title">Selamat Datang di Surade.com</h4>
                 <p className="surade-mobile-guest-desc">
                   Temukan direktori bisnis lokal dan promosikan usaha Anda secara gratis & mudah.
                 </p>
@@ -234,7 +325,7 @@ export default function MobileMenu({
                   Masuk Akun
                 </Link>
                 <Link
-                  to="/login"
+                  to="/register"
                   onClick={onClose}
                   className="surade-mobile-btn-guest-register"
                 >
@@ -282,12 +373,12 @@ export default function MobileMenu({
                       <Layers size={18} />
                     </span>
                     <span className="font-semibold text-[13.5px] text-slate-800">
-                      Kategori Direktori
+                      Direktori
                     </span>
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="surade-mobile-accordion-badge">
-                      {categories.length}
+                      {menuCategories.length || categories.length}
                     </span>
                     <ChevronDown
                       size={16}
@@ -300,7 +391,7 @@ export default function MobileMenu({
 
                 <div className="surade-mobile-accordion-panel">
                   {/* Category mini filter if more than 5 */}
-                  {categories.length > 5 && (
+                  {(menuCategories.length || categories.length) > 5 && (
                     <div className="surade-mobile-cat-filter">
                       <input
                         type="text"
@@ -314,20 +405,22 @@ export default function MobileMenu({
                   {/* List of categories */}
                   {filteredCategories.map((cat) => {
                     const isParentExpanded = expandedCatId === cat.id;
-                    const hasChildren = cat.children && cat.children.length > 0;
+                    const subList = cat.children || cat.subcategories || [];
+                    const hasChildren = subList.length > 0;
+                    const catSlug = cat.slug || String(cat.id);
 
                     return (
                       <div key={cat.id} className="surade-mobile-cat-item">
                         <div className="surade-mobile-cat-header">
                           <Link
-                            to={`/category/${cat.slug}`}
+                            to={`/category/${catSlug}`}
                             onClick={onClose}
                             className="surade-mobile-cat-link"
                           >
-                            <span>{cat.name}</span>
+                            <span>{cat.name || cat.label}</span>
                             {hasChildren && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 font-semibold">
-                                {cat.children.length}
+                                {subList.length}
                               </span>
                             )}
                           </Link>
@@ -337,7 +430,7 @@ export default function MobileMenu({
                               type="button"
                               onClick={(e) => toggleCategoryExpand(cat.id, e)}
                               className="surade-mobile-cat-expand-btn"
-                              aria-label={`Lihat subkategori ${cat.name}`}
+                              aria-label={`Lihat subkategori ${cat.name || cat.label}`}
                             >
                               <ChevronDown
                                 size={14}
@@ -352,17 +445,20 @@ export default function MobileMenu({
                         {/* Subcategories list */}
                         {hasChildren && isParentExpanded && (
                           <div className="surade-mobile-subcat-list">
-                            {cat.children.map((child) => (
-                              <Link
-                                key={child.id}
-                                to={`/category/${child.slug}`}
-                                onClick={onClose}
-                                className="surade-mobile-subcat-link"
-                              >
-                                <span>{child.name}</span>
-                                <ChevronRight size={12} className="opacity-40" />
-                              </Link>
-                            ))}
+                            {subList.map((child) => {
+                              const childSlug = child.slug || String(child.id);
+                              return (
+                                <Link
+                                  key={child.id || child.slug}
+                                  to={`/category/${catSlug}?sub=${childSlug}`}
+                                  onClick={onClose}
+                                  className="surade-mobile-subcat-link"
+                                >
+                                  <span>{child.name || child.label}</span>
+                                  <ChevronRight size={12} className="opacity-40" />
+                                </Link>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -370,17 +466,34 @@ export default function MobileMenu({
                   })}
 
                   <Link
-                    to="/category"
+                    to="/category/all"
                     onClick={onClose}
                     className="surade-mobile-cat-all"
                   >
-                    <span>Jelajahi Semua Kategori Bisnis</span>
-                    <ExternalLink size={13} />
+                    <span>Lihat Semua Direktori Kategori</span>
+                    <ChevronRight size={13} />
                   </Link>
                 </div>
               </div>
 
-              {/* Blog */}
+              {/* Nomor Penting */}
+              <NavLink
+                to="/nomor-penting"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `surade-mobile-nav-link ${isActive ? "active" : ""}`
+                }
+              >
+                <span className="surade-mobile-nav-link-left">
+                  <span className="surade-mobile-nav-icon text-rose-500">
+                    <PhoneCall size={18} />
+                  </span>
+                  <span className="font-semibold text-rose-700">Nomor Penting & Darurat</span>
+                </span>
+                <ChevronRight size={15} className="opacity-40" />
+              </NavLink>
+
+              {/* Berita */}
               <NavLink
                 to="/blog"
                 onClick={onClose}
@@ -392,27 +505,69 @@ export default function MobileMenu({
                   <span className="surade-mobile-nav-icon">
                     <BookOpen size={18} />
                   </span>
-                  <span>Blog & Kabar Daerah</span>
+                  <span>Berita</span>
                 </span>
                 <ChevronRight size={15} className="opacity-40" />
               </NavLink>
 
-              {/* Smart City */}
-              <NavLink
-                to="/smart-city"
-                onClick={onClose}
-                className={({ isActive }) =>
-                  `surade-mobile-nav-link ${isActive ? "active" : ""}`
-                }
+              {/* Smart Village Accordion */}
+              <div
+                className={`surade-mobile-accordion ${
+                  smartVillageExpanded ? "expanded" : ""
+                }`}
               >
-                <span className="surade-mobile-nav-link-left">
-                  <span className="surade-mobile-nav-icon">
-                    <Building2 size={18} />
+                <button
+                  type="button"
+                  onClick={() => setSmartVillageExpanded((v) => !v)}
+                  className="surade-mobile-accordion-toggle"
+                >
+                  <span className="surade-mobile-nav-link-left">
+                    <span className="surade-mobile-accordion-icon">
+                      <Building2 size={18} />
+                    </span>
+                    <span className="font-semibold text-[13.5px] text-slate-800">
+                      Smart Village Surade
+                    </span>
                   </span>
-                  <span>Smart City Surade</span>
-                </span>
-                <ChevronRight size={15} className="opacity-40" />
-              </NavLink>
+                  <div className="flex items-center gap-2">
+                    <span className="surade-mobile-accordion-badge">
+                      {SMART_CITIES.length}
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={`text-slate-400 transition-transform duration-200 ${
+                        smartVillageExpanded ? "rotate-180 text-emerald-600" : ""
+                      }`}
+                    />
+                  </div>
+                </button>
+
+                <div className="surade-mobile-accordion-panel">
+                  {SMART_CITIES.map((village) => {
+                    const villageSlug = village.slug || village.name.toLowerCase().replace(/\s+/g, "-");
+                    const nameKey = village.name.toLowerCase().trim();
+                    const slugKey = villageSlug.toLowerCase().trim();
+                    const realBisnis = villageCounts[nameKey] ?? villageCounts[slugKey] ?? village.bisnis;
+
+                    return (
+                      <div key={village.id} className="surade-mobile-cat-item">
+                        <div className="surade-mobile-cat-header">
+                          <Link
+                            to={`/smart-city/${villageSlug}`}
+                            onClick={onClose}
+                            className="surade-mobile-cat-link"
+                          >
+                            <span className="font-medium text-slate-700">{village.name}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100/80">
+                              {realBisnis} UMKM
+                            </span>
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Tentang Kami */}
               <NavLink
@@ -448,7 +603,7 @@ export default function MobileMenu({
                 <ChevronRight size={15} className="opacity-40" />
               </NavLink>
 
-              {/* Panduan Penggunaan */}
+              {/* Cara Penggunaan */}
               <NavLink
                 to="/panduan"
                 onClick={onClose}
@@ -460,7 +615,7 @@ export default function MobileMenu({
                   <span className="surade-mobile-nav-icon">
                     <Compass size={18} />
                   </span>
-                  <span>Panduan Penggunaan</span>
+                  <span>Cara Penggunaan</span>
                 </span>
                 <ChevronRight size={15} className="opacity-40" />
               </NavLink>
@@ -501,7 +656,7 @@ export default function MobileMenu({
               rel="noopener noreferrer"
               className="surade-mobile-wa-btn"
             >
-              <MessageCircle size={17} />
+              <WhatsAppIcon size={17} />
               <span>Chat WhatsApp Admin CS</span>
             </a>
           </div>
@@ -524,7 +679,7 @@ export default function MobileMenu({
           )}
 
           <p className="surade-mobile-footer-text">
-            © {new Date().getFullYear()} Surade.co.id • Sukabumi Selatan
+            © {new Date().getFullYear()} Surade.com • Sukabumi Selatan
           </p>
         </div>
       </aside>

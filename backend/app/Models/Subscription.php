@@ -11,7 +11,14 @@ class Subscription extends Model
         'invoice_number',
         'user_id',
         'business_id',
+        'plan_id',
         'plan',
+        'start_date',
+        'end_date',
+        'price',
+        'discount',
+        'final_price',
+        'coupon_code',
         'duration_days',
         'amount',
         'original_amount',
@@ -84,6 +91,21 @@ class Subscription extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
     }
 
     public function transaction()

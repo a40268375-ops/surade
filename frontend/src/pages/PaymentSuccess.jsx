@@ -7,6 +7,7 @@ export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    document.title = "Pembayaran Berhasil - Surade.com";
     // Auto redirect after 5 seconds
     const timer = setTimeout(() => {
       navigate('/dashboard?tab=businesses');

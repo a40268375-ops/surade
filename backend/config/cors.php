@@ -28,7 +28,12 @@ return [
     | 5173 is already taken) - so we allow the whole local dev range instead
     | of a single hardcoded origin.
     */
-    'allowed_origins' => [],
+    'allowed_origins' => [
+        'http://surade.com',
+        'https://surade.com',
+        'http://www.surade.com',
+        'https://www.surade.com',
+    ],
 
     'allowed_origins_patterns' => [
         '#^http://localhost:\d+$#',

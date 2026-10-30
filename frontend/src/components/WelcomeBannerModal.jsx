@@ -1,17 +1,34 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import welcomeBanner from "../assets/welcome-banner.jpg";
+import welcomeBanner from "../assets/banner-surade-umkm.jpg";
 import "./WelcomeBannerModal.css";
 
-const SESSION_KEY = "surade_welcome_banner_shown";
+const COOKIE_NAME = "surade_welcome_banner_shown";
+
+function isBannerSeen() {
+  try {
+    const match = document.cookie.match(new RegExp("(^| )" + COOKIE_NAME + "=([^;]+)"));
+    if (match) return true;
+  } catch (e) {}
+  return false;
+}
+
+function markBannerSeen() {
+  try {
+    // Session cookie without expires/max-age header is shared across all tabs,
+    // but automatically cleared when the user closes/exits the browser window.
+    document.cookie = `${COOKIE_NAME}=1; path=/; SameSite=Lax`;
+    localStorage.removeItem(COOKIE_NAME);
+    sessionStorage.removeItem(COOKIE_NAME);
+  } catch (e) {}
+}
 
 export default function WelcomeBannerModal() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const alreadyShown = sessionStorage.getItem(SESSION_KEY);
-    if (!alreadyShown) {
-      // Small delay so it doesn't flash before the page has painted
+    // Show banner only if not seen in current browser session across any tab
+    if (!isBannerSeen()) {
       const timer = setTimeout(() => setOpen(true), 400);
       return () => clearTimeout(timer);
     }
@@ -19,9 +36,7 @@ export default function WelcomeBannerModal() {
 
   const close = () => {
     setOpen(false);
-    try {
-      sessionStorage.setItem(SESSION_KEY, "1");
-    } catch (e) {}
+    markBannerSeen();
   };
 
   const handleBannerClick = (e) => {
@@ -29,6 +44,21 @@ export default function WelcomeBannerModal() {
     close();
     if (window.location.pathname !== "/") {
       window.location.href = "/";
+    }
+  };
+
+  const handleRegisterClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    close();
+
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
+
+    if (token && user) {
+      window.location.href = "/dashboard";
+    } else {
+      window.location.href = "/login";
     }
   };
 
@@ -41,13 +71,26 @@ export default function WelcomeBannerModal() {
           type="button"
           className="welcome-banner-modal__close"
           onClick={close}
-          aria-label="Tutup"
+          aria-label="Tutup Banner"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
-        <a href="/" className="welcome-banner-modal__image-btn" onClick={handleBannerClick}>
-          <img src={welcomeBanner} alt="Surade.co.id - Temukan Bisnis, Produk, Jasa & Informasi di Surade" className="welcome-banner-modal__image" />
-        </a>
+
+        <div className="welcome-banner-modal__container" onClick={handleBannerClick}>
+          <img
+            src={welcomeBanner}
+            alt="Surade.com - Surade Maju Bersama UMKM!"
+            className="welcome-banner-modal__image"
+          />
+
+          {/* Interactive 'Daftar Now' Hotspot Button */}
+          <button
+            type="button"
+            className="welcome-banner-modal__register-btn"
+            onClick={handleRegisterClick}
+            aria-label="Daftar Now - Ke Halaman Login"
+          />
+        </div>
       </div>
     </div>
   );

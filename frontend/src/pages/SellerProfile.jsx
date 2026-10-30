@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api, { getImageUrl } from "../utils/api";
 import Navbar from "../components/Navbar";
+import SuradeLoader from "../components/SuradeLoader";
 import { 
   ArrowLeft, 
   Star, 
@@ -94,19 +95,16 @@ export default function SellerProfile() {
   // Update page title and meta tags when seller data loads
   useEffect(() => {
     if (seller) {
-      document.title = `${seller.name} - Profile Penjual | Surade.co.id`;
+      document.title = `${seller.name} - Profil Penjual - Surade.com`;
       
       // Update meta description
       const metaDesc = document.querySelector('meta[name="description"]');
       if (metaDesc) {
-        metaDesc.setAttribute('content', `Profile ${seller.name} dengan ${seller.businessCount} bisnis di Surade.co.id. Rating ${seller.rating}/5 dari ${seller.reviewCount} ulasan.`);
+        metaDesc.setAttribute('content', `Profile ${seller.name} dengan ${seller.businessCount} bisnis di Surade.com. Rating ${seller.rating}/5 dari ${seller.reviewCount} ulasan.`);
       }
+    } else {
+      document.title = "Profil Penjual - Surade.com";
     }
-    
-    return () => {
-      // Reset title when component unmounts
-      document.title = "Surade.co.id - Platform Bisnis Lokal";
-    };
   }, [seller]);
 
   // Notifikasi custom (pojok kanan atas, hilang otomatis) - menggantikan
@@ -229,6 +227,13 @@ export default function SellerProfile() {
   };
 
   const handleWhatsApp = () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      showNotification("Silakan login terlebih dahulu untuk mengakses WhatsApp penjual.", 'error');
+      navigate("/login", { state: { from: window.location.pathname } });
+      return;
+    }
+
     if (!seller?.phone) {
       showNotification("Nomor WhatsApp tidak tersedia untuk penjual ini", 'error');
       return;
@@ -244,15 +249,15 @@ export default function SellerProfile() {
       formattedPhone = "62" + phone;
     }
     
-    const message = `Halo ${seller.name}, saya tertarik dengan bisnis Anda di Surade.co.id`;
+    const message = `Halo ${seller.name}, saya tertarik dengan bisnis Anda di Surade.com`;
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   };
 
   const handleShare = async () => {
     const url = window.location.href;
-    const title = `Profile ${seller.name} - Surade.co.id`;
-    const text = `Lihat profile ${seller.name} dan ${seller.businessCount} bisnisnya di Surade.co.id`;
+    const title = `Profile ${seller.name} - Surade.com`;
+    const text = `Lihat profile ${seller.name} dan ${seller.businessCount} bisnisnya di Surade.com`;
     
     if (navigator.share) {
       try {
@@ -452,11 +457,15 @@ export default function SellerProfile() {
 
   if (loading) {
     return (
-      <div className="seller-profile-page">
+      <div className="seller-profile-page min-h-screen flex flex-col bg-[#f8fafc]">
         <Navbar />
-        <div className="seller-loading">
-          <div className="spinner"></div>
-          <p>Memuat profile penjual...</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-6">
+          <SuradeLoader
+            variant="section"
+            text="Memuat profil penjual"
+            subtext="Mengambil etalase bisnis dan informasi kontak di Surade"
+            showBrand
+          />
         </div>
       </div>
     );
@@ -679,7 +688,14 @@ export default function SellerProfile() {
                       <div className="business-info">
                         <h3 className="business-name">{business.name}</h3>
                         <p className="business-category">{business.category || "Belum ada kategori"}</p>
-                        <p className="business-description">{business.description}</p>
+                        <p className="business-description">
+                          {(() => {
+                            if (!business.description) return "";
+                            const tmp = document.createElement("DIV");
+                            tmp.innerHTML = business.description;
+                            return tmp.textContent || tmp.innerText || "";
+                          })()}
+                        </p>
                         
                         {business.address && (
                           <div className="business-meta">

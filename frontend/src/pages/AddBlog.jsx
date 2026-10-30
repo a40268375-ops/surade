@@ -2,14 +2,19 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import api from "../services/api";
+import { useGlobalReferral } from "../context/ReferralContext";
 import {
   FileText, ImageIcon, Send, X, Upload,
   Check, AlertCircle, Loader2, ArrowLeft, Plus, Calendar, MapPin, Trash2,
   ChevronDown, CheckCircle2, Sparkles, Clock, Tag, CreditCard, ShieldCheck,
-  ChevronRight, ChevronLeft, Copy, Wallet
+  ChevronRight, ChevronLeft, Copy, Wallet, Zap, Edit
 } from "lucide-react";
+import toast from "react-hot-toast";
+import SuradeCoinIcon from "../components/SuradeCoinIcon";
+import { BuyCoinModal } from "../components/SuradeCoinModal";
 import { getStorageUrl } from "../utils/constants";
 import PaymentMethodSelector from "../components/PaymentMethodSelector";
+import DiscountCodeInput from "../components/DiscountCodeInput";
 import "./AddBlog.css";
 
 const DEFAULT_BLOG_CATEGORIES = [
@@ -73,6 +78,15 @@ export default function AddBlog() {
   const typeParam = searchParams.get("type") || "blog";
   const isEditing = !!id;
 
+  const user = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user")) || null;
+    } catch {
+      return null;
+    }
+  })();
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin" || !!user?.is_admin;
+
   const [step, setStep] = useState(1);
   const [contentType, setContentType] = useState(typeParam);
   const [submitting, setSubmitting] = useState(false);
@@ -93,7 +107,28 @@ export default function AddBlog() {
   const [couponError, setCouponError] = useState("");
   const [couponSuccessMsg, setCouponSuccessMsg] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [appliedReferral, setAppliedReferral] = useState(null);
   const [publicCoupons, setPublicCoupons] = useState([]);
+
+  // Global referral context - auto-populate appliedReferral
+  const { appliedReferral: globalAppliedReferral, isBound: isGloballyBound } = useGlobalReferral();
+
+  useEffect(() => {
+    if (isGloballyBound && globalAppliedReferral && !appliedReferral) {
+      const boundCode = globalAppliedReferral.code || globalAppliedReferral.referral_code;
+      if (boundCode) {
+        setAppliedReferral({
+          code: boundCode,
+          referral_code: boundCode,
+          discount_percent: 10,
+          discount_amount: null,
+          referrer_name: globalAppliedReferral.referrer_name,
+          is_bound: true,
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGloballyBound, globalAppliedReferral]);
 
   useEffect(() => {
     api.get("/coupons/public-codes")
@@ -104,6 +139,14 @@ export default function AddBlog() {
       .catch((err) => console.warn("Failed to fetch public coupons:", err));
   }, []);
 
+  useEffect(() => {
+    if (isEditing) {
+      document.title = `Edit ${contentType === "event" ? "Event" : "Berita"} - Surade.com`;
+    } else {
+      document.title = `Tambah ${contentType === "event" ? "Event" : "Berita"} - Surade.com`;
+    }
+  }, [isEditing, contentType]);
+
   // ── Payment Method State ──
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("DANA");
   const [copiedAccount, setCopiedAccount] = useState(false);
@@ -112,10 +155,23 @@ export default function AddBlog() {
   const [proofFile, setProofFile] = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
   const [existingProof, setExistingProof] = useState(null);
-  const proofInputRef = useRef();
+  // ── Poin Payment State ──
+  const [poinBalance, setPoinBalance] = useState(null);
+  const [payingWithPoin, setPayingWithPoin] = useState(false);
+  const [showBuyPoinModal, setShowBuyPoinModal] = useState(false);
 
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const isAdmin = currentUser?.role === "admin";
+  const fetchPoinBalance = async () => {
+    try {
+      const res = await api.get("/coins/balance");
+      if (res.data?.balance !== undefined) {
+        setPoinBalance(Number(res.data.balance));
+      }
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    fetchPoinBalance();
+  }, [step]);
 
   const [form, setForm] = useState({
     title: "",
@@ -124,6 +180,7 @@ export default function AddBlog() {
     content: "",
     status: "draft",
     event_date: "",
+    event_end_date: "",
     event_location: "",
   });
 
@@ -131,13 +188,10 @@ export default function AddBlog() {
   const [thumbnail, setThumbnail] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
 
-  // Banner (max 4)
-  const [banners, setBanners] = useState([]);
-  const bannerInputRef = useRef();
-
-  // Gallery (additional images)
+  // Gallery (max 5 images)
   const [gallery, setGallery] = useState([]);
   const galleryInputRef = useRef();
+  const proofInputRef = useRef();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -146,10 +200,16 @@ export default function AddBlog() {
 
   // ── Thumbnail ──
   const handleThumbnailChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`Ukuran file "${file.name}" melebihi batas maksimal 5MB (${(file.size / (1024 * 1024)).toFixed(1)}MB). Silakan pilih foto dengan ukuran di bawah 5MB.`);
+        e.target.value = "";
+        return;
+      }
       setThumbnail(file);
       setThumbnailPreview(URL.createObjectURL(file));
+      setError("");
     }
   };
 
@@ -157,34 +217,50 @@ export default function AddBlog() {
     setThumbnail(null);
     if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
     setThumbnailPreview(null);
-  };
-
-  // ── Banner ──
-  const handleBannerAdd = (files) => {
-    const arr = Array.from(files);
-    const remaining = 4 - banners.length;
-    arr.slice(0, remaining).forEach((file) => {
-      setBanners((p) => [...p, { file, preview: URL.createObjectURL(file) }]);
-    });
-  };
-
-  const removeBanner = (i) => {
-    setBanners((p) => {
-      URL.revokeObjectURL(p[i].preview);
-      return p.filter((_, idx) => idx !== i);
-    });
+    const input = document.getElementById("thumb-input");
+    if (input) input.value = "";
   };
 
   // ── Gallery ──
   const handleGalleryAdd = (files) => {
-    Array.from(files).forEach((file) => {
-      setGallery((p) => [...p, { file, preview: URL.createObjectURL(file) }]);
+    if (!files || files.length === 0) return;
+    const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    
+    // Check oversized files
+    const validFiles = [];
+    let hasOversized = false;
+    for (const file of arr) {
+      if (file.size > 5 * 1024 * 1024) {
+        hasOversized = true;
+        toast.error(`Foto galeri "${file.name}" melebihi batas maksimal 5MB (${(file.size / (1024 * 1024)).toFixed(1)}MB).`);
+      } else {
+        validFiles.push(file);
+      }
+    }
+    if (hasOversized && validFiles.length === 0) {
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
+      return;
+    }
+
+    setGallery((prev) => {
+      const remaining = 5 - prev.length;
+      if (remaining <= 0) {
+        toast.error("Batas maksimal galeri adalah 5 foto.");
+        return prev;
+      }
+      const newItems = validFiles.slice(0, remaining).map((file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+      }));
+      return [...prev, ...newItems];
     });
+
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
   };
 
   const removeGallery = (i) => {
     setGallery((p) => {
-      if (p[i]?.preview) URL.revokeObjectURL(p[i].preview);
+      if (p[i]?.preview && p[i]?.file) URL.revokeObjectURL(p[i].preview);
       return p.filter((_, idx) => idx !== i);
     });
   };
@@ -209,9 +285,10 @@ export default function AddBlog() {
               blog_category: data.blog_category || "",
               excerpt: data.excerpt || "",
               content: data.content || "",
-              status: data.status || "draft",
+              status: data.status === "draft" ? "draft" : "published",
               rejection_reason: data.rejection_reason || "",
               event_date: data.event_date ? data.event_date.split("T")[0] : "",
+              event_end_date: data.event_end_date ? data.event_end_date.split("T")[0] : "",
               event_location: data.event_location || "",
             });
             if (data.type) setContentType(data.type);
@@ -223,20 +300,42 @@ export default function AddBlog() {
               setExistingProof(getStorageUrl(p));
             }
             if (data.images && data.images.length > 0) {
-              const rawImages = typeof data.images === "string" ? JSON.parse(data.images) : data.images;
+              let rawImages = data.images;
+              if (typeof rawImages === "string") {
+                try {
+                  rawImages = JSON.parse(rawImages);
+                } catch (e) {
+                  rawImages = [];
+                }
+              }
               if (Array.isArray(rawImages)) {
-                setBanners(rawImages.map((img) => ({ preview: getStorageUrl(img.image_url || img) })));
+                setGallery(
+                  rawImages.slice(0, 5).map((img) => {
+                    const pathStr = typeof img === "string" ? img : (img.path || img.image_url || "");
+                    return {
+                      path: pathStr,
+                      preview: getStorageUrl(pathStr),
+                    };
+                  })
+                );
               }
             }
           }
         })
         .catch((err) => {
           console.error("Gagal memuat data konten:", err);
-          setError("Gagal memuat data konten.");
+          if (err.response?.status === 404) {
+            setError("Konten tidak ditemukan atau sudah dihapus. Mengalihkan ke form baru...");
+            setTimeout(() => {
+              navigate("/add-blog", { replace: true });
+            }, 1500);
+          } else {
+            setError("Gagal memuat data konten.");
+          }
         })
         .finally(() => setSubmitting(false));
     }
-  }, [isEditing, id]);
+  }, [isEditing, id, navigate]);
 
   // Fetch blog categories from backend
   useEffect(() => {
@@ -278,6 +377,13 @@ export default function AddBlog() {
   }, []);
 
   const currentFee = contentType === "event" ? pricing.event : pricing.blog;
+  const couponDiscount = appliedCoupon ? Number(appliedCoupon.discount_amount || 0) : 0;
+  const refDiscount = appliedReferral ? Number(appliedReferral.discount_amount || 0) : 0;
+  const totalDiscount = couponDiscount + refDiscount;
+  const finalCalculatedPrice = Math.max(0, currentFee - totalDiscount);
+  const basePoin = Math.max(1, Math.round(currentFee / 1000));
+  const requiredPoin = Math.max(0, Math.round(finalCalculatedPrice / 1000));
+  const discountPoin = Math.max(0, basePoin - requiredPoin);
 
   const activeCategories = contentType === "event"
     ? DEFAULT_EVENT_CATEGORIES
@@ -300,6 +406,19 @@ export default function AddBlog() {
     if (!form.content.trim()) return "Konten wajib diisi.";
     if (contentType === "event" && !form.event_date) return "Tanggal event wajib diisi.";
     if (contentType === "event" && !form.event_location.trim()) return "Lokasi event wajib diisi.";
+    
+    // File size validations (max 5MB)
+    if (thumbnail instanceof File && thumbnail.size > 5 * 1024 * 1024) {
+      return `Ukuran file thumbnail "${thumbnail.name}" melebihi batas maksimal 5MB. Silakan ganti foto sebelum melanjutkan.`;
+    }
+    const oversizedGallery = gallery.find((g) => g.file instanceof File && g.file.size > 5 * 1024 * 1024);
+    if (oversizedGallery) {
+      return `Foto galeri "${oversizedGallery.file.name}" melebihi batas maksimal 5MB. Silakan hapus atau ganti foto tersebut.`;
+    }
+    if (proofFile instanceof File && proofFile.size > 5 * 1024 * 1024) {
+      return "Ukuran file bukti pembayaran melebihi batas maksimal 5MB.";
+    }
+
     return null;
   };
 
@@ -318,21 +437,41 @@ export default function AddBlog() {
     try {
       const endpoint = "/blogs";
       const isPublish = targetAction === "publish";
-      const isResubmit = isEditing && form.status === "rejected";
-      const targetStatus = isPublish
-        ? (isAdmin ? "published" : (isResubmit ? "pending" : "waiting_payment"))
-        : "draft";
+      const isResubmit = isEditing && (form.status === "rejected" || form.status === "needs_revision");
+      let targetStatus;
+      if (isEditing) {
+        if (form.status === "draft" && !isPublish) {
+          targetStatus = "draft";
+        } else if (isAdmin) {
+          targetStatus = form.status || "published";
+        } else {
+          // Seperti usaha: setiap selesai edit konten, status kembali ke 'pending' untuk diverifikasi ulang oleh admin
+          targetStatus = "pending";
+        }
+      } else {
+        targetStatus = isPublish
+          ? (isAdmin ? "published" : "waiting_payment")
+          : "draft";
+      }
+
+      // Kumpulkan path gambar galeri lama yang dipertahankan
+      const existingImages = gallery
+        .filter((g) => g && !g.file && g.path)
+        .map((g) => g.path);
 
       const payload = {
         title: form.title,
         blog_category: form.blog_category || null,
+        category: form.blog_category || form.category || null,
         excerpt: form.excerpt || null,
         content: form.content,
         type: contentType,
         status: targetStatus,
         resubmit: isResubmit,
+        existing_images: existingImages,
         ...(contentType === "event" && {
           event_date: form.event_date,
+          event_end_date: form.event_end_date || form.event_date,
           event_location: form.event_location,
         }),
       };
@@ -341,13 +480,19 @@ export default function AddBlog() {
       let itemData;
       if (isEditing) {
         const res = await api.put(`${endpoint}/${id}`, payload);
-        itemData = res.data?.data || { id, ...payload };
-        itemId = id;
+        itemData = res.data?.data || res.data?.blog || res.data || { id, ...payload };
+        itemId = res.data?.id || res.data?.blog?.id || res.data?.data?.id || id;
+      } else if (createdId) {
+        // Reuse and update the draft item created in this session on retry
+        const res = await api.put(`${endpoint}/${createdId}`, payload);
+        itemData = res.data?.data || res.data?.blog || res.data || { id: createdId, ...payload };
+        itemId = res.data?.id || res.data?.blog?.id || res.data?.data?.id || createdId;
       } else {
         const res = await api.post(endpoint, payload);
-        itemData = res.data?.data || res.data;
-        itemId = itemData?.id;
-        if (!itemId) throw new Error("Gagal membuat konten");
+        itemData = res.data?.blog || res.data?.data || res.data;
+        itemId = res.data?.id || res.data?.blog?.id || res.data?.data?.id || itemData?.id;
+        if (!itemId) throw new Error("Gagal membuat konten. ID konten tidak ditemukan.");
+        setCreatedId(itemId);
       }
 
       // Upload thumbnail if exists
@@ -361,19 +506,24 @@ export default function AddBlog() {
         }
       }
 
-      // Upload banners & gallery (only valid File instances)
-      const newImageFiles = [
-        ...banners.filter((b) => b && b.file instanceof File).map((b) => b.file),
-        ...gallery.filter((g) => g && g.file instanceof File).map((g) => g.file),
-      ];
+      // Upload gallery images (only valid File instances, max 5)
+      const newImageFiles = gallery
+        .filter((g) => g && g.file instanceof File)
+        .slice(0, 5)
+        .map((g) => g.file);
       if (newImageFiles.length > 0) {
         try {
           const fd = new FormData();
           newImageFiles.forEach((file) => fd.append("images[]", file));
-          await api.post(`${endpoint}/${itemId}/images`, fd);
+          const uploadRes = await api.post(`${endpoint}/${itemId}/images`, fd);
+          if (uploadRes.data?.paths && Array.isArray(uploadRes.data.paths)) {
+            itemData.images = uploadRes.data.paths;
+          }
         } catch (imgErr) {
           console.error("Gagal upload gambar pendukung:", imgErr);
         }
+      } else {
+        itemData.images = existingImages;
       }
 
       setCreatedId(itemId);
@@ -386,14 +536,23 @@ export default function AddBlog() {
       };
       setCreatedBlogObj(fullBlogData);
 
-      if (isResubmit) {
-        // Go directly to Step 4 (Upload Bukti Pembayaran Revisi) without payment methods
-        setStep(4);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      } else if (!isPublish || isAdmin) {
+      if (isEditing) {
+        toast.success(
+          isAdmin
+            ? "Perubahan konten berhasil disimpan!"
+            : "Konten berhasil diperbarui dan kini menunggu verifikasi ulang oleh admin!"
+        );
+        setSuccess(true);
+        setTimeout(() => {
+          navigate("/admin-user?tab=blog-event");
+        }, 1200);
+        return;
+      }
+
+      if (!isPublish || isAdmin) {
         setSuccess(true);
       } else {
-        // Go to Step 2 (Ringkasan Pesanan & Pembayaran)
+        // Go to Step 2 (Ringkasan Pesanan & Pembayaran) hanya untuk postingan baru
         setStep(2);
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
@@ -429,13 +588,20 @@ export default function AddBlog() {
     setCouponError("");
     setCouponSuccessMsg("");
     try {
+      let currentUserId = null;
+      try {
+        const u = localStorage.getItem("user");
+        if (u) currentUserId = JSON.parse(u)?.id;
+      } catch (e) {}
+
       const res = await api.post("/coupons/validate", {
         code: codeToUse,
         product_type: contentType,
         amount: currentFee,
+        user_id: currentUserId,
       });
       const data = res.data?.data || res.data;
-      if (data && (data.valid || data.is_valid !== false)) {
+      if (data && (data.valid === true || data.is_valid === true)) {
         const couponObj = data.coupon || data;
         let discount = 0;
         if (couponObj.type === "percentage" || couponObj.discount_type === "percentage") {
@@ -474,8 +640,8 @@ export default function AddBlog() {
   const handleProofChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setError("Ukuran file maksimal 10MB.");
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Ukuran file maksimal 5MB.");
         return;
       }
       setProofFile(file);
@@ -490,12 +656,47 @@ export default function AddBlog() {
     setProofPreview(null);
   };
 
+  // ── Bayar Instan dengan Poin ──
+  const handlePayWithPoin = async () => {
+    let targetId = createdId || id;
+    if (!targetId) {
+      toast.error("ID konten belum tersedia. Silakan klik tombol simpan terlebih dahulu.");
+      return;
+    }
+    setPayingWithPoin(true);
+    setError("");
+    try {
+      const res = await api.post("/coins/pay-service", {
+        service_code: "info_event_post",
+        blog_id: targetId,
+        coupon_code: appliedCoupon?.code || null,
+        referral_code: appliedReferral?.referral_code || appliedReferral?.code || null,
+      });
+      if (res.data?.success) {
+        toast.success(res.data.message || "Konten berhasil diterbitkan menggunakan Poin!");
+        setForm((p) => ({ ...p, status: "published" }));
+        setIsPendingVerification(false);
+        setSuccess(true);
+        fetchPoinBalance();
+        window.dispatchEvent(new CustomEvent("poin-balance-updated"));
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        setError(res.data?.message || "Gagal memproses pembayaran dengan Poin.");
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Saldo Poin tidak mencukupi untuk menerbitkan konten ini.");
+    } finally {
+      setPayingWithPoin(false);
+    }
+  };
+
   // ── Final Checkout Submit ──
   const handleFinalCheckout = async () => {
     const isResubmit = isEditing && (form.status === "rejected" || createdBlogObj?.status === "rejected");
     const basePrice = currentFee;
-    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discount_amount || 0) : 0;
-    const finalAmount = isResubmit ? 0 : Math.max(0, basePrice - couponDiscount);
+    const cDiscount = appliedCoupon ? Number(appliedCoupon.discount_amount || 0) : 0;
+    const rDiscount = appliedReferral ? Number(appliedReferral.discount_amount || 0) : 0;
+    const finalAmount = isResubmit ? 0 : Math.max(0, basePrice - (cDiscount + rDiscount));
 
     if (!isResubmit && finalAmount > 0 && !proofFile) {
       setError("Silakan unggah bukti transfer / pembayaran terlebih dahulu.");
@@ -510,6 +711,9 @@ export default function AddBlog() {
       const formData = new FormData();
       if (appliedCoupon && !isResubmit) {
         formData.append("coupon_code", appliedCoupon.code);
+      }
+      if (appliedReferral && !isResubmit) {
+        formData.append("referral_code", appliedReferral.referral_code || appliedReferral.code);
       }
       formData.append("payment_method", isResubmit ? "Revisi Pembayaran" : (selectedPaymentMethod || "Bank BCA"));
       if (proofFile) {
@@ -574,7 +778,7 @@ export default function AddBlog() {
                 <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold block mb-1">Status Publikasi: Pending Verifikasi Admin</span>
-                  Konten kamu telah tersimpan aman. Setelah diverifikasi, artikel/event ini akan otomatis tampil di halaman utama Surade.co.id.
+                  Konten kamu telah tersimpan aman. Setelah diverifikasi, artikel/event ini akan otomatis tampil di halaman utama Surade.com.
                 </div>
               </div>
             </>
@@ -592,7 +796,7 @@ export default function AddBlog() {
               </h1>
               <p className="text-base text-[#64748b] leading-[1.7] mb-9">
                 {form.status === "published" || isAdmin
-                  ? `Konten "${form.title}" telah terbit dan kini dapat dibaca oleh seluruh pengunjung website Surade.co.id.`
+                  ? `Konten "${form.title}" telah terbit dan kini dapat dibaca oleh seluruh pengunjung website Surade.com.`
                   : (isEditing && form.status === "rejected"
                     ? `Revisi untuk konten "${form.title}" telah dikirim ke Admin dan kini berstatus Menunggu Persetujuan. Kamu tidak perlu membayar ulang.`
                     : `Draft "${form.title}" telah tersimpan. Kamu dapat melanjutkannya kapan saja melalui Dashboard.`)}
@@ -631,11 +835,11 @@ export default function AddBlog() {
         <div className="relative z-[1]">
           <h1 className="text-[clamp(1.8rem,4vw,2.8rem)] font-extrabold text-white tracking-[-0.03em] mb-2.5">
             {isEditing
-              ? `Edit ${contentType === "event" ? "Event" : "Blog"}`
-              : `Buat ${contentType === "event" ? "Event Baru" : "Blog Baru"}`}
+              ? `Edit ${contentType === "event" ? "Event" : "Info"}`
+              : `Buat ${contentType === "event" ? "Event Baru" : "Info Baru"}`}
           </h1>
           <p className="text-[1.05rem] text-white/75">
-            Publikasikan artikel inspiratif atau promosikan agenda event kamu ke seluruh Indonesia
+            Publikasikan info inspiratif atau promosikan agenda event kamu ke seluruh Indonesia
           </p>
         </div>
       </div>
@@ -643,15 +847,34 @@ export default function AddBlog() {
       {/* BODY CONTAINER */}
       <div className="max-w-[920px] mx-auto px-6 pt-10 pb-20">
 
-        {/* STEP INDICATOR (FOR MULTI-STEP FLOW) */}
-        {!isAdmin && (() => {
-          const isResubmit = isEditing && (form.status === "rejected" || createdBlogObj?.status === "rejected");
-          const displayedSteps = isResubmit
-            ? [
-                { id: 1, label: "Edit Konten", icon: <FileText size={16} /> },
-                { id: 4, label: "Upload Bukti Transfer", icon: <Upload size={16} /> },
-              ]
-            : BLOG_STEPS;
+        {/* TOP BAR / BACK NAVIGATION */}
+        <div className="flex items-center justify-between mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              if (step > 1) {
+                setStep(step - 1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              } else {
+                navigate("/admin-user?tab=blog-event");
+              }
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-[#007570] hover:border-[#007570] text-xs sm:text-sm font-semibold transition-all shadow-xs cursor-pointer"
+          >
+            <ArrowLeft size={16} />
+            <span>{step > 1 ? "Kembali ke Langkah Sebelumnya" : "Kembali ke Dashboard"}</span>
+          </button>
+
+          {createdId && (
+            <span className="text-[11px] font-semibold text-slate-500 bg-white border border-slate-200 px-3 py-1 rounded-full shadow-2xs">
+              ID Draft: #{createdId}
+            </span>
+          )}
+        </div>
+
+        {/* STEP INDICATOR (FOR MULTI-STEP FLOW) - HANYA UNTUK POSTINGAN BARU */}
+        {!isAdmin && !isEditing && (() => {
+          const displayedSteps = BLOG_STEPS;
 
           return (
             <div className="flex items-center justify-center mb-9 flex-wrap gap-y-4">
@@ -693,19 +916,19 @@ export default function AddBlog() {
           </div>
         )}
 
-        {/* REJECTION REASON ALERT BANNER */}
-        {form.rejection_reason && form.status === "rejected" && (
-          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-start gap-3 shadow-xs animate-[slideDown_0.2s_ease]">
-            <AlertCircle size={22} className="text-rose-600 shrink-0 mt-0.5" />
+        {/* REJECTION / REVISION REASON ALERT BANNER */}
+        {form.rejection_reason && (form.status === "rejected" || form.status === "needs_revision") && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-start gap-3 shadow-xs animate-[slideDown_0.2s_ease]">
+            <AlertCircle size={22} className="text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <strong className="block text-rose-900 font-bold mb-1">
-                Catatan Penolakan dari Admin:
+              <strong className="block text-amber-900 font-bold mb-1">
+                Catatan Perbaikan dari Admin:
               </strong>
-              <p className="leading-relaxed text-rose-700 bg-white/70 p-2.5 rounded-xl border border-rose-200/60 font-medium">
+              <p className="leading-relaxed text-amber-800 bg-white/80 p-2.5 rounded-xl border border-amber-200/60 font-medium">
                 "{form.rejection_reason}"
               </p>
-              <p className="text-[12px] text-rose-600 font-semibold mt-2">
-                💡 Silakan perbaiki isi konten/formulir di bawah ini sesuai catatan admin, kemudian klik tombol <strong>"Simpan Revisi & Ajukan Ulang"</strong>. Anda tidak perlu membayar ulang.
+              <p className="text-[12px] text-amber-700 font-semibold mt-2">
+                💡 Silakan perbaiki isi konten atau foto di bawah ini sesuai catatan admin, kemudian klik tombol <strong>"Simpan Perbaikan & Ajukan Ulang"</strong>. Anda tidak perlu membayar ulang.
               </p>
             </div>
           </div>
@@ -723,7 +946,7 @@ export default function AddBlog() {
                   onClick={() => setContentType("blog")}
                 >
                   <FileText size={18} />
-                  <span>Blog</span>
+                  <span>Info</span>
                 </button>
                 <button
                   type="button"
@@ -736,34 +959,61 @@ export default function AddBlog() {
               </div>
             </div>
 
-            {/* Tarif Banner */}
-            <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-teal-50/90 via-emerald-50/50 to-teal-50/90 border border-teal-200/80 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-[#007570] text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <Sparkles size={22} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900">
-                      Tarif Publikasi {contentType === "event" ? "Event" : "Blog"}
-                    </h3>
-                    <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                      AKTIF 1 TAHUN
-                    </span>
+            {/* Mode Banner / Tarif Banner */}
+            {isEditing ? (
+              <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-teal-50/90 via-emerald-50/50 to-teal-50/90 border border-teal-200/80 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-[#007570] text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <Edit size={22} />
                   </div>
-                  <p className="text-xs text-slate-600 mt-1 max-w-lg leading-relaxed">
-                    Posting Anda akan tayang aktif selama 1 tahun (365 hari) di platform Surade.co.id. Dapatkan jangkauan audiens lebih luas, optimasi SEO, dan bebas update konten kapan saja.
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-slate-900">
+                        Mode Edit {contentType === "event" ? "Event" : "Info"}
+                      </h3>
+                      <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-teal-100 text-[#007570] border border-teal-300">
+                        {form.status === "needs_revision"
+                          ? "PERLU PERBAIKAN"
+                          : form.status === "rejected"
+                          ? "DITOLAK (REVISI)"
+                          : (form.status || "EDIT").toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 max-w-lg leading-relaxed">
+                      Perbarui rincian, teks, gambar, atau agenda event Anda. Setelah disimpan, konten akan diverifikasi ulang oleh admin (seperti verifikasi profil usaha) tanpa dikenakan biaya pembayaran ulang.
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">BIAYA PUBLIKASI</span>
-                <span className="text-2xl font-black text-[#007570] block">
-                  Rp {currentFee.toLocaleString("id-ID")}
-                </span>
-                <span className="text-[11px] text-slate-500 font-medium">/ posting / tahun</span>
+            ) : (
+              <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-teal-50/90 via-emerald-50/50 to-teal-50/90 border border-teal-200/80 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-[#007570] text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <Sparkles size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-slate-900">
+                        Tarif Publikasi {contentType === "event" ? "Event" : "Info"}
+                      </h3>
+                      <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        AKTIF 1 TAHUN
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 max-w-lg leading-relaxed">
+                      Posting Anda akan tayang aktif selama 1 tahun (365 hari) di platform Surade.com. Dapatkan jangkauan audiens lebih luas, optimasi SEO, dan bebas update konten kapan saja.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">BIAYA PUBLIKASI</span>
+                  <span className="text-2xl font-black text-[#007570] block">
+                    Rp {currentFee.toLocaleString("id-ID")}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">/ posting / tahun</span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Form Card */}
             <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,0.07)] p-6 sm:p-9 mb-6 border border-[#e2e8f0] animate-[fadeCard_0.25s_ease]">
@@ -772,13 +1022,13 @@ export default function AddBlog() {
                 <div className="form-row">
                   <div className="form-group form-group--full">
                     <label className="form-label">
-                      Judul {contentType === "event" ? "Event" : "Blog"} <span className="required-star">*</span>
+                      Judul {contentType === "event" ? "Event" : "Info"} <span className="required-star">*</span>
                     </label>
                     <div className="input-with-icon">
                       <input
                         name="title"
                         type="text"
-                        placeholder={`Masukan judul ${contentType === "event" ? "event" : "blog"}`}
+                        placeholder={`Masukan judul ${contentType === "event" ? "event" : "info"}`}
                         value={form.title}
                         onChange={handleChange}
                         className="form-input"
@@ -790,7 +1040,7 @@ export default function AddBlog() {
               {/* Kategori */}
               <div className="form-row form-row--2cols">
                 <div className="form-group">
-                  <label className="form-label">Kategori {contentType === "event" ? "Event" : "Blog"}</label>
+                  <label className="form-label">Kategori {contentType === "event" ? "Event" : "Info"}</label>
                   <div className="select-wrapper">
                     <select
                       name="blog_category"
@@ -845,19 +1095,28 @@ export default function AddBlog() {
 
               {/* Tanggal Event (if event) */}
               {contentType === "event" && (
-                <div className="form-row form-row--2cols">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
                   <div className="form-group">
-                    <label className="form-label">Tanggal Penyelenggaraan Event <span className="required-star">*</span></label>
-                    <div className="input-with-icon">
-                      <input
-                        name="event_date"
-                        type="date"
-                        value={form.event_date}
-                        onChange={handleChange}
-                        className="form-input"
-                      />
-                      <Calendar size={18} className="input-icon" />
-                    </div>
+                    <label className="form-label">Tanggal Mulai Event <span className="required-star">*</span></label>
+                    <input
+                      name="event_date"
+                      type="date"
+                      value={form.event_date}
+                      onChange={handleChange}
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Tanggal Berakhir Event</label>
+                    <input
+                      name="event_end_date"
+                      type="date"
+                      value={form.event_end_date}
+                      onChange={handleChange}
+                      className="form-input"
+                    />
+                    <span className="text-[11px] text-slate-400 mt-1 block">Opsional (Kosongkan jika 1 hari)</span>
                   </div>
 
                   <div className="form-group">
@@ -912,26 +1171,60 @@ export default function AddBlog() {
 
               {/* ── GAMBAR & MEDIA SECTION ── */}
               <div className="form-section-divider" />
-              <div className="form-section-title">Gambar & Media</div>
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                <div className="form-section-title !mb-0">Gambar & Media</div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200/80 rounded-full text-xs font-bold text-amber-900 shadow-2xs">
+                  <span>ℹ️ Batasan Ukuran: Maksimal 5 MB per foto</span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Pastikan foto berformat <strong>JPG, JPEG, PNG, atau WEBP</strong> dengan ukuran masing-masing tidak melebihi <strong>5 MB</strong>.
+              </p>
 
               <div className="form-row">
                 <div className="form-group form-group--full">
-                  <label className="form-label">Thumbnail (Foto Sampul Utama)</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="form-label !mb-0 font-bold text-slate-800">
+                      Thumbnail (Foto Sampul Utama) <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                      Maks. 5 MB
+                    </span>
+                  </div>
                   {thumbnailPreview ? (
-                    <div className="thumbnail-preview-wrapper">
-                      <img src={thumbnailPreview} alt="Thumbnail" className="thumbnail-preview" />
-                      <button type="button" className="thumbnail-remove" onClick={removeThumbnail}>
-                        <X size={16} />
-                      </button>
+                    <div>
+                      <div className="thumbnail-preview-wrapper">
+                        <img src={thumbnailPreview} alt="Thumbnail" className="thumbnail-preview" />
+                        <button type="button" className="thumbnail-remove" onClick={removeThumbnail} title="Hapus Thumbnail">
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <p className="text-[11.5px] text-slate-500 mt-2 flex items-center gap-1.5 font-medium">
+                        <span className="text-emerald-600 font-bold">✓ Foto terpilih</span>
+                        <span className="text-slate-400">•</span>
+                        <span>Ukuran maksimal yang diizinkan: <strong>5 MB</strong> (JPG, PNG, WEBP)</span>
+                      </p>
                     </div>
                   ) : (
                     <div
                       className="upload-zone upload-zone--small"
+                      {...createDropHandler((files) => {
+                        if (files && files[0]) {
+                          const file = files[0];
+                          if (file.size > 5 * 1024 * 1024) {
+                            toast.error(`Ukuran file "${file.name}" melebihi batas maksimal 5MB (${(file.size / (1024 * 1024)).toFixed(1)}MB). Silakan pilih foto dengan ukuran di bawah 5MB.`);
+                            return;
+                          }
+                          setThumbnail(file);
+                          setThumbnailPreview(URL.createObjectURL(file));
+                          setError("");
+                        }
+                      })}
                       onClick={() => document.getElementById("thumb-input").click()}
                     >
                       <Upload size={28} className="upload-zone__icon" />
-                      <p className="upload-zone__text">Klik untuk upload thumbnail</p>
-                      <p className="upload-zone__hint">JPG, PNG, WEBP max 4MB</p>
+                      <p className="upload-zone__text">Klik atau drag &amp; drop untuk upload thumbnail</p>
+                      <p className="upload-zone__hint">JPG, PNG, WEBP &bull; <strong>Maksimal 5 MB</strong></p>
                     </div>
                   )}
                   <input
@@ -946,61 +1239,18 @@ export default function AddBlog() {
 
               <div className="form-row">
                 <div className="form-group form-group--full">
-                  <label className="form-label">Banner (Opsional, maks. 4)</label>
-                  <div
-                    className={"upload-zone upload-zone--small " + (banners.length >= 4 ? "upload-zone--disabled" : "")}
-                    {...createDropHandler(handleBannerAdd)}
-                    onClick={() => banners.length < 4 && bannerInputRef.current?.click()}
-                  >
-                    <input
-                      ref={bannerInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      hidden
-                      onChange={(e) => handleBannerAdd(e.target.files)}
-                    />
-                    <Upload size={28} className="upload-zone__icon" />
-                    <p className="upload-zone__text">
-                      {banners.length >= 4 ? "Batas maksimum 4 banner" : "Klik atau drag & drop banner"}
-                    </p>
-                    <p className="upload-zone__hint">{banners.length}/4 banner</p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="form-label !mb-0 font-bold text-slate-800">
+                      Galeri Foto (Opsional, maks. 5)
+                    </label>
+                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                      Maks. 5 MB / foto
+                    </span>
                   </div>
-                  {banners.length > 0 && (
-                    <div className="add-blog-banner-grid">
-                      {banners.map((b, i) => (
-                        <div key={i} className="add-blog-banner-item">
-                          <img src={b.preview} alt="" className="add-blog-banner-item__img" />
-                          <div className="add-blog-banner-item__overlay">
-                            <button type="button" onClick={() => removeBanner(i)} className="add-blog-banner-item__remove">
-                              <X size={16} />
-                            </button>
-                            <span className="add-blog-banner-item__badge">Banner {i + 1}</span>
-                          </div>
-                        </div>
-                      ))}
-                      {banners.length < 4 && (
-                        <button
-                          type="button"
-                          className="add-blog-banner-add-more"
-                          onClick={() => bannerInputRef.current?.click()}
-                        >
-                          <Plus size={28} />
-                          <span>Tambah</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group form-group--full">
-                  <label className="form-label">Galeri Foto (Opsional)</label>
                   <div
-                    className="upload-zone upload-zone--small"
+                    className={"upload-zone upload-zone--small " + (gallery.length >= 5 ? "upload-zone--disabled" : "")}
                     {...createDropHandler(handleGalleryAdd)}
-                    onClick={() => galleryInputRef.current?.click()}
+                    onClick={() => gallery.length < 5 && galleryInputRef.current?.click()}
                   >
                     <input
                       ref={galleryInputRef}
@@ -1011,23 +1261,31 @@ export default function AddBlog() {
                       onChange={(e) => handleGalleryAdd(e.target.files)}
                     />
                     <Upload size={28} className="upload-zone__icon" />
-                    <p className="upload-zone__text">Klik atau drag & drop foto</p>
-                    <p className="upload-zone__hint">JPG, PNG, WEBP — bisa multiple file</p>
+                    <p className="upload-zone__text">
+                      {gallery.length >= 5 ? "Batas maksimum 5 foto galeri tercapai" : "Klik atau drag & drop foto galeri"}
+                    </p>
+                    <p className="upload-zone__hint">{gallery.length}/5 foto galeri &bull; <strong>Maksimal 5 MB</strong> per foto (JPG, PNG, WEBP)</p>
                   </div>
                   {gallery.length > 0 && (
-                    <div className="add-blog-gallery-grid">
-                      {gallery.map((img, i) => (
-                        <div key={i} className="add-blog-gallery-item">
-                          <img src={img.preview} alt="" className="add-blog-gallery-item__img" />
-                          <button
-                            type="button"
-                            className="add-blog-gallery-item__remove"
-                            onClick={() => removeGallery(i)}
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
+                    <div className="mt-2.5 space-y-1.5">
+                      <div className="add-blog-gallery-grid">
+                        {gallery.map((img, i) => (
+                          <div key={i} className="add-blog-gallery-item">
+                            <img src={img.preview} alt="" className="add-blog-gallery-item__img" />
+                            <button
+                              type="button"
+                              className="add-blog-gallery-item__remove"
+                              onClick={() => removeGallery(i)}
+                              title="Hapus foto ini"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11.5px] text-slate-500 font-medium">
+                        ℹ️ Batasan foto galeri: <strong>maksimal 5 MB</strong> per foto (hingga 5 foto).
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1067,10 +1325,18 @@ export default function AddBlog() {
                     <><Loader2 size={18} className={spinCls} /> Menyimpan...</>
                   ) : (
                     <>
-                      {form.status === "rejected"
-                        ? "Simpan Revisi & Ajukan Ulang"
-                        : (isAdmin ? "Terbitkan Langsung" : `Lanjut ke Pembayaran (Rp ${currentFee.toLocaleString("id-ID")})`)}
-                      <ChevronRight size={18} />
+                      {isEditing ? (
+                        form.status === "needs_revision"
+                          ? "Simpan Perbaikan & Ajukan Ulang"
+                          : form.status === "rejected"
+                          ? "Simpan Revisi & Ajukan Ulang"
+                          : "Simpan & Ajukan Verifikasi Ulang"
+                      ) : isAdmin ? (
+                        "Terbitkan Langsung"
+                      ) : (
+                        `Lanjut ke Pembayaran (Rp ${currentFee.toLocaleString("id-ID")})`
+                      )}
+                      {isEditing ? <Check size={18} /> : <ChevronRight size={18} />}
                     </>
                   )}
                 </button>
@@ -1087,7 +1353,7 @@ export default function AddBlog() {
               <FileText size={28} className="text-[#007570] shrink-0 mt-1" />
               <div>
                 <h2 className="text-[1.35rem] font-bold text-[#0f172a] mb-1">Ringkasan Pesanan</h2>
-                <p className="text-[0.9rem] text-[#64748b]">Periksa rincian publikasi {contentType === "event" ? "Event" : "Blog"} dan gunakan kode promo jika ada.</p>
+                <p className="text-[0.9rem] text-[#64748b]">Periksa rincian publikasi {contentType === "event" ? "Event" : "Info"} dan gunakan kode promo jika ada.</p>
               </div>
             </div>
 
@@ -1099,7 +1365,7 @@ export default function AddBlog() {
               </div>
               <div className="flex justify-between items-center text-sm pb-3 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Tipe Konten</span>
-                <span className="font-bold text-[#007570] uppercase">{contentType === "event" ? "Event / Agenda" : "Blog / Artikel"}</span>
+                <span className="font-bold text-[#007570] uppercase">{contentType === "event" ? "Event / Agenda" : "Info / Publikasi"}</span>
               </div>
               <div className="flex justify-between items-center text-sm pb-3 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Masa Aktif Publikasi</span>
@@ -1112,6 +1378,16 @@ export default function AddBlog() {
                 </span>
               </div>
             </div>
+
+            {/* ── Kode Referral (Opsional) ── */}
+            <DiscountCodeInput
+              type="referral"
+              amount={currentFee}
+              appliedCode={appliedReferral}
+              onApplied={(data) => setAppliedReferral(data)}
+              onRemoved={() => setAppliedReferral(null)}
+              className="mb-4"
+            />
 
             {/* ── Kode Kupon / Diskon (Opsional) ── */}
             <div className="border border-slate-200 rounded-2xl p-5 bg-white mb-4">
@@ -1166,33 +1442,6 @@ export default function AddBlog() {
                       <CheckCircle2 size={13} /> {couponSuccessMsg}
                     </p>
                   )}
-
-                  {/* Recommendations */}
-                  {publicCoupons.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-slate-100">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                        🔥 Rekomendasi Kode Kupon Diskon Aktif (Klik untuk gunakan):
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        {publicCoupons.map((c) => (
-                          <button
-                            key={c.code}
-                            type="button"
-                            onClick={() => handleApplyCoupon(c.code)}
-                            className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-[#007570] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                          >
-                            <Tag size={13} className="text-[#007570]" />
-                            <span>{c.code}</span>
-                            <span className="text-[10px] font-normal text-teal-900 bg-teal-200/70 px-1.5 py-0.5 rounded-md">
-                              {c.discount_type === "percentage"
-                                ? `Diskon ${c.discount_value}%`
-                                : `Potongan Rp ${Number(c.discount_value).toLocaleString("id-ID")}`}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1200,15 +1449,16 @@ export default function AddBlog() {
             {/* Total Pembayaran Calculation */}
             {(() => {
               const basePrice = currentFee;
-              const couponDiscount = appliedCoupon ? Number(appliedCoupon.discount_amount || 0) : 0;
-              const totalDiscount = couponDiscount;
-              const finalCalculatedPrice = Math.max(0, basePrice - totalDiscount);
+              const cDiscount = appliedCoupon ? Number(appliedCoupon.discount_amount || 0) : 0;
+              const rDiscount = appliedReferral ? Number(appliedReferral.discount_amount || 0) : 0;
+              const totDiscount = cDiscount + rDiscount;
+              const finalPrice = Math.max(0, basePrice - totDiscount);
 
               return (
                 <div className="bg-[#f0fffe] border border-[#007570]/30 rounded-2xl p-5 flex items-center justify-between mb-8 mt-6">
                   <div>
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Tagihan Publikasi</span>
-                    {totalDiscount > 0 && (
+                    {totDiscount > 0 && (
                       <span className="text-xs text-slate-400 line-through">
                         Rp {basePrice.toLocaleString("id-ID")}
                       </span>
@@ -1216,17 +1466,112 @@ export default function AddBlog() {
                   </div>
                   <div className="text-right">
                     <span className="text-2xl font-black text-[#007570]">
-                      Rp {finalCalculatedPrice.toLocaleString("id-ID")}
+                      Rp {finalPrice.toLocaleString("id-ID")}
                     </span>
-                    {totalDiscount > 0 && (
+                    {totDiscount > 0 && (
                       <span className="text-[11px] font-bold text-emerald-600 block">
-                        Hemat Rp {totalDiscount.toLocaleString("id-ID")}
+                        Hemat Rp {totDiscount.toLocaleString("id-ID")}
                       </span>
                     )}
                   </div>
                 </div>
               );
             })()}
+
+            {/* ── BAYAR INSTAN DENGAN POIN BANNER (STEP 2) ── */}
+            {(() => {
+              const basePrice = currentFee;
+              const cDiscount = appliedCoupon ? Number(appliedCoupon.discount_amount || 0) : 0;
+              const rDiscount = appliedReferral ? Number(appliedReferral.discount_amount || 0) : 0;
+              const finalPrice = Math.max(0, basePrice - (cDiscount + rDiscount));
+
+              const basePoin = Math.max(1, Math.round(Number(basePrice || 10000) / 1000));
+              const poinCost = Math.max(0, Math.round(Number(finalPrice) / 1000));
+              const discountPoin = Math.max(0, basePoin - poinCost);
+              const isInsufficient = poinBalance !== null && poinBalance < poinCost;
+
+              return (
+                <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-teal-500/15 border-2 border-amber-400 shadow-sm space-y-3 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <SuradeCoinIcon size={28} />
+                      <div>
+                        <span className="text-sm font-black text-slate-900 uppercase tracking-wide block">
+                          Bayar Instan dengan Poin
+                        </span>
+                        <span className="text-[11px] text-slate-600">Terbit langsung tanpa tunggu verifikasi admin &amp; tanpa upload bukti</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {discountPoin > 0 && (
+                        <>
+                          <span className="text-xs text-slate-400 line-through font-semibold">
+                            {basePoin} Poin
+                          </span>
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                            Hemat {discountPoin} Poin
+                          </span>
+                        </>
+                      )}
+                      <span className="text-xs font-black px-3 py-1 rounded-full bg-amber-400 text-slate-950 shadow-2xs">
+                        {poinCost} Poin (Rp {Number(finalCalculatedPrice).toLocaleString("id-ID")})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-200/60">
+                    <span className="text-slate-600 font-medium">Saldo Poin Anda:</span>
+                    <span className="font-extrabold text-amber-800 text-sm">
+                      {poinBalance !== null ? `${poinBalance.toLocaleString("id-ID")} Poin` : "Memuat..."}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={handlePayWithPoin}
+                      disabled={payingWithPoin || isInsufficient}
+                      className={`flex-1 py-3 rounded-xl ${
+                        isInsufficient
+                          ? "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300"
+                          : "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-slate-950 font-black shadow-md cursor-pointer border border-amber-300"
+                      } text-xs flex items-center justify-center gap-2 transition-all`}
+                    >
+                      {payingWithPoin ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          <span>Memproses Pembayaran Poin...</span>
+                        </>
+                      ) : isInsufficient ? (
+                        <span>Saldo Poin Kurang (Butuh {poinCost} Poin)</span>
+                      ) : (
+                        <>
+                          <Zap size={15} className="text-amber-950 fill-amber-950" />
+                          <span>Terbitkan Instan Sekarang ({poinCost} Poin)</span>
+                        </>
+                      )}
+                    </button>
+
+                    {isInsufficient && (
+                      <button
+                        type="button"
+                        onClick={() => setShowBuyPoinModal(true)}
+                        className="px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm cursor-pointer transition-all border-0 flex items-center gap-1.5 shrink-0"
+                      >
+                        <Plus size={14} />
+                        <span>Top Up Poin</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-slate-200"></div>
+              <span className="flex-shrink mx-4 text-xs font-bold text-slate-400 uppercase">Atau Lanjut Pembayaran Transfer</span>
+              <div className="flex-grow border-t border-slate-200"></div>
+            </div>
 
             {/* Navigation Buttons (Step 2) */}
             <div className="flex items-center gap-3">
@@ -1245,7 +1590,7 @@ export default function AddBlog() {
                 onClick={() => { setStep(3); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                 className="inline-flex items-center gap-2 px-8 py-3.5 rounded-[14px] text-[0.95rem] font-bold cursor-pointer border-0 transition-all duration-[0.25s] bg-gradient-to-br from-[#007570] to-[#009990] text-white shadow-[0_4px_16px_rgba(0,117,112,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,117,112,0.4)]"
               >
-                <span>Pilih Metode Pembayaran</span>
+                <span>Pilih Metode Transfer / QRIS</span>
                 <ChevronRight size={18} />
               </button>
             </div>
@@ -1261,6 +1606,43 @@ export default function AddBlog() {
                 <h2 className="text-[1.35rem] font-bold text-[#0f172a] mb-1">Pilihan Metode Pembayaran</h2>
                 <p className="text-[0.9rem] text-[#64748b]">Pilih saluran transfer Bank atau E-Wallet yang kamu inginkan.</p>
               </div>
+            </div>
+
+            {/* Opsi Bayar dengan Poin di Step 3 */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-teal-500/15 border-2 border-amber-400/80 shadow-xs mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <SuradeCoinIcon size={26} />
+                <div>
+                  <div className="text-xs font-black text-slate-900 flex items-center gap-2 flex-wrap">
+                    <span>Gunakan Poin ({requiredPoin.toLocaleString("id-ID")} Poin)</span>
+                    {discountPoin > 0 && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                        Hemat {discountPoin.toLocaleString("id-ID")} Poin
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-600 mt-0.5">
+                    Saldo Anda: <strong>{poinBalance !== null ? `${poinBalance.toLocaleString("id-ID")} Poin` : "..."}</strong> · Langsung terbit tanpa upload bukti
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handlePayWithPoin}
+                disabled={payingWithPoin || (poinBalance !== null && poinBalance < requiredPoin)}
+                className={`w-full sm:w-auto px-5 py-2.5 rounded-xl ${
+                  poinBalance !== null && poinBalance < requiredPoin
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black cursor-pointer shadow-sm"
+                } text-xs flex items-center justify-center gap-1.5 transition-all`}
+              >
+                <Zap size={14} className="fill-current" />
+                <span>
+                  {payingWithPoin
+                    ? "Memproses..."
+                    : `Bayar ${requiredPoin.toLocaleString("id-ID")} Poin`}
+                </span>
+              </button>
             </div>
 
             {/* Dynamic Payment Method Selector (Synchronized with Kelola Pembayaran) */}
@@ -1406,7 +1788,7 @@ export default function AddBlog() {
                   <input ref={proofInputRef} type="file" accept="image/*,application/pdf" hidden onChange={handleProofChange} />
                   <Upload size={40} className="mx-auto text-slate-400 mb-3" />
                   <p className="text-base font-semibold text-slate-800 mb-1">Klik atau drag &amp; drop bukti transfer</p>
-                  <p className="text-xs text-slate-400">Format JPG, PNG, WEBP, PDF max 10MB</p>
+                  <p className="text-xs text-slate-400">Format JPG, PNG, WEBP, PDF max 5MB</p>
                 </div>
               )}
 
@@ -1447,6 +1829,17 @@ export default function AddBlog() {
         })()}
 
       </div>
+
+      {/* Modal Beli / Top-Up Poin */}
+      <BuyCoinModal
+        isOpen={showBuyPoinModal}
+        onClose={() => setShowBuyPoinModal(false)}
+        onSuccess={() => {
+          setShowBuyPoinModal(false);
+          fetchPoinBalance();
+        }}
+        currentBalance={poinBalance || 0}
+      />
     </div>
   );
 }

@@ -1,0 +1,1970 @@
+[
+  {
+    "category_id": 244,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 244,
+    "sub_name": "Asisten Rumah Tangga",
+    "sub_slug": "jasa-asisten-rumah-tangga"
+  },
+  {
+    "category_id": 528,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 528,
+    "sub_name": "Bantuan Hukum",
+    "sub_slug": "jasa-bantuan-hukum"
+  },
+  {
+    "category_id": 264,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 264,
+    "sub_name": "Basmi Rayap & Hama",
+    "sub_slug": "jasa-basmi-rayap-pest-control"
+  },
+  {
+    "category_id": 34,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 34,
+    "sub_name": "Bengkel Bubut",
+    "sub_slug": "bengkel-bubut"
+  },
+  {
+    "category_id": 33,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 33,
+    "sub_name": "Bengkel Las",
+    "sub_slug": "bengkel-las"
+  },
+  {
+    "category_id": 263,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 263,
+    "sub_name": "Cuci Kasur & Sofa",
+    "sub_slug": "jasa-cuci-kasur-sofa-hydro-vacuum"
+  },
+  {
+    "category_id": 457,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 457,
+    "sub_name": "Duplikat Kunci",
+    "sub_slug": "jasa-tukang-duplikat-kunci-brankas"
+  },
+  {
+    "category_id": 529,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 529,
+    "sub_name": "Jasa Angkut Barang",
+    "sub_slug": "jasa-jasa-angkut-barang"
+  },
+  {
+    "category_id": 260,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 260,
+    "sub_name": "Kuras Toren Air",
+    "sub_slug": "jasa-gali-sumur-kuras-toren-air"
+  },
+  {
+    "category_id": 506,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 506,
+    "sub_name": "Laundry Kiloan",
+    "sub_slug": "jasa-laundry"
+  },
+  {
+    "category_id": 255,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 255,
+    "sub_name": "Notaris & PPAT",
+    "sub_slug": "jasa-notaris-ppat"
+  },
+  {
+    "category_id": 262,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 262,
+    "sub_name": "Pengasuh Anak",
+    "sub_slug": "jasa-pengasuh-anak-babysitter-nanny"
+  },
+  {
+    "category_id": 254,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 254,
+    "sub_name": "Pengasuh Lansia",
+    "sub_slug": "jasa-pengasuh-orang-tua-caregiver-lansia"
+  },
+  {
+    "category_id": 257,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 257,
+    "sub_name": "Pengurusan Izin Usaha",
+    "sub_slug": "jasa-pengurusan-izin-usaha-legalitas"
+  },
+  {
+    "category_id": 250,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 250,
+    "sub_name": "Perbaikan Rumah Bocor",
+    "sub_slug": "jasa-perbaikan-rumah-bocor-waterproofing"
+  },
+  {
+    "category_id": 247,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 247,
+    "sub_name": "Pindahan Rumah",
+    "sub_slug": "jasa-pindahan-rumah"
+  },
+  {
+    "category_id": 261,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 261,
+    "sub_name": "Plafon Gypsum & PVC",
+    "sub_slug": "jasa-pasang-plafon-gypsum-partisi"
+  },
+  {
+    "category_id": 266,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 266,
+    "sub_name": "Poles Lantai",
+    "sub_slug": "jasa-poles-lantai-marmer"
+  },
+  {
+    "category_id": 248,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 248,
+    "sub_name": "Potong Rumput",
+    "sub_slug": "jasa-potong-rumput-bersih-halaman"
+  },
+  {
+    "category_id": 38,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 38,
+    "sub_name": "Salon & Barbershop",
+    "sub_slug": "salon-barbershop"
+  },
+  {
+    "category_id": 252,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 252,
+    "sub_name": "Satpam & Security",
+    "sub_slug": "jasa-satpam-security-penjagaan"
+  },
+  {
+    "category_id": 245,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 245,
+    "sub_name": "Sedot WC",
+    "sub_slug": "jasa-sedot-wc"
+  },
+  {
+    "category_id": 100,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 100,
+    "sub_name": "Service AC",
+    "sub_slug": "jasa-service-ac"
+  },
+  {
+    "category_id": 258,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 258,
+    "sub_name": "Sewa Kamera & Drone",
+    "sub_slug": "jasa-sewa-hp-kamera-drone"
+  },
+  {
+    "category_id": 249,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 249,
+    "sub_name": "Sumur Bor",
+    "sub_slug": "jasa-sumur-bor-geolistrik"
+  },
+  {
+    "category_id": 454,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 454,
+    "sub_name": "Tebang Pohon",
+    "sub_slug": "jasa-tebang-pohon-pangkas-dahan"
+  },
+  {
+    "category_id": 36,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 36,
+    "sub_name": "Tukang Bangunan",
+    "sub_slug": "tukang-bangunan"
+  },
+  {
+    "category_id": 35,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 35,
+    "sub_name": "Tukang Kayu",
+    "sub_slug": "tukang-kayu"
+  },
+  {
+    "category_id": 501,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 501,
+    "sub_name": "Tukang Las",
+    "sub_slug": "jasa-bengkel-las"
+  },
+  {
+    "category_id": 99,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 99,
+    "sub_name": "Tukang Ledeng",
+    "sub_slug": "jasa-tukang-ledeng"
+  },
+  {
+    "category_id": 98,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 98,
+    "sub_name": "Tukang Listrik",
+    "sub_slug": "jasa-tukang-listrik"
+  },
+  {
+    "category_id": 108,
+    "category_name": "Jasa",
+    "category_slug": "jasa",
+    "sub_id": 108,
+    "sub_name": "Wedding Organizer",
+    "sub_slug": "jasa-wedding-organizer"
+  },
+  {
+    "category_id": 269,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 269,
+    "sub_name": "Servis AC",
+    "sub_slug": "servis-ac-cuci-pasang-freon"
+  },
+  {
+    "category_id": 276,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 276,
+    "sub_name": "Servis Dinamo Mesin",
+    "sub_slug": "servis-dinamo-genset"
+  },
+  {
+    "category_id": 534,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 534,
+    "sub_name": "Servis Dispenser & Magic Com",
+    "sub_slug": "servis-servis-dispenser-magic-com"
+  },
+  {
+    "category_id": 460,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 460,
+    "sub_name": "Servis Genset",
+    "sub_slug": "servis-genset-mesin-penggerak"
+  },
+  {
+    "category_id": 465,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 465,
+    "sub_name": "Servis Kipas Angin",
+    "sub_slug": "servis-kipas-angin-exhaust-blower"
+  },
+  {
+    "category_id": 273,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 273,
+    "sub_name": "Servis Kompor Gas",
+    "sub_slug": "servis-kompor-gas-water-heater"
+  },
+  {
+    "category_id": 531,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 531,
+    "sub_name": "Servis Kulkas",
+    "sub_slug": "servis-servis-kulkas"
+  },
+  {
+    "category_id": 532,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 532,
+    "sub_name": "Servis Listrik & MCB",
+    "sub_slug": "servis-servis-listrik-mcb"
+  },
+  {
+    "category_id": 459,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 459,
+    "sub_name": "Servis Mesin Cuci",
+    "sub_slug": "servis-mesin-cuci-otomatis-manual"
+  },
+  {
+    "category_id": 462,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 462,
+    "sub_name": "Servis Mesin Rumput",
+    "sub_slug": "servis-mesin-potong-rumput-chainsaw"
+  },
+  {
+    "category_id": 463,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 463,
+    "sub_name": "Servis Mesin Steam",
+    "sub_slug": "servis-mesin-cuci-steam-jet-cleaner"
+  },
+  {
+    "category_id": 464,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 464,
+    "sub_name": "Servis Microwave & Oven",
+    "sub_slug": "servis-microwave-oven-air-fryer"
+  },
+  {
+    "category_id": 272,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 272,
+    "sub_name": "Servis Pompa Air",
+    "sub_slug": "servis-pompa-air-sumur"
+  },
+  {
+    "category_id": 535,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 535,
+    "sub_name": "Servis Sound System",
+    "sub_slug": "servis-servis-sound-system"
+  },
+  {
+    "category_id": 533,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 533,
+    "sub_name": "Servis TV & Elektronik",
+    "sub_slug": "servis-servis-tv-elektronik"
+  },
+  {
+    "category_id": 530,
+    "category_name": "Servis",
+    "category_slug": "servis",
+    "sub_id": 530,
+    "sub_name": "Tambal Ban 24 Jam",
+    "sub_slug": "servis-tambal-ban-24-jam"
+  },
+  {
+    "category_id": 542,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 542,
+    "sub_name": "Aki & Kelistrikan Mobil",
+    "sub_slug": "otomotif-aki-kelistrikan-mobil"
+  },
+  {
+    "category_id": 174,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 174,
+    "sub_name": "Audio Mobil",
+    "sub_slug": "otomotif-audio-mobil"
+  },
+  {
+    "category_id": 50,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 50,
+    "sub_name": "Bengkel Mobil",
+    "sub_slug": "bengkel-mobil"
+  },
+  {
+    "category_id": 49,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 49,
+    "sub_name": "Bengkel Motor",
+    "sub_slug": "bengkel-motor"
+  },
+  {
+    "category_id": 537,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 537,
+    "sub_name": "Cat Oven & Body Repair",
+    "sub_slug": "otomotif-cat-oven-body-repair"
+  },
+  {
+    "category_id": 292,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 292,
+    "sub_name": "Cuci Helm & Sepatu",
+    "sub_slug": "otomotif-cuci-helm-sepatu-bikers"
+  },
+  {
+    "category_id": 232,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 232,
+    "sub_name": "Cuci Motor",
+    "sub_slug": "otomotif-cuci-motor"
+  },
+  {
+    "category_id": 539,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 539,
+    "sub_name": "Cuci Motor & Mobil",
+    "sub_slug": "otomotif-cuci-motor-mobil"
+  },
+  {
+    "category_id": 536,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 536,
+    "sub_name": "Jahit Cover Jok",
+    "sub_slug": "otomotif-jahit-cover-jok"
+  },
+  {
+    "category_id": 543,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 543,
+    "sub_name": "Knalpot Motor & Mobil",
+    "sub_slug": "otomotif-knalpot-motor-mobil"
+  },
+  {
+    "category_id": 538,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 538,
+    "sub_name": "Poles & Auto Detailing",
+    "sub_slug": "otomotif-poles-auto-detailing"
+  },
+  {
+    "category_id": 540,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 540,
+    "sub_name": "Rental Mobil",
+    "sub_slug": "otomotif-rental-mobil"
+  },
+  {
+    "category_id": 541,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 541,
+    "sub_name": "Rental Truk & Pick Up",
+    "sub_slug": "otomotif-rental-truk-pick-up"
+  },
+  {
+    "category_id": 471,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 471,
+    "sub_name": "Restorasi Motor Lawas",
+    "sub_slug": "otomotif-speedometer-restorasi-motor-lawas"
+  },
+  {
+    "category_id": 298,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 298,
+    "sub_name": "Servis Radiator",
+    "sub_slug": "otomotif-servis-radiator-knalpot"
+  },
+  {
+    "category_id": 295,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 295,
+    "sub_name": "Sewa Motor",
+    "sub_slug": "otomotif-sewa-motor-rental-motor"
+  },
+  {
+    "category_id": 544,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 544,
+    "sub_name": "Shockbreaker & Kaki Kaki",
+    "sub_slug": "otomotif-shockbreaker-kaki-kaki"
+  },
+  {
+    "category_id": 299,
+    "category_name": "Otomotif",
+    "category_slug": "otomotif",
+    "sub_id": 299,
+    "sub_name": "Toko Ban & Velg",
+    "sub_slug": "otomotif-toko-ban-velg-spooring"
+  },
+  {
+    "category_id": 513,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 513,
+    "sub_name": "Apotek",
+    "sub_slug": "kesehatan-apotek"
+  },
+  {
+    "category_id": 310,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 310,
+    "sub_name": "Apotek 24 Jam",
+    "sub_slug": "kesehatan-apotek-toko-obat"
+  },
+  {
+    "category_id": 546,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 546,
+    "sub_name": "Bidan & Persalinan",
+    "sub_slug": "kesehatan-bidan-persalinan"
+  },
+  {
+    "category_id": 547,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 547,
+    "sub_name": "Dokter & Mantri Khitan",
+    "sub_slug": "kesehatan-dokter-mantri-khitan"
+  },
+  {
+    "category_id": 153,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 153,
+    "sub_name": "Fisioterapi",
+    "sub_slug": "kesehatan-fisioterapi"
+  },
+  {
+    "category_id": 306,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 306,
+    "sub_name": "Jamu Tradisional",
+    "sub_slug": "kesehatan-jamu-tradisional-jamu-gendong"
+  },
+  {
+    "category_id": 550,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 550,
+    "sub_name": "Klinik Kesehatan",
+    "sub_slug": "kesehatan-klinik-kesehatan"
+  },
+  {
+    "category_id": 474,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 474,
+    "sub_name": "Laboratorium Darah",
+    "sub_slug": "kesehatan-laboratorium-darah-cek-gula"
+  },
+  {
+    "category_id": 473,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 473,
+    "sub_name": "Pengobatan Patah Tulang",
+    "sub_slug": "kesehatan-patah-tulang-sangkal-putung"
+  },
+  {
+    "category_id": 549,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 549,
+    "sub_name": "Perawat Home Care",
+    "sub_slug": "kesehatan-perawat-home-care"
+  },
+  {
+    "category_id": 312,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 312,
+    "sub_name": "Pijat Refleksi",
+    "sub_slug": "kesehatan-refleksi-totok-syaraf"
+  },
+  {
+    "category_id": 304,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 304,
+    "sub_name": "Pijat Urut Tradisional",
+    "sub_slug": "kesehatan-terapi-pijat-tradisional-urut"
+  },
+  {
+    "category_id": 472,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 472,
+    "sub_name": "Praktek Dokter Gigi",
+    "sub_slug": "kesehatan-dokter-gigi-tambal-behel"
+  },
+  {
+    "category_id": 545,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 545,
+    "sub_name": "Praktek Dokter Spesialis",
+    "sub_slug": "kesehatan-praktek-dokter-spesialis"
+  },
+  {
+    "category_id": 301,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 301,
+    "sub_name": "Praktek Dokter Umum",
+    "sub_slug": "kesehatan-praktek-dokter-umum-spesialis"
+  },
+  {
+    "category_id": 17,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 17,
+    "sub_name": "Puskesmas",
+    "sub_slug": "puskesmas"
+  },
+  {
+    "category_id": 144,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 144,
+    "sub_name": "Rumah Sakit",
+    "sub_slug": "kesehatan-rumah-sakit"
+  },
+  {
+    "category_id": 548,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 548,
+    "sub_name": "Terapi Bekam & Ruqyah",
+    "sub_slug": "kesehatan-terapi-bekam-ruqyah"
+  },
+  {
+    "category_id": 305,
+    "category_name": "Kesehatan",
+    "category_slug": "kesehatan",
+    "sub_id": 305,
+    "sub_name": "Toko Obat Herbal",
+    "sub_slug": "kesehatan-obat-herbal-thibbun-nabawi"
+  },
+  {
+    "category_id": 555,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 555,
+    "sub_name": "Aspal Hotmix Jalan",
+    "sub_slug": "properti-aspal-hotmix-jalan"
+  },
+  {
+    "category_id": 325,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 325,
+    "sub_name": "Homestay & Cottage",
+    "sub_slug": "properti-homestay-penginapan-lokal"
+  },
+  {
+    "category_id": 319,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 319,
+    "sub_name": "Interior & Kitchen Set",
+    "sub_slug": "properti-desain-pembuatan-interior"
+  },
+  {
+    "category_id": 332,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 332,
+    "sub_name": "Kanopi Baja Ringan",
+    "sub_slug": "properti-pembuatan-kanopi-baja-ringan-awning"
+  },
+  {
+    "category_id": 330,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 330,
+    "sub_name": "Kolam Koi & Air Mancur",
+    "sub_slug": "properti-pembuatan-kolam-ikan-koi-minimalis"
+  },
+  {
+    "category_id": 313,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 313,
+    "sub_name": "Kontrakan Rumah",
+    "sub_slug": "properti-kontrakan-rumah"
+  },
+  {
+    "category_id": 314,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 314,
+    "sub_name": "Kost Karyawan & Mahasiswa",
+    "sub_slug": "properti-kost-kostan"
+  },
+  {
+    "category_id": 320,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 320,
+    "sub_name": "Kusen Kayu & Aluminium",
+    "sub_slug": "properti-pembuatan-kusen-kayu-aluminium"
+  },
+  {
+    "category_id": 552,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 552,
+    "sub_name": "Mebel & Kursi Kayu",
+    "sub_slug": "properti-mebel-kursi-kayu"
+  },
+  {
+    "category_id": 322,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 322,
+    "sub_name": "Pagar Besi & Tralis",
+    "sub_slug": "properti-pembuatan-pagar-tralis-railing"
+  },
+  {
+    "category_id": 331,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 331,
+    "sub_name": "Pembuatan Kolam Renang",
+    "sub_slug": "properti-pembuatan-perawatan-kolam-renang"
+  },
+  {
+    "category_id": 560,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 560,
+    "sub_name": "Rolling Door & Folding Gate",
+    "sub_slug": "properti-rolling-door-folding-gate"
+  },
+  {
+    "category_id": 558,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 558,
+    "sub_name": "Ruko & Kios Dijual",
+    "sub_slug": "properti-ruko-kios-dijual"
+  },
+  {
+    "category_id": 338,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 338,
+    "sub_name": "Rumah Dijual",
+    "sub_slug": "properti-rumah-dijual"
+  },
+  {
+    "category_id": 556,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 556,
+    "sub_name": "Saluran Air & Gorong Gorong",
+    "sub_slug": "properti-saluran-air-gorong-gorong"
+  },
+  {
+    "category_id": 317,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 317,
+    "sub_name": "Sewa Kantor & Coworking",
+    "sub_slug": "properti-sewa-kantor-virtual-office"
+  },
+  {
+    "category_id": 551,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 551,
+    "sub_name": "Sewa Ruang Pertemuan",
+    "sub_slug": "properti-sewa-ruang-pertemuan"
+  },
+  {
+    "category_id": 316,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 316,
+    "sub_name": "Sewa Ruko & Kios",
+    "sub_slug": "properti-sewa-ruko-kios"
+  },
+  {
+    "category_id": 557,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 557,
+    "sub_name": "Tanah Kavling Dijual",
+    "sub_slug": "properti-tanah-kavling-dijual"
+  },
+  {
+    "category_id": 515,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 515,
+    "sub_name": "Toko Bangunan",
+    "sub_slug": "properti-toko-bangunan"
+  },
+  {
+    "category_id": 235,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 235,
+    "sub_name": "Toko Cat Bangunan",
+    "sub_slug": "properti-toko-cat"
+  },
+  {
+    "category_id": 553,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 553,
+    "sub_name": "Toko Kasur & Mebel",
+    "sub_slug": "properti-toko-kasur-mebel"
+  },
+  {
+    "category_id": 236,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 236,
+    "sub_name": "Toko Keramik & Granit",
+    "sub_slug": "properti-toko-keramik"
+  },
+  {
+    "category_id": 334,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 334,
+    "sub_name": "Toko Material Bangunan",
+    "sub_slug": "properti-toko-bangunan-material-konstruksi"
+  },
+  {
+    "category_id": 328,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 328,
+    "sub_name": "Tukang Taman & Rumput",
+    "sub_slug": "properti-pembuatan-taman-lanskap-rumah"
+  },
+  {
+    "category_id": 554,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 554,
+    "sub_name": "Villa & Penginapan",
+    "sub_slug": "properti-villa-penginapan"
+  },
+  {
+    "category_id": 559,
+    "category_name": "Properti",
+    "category_slug": "properti",
+    "sub_id": 559,
+    "sub_name": "Wallpaper & Vinyl Lantai",
+    "sub_slug": "properti-wallpaper-vinyl-lantai"
+  },
+  {
+    "category_id": 352,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 352,
+    "sub_name": "Alat Musik Tradisional",
+    "sub_slug": "musik-alat-musik-tradisional"
+  },
+  {
+    "category_id": 568,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 568,
+    "sub_name": "Aransemen & Jingle Musik",
+    "sub_slug": "musik-aransemen-jingle-musik"
+  },
+  {
+    "category_id": 563,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 563,
+    "sub_name": "Grup Band Wedding",
+    "sub_slug": "musik-grup-band-wedding"
+  },
+  {
+    "category_id": 561,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 561,
+    "sub_name": "Guru Les Musik",
+    "sub_slug": "musik-guru-les-musik"
+  },
+  {
+    "category_id": 355,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 355,
+    "sub_name": "MC Acara & Pernikahan",
+    "sub_slug": "musik-mc-master-of-ceremony-acara"
+  },
+  {
+    "category_id": 347,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 347,
+    "sub_name": "Organ Tunggal",
+    "sub_slug": "musik-organ-tunggal-solo-organ"
+  },
+  {
+    "category_id": 349,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 349,
+    "sub_name": "Penyanyi & Vokalis",
+    "sub_slug": "musik-penyanyi-biduan-acara-resepsi"
+  },
+  {
+    "category_id": 565,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 565,
+    "sub_name": "Rebana Hadroh & Marawis",
+    "sub_slug": "musik-rebana-hadroh-marawis"
+  },
+  {
+    "category_id": 562,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 562,
+    "sub_name": "Rental Alat Musik Band",
+    "sub_slug": "musik-rental-alat-musik-band"
+  },
+  {
+    "category_id": 346,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 346,
+    "sub_name": "Rental Sound System",
+    "sub_slug": "musik-rental-sound-system-lighting"
+  },
+  {
+    "category_id": 566,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 566,
+    "sub_name": "Sanggar Seni & Tari Sunda",
+    "sub_slug": "musik-sanggar-seni-tari-sunda"
+  },
+  {
+    "category_id": 344,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 344,
+    "sub_name": "Servis Alat Musik",
+    "sub_slug": "musik-servis-alat-musik"
+  },
+  {
+    "category_id": 564,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 564,
+    "sub_name": "Servis Speaker Aktif",
+    "sub_slug": "musik-servis-speaker-aktif"
+  },
+  {
+    "category_id": 567,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 567,
+    "sub_name": "Sewa Kostum Adat & Kebaya",
+    "sub_slug": "musik-sewa-kostum-adat-kebaya"
+  },
+  {
+    "category_id": 348,
+    "category_name": "Musik & Seni",
+    "category_slug": "musik",
+    "sub_id": 348,
+    "sub_name": "Studio Musik & Recording",
+    "sub_slug": "musik-studio-musik-rekaman-recording"
+  },
+  {
+    "category_id": 573,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 573,
+    "sub_name": "Instruktur Senam & Fitness",
+    "sub_slug": "olahraga-instruktur-senam-fitness"
+  },
+  {
+    "category_id": 571,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 571,
+    "sub_name": "Konveksi Jersey Tim",
+    "sub_slug": "olahraga-konveksi-jersey-tim"
+  },
+  {
+    "category_id": 572,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 572,
+    "sub_name": "Kursus Renang",
+    "sub_slug": "olahraga-kursus-renang"
+  },
+  {
+    "category_id": 570,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 570,
+    "sub_name": "Pelatih Bela Diri",
+    "sub_slug": "olahraga-pelatih-bela-diri"
+  },
+  {
+    "category_id": 479,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 479,
+    "sub_name": "Pemandu Gowes & Trail",
+    "sub_slug": "olahraga-pemandu-gowes-trekking-trail"
+  },
+  {
+    "category_id": 569,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 569,
+    "sub_name": "Sekolah Sepak Bola",
+    "sub_slug": "olahraga-sekolah-sepak-bola"
+  },
+  {
+    "category_id": 366,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 366,
+    "sub_name": "Servis Sepeda",
+    "sub_slug": "olahraga-bengkel-servis-sepeda"
+  },
+  {
+    "category_id": 574,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 574,
+    "sub_name": "Sewa Alat Camping",
+    "sub_slug": "olahraga-sewa-alat-camping"
+  },
+  {
+    "category_id": 360,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 360,
+    "sub_name": "Sewa Alat Olahraga",
+    "sub_slug": "olahraga-sewa-alat-olahraga"
+  },
+  {
+    "category_id": 477,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 477,
+    "sub_name": "Sewa Lapangan Badminton",
+    "sub_slug": "olahraga-sewa-lapangan-badminton-tenis"
+  },
+  {
+    "category_id": 358,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 358,
+    "sub_name": "Sewa Lapangan Futsal",
+    "sub_slug": "olahraga-sewa-lapangan-futsal-badminton"
+  },
+  {
+    "category_id": 367,
+    "category_name": "Olahraga",
+    "category_slug": "olahraga",
+    "sub_id": 367,
+    "sub_name": "Toko Alat Pancing",
+    "sub_slug": "olahraga-toko-alat-pancing-umpan"
+  },
+  {
+    "category_id": 575,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 575,
+    "sub_name": "Pasang CCTV",
+    "sub_slug": "elektronik-pasang-cctv"
+  },
+  {
+    "category_id": 377,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 377,
+    "sub_name": "Pasang WiFi & Jaringan",
+    "sub_slug": "elektronik-jasa-pasang-wifi-jaringan"
+  },
+  {
+    "category_id": 480,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 480,
+    "sub_name": "Recovery Data Harddisk",
+    "sub_slug": "elektronik-recovery-data-harddisk-flashdisk"
+  },
+  {
+    "category_id": 481,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 481,
+    "sub_name": "Running Text LED Display",
+    "sub_slug": "elektronik-running-text-led-jam-masjid"
+  },
+  {
+    "category_id": 373,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 373,
+    "sub_name": "Servis HP Android & iPhone",
+    "sub_slug": "elektronik-servis-hp-ganti-lcd"
+  },
+  {
+    "category_id": 577,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 577,
+    "sub_name": "Servis Kamera & Lensa",
+    "sub_slug": "elektronik-servis-kamera-lensa"
+  },
+  {
+    "category_id": 576,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 576,
+    "sub_name": "Servis Laptop & Komputer",
+    "sub_slug": "elektronik-servis-laptop-komputer"
+  },
+  {
+    "category_id": 371,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 371,
+    "sub_name": "Servis Printer",
+    "sub_slug": "elektronik-servis-printer-infus-tinta"
+  },
+  {
+    "category_id": 376,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 376,
+    "sub_name": "Toko Elektronik Rumah Tangga",
+    "sub_slug": "elektronik-toko-elektronik-rumah-tangga"
+  },
+  {
+    "category_id": 375,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 375,
+    "sub_name": "Toko HP & Aksesoris",
+    "sub_slug": "elektronik-toko-hp-aksesoris-gadget"
+  },
+  {
+    "category_id": 578,
+    "category_name": "Elektronik",
+    "category_slug": "elektronik",
+    "sub_id": 578,
+    "sub_name": "Toko Laptop & Komputer",
+    "sub_slug": "elektronik-toko-laptop-komputer"
+  },
+  {
+    "category_id": 383,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 383,
+    "sub_name": "Barbershop Pria",
+    "sub_slug": "fashion-barbershop-pangkas-rambut-pria"
+  },
+  {
+    "category_id": 583,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 583,
+    "sub_name": "Bordir & Sablon Kaos",
+    "sub_slug": "fashion-bordir-sablon-kaos"
+  },
+  {
+    "category_id": 483,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 483,
+    "sub_name": "Cuci Sepatu",
+    "sub_slug": "fashion-cuci-sepatu-shoe-laundry"
+  },
+  {
+    "category_id": 484,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 484,
+    "sub_name": "Henna Art Pengantin",
+    "sub_slug": "fashion-pasang-henna-art-inai"
+  },
+  {
+    "category_id": 580,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 580,
+    "sub_name": "Konveksi Seragam",
+    "sub_slug": "fashion-konveksi-seragam"
+  },
+  {
+    "category_id": 581,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 581,
+    "sub_name": "Make Up Artist",
+    "sub_slug": "fashion-make-up-artist"
+  },
+  {
+    "category_id": 382,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 382,
+    "sub_name": "Salon Kecantikan",
+    "sub_slug": "fashion-salon-kecantikan-perawatan-spa"
+  },
+  {
+    "category_id": 582,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 582,
+    "sub_name": "Sewa Kebaya & Gaun Pengantin",
+    "sub_slug": "fashion-sewa-kebaya-gaun-pengantin"
+  },
+  {
+    "category_id": 584,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 584,
+    "sub_name": "Toko Busana Muslim & Hijab",
+    "sub_slug": "fashion-toko-busana-muslim-hijab"
+  },
+  {
+    "category_id": 482,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 482,
+    "sub_name": "Toko Sepatu & Tas",
+    "sub_slug": "fashion-toko-sepatu-sandal-tas"
+  },
+  {
+    "category_id": 579,
+    "category_name": "Fashion",
+    "category_slug": "fashion",
+    "sub_id": 579,
+    "sub_name": "Tukang Jahit Pakaian",
+    "sub_slug": "fashion-tukang-jahit-pakaian"
+  },
+  {
+    "category_id": 393,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 393,
+    "sub_name": "Cetak Foto & Frame",
+    "sub_slug": "multimedia-jasa-cetak-foto-canvas-album"
+  },
+  {
+    "category_id": 586,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 586,
+    "sub_name": "Desain Grafis & Logo",
+    "sub_slug": "multimedia-desain-grafis-logo"
+  },
+  {
+    "category_id": 585,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 585,
+    "sub_name": "Foto Wedding & Prewedding",
+    "sub_slug": "multimedia-foto-wedding-prewedding"
+  },
+  {
+    "category_id": 392,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 392,
+    "sub_name": "Live Streaming Acara",
+    "sub_slug": "multimedia-jasa-live-streaming-podcast"
+  },
+  {
+    "category_id": 587,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 587,
+    "sub_name": "Pembuatan Website",
+    "sub_slug": "multimedia-pembuatan-website"
+  },
+  {
+    "category_id": 391,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 391,
+    "sub_name": "Sewa Drone & Pilot",
+    "sub_slug": "multimedia-sewa-drone-pilot-drone-acara"
+  },
+  {
+    "category_id": 588,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 588,
+    "sub_name": "Undangan Digital",
+    "sub_slug": "multimedia-undangan-digital"
+  },
+  {
+    "category_id": 388,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 388,
+    "sub_name": "Video Dokumentasi Acara",
+    "sub_slug": "multimedia-jasa-pembuat-video-videografer"
+  },
+  {
+    "category_id": 485,
+    "category_name": "Multimedia",
+    "category_slug": "multimedia",
+    "sub_id": 485,
+    "sub_name": "Video Iklan & Promosi",
+    "sub_slug": "multimedia-video-iklan-promosi-produk"
+  },
+  {
+    "category_id": 590,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 590,
+    "sub_name": "Angkringan & Sate",
+    "sub_slug": "kuliner-angkringan-sate"
+  },
+  {
+    "category_id": 597,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 597,
+    "sub_name": "Ayam Geprek & Bebek Goreng",
+    "sub_slug": "kuliner-ayam-geprek-bebek-goreng"
+  },
+  {
+    "category_id": 591,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 591,
+    "sub_name": "Cafe & Resto",
+    "sub_slug": "kuliner-cafe-resto"
+  },
+  {
+    "category_id": 402,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 402,
+    "sub_name": "Jajanan Pasar Tradisional",
+    "sub_slug": "kuliner-jajanan-pasar-tradisional"
+  },
+  {
+    "category_id": 594,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 594,
+    "sub_name": "Katering Nasi Kotak",
+    "sub_slug": "kuliner-katering-nasi-kotak"
+  },
+  {
+    "category_id": 593,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 593,
+    "sub_name": "Oleh Oleh Khas Surade",
+    "sub_slug": "kuliner-oleh-oleh-khas-surade"
+  },
+  {
+    "category_id": 519,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 519,
+    "sub_name": "Produk Olahan",
+    "sub_slug": "kuliner-produk-olahan"
+  },
+  {
+    "category_id": 592,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 592,
+    "sub_name": "Restoran Ikan Bakar",
+    "sub_slug": "kuliner-restoran-ikan-bakar"
+  },
+  {
+    "category_id": 596,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 596,
+    "sub_name": "Rumah Makan Padang",
+    "sub_slug": "kuliner-rumah-makan-padang"
+  },
+  {
+    "category_id": 400,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 400,
+    "sub_name": "Rumah Makan Sunda",
+    "sub_slug": "kuliner-rumah-makan-khas-sunda-nusantara"
+  },
+  {
+    "category_id": 118,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 118,
+    "sub_name": "Seafood",
+    "sub_slug": "kuliner-seafood"
+  },
+  {
+    "category_id": 598,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 598,
+    "sub_name": "Sentra Ikan Asin",
+    "sub_slug": "kuliner-sentra-ikan-asin"
+  },
+  {
+    "category_id": 399,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 399,
+    "sub_name": "Toko Buah Segar",
+    "sub_slug": "kuliner-toko-buah-segar-jus-buah"
+  },
+  {
+    "category_id": 120,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 120,
+    "sub_name": "Toko Roti",
+    "sub_slug": "kuliner-toko-roti"
+  },
+  {
+    "category_id": 403,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 403,
+    "sub_name": "Toko Roti & Bakery",
+    "sub_slug": "kuliner-toko-roti-kue-bakery"
+  },
+  {
+    "category_id": 397,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 397,
+    "sub_name": "Warkop & Kedai Kopi",
+    "sub_slug": "kuliner-warkop-kedai-kopi"
+  },
+  {
+    "category_id": 595,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 595,
+    "sub_name": "Warung Bakso & Mie",
+    "sub_slug": "kuliner-warung-bakso-mie"
+  },
+  {
+    "category_id": 517,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 517,
+    "sub_name": "Warung Kopi",
+    "sub_slug": "kuliner-warung-kopi"
+  },
+  {
+    "category_id": 518,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 518,
+    "sub_name": "Warung Makan",
+    "sub_slug": "kuliner-warung-makan"
+  },
+  {
+    "category_id": 589,
+    "category_name": "Kuliner",
+    "category_slug": "kuliner",
+    "sub_id": 589,
+    "sub_name": "Warung Tegal",
+    "sub_slug": "kuliner-warung-tegal"
+  },
+  {
+    "category_id": 599,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 599,
+    "sub_name": "Bimbingan Belajar",
+    "sub_slug": "pendidikan-bimbingan-belajar"
+  },
+  {
+    "category_id": 409,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 409,
+    "sub_name": "Fotocopy & Pengetikan",
+    "sub_slug": "pendidikan-fotocopy-pengetikan-jilid"
+  },
+  {
+    "category_id": 412,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 412,
+    "sub_name": "Kursus Bahasa Asing",
+    "sub_slug": "pendidikan-kursus-bahasa-asing"
+  },
+  {
+    "category_id": 411,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 411,
+    "sub_name": "Kursus Komputer & Desain",
+    "sub_slug": "pendidikan-kursus-komputer-desain"
+  },
+  {
+    "category_id": 82,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 82,
+    "sub_name": "Kursus Mengemudi",
+    "sub_slug": "kursus-mengemudi"
+  },
+  {
+    "category_id": 601,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 601,
+    "sub_name": "Kursus Menjahit",
+    "sub_slug": "pendidikan-kursus-menjahit"
+  },
+  {
+    "category_id": 603,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 603,
+    "sub_name": "Lembaga Pelatihan Kerja",
+    "sub_slug": "pendidikan-lembaga-pelatihan-kerja"
+  },
+  {
+    "category_id": 600,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 600,
+    "sub_name": "Les Privat ke Rumah",
+    "sub_slug": "pendidikan-les-privat-ke-rumah"
+  },
+  {
+    "category_id": 602,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 602,
+    "sub_name": "Pondok Pesantren",
+    "sub_slug": "pendidikan-pondok-pesantren"
+  },
+  {
+    "category_id": 155,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 155,
+    "sub_name": "Sekolah",
+    "sub_slug": "pendidikan-sekolah"
+  },
+  {
+    "category_id": 604,
+    "category_name": "Pendidikan",
+    "category_slug": "pendidikan",
+    "sub_id": 604,
+    "sub_name": "Toko Buku & Alat Tulis",
+    "sub_slug": "pendidikan-toko-buku-alat-tulis"
+  },
+  {
+    "category_id": 607,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 607,
+    "sub_name": "Bibit Buah Unggul",
+    "sub_slug": "pertanian-bibit-buah-unggul"
+  },
+  {
+    "category_id": 611,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 611,
+    "sub_name": "Bibit Ikan Air Tawar",
+    "sub_slug": "pertanian-bibit-ikan-air-tawar"
+  },
+  {
+    "category_id": 606,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 606,
+    "sub_name": "Buket Bunga & Parsel",
+    "sub_slug": "pertanian-buket-bunga-parsel"
+  },
+  {
+    "category_id": 428,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 428,
+    "sub_name": "Distributor Telur Ayam",
+    "sub_slug": "pertanian-distributor-telur-ayam-bebek"
+  },
+  {
+    "category_id": 420,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 420,
+    "sub_name": "Hewan Qurban & Aqiqah",
+    "sub_slug": "pertanian-hewan-qurban-aqiqah-sapi-kambing"
+  },
+  {
+    "category_id": 608,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 608,
+    "sub_name": "Madu Murni Hutan",
+    "sub_slug": "pertanian-madu-murni-hutan"
+  },
+  {
+    "category_id": 612,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 612,
+    "sub_name": "Pakan Ternak & Pelet",
+    "sub_slug": "pertanian-pakan-ternak-pelet"
+  },
+  {
+    "category_id": 429,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 429,
+    "sub_name": "Pengepul Hasil Bumi",
+    "sub_slug": "pertanian-pengepul-hasil-bumi-sayur-kelapa"
+  },
+  {
+    "category_id": 427,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 427,
+    "sub_name": "Pengrajin Gula Kelapa",
+    "sub_slug": "pertanian-pengrajin-gula-kelapa-merah-aren"
+  },
+  {
+    "category_id": 215,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 215,
+    "sub_name": "Pertanian & Hasil Bumi",
+    "sub_slug": "retail-pertanian-hasil-bumi"
+  },
+  {
+    "category_id": 216,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 216,
+    "sub_name": "Peternakan Ayam",
+    "sub_slug": "retail-peternakan-ayam"
+  },
+  {
+    "category_id": 610,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 610,
+    "sub_name": "Pupuk Organik & Obat Hama",
+    "sub_slug": "pertanian-pupuk-organik-obat-hama"
+  },
+  {
+    "category_id": 609,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 609,
+    "sub_name": "Susu Murni Sapi & Kambing",
+    "sub_slug": "pertanian-susu-murni-sapi-kambing"
+  },
+  {
+    "category_id": 605,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 605,
+    "sub_name": "Tanaman Hias & Polybag",
+    "sub_slug": "pertanian-tanaman-hias-polybag"
+  },
+  {
+    "category_id": 426,
+    "category_name": "Pertanian & Ternak",
+    "category_slug": "pertanian",
+    "sub_id": 426,
+    "sub_name": "Toko Ikan Hias & Akuarium",
+    "sub_slug": "pertanian-toko-ikan-hias-akuarium"
+  },
+  {
+    "category_id": 618,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 618,
+    "sub_name": "Kolam Renang Waterboom",
+    "sub_slug": "hiburan-kolam-renang-waterboom"
+  },
+  {
+    "category_id": 615,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 615,
+    "sub_name": "Paket Tour Surade",
+    "sub_slug": "hiburan-paket-tour-surade"
+  },
+  {
+    "category_id": 614,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 614,
+    "sub_name": "Pemandu Wisata Geopark",
+    "sub_slug": "hiburan-pemandu-wisata-geopark"
+  },
+  {
+    "category_id": 434,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 434,
+    "sub_name": "Spot Foto & Camping Ground",
+    "sub_slug": "hiburan-spot-foto-area-camping-ground"
+  },
+  {
+    "category_id": 490,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 490,
+    "sub_name": "Taman Bermain & Sewa ATV",
+    "sub_slug": "hiburan-taman-bermain-atv-odong"
+  },
+  {
+    "category_id": 616,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 616,
+    "sub_name": "Wisata Agro Petik Buah",
+    "sub_slug": "hiburan-wisata-agro-petik-buah"
+  },
+  {
+    "category_id": 194,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 194,
+    "sub_name": "Wisata Alam",
+    "sub_slug": "hiburan-wisata-alam"
+  },
+  {
+    "category_id": 613,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 613,
+    "sub_name": "Wisata Curug Cikaso",
+    "sub_slug": "hiburan-wisata-curug-cikaso"
+  },
+  {
+    "category_id": 430,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 430,
+    "sub_name": "Wisata Pantai Minajaya",
+    "sub_slug": "hiburan-wisata-pantai-muara-pesisir"
+  },
+  {
+    "category_id": 617,
+    "category_name": "Wisata & Destinasi",
+    "category_slug": "hiburan",
+    "sub_id": 617,
+    "sub_name": "Wisata Sejarah & Gua Sungging",
+    "sub_slug": "hiburan-wisata-sejarah-gua-sungging"
+  },
+  {
+    "category_id": 622,
+    "category_name": "Komunitas",
+    "category_slug": "komunitas",
+    "sub_id": 622,
+    "sub_name": "Karang Taruna Pemuda",
+    "sub_slug": "komunitas-karang-taruna-pemuda"
+  },
+  {
+    "category_id": 624,
+    "category_name": "Komunitas",
+    "category_slug": "komunitas",
+    "sub_id": 624,
+    "sub_name": "Komunitas Fotografer",
+    "sub_slug": "komunitas-komunitas-fotografer"
+  },
+  {
+    "category_id": 619,
+    "category_name": "Komunitas",
+    "category_slug": "komunitas",
+    "sub_id": 619,
+    "sub_name": "Komunitas Lari & Gowes",
+    "sub_slug": "komunitas-komunitas-lari-gowes"
+  },
+  {
+    "category_id": 441,
+    "category_name": "Komunitas",
+    "category_slug": "komunitas",
+    "sub_id": 441,
+    "sub_name": "Komunitas Motor & Mobil",
+    "sub_slug": "komunitas-motor-mobil-hobi-otomotif"
+  },
+  {
+    "category_id": 444,
+    "category_name": "Komunitas",
+    "category_slug": "komunitas",
+    "sub_id": 444,
+    "sub_name": "Komunitas Pecinta Alam",
+    "sub_slug": "komunitas-pecinta-alam-lingkungan"
+  },
+  {
+    "category_id": 621,
+    "category_name": "Komunitas",
+    "category_slug": "komunitas",
+    "sub_id": 621,
+    "sub_name": "Komunitas Relawan Bencana",
+    "sub_slug": "komunitas-komunitas-relawan-bencana"
+  },
+  {
+    "category_id": 620,
+    "category_name": "Komunitas",
+    "category_slug": "komunitas",
+    "sub_id": 620,
+    "sub_name": "Komunitas Seni & Silat Sunda",
+    "sub_slug": "komunitas-komunitas-seni-silat-sunda"
+  },
+  {
+    "category_id": 623,
+    "category_name": "Komunitas",
+    "category_slug": "komunitas",
+    "sub_id": 623,
+    "sub_name": "Komunitas UMKM Naik Kelas",
+    "sub_slug": "komunitas-komunitas-umkm-naik-kelas"
+  },
+  {
+    "category_id": 625,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 625,
+    "sub_name": "Grosir Sembako & Beras",
+    "sub_slug": "retail-grosir-sembako-beras"
+  },
+  {
+    "category_id": 627,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 627,
+    "sub_name": "Kerajinan Anyaman Bambu",
+    "sub_slug": "retail-kerajinan-anyaman-bambu"
+  },
+  {
+    "category_id": 527,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 527,
+    "sub_name": "Kerajinan Tangan",
+    "sub_slug": "retail-kerajinan-tangan"
+  },
+  {
+    "category_id": 626,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 626,
+    "sub_name": "Minimarket & Kelontong",
+    "sub_slug": "retail-minimarket-kelontong"
+  },
+  {
+    "category_id": 63,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 63,
+    "sub_name": "Pasar Tradisional",
+    "sub_slug": "pasar-tradisional"
+  },
+  {
+    "category_id": 631,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 631,
+    "sub_name": "Perabot Dapur & Plastik",
+    "sub_slug": "retail-perabot-dapur-plastik"
+  },
+  {
+    "category_id": 629,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 629,
+    "sub_name": "Perlengkapan Bayi & Anak",
+    "sub_slug": "retail-perlengkapan-bayi-anak"
+  },
+  {
+    "category_id": 632,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 632,
+    "sub_name": "Plastik Kemasan & Dus Nasi",
+    "sub_slug": "retail-plastik-kemasan-dus-nasi"
+  },
+  {
+    "category_id": 449,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 449,
+    "sub_name": "Toko Jam Tangan & Optik",
+    "sub_slug": "retail-toko-jam-tangan-kacamata"
+  },
+  {
+    "category_id": 630,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 630,
+    "sub_name": "Toko Mainan Edukatif",
+    "sub_slug": "retail-toko-mainan-edukatif"
+  },
+  {
+    "category_id": 628,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 628,
+    "sub_name": "Toko Pakaian Jadi",
+    "sub_slug": "retail-toko-pakaian-jadi"
+  },
+  {
+    "category_id": 128,
+    "category_name": "Retail & Belanja",
+    "category_slug": "retail",
+    "sub_id": 128,
+    "sub_name": "Warung Sembako",
+    "sub_slug": "retail-warung-sembako"
+  }
+]

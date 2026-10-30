@@ -23,13 +23,28 @@ const FileUpload = ({
   const handleFiles = (newFiles) => {
     if (disabled) return;
     
-    let filesToAdd = newFiles;
+    // Validate file sizes (max 5MB)
+    const validFiles = [];
+    let hasOversized = false;
+    for (const file of newFiles) {
+      if (file.size > 5 * 1024 * 1024) {
+        hasOversized = true;
+      } else {
+        validFiles.push(file);
+      }
+    }
+    if (hasOversized) {
+      alert("Ukuran file maksimal adalah 5MB. File yang lebih dari 5MB tidak dapat diunggah.");
+    }
+    if (validFiles.length === 0) return;
+
+    let filesToAdd = validFiles;
     
-    if (!multiple && newFiles.length > 0) {
-      filesToAdd = [newFiles[0]];
+    if (!multiple && validFiles.length > 0) {
+      filesToAdd = [validFiles[0]];
     } else if (multiple && maxFiles) {
       const remainingSlots = maxFiles - files.length;
-      filesToAdd = newFiles.slice(0, remainingSlots);
+      filesToAdd = validFiles.slice(0, remainingSlots);
     }
     
     const updatedFiles = multiple ? [...files, ...filesToAdd] : filesToAdd;

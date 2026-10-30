@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, ChevronDown, MapPin, Store } from "lucide-react";
 import api from "../../services/api";
+import { getStorageUrl } from "../../utils/constants";
 
 /* ── Desa/Kelurahan di Kecamatan Surade ── */
 const KOTA_INDONESIA = [
@@ -126,32 +127,46 @@ export default function HeroSection({
                 </defs>
               </svg>
             </div>
-            <span>Direktori UMKM (Usaha Mikro, Kecil Dan Menengah)</span>
+            <span>Direktori Usaha Perorangan dan UMKM di Surade</span>
           </div>
 
           {/* Title & Subtitle */}
-          <h1 className="home-hero__title" data-text="Surade.co.id">
-            Surade<span className="home-hero__title-accent">.co.id</span>
+          <h1 className="home-hero__title" data-text="Surade.com">
+            Surade<span className="home-hero__title-accent">.com</span>
           </h1>
           <p className="home-hero__subtitle">
-            Semua UMKM ada di <span style={{ color: "#34D399", fontWeight: 700 }}>Surade</span>.
+            Cari semua <span style={{ color: "#34D399", fontWeight: 700 }}>jasa dan produk</span> yang Anda butuhkan di sini.
           </p>
 
           {/* Search Bar */}
-          <form className="home-search" onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(); }}>
+          <form
+            className="home-search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              document.activeElement?.blur?.();
+              setKeywordDropdownOpen(false);
+              handleSearchSubmit();
+            }}
+          >
             <div className="home-search__group home-search__group--keyword" ref={keywordDropdownRef}>
               <span className="home-search__label">Kata Kunci :</span>
               <input
                 className="home-search__input"
-                type="text"
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck="false"
                 placeholder="UMKM, Pelaku Usaha, Bisnis, dll"
                 id="search-keyword"
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
                 onFocus={() => setKeywordDropdownOpen(true)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (e.key === "Enter" || e.keyCode === 13) {
                     e.preventDefault();
+                    e.currentTarget.blur?.();
                     setKeywordDropdownOpen(false);
                     handleSearchSubmit();
                   }
@@ -188,7 +203,24 @@ export default function HeroSection({
                               }}
                             >
                               <div className="home-keyword-dropdown__business-icon">
-                                <Store size={20} strokeWidth={1.8} />
+                                {business.logo ? (
+                                  <img
+                                    src={getStorageUrl(business.logo)}
+                                    alt={business.name}
+                                    className="home-keyword-dropdown__business-img"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      if (e.currentTarget.nextElementSibling) {
+                                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <Store
+                                  size={20}
+                                  strokeWidth={1.8}
+                                  style={{ display: business.logo ? 'none' : 'block' }}
+                                />
                               </div>
                               <div className="home-keyword-dropdown__business-info">
                                 <span className="home-keyword-dropdown__business-name">{business.name}</span>

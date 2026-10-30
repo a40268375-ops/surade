@@ -2,9 +2,11 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams, Link, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api, { getImageUrl } from "../utils/api";
+import { getStorageUrl } from "../utils/constants";
 import "./Dashboard.css";
 import "./Pricing.css";
 import Loading from "../components/Loading";
+import SuradeLoader from "../components/SuradeLoader";
 import { 
   LoadingSpinner, 
   ErrorState, 
@@ -119,6 +121,13 @@ import {
   Wallet, 
   Copy, 
   Target,
+  Pin,
+  BellOff,
+  Archive,
+  MoreVertical,
+  Paperclip,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import emptyStateIcon from "../assets/icon-empty-state.png";
 import logoImg from "../assets/logo.png";
@@ -249,7 +258,6 @@ export default function Dashboard() {
   const { user, loading: authLoading, logout, isAdmin, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tab } = useParams();
   const activeTab = tab || (isAdmin ? "dashboard" : "saved");
   const setActiveTab = (newTab) => {
     navigate(`/dashboard/${newTab}`);
@@ -257,6 +265,22 @@ export default function Dashboard() {
       setSidebarOpen(false);
     }
   };
+
+  useEffect(() => {
+    const tabTitles = {
+      dashboard: "Dashboard Pengguna",
+      businesses: "Kelola Usaha",
+      blogs: "Artikel & Event",
+      referrals: "Referral Saya",
+      saved: "Simpanan Saya",
+      messages: "Pesan Inbox",
+      inbox: "Pesan Inbox",
+      premium: "Upgrade Premium",
+      settings: "Pengaturan Akun",
+    };
+    const titleText = tabTitles[activeTab] || "Dashboard Pengguna";
+    document.title = `${titleText} - Surade.com`;
+  }, [activeTab]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -362,6 +386,9 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  // Admin bisnis detail view modal
+  const [showAdminBizDetail, setShowAdminBizDetail] = useState(false);
+  const [adminBizDetailData, setAdminBizDetailData] = useState(null);
 
   // Tarik Saldo Komisi (Withdrawal)
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -558,9 +585,119 @@ export default function Dashboard() {
   const [messages, setMessages] = useState([]);
   const [selectedInboxId, setSelectedInboxId] = useState(null); // sekarang menyimpan KEY thread, bukan id pesan
   const [inboxSearch, setInboxSearch] = useState("");
-  const [inboxFilter, setInboxFilter] = useState("all"); // all | unread
+  const [inboxFilter, setInboxFilter] = useState("all"); // all | unread | favorite
   const [inboxDraft, setInboxDraft] = useState("");
   const [sendingInboxReply, setSendingInboxReply] = useState(false);
+  const [showInboxCamera, setShowInboxCamera] = useState(false);
+  // --- Inbox context menu & local thread metadata ---
+  const [inboxContextMenu, setInboxContextMenu] = useState(null); // { key, x, y }
+  const [pinnedThreads, setPinnedThreads] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('inbox_pinned') || '[]'); } catch { return []; }
+  });
+  const [favoriteThreads, setFavoriteThreads] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('inbox_favorites') || '[]'); } catch { return []; }
+  });
+  const [archivedThreads, setArchivedThreads] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('inbox_archived') || '[]'); } catch { return []; }
+  });
+  const [mutedThreads, setMutedThreads] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('inbox_muted') || '[]'); } catch { return []; }
+  });
+  const [clearedThreads, setClearedThreads] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('inbox_cleared') || '{}'); } catch { return {}; }
+  });
+  const [hiddenThreads, setHiddenThreads] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('inbox_hidden') || '[]'); } catch { return []; }
+  });
+  const [unreadOverrides, setUnreadOverrides] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('inbox_unread_overrides') || '[]'); } catch { return []; }
+  });
+  const [sendingImage, setSendingImage] = useState(false);
+  const imageInputRef = useRef(null);
+  const contextMenuRef = useRef(null);
+
+  // Close context menu on outside click or scroll
+  useEffect(() => {
+    const handleCloseMenu = (e) => {
+      if (inboxContextMenu && contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setInboxContextMenu(null);
+      }
+    };
+    window.addEventListener("click", handleCloseMenu);
+    window.addEventListener("scroll", handleCloseMenu, true);
+    return () => {
+      window.removeEventListener("click", handleCloseMenu);
+      window.removeEventListener("scroll", handleCloseMenu, true);
+    };
+  }, [inboxContextMenu]);
+
+  const handleTogglePin = (key) => {
+    setPinnedThreads((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      localStorage.setItem("inbox_pinned", JSON.stringify(next));
+      return next;
+    });
+    setInboxContextMenu(null);
+  };
+
+  const handleToggleMarkUnread = (key) => {
+    setUnreadOverrides((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      localStorage.setItem("inbox_unread_overrides", JSON.stringify(next));
+      return next;
+    });
+    setInboxContextMenu(null);
+  };
+
+  const handleToggleFavorite = (key) => {
+    setFavoriteThreads((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      localStorage.setItem("inbox_favorites", JSON.stringify(next));
+      return next;
+    });
+    setInboxContextMenu(null);
+  };
+
+  const handleToggleArchive = (key) => {
+    setArchivedThreads((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      localStorage.setItem("inbox_archived", JSON.stringify(next));
+      return next;
+    });
+    setInboxContextMenu(null);
+  };
+
+  const handleToggleMute = (key) => {
+    setMutedThreads((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      localStorage.setItem("inbox_muted", JSON.stringify(next));
+      return next;
+    });
+    setInboxContextMenu(null);
+  };
+
+  const handleClearChat = (key) => {
+    if (!window.confirm("Bersihkan seluruh isi obrolan ini? Pesan sebelumnya tidak akan ditampilkan.")) return;
+    setClearedThreads((prev) => {
+      const next = { ...prev, [key]: Date.now() };
+      localStorage.setItem("inbox_cleared", JSON.stringify(next));
+      return next;
+    });
+    setInboxContextMenu(null);
+  };
+
+  const handleDeleteChat = (key) => {
+    if (!window.confirm("Hapus obrolan ini dari daftar inbox Anda?")) return;
+    setHiddenThreads((prev) => {
+      const next = [...prev, key];
+      localStorage.setItem("inbox_hidden", JSON.stringify(next));
+      return next;
+    });
+    if (selectedInboxId === key) {
+      setSelectedInboxId(null);
+    }
+    setInboxContextMenu(null);
+  };
   const [savedBusinesses, setSavedBusinesses] = useState([]);
   const [businessReviews, setBusinessReviews] = useState([]);
   const [replyDrafts, setReplyDrafts] = useState({});
@@ -579,10 +716,16 @@ export default function Dashboard() {
     const groups = new Map();
 
     messages.forEach((m) => {
-      // Pesan tamu (belum login, tanpa customer_id) tetap jadi thread-nya
-      // sendiri per pesan - tidak bisa dibalas lewat chat karena tidak ada
-      // akun tujuan, tapi tetap kelihatan di Inbox seperti biasa.
       const key = m.customer_id ? `${m.business_id}-${m.customer_id}` : `guest-${m.id}`;
+      // Sembunyikan thread yang sudah dihapus pengguna
+      if (hiddenThreads.includes(key)) return;
+
+      // Filter pesan yang sudah dibersihkan
+      const clearedAt = clearedThreads[key];
+      if (clearedAt && new Date(m.created_at).getTime() <= clearedAt) {
+        return;
+      }
+
       if (!groups.has(key)) {
         groups.set(key, {
           key,
@@ -602,27 +745,60 @@ export default function Dashboard() {
         const items = [...group.items].sort(
           (a, b) => new Date(a.created_at) - new Date(b.created_at)
         );
-        const last = items[items.length - 1];
+        const last = items[items.length - 1] || {};
         const amOwner = isAdmin || group.business?.user_id === user?.id;
         const fromCustomerMsg = items.find((m) => m.sender_role !== "seller");
         const otherName = amOwner
-          ? fromCustomerMsg?.sender_name || last.sender_name
+          ? fromCustomerMsg?.sender_name || last.sender_name || "Pelanggan"
           : group.business?.title || "Penjual";
-        const unread = items.filter(
+        let unread = items.filter(
           (m) => !m.is_read && m.sender_id !== user?.id && m.sender_role !== (amOwner ? "seller" : "customer")
         ).length;
-        return { ...group, items, last, amOwner, otherName, unread };
+        if (unreadOverrides.includes(group.key)) {
+          unread = Math.max(unread, 1);
+        }
+        const isPinned = pinnedThreads.includes(group.key);
+        const isFavorite = favoriteThreads.includes(group.key);
+        const isArchived = archivedThreads.includes(group.key);
+        const isMuted = mutedThreads.includes(group.key);
+
+        return {
+          ...group,
+          items,
+          last,
+          amOwner,
+          otherName,
+          unread,
+          isPinned,
+          isFavorite,
+          isArchived,
+          isMuted,
+        };
       })
-      .sort((a, b) => new Date(b.last.created_at) - new Date(a.last.created_at));
-  }, [messages, isAdmin, user]);
+      .sort((a, b) => {
+        // Pinned threads tampil di urutan paling atas
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        const timeA = a.last?.created_at ? new Date(a.last.created_at).getTime() : 0;
+        const timeB = b.last?.created_at ? new Date(b.last.created_at).getTime() : 0;
+        return timeB - timeA;
+      });
+  }, [messages, isAdmin, user, hiddenThreads, clearedThreads, unreadOverrides, pinnedThreads, favoriteThreads, archivedThreads, mutedThreads]);
 
   const selectedInboxThread =
     inboxThreads.find((t) => t.key === selectedInboxId) || inboxThreads[0] || null;
 
   // Daftar thread yang benar-benar ditampilkan di sidebar, setelah kena
-  // filter pencarian & "Belum Dibaca" (persis kayak tab filter WhatsApp).
+  // filter pencarian & tab kategori (Semua, Belum Dibaca, Favorit, Arsip).
   const visibleInboxThreads = inboxThreads.filter((t) => {
-    if (inboxFilter === "unread" && t.unread === 0) return false;
+    if (inboxFilter === "archived") {
+      if (!t.isArchived) return false;
+    } else {
+      if (t.isArchived) return false;
+      if (inboxFilter === "unread" && t.unread === 0) return false;
+      if (inboxFilter === "favorite" && !t.isFavorite) return false;
+    }
+
     if (!inboxSearch.trim()) return true;
     const q = inboxSearch.trim().toLowerCase();
     return (
@@ -760,6 +936,7 @@ export default function Dashboard() {
   const [bizTags, setBizTags] = useState("");
   const [bizInstagram, setBizInstagram] = useState("");
   const [bizFacebook, setBizFacebook] = useState("");
+  const [bizWhatsapp, setBizWhatsapp] = useState("");
   
   // New form states for multi-step design
   const [bizThumbnail, setBizThumbnail] = useState(null);
@@ -1397,6 +1574,7 @@ export default function Dashboard() {
       setBizAddress(biz.address);
       setBizVillage(biz.village || "");
       setBizPhone(biz.phone);
+      setBizWhatsapp(biz.whatsapp || biz.phone || "");
       setBizEmail(biz.email || "");
       setBizHours(biz.operating_hours || "");
       setBizWebsite(biz.website || "");
@@ -1528,6 +1706,7 @@ export default function Dashboard() {
       formData.append("address", bizAddressFull || bizAddress);
       formData.append("village", selectedDesa || bizVillage);
       formData.append("phone", bizPhone);
+      formData.append("whatsapp", bizWhatsapp || bizPhone);
       if (bizEmail) formData.append("email", bizEmail);
       if (bizHours) formData.append("operating_hours", bizHours);
       if (bizWebsite) formData.append("website", bizWebsite);
@@ -1613,8 +1792,8 @@ export default function Dashboard() {
 
   const handleDeleteBusiness = async (id) => {
     const confirmed = await confirm({
-      title: 'Hapus Bisnis',
-      message: 'Apakah Anda yakin ingin menghapus bisnis ini? Tindakan ini tidak dapat dibatalkan.',
+      title: 'Hapus Usaha',
+      message: 'Apakah Anda yakin ingin menghapus usaha ini? Tindakan ini tidak dapat dibatalkan.',
       type: 'danger',
       confirmText: 'Hapus',
       cancelText: 'Batal'
@@ -1630,10 +1809,10 @@ export default function Dashboard() {
       // Refresh businesses data instead of full reload
       await fetchBusinessesPage(businessCurrentPage);
       
-      success('Bisnis berhasil dihapus');
+      success('Usaha berhasil dihapus');
     } catch (err) {
       errorHandler.logError(err, 'Delete business');
-      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menghapus bisnis');
+      const errorMessage = errorHandler.getErrorMessage(err, 'Gagal menghapus usaha');
       notifyError(errorMessage);
     } finally {
       setCrudLoading(prev => ({ ...prev, [`business-${id}`]: false }));
@@ -2115,6 +2294,61 @@ export default function Dashboard() {
     }
   };
 
+  const handleSendPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran foto maksimal 5MB.");
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      return;
+    }
+
+    const thread = selectedInboxThread;
+    if (!thread) {
+      alert("Pilih percakapan terlebih dahulu.");
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      return;
+    }
+
+    if (!thread.customer_id) {
+      alert("Pesan dari tamu tidak dapat dibalas.");
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      return;
+    }
+
+    setSendingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      if (inboxDraft.trim()) {
+        formData.append("message", inboxDraft.trim());
+      }
+
+      let newMessage;
+      if (thread.amOwner) {
+        newMessage = await api.post(
+          `/businesses/${thread.business_id}/messages/${thread.customer_id}/reply`,
+          formData
+        );
+      } else {
+        formData.append("business_id", thread.business_id);
+        formData.append("sender_name", user?.name || "Pengguna");
+        formData.append("sender_contact", user?.phone || user?.email || "");
+        newMessage = await api.post("/messages", formData);
+      }
+
+      setMessages((prev) => [...prev, newMessage]);
+      setInboxDraft("");
+      if (imageInputRef.current) imageInputRef.current.value = "";
+    } catch (err) {
+      console.error("Gagal mengirim foto:", err);
+      alert(err?.data?.message || err?.message || "Gagal mengirim foto.");
+    } finally {
+      setSendingImage(false);
+    }
+  };
+
   // --- SAVED (Simpan) HANDLERS ---
   const handleUnsaveBusiness = async (id) => {
     if (!confirm("Hapus dari daftar simpanan?")) return;
@@ -2315,9 +2549,7 @@ export default function Dashboard() {
     if (!proofPath) return;
     
     // Create full image URL
-    const imageUrl = proofPath.startsWith('http') 
-      ? proofPath 
-      : `${import.meta.env.VITE_API_BASE_URL || 'http://surade.latihan.co.id'}/storage/${proofPath}`;
+    const imageUrl = getStorageUrl(proofPath);
     
     // Open in new window/tab
     window.open(imageUrl, '_blank');
@@ -3297,11 +3529,35 @@ export default function Dashboard() {
 
   // Show loading overlay for initial dashboard loading
   if (dashboardLoading) {
+    const isUserAdmin = user?.role === "admin" || user?.role === "super_admin";
+    const isUserSeller = Boolean(
+      user?.role === "seller" ||
+      user?.role === "reseller" ||
+      user?.role === "merchant" ||
+      user?.is_seller === true ||
+      (businesses && businesses.length > 0)
+    );
+
+    const dashText = isUserAdmin
+      ? "Memuat Dashboard Administrator"
+      : isUserSeller
+      ? "Memuat Dashboard Pemilik Usaha"
+      : "Memuat Dashboard Pengguna";
+
+    const dashSubtext = isUserAdmin
+      ? "Menyiapkan sistem manajemen dan kontrol portal Surade"
+      : isUserSeller
+      ? "Menyiapkan data toko, analitik usaha, dan layanan digital Anda di Surade"
+      : "Menyiapkan aktivitas akun, riwayat pesan, dan layanan favorit Anda di Surade";
+
     return (
-      <LoadingSpinner 
-        overlay={true} 
-        size="xl" 
-        text="Memuat dashboard Anda..." 
+      <SuradeLoader
+        variant="screen"
+        brandTitle="Surade.com"
+        text={dashText}
+        subtext={dashSubtext}
+        showBrand
+        showProgress
       />
     );
   }
@@ -3338,12 +3594,12 @@ export default function Dashboard() {
               role="button"
               tabIndex={0}
               style={{ cursor: "pointer" }}
-              title="Ke Beranda Surade.co.id"
+              title="Ke Beranda Surade.com"
             >
-              <img src={logoImg} alt="Surade.co.id" className="db-sidebar-logo__img" />
+              <img src={logoImg} alt="Surade.com" className="db-sidebar-logo__img" />
               {!sidebarCollapsed && (
                 <div className="db-sidebar-logo-text-group">
-                  <span className="db-sidebar-logo__text">Surade.co.id</span>
+                  <span className="db-sidebar-logo__text">Surade.com</span>
                   <span className="db-sidebar-logo__subtitle">{isAdmin ? "Admin Panel" : "Dashboard"}</span>
                 </div>
               )}
@@ -3399,12 +3655,12 @@ export default function Dashboard() {
                   type="button"
                   className={`db-menu-btn ${activeTab === "businesses" ? "active" : ""}`}
                   onClick={() => setActiveTab("businesses")}
-                  title="Kelola Bisnis"
+                  title="Kelola Usaha"
                 >
                   <div className="db-menu-icon">
                     <ShoppingBag size={20} />
                   </div>
-                  <span>Kelola Bisnis</span>
+                  <span>Kelola Usaha</span>
                 </button>
 
                 <button
@@ -3459,12 +3715,12 @@ export default function Dashboard() {
                   type="button"
                   className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
                   onClick={handleOpenContentTab}
-                  title="Blog & Event"
+                  title="Info & Event"
                 >
                   <div className="db-menu-icon">
                     <BookOpen size={20} />
                   </div>
-                  <span>Blog & Event</span>
+                  <span>Info & Event</span>
                 </button>
 
                 <button
@@ -3581,12 +3837,12 @@ export default function Dashboard() {
                   type="button"
                   className={`db-menu-btn ${activeTab === "inbox" ? "active" : ""}`}
                   onClick={() => setActiveTab("inbox")}
-                  title="Inbox"
+                  title="Pesan"
                 >
                   <div className="db-menu-icon">
                     <Inbox size={20} />
                   </div>
-                  <span>Inbox</span>
+                  <span>Pesan</span>
                   {unreadInboxCount > 0 && (
                     <span className="db-menu-badge">{unreadInboxCount > 9 ? "9+" : unreadInboxCount}</span>
                   )}
@@ -3604,17 +3860,19 @@ export default function Dashboard() {
                   <span>Referral</span>
                 </button>
 
-                <button
-                  type="button"
-                  className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
-                  onClick={() => setActiveTab("content")}
-                  title="Blog & Event"
-                >
-                  <div className="db-menu-icon">
-                    <BookOpen size={20} />
-                  </div>
-                  <span>Blog & Event</span>
-                </button>
+                {(user?.role === "seller" || user?.role === "reseller" || user?.role === "admin") && (
+                  <button
+                    type="button"
+                    className={`db-menu-btn ${activeTab === "content" ? "active" : ""}`}
+                    onClick={() => setActiveTab("content")}
+                    title="Info & Event"
+                  >
+                    <div className="db-menu-icon">
+                      <BookOpen size={20} />
+                    </div>
+                    <span>Info & Event</span>
+                  </button>
+                )}
               </>
             )}
           </nav>
@@ -3681,8 +3939,8 @@ export default function Dashboard() {
               <MenuIcon size={20} />
             </button>
             <div className="db-mobile-header__brand" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
-              <img src={logoImg} alt="Surade.co.id" className="db-mobile-header__logo" />
-              <span>Surade.co.id</span>
+              <img src={logoImg} alt="Surade.com" className="db-mobile-header__logo" />
+              <span>Surade.com</span>
             </div>
             <button
               type="button"
@@ -3890,7 +4148,7 @@ export default function Dashboard() {
                 <div>
                   <h1 className="db-dashboard-titlebar__title">Dashboard</h1>
                   {isAdmin ? (
-                    <p className="db-dashboard-titlebar__subtitle">Selamat datang kembali di panel kontrol Surade.co.id</p>
+                    <p className="db-dashboard-titlebar__subtitle">Selamat datang kembali di panel kontrol Surade.com</p>
                   ) : (
                     <p className="db-dashboard-titlebar__subtitle">Selamat Datang {user?.name || "Pengguna"}</p>
                   )}
@@ -3906,7 +4164,7 @@ export default function Dashboard() {
                 <div className="db-dashboard-banner db-dashboard-banner--info">
                   <div className="db-dashboard-banner__content">
                     <Shield size={16} />
-                    <span>Surade.co.id dapat meningkatkan daya saing usaha Anda.</span>
+                    <span>Surade.com dapat meningkatkan daya saing usaha Anda.</span>
                   </div>
                   <button
                     className="db-dashboard-banner__close"
@@ -4235,7 +4493,7 @@ export default function Dashboard() {
                             onClick={() => setActiveTab("businesses")}
                           >
                             <Building2 size={16} /> 
-                            Kelola Bisnis
+                            Kelola Usaha
                           </button>
                         </div>
                       </div>
@@ -4531,7 +4789,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="db-dashboard-footer">
-                  <span>Copyright &copy; {new Date().getFullYear()} <strong>Surade.co.id</strong>. All rights reserved.</span>
+                  <span>Copyright &copy; {new Date().getFullYear()} <strong>Surade.com</strong>. All rights reserved.</span>
                 </div>
             </div>
           )}
@@ -4551,7 +4809,7 @@ export default function Dashboard() {
                     <div className="db-form-title-group">
                       <h1>{selectedBiz ? "Edit Bisnis" : "Tambah Bisnis Baru"}</h1>
                       <p className="db-form-subtitle">
-                        {selectedBiz ? "Perbarui informasi bisnis Anda" : "Daftarkan bisnis atau usaha Anda di Surade.co.id"}
+                        {selectedBiz ? "Perbarui informasi bisnis Anda" : "Daftarkan bisnis atau usaha Anda di Surade.com"}
                       </p>
                     </div>
                   </div>
@@ -5030,6 +5288,8 @@ export default function Dashboard() {
                           >
                             <TileLayer
                               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                              subdomains={['a', 'b', 'c']}
+                              maxZoom={19}
                               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                             />
                             <MapClickHandler setPosition={(pos) => setBizCoordinates(`${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}`)} />
@@ -5432,13 +5692,25 @@ export default function Dashboard() {
                           </td>
                           <td>
                             <div className="db-table-actions">
+                              {/* Mata 1: Lihat halaman bisnis asli di tab baru */}
                               <button
                                 className="db-table-btn db-btn-view"
                                 onClick={() => window.open(`/business/${biz.id}`, "_blank")}
-                                title="Lihat"
+                                title="Lihat Halaman Bisnis"
                               >
                                 <Eye size={16} />
                               </button>
+                              {/* Mata 2: Lihat detail bisnis + bukti transaksi di modal admin */}
+                              {isAdmin && (
+                                <button
+                                  className="db-table-btn db-btn-detail"
+                                  onClick={() => { setAdminBizDetailData(biz); setShowAdminBizDetail(true); }}
+                                  title="Detail Admin & Transaksi"
+                                  style={{ background: '#ede9fe', color: '#7c3aed', border: '1.5px solid #c4b5fd' }}
+                                >
+                                  <EyeOff size={16} />
+                                </button>
+                              )}
                               {(isAdmin || biz.user_id === user?.id) && (
                                 <button
                                   className="db-table-btn db-btn-edit"
@@ -5830,9 +6102,13 @@ export default function Dashboard() {
                 </div>
 
                 {loading ? (
-                  <div className="db-loader-wrap">
-                    <div className="db-spinner" />
-                    <span>Memuat iklan...</span>
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                    <SuradeLoader
+                      variant="section"
+                      size="md"
+                      text="Memuat iklan"
+                      minHeight="180px"
+                    />
                   </div>
                 ) : filteredAds.length > 0 ? (
                   <div className="db-table-responsive">
@@ -5962,7 +6238,7 @@ export default function Dashboard() {
                           <div className="db-3d-card-holder-name">{user?.name || 'SURADE MEMBER'}</div>
                         </div>
                         <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#f59e0b', fontStyle: 'italic' }}>
-                          SURADE.CO.ID
+                          SURADE.COM
                         </div>
                       </div>
                     </div>
@@ -6132,9 +6408,13 @@ export default function Dashboard() {
               {isAdmin ? "Riwayat Pengajuan Premium (Semua User & Reseller)" : "Riwayat Invoice"}
             </h3>
             {loading ? (
-              <div className="db-loader-wrap">
-                <div className="db-spinner" />
-                <span>Memuat invoice...</span>
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                <SuradeLoader
+                  variant="section"
+                  size="md"
+                  text="Memuat invoice"
+                  minHeight="180px"
+                />
               </div>
             ) : subscriptions.length > 0 ? (
               <div className="db-table-responsive">
@@ -6671,39 +6951,167 @@ export default function Dashboard() {
                       >
                         Belum dibaca{unreadInboxCount > 0 ? ` (${unreadInboxCount})` : ""}
                       </button>
+                      <button
+                        type="button"
+                        className={`db-inbox-filter-pill ${inboxFilter === "favorite" ? "active" : ""}`}
+                        onClick={() => setInboxFilter("favorite")}
+                      >
+                        Favorit{favoriteThreads.length > 0 ? ` (${favoriteThreads.length})` : ""}
+                      </button>
+                      <button
+                        type="button"
+                        className={`db-inbox-filter-pill ${inboxFilter === "archived" ? "active" : ""}`}
+                        onClick={() => setInboxFilter("archived")}
+                      >
+                        Arsip{archivedThreads.length > 0 ? ` (${archivedThreads.length})` : ""}
+                      </button>
                     </div>
 
                     {visibleInboxThreads.length === 0 ? (
                       <p className="db-inbox-sidebar__empty">Tidak ada percakapan yang cocok.</p>
                     ) : (
                       visibleInboxThreads.map((t) => (
-                        <button
+                        <div
                           key={t.key}
-                          type="button"
-                          className={`db-inbox-item ${selectedInboxThread?.key === t.key ? "active" : ""}`}
-                          onClick={() => handleSelectInboxThread(t)}
+                          className={`db-inbox-item-row ${selectedInboxThread?.key === t.key ? "active" : ""}`}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setInboxContextMenu({ key: t.key, x: e.clientX, y: e.clientY });
+                          }}
                         >
-                          <div className="db-inbox-avatar">
-                            {(t.otherName || "?").charAt(0).toUpperCase()}
-                          </div>
-                          <div className="db-inbox-item__meta">
-                            <div className="db-inbox-item__top">
-                              <strong>{t.otherName}</strong>
-                              {t.last?.created_at && (
-                                <span className="db-inbox-item__time">
-                                  {new Date(t.last.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                              )}
+                          <button
+                            type="button"
+                            className="db-inbox-item"
+                            onClick={() => handleSelectInboxThread(t)}
+                          >
+                            <div className="db-inbox-avatar">
+                              {(t.otherName || "?").charAt(0).toUpperCase()}
                             </div>
-                            <span className="db-inbox-item__business">
-                              {t.amOwner ? (t.business?.title || "Bisnis") : "Anda bertanya ke penjual ini"}
-                            </span>
-                            <p>{t.last.message}</p>
-                          </div>
-                          {t.unread > 0 && <span className="db-inbox-dot">{t.unread}</span>}
-                        </button>
+                            <div className="db-inbox-item__meta">
+                              <div className="db-inbox-item__top">
+                                <div className="db-inbox-item__title-wrap">
+                                  <strong>{t.otherName}</strong>
+                                  <div className="db-inbox-indicators">
+                                    {t.isPinned && <Pin size={12} className="db-inbox-ind pin" title="Disematkan" />}
+                                    {t.isFavorite && <Star size={12} className="db-inbox-ind star" title="Favorit" />}
+                                    {t.isMuted && <BellOff size={12} className="db-inbox-ind muted" title="Notifikasi dibisukan" />}
+                                  </div>
+                                </div>
+                                {t.last?.created_at && (
+                                  <span className="db-inbox-item__time">
+                                    {new Date(t.last.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="db-inbox-item__business">
+                                {t.amOwner ? (t.business?.title || "Bisnis") : "Anda bertanya ke penjual ini"}
+                              </span>
+                              <p className="db-inbox-item__snippet">
+                                {t.last?.image_url || t.last?.message_type === "image" ? (
+                                  <span className="db-inbox-snippet-img"><Camera size={12} /> Foto</span>
+                                ) : (
+                                  t.last?.message || ""
+                                )}
+                              </p>
+                            </div>
+                            {t.unread > 0 && <span className="db-inbox-dot">{t.unread}</span>}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="db-inbox-dots-btn"
+                            title="Pilihan percakapan"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setInboxContextMenu(
+                                inboxContextMenu?.key === t.key
+                                  ? null
+                                  : { key: t.key, x: Math.min(rect.left, window.innerWidth - 220), y: rect.bottom + 6 }
+                              );
+                            }}
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                        </div>
                       ))
                     )}
+
+                    {/* Floating Context Menu Dropdown */}
+                    {inboxContextMenu && (() => {
+                      const targetThread = inboxThreads.find((x) => x.key === inboxContextMenu.key);
+                      if (!targetThread) return null;
+                      return (
+                        <div
+                          ref={contextMenuRef}
+                          className="db-inbox-dropdown-menu"
+                          style={{
+                            position: "fixed",
+                            top: `${Math.min(inboxContextMenu.y, window.innerHeight - 320)}px`,
+                            left: `${Math.max(10, Math.min(inboxContextMenu.x, window.innerWidth - 220))}px`,
+                            zIndex: 99999,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="db-inbox-dropdown-item"
+                            onClick={() => handleTogglePin(targetThread.key)}
+                          >
+                            <Pin size={15} />
+                            <span>{targetThread.isPinned ? "Lepas sematan chat" : "Sematkan chat"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="db-inbox-dropdown-item"
+                            onClick={() => handleToggleMarkUnread(targetThread.key)}
+                          >
+                            <Mail size={15} />
+                            <span>{targetThread.unread > 0 ? "Tandai sudah dibaca" : "Tandai belum dibaca"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="db-inbox-dropdown-item"
+                            onClick={() => handleToggleFavorite(targetThread.key)}
+                          >
+                            <Star size={15} />
+                            <span>{targetThread.isFavorite ? "Hapus dari favorit" : "Tambah ke favorit"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="db-inbox-dropdown-item"
+                            onClick={() => handleToggleArchive(targetThread.key)}
+                          >
+                            <Archive size={15} />
+                            <span>{targetThread.isArchived ? "Buka arsip chat" : "Arsipkan chat"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="db-inbox-dropdown-item"
+                            onClick={() => handleToggleMute(targetThread.key)}
+                          >
+                            <BellOff size={15} />
+                            <span>{targetThread.isMuted ? "Bunyikan notifikasi" : "Bisukan notifikasi"}</span>
+                          </button>
+                          <div className="db-inbox-dropdown-divider" />
+                          <button
+                            type="button"
+                            className="db-inbox-dropdown-item danger"
+                            onClick={() => handleClearChat(targetThread.key)}
+                          >
+                            <RefreshCw size={15} />
+                            <span>Bersihkan obrolan</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="db-inbox-dropdown-item danger"
+                            onClick={() => handleDeleteChat(targetThread.key)}
+                          >
+                            <Trash2 size={15} />
+                            <span>Hapus obrolan</span>
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </aside>
 
                   <div className="db-chat-panel">
@@ -6757,7 +7165,12 @@ export default function Dashboard() {
                               {(selectedInboxThread.otherName || "?").charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <h3>{selectedInboxThread.otherName}</h3>
+                              <div className="db-chat-header__title-row">
+                                <h3>{selectedInboxThread.otherName}</h3>
+                                {selectedInboxThread.isPinned && <Pin size={14} className="text-emerald-600" title="Disematkan" />}
+                                {selectedInboxThread.isFavorite && <Star size={14} className="text-amber-500 fill-amber-500" title="Favorit" />}
+                                {selectedInboxThread.isMuted && <BellOff size={14} className="text-slate-400" title="Notifikasi dibisukan" />}
+                              </div>
                               <span>
                                 {selectedInboxThread.amOwner
                                   ? selectedInboxThread.business?.title || "Konsumen"
@@ -6765,32 +7178,57 @@ export default function Dashboard() {
                               </span>
                             </div>
                           </div>
-                          {(selectedInboxThread.amOwner || isAdmin) && (
-                            <div className="db-chat-header__actions">
-                              <button
-                                type="button"
-                                className="db-chat-action"
-                                onClick={() => handleDeleteMessage(selectedInboxThread.last.id)}
-                                title="Hapus pesan terakhir"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          )}
+                          <div className="db-chat-header__actions">
+                            <button
+                              type="button"
+                              className="db-chat-action"
+                              title="Pilihan obrolan"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setInboxContextMenu(
+                                  inboxContextMenu?.key === selectedInboxThread.key
+                                    ? null
+                                    : { key: selectedInboxThread.key, x: Math.min(rect.left, window.innerWidth - 220), y: rect.bottom + 6 }
+                                );
+                              }}
+                            >
+                              <MoreVertical size={17} />
+                            </button>
+                          </div>
                         </div>
 
                         <div className="db-chat-thread">
-                          {selectedInboxThread.items.map((m) => {
-                            const isMine = selectedInboxThread.amOwner
-                              ? m.sender_role === "seller"
-                              : m.sender_role !== "seller";
-                            return (
-                              <div key={m.id} className={`db-chat-bubble ${isMine ? "outgoing" : "incoming"}`}>
-                                <p>{m.message}</p>
-                                <span>{m.created_at ? new Date(m.created_at).toLocaleString("id-ID") : ""}</span>
-                              </div>
-                            );
-                          })}
+                          {selectedInboxThread.items.length === 0 ? (
+                            <div className="db-chat-empty">
+                              Belum ada pesan dalam percakapan ini.
+                            </div>
+                          ) : (
+                            selectedInboxThread.items.map((m) => {
+                              const isMine = selectedInboxThread.amOwner
+                                ? m.sender_role === "seller"
+                                : m.sender_role !== "seller";
+                              return (
+                                <div key={m.id} className={`db-chat-bubble ${isMine ? "outgoing" : "incoming"}`}>
+                                  {m.image_url && (
+                                    <div className="db-chat-img-container">
+                                      <img
+                                        src={getImageUrl(m.image_url)}
+                                        alt="Foto obrolan"
+                                        className="db-chat-bubble-photo"
+                                        onClick={() => window.open(getImageUrl(m.image_url), "_blank")}
+                                      />
+                                    </div>
+                                  )}
+                                  {m.message && m.message !== "📷 Foto" && <p>{m.message}</p>}
+                                  <div className="db-chat-bubble-meta">
+                                    <span>{m.created_at ? new Date(m.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                                    {isMine && <Check size={13} className="db-chat-tick" />}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
                         </div>
 
                         {!selectedInboxThread.customer_id ? (
@@ -6812,10 +7250,32 @@ export default function Dashboard() {
                           </div>
                         ) : (
                           <div className="db-chat-composer">
+                            {/* Hidden file input for camera/photo */}
+                            <input
+                              type="file"
+                              ref={imageInputRef}
+                              accept="image/*"
+                              style={{ display: "none" }}
+                              onChange={handleSendPhoto}
+                            />
+                            <button
+                              type="button"
+                              className="db-chat-camera-btn"
+                              title="Ambil Foto Kamera Langsung"
+                              onClick={() => setShowInboxCamera(true)}
+                              disabled={sendingImage || sendingInboxReply}
+                            >
+                              {sendingImage ? (
+                                <Loader2 size={19} className="db-chat-spinner" />
+                              ) : (
+                                <Camera size={19} />
+                              )}
+                            </button>
                             <textarea
                               value={inboxDraft}
                               rows={2}
-                              placeholder="Tulis pesan..."
+                              placeholder={sendingImage ? "Sedang mengunggah foto..." : "Tulis pesan..."}
+                              disabled={sendingImage}
                               onChange={(e) => setInboxDraft(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" && !e.shiftKey) {
@@ -6827,7 +7287,7 @@ export default function Dashboard() {
                             <button
                               type="button"
                               onClick={handleInboxReply}
-                              disabled={sendingInboxReply || !inboxDraft.trim()}
+                              disabled={sendingInboxReply || sendingImage || !inboxDraft.trim()}
                             >
                               <Send size={16} />
                               {sendingInboxReply ? "Mengirim..." : "Kirim"}
@@ -6856,14 +7316,21 @@ export default function Dashboard() {
               </div>
 
               {loading ? (
-                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat bisnis favorit...</span></div>
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                  <SuradeLoader
+                    variant="section"
+                    size="md"
+                    text="Memuat bisnis favorit"
+                    minHeight="180px"
+                  />
+                </div>
               ) : savedBusinesses.length > 0 ? (
                 <div className="db-grid">
                   {savedBusinesses.map((savedBiz) => (
                     <div key={savedBiz.id} className="db-card db-saved-business-card">
                       <div className="db-saved-business-card__image">
                         <img
-                          src={savedBiz.business?.img || savedBiz.business?.image || "https://images.unsplash.com/photo-1556740738-b6a63e27c4df?w=400&h=300&fit=crop"}
+                          src={getStorageUrl(savedBiz.business?.banner || savedBiz.business?.logo || savedBiz.business?.img || savedBiz.business?.image) || "/images/businesses/pasar.jpg"}
                           alt={savedBiz.business?.name || savedBiz.business?.title}
                         />
                         <div className="db-saved-business-card__overlay">
@@ -6909,7 +7376,7 @@ export default function Dashboard() {
                             className="db-saved-business-card__action-btn whatsapp-btn"
                             onClick={() => {
                               const phone = savedBiz.business?.phone?.replace(/\D/g, "");
-                              const message = `Halo, saya tertarik dengan ${savedBiz.business?.name} yang saya lihat di Surade.co.id`;
+                              const message = `Halo, saya tertarik dengan ${savedBiz.business?.name} yang saya lihat di Surade.com`;
                               const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
                               window.open(url, "_blank");
                             }}
@@ -6963,7 +7430,14 @@ export default function Dashboard() {
               </div>
 
               {loading ? (
-                <div className="db-loader-wrap"><div className="db-spinner" /><span>Memuat ulasan...</span></div>
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                  <SuradeLoader
+                    variant="section"
+                    size="md"
+                    text="Memuat ulasan"
+                    minHeight="180px"
+                  />
+                </div>
               ) : (
                 <>
                   <div className="db-kpi-grid">
@@ -7196,7 +7670,7 @@ export default function Dashboard() {
                     type="text"
                     value={settingsDraft.site_name || ""}
                     onChange={(e) => setSettingsDraft((prev) => ({ ...prev, site_name: e.target.value }))}
-                    placeholder="Surade.co.id"
+                    placeholder="Surade.com"
                   />
                 </div>
                 <div className="db-form-group">
@@ -7205,7 +7679,7 @@ export default function Dashboard() {
                     type="email"
                     value={settingsDraft.contact_email || ""}
                     onChange={(e) => setSettingsDraft((prev) => ({ ...prev, contact_email: e.target.value }))}
-                    placeholder="admin@surade.co.id"
+                    placeholder="admin@surade.com"
                   />
                 </div>
                 <div className="db-form-group">
@@ -7470,8 +7944,8 @@ export default function Dashboard() {
                       {selectedContent 
                         ? "Perbarui konten blog atau event" 
                         : contentType === "blog" 
-                          ? "Bagikan informasi, cerita, atau pengetahuan menarik untuk pengunjung Surade.co.id"
-                          : "Buat event menarik untuk pengunjung Surade.co.id"}
+                          ? "Bagikan informasi, cerita, atau pengetahuan menarik untuk pengunjung Surade.com"
+                          : "Buat event menarik untuk pengunjung Surade.com"}
                     </p>
                   </div>
                   <div className="db-hero__illustration">
@@ -7681,6 +8155,8 @@ export default function Dashboard() {
                             >
                               <TileLayer
                                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                subdomains={['a', 'b', 'c']}
+                                maxZoom={19}
                                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                               />
                               <MapClickHandler setPosition={setMapPosition} />
@@ -7886,8 +8362,8 @@ export default function Dashboard() {
               <>
               <div className="db-content-header">
                 <div>
-                  <h2>Manajemen Blog & Event</h2>
-                  <p className="db-content-header__subtitle">Kelola artikel blog dan acara dalam satu halaman</p>
+                  <h2>Manajemen Info & Event</h2>
+                  <p className="db-content-header__subtitle">Kelola artikel info dan acara dalam satu halaman</p>
                 </div>
               </div>
 
@@ -7899,7 +8375,7 @@ export default function Dashboard() {
                     onClick={() => setContentTypeFilter("blog")}
                   >
                     <BookOpen size={16} />
-                    Blog
+                    Info
                   </button>
                   {/* Tab "Event" sekarang tampil untuk semua role (bukan
                       cuma admin) supaya tampilannya sama persis dengan
@@ -8082,55 +8558,144 @@ export default function Dashboard() {
                 />
               ) : (
                 <>
-                  {/* Referral Hero Banner */}
-                  <div className="db-referral-hero">
-                    <div className="db-referral-hero__left">
-                      <span className="db-referral-hero__badge">🎁 Program Kemitraan</span>
-                      <h3>Dapatkan Komisi <span style={{color:'#f59e0b'}}>15%</span> Dari Setiap Referral!</h3>
-                      <p>Bagikan kode unik Anda kepada rekan usaha. Teman Anda mendapat diskon 5%, Anda mendapat komisi tunai 15% otomatis.</p>
-                      <div className="db-referral-code-row">
-                        <div className="db-referral-code-box">
-                          <span>{referralStats?.referral_code || user?.referral_code || "Belum Ada"}</span>
+                  {/* Status 1: User Biasa (Belum Punya Usaha) */}
+                  {referralStats?.agent_status === "regular_user" && (
+                    <div className="db-card" style={{padding:'40px 24px', textAlign:'center', maxWidth: 680, margin: '20px auto', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)'}}>
+                      <div style={{width: 64, height: 64, borderRadius: '20px', background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', display:'inline-flex', alignItems:'center', justifyContent:'center', color: '#fff', marginBottom: 16, boxShadow: '0 8px 16px -4px rgba(13,148,136,0.3)'}}>
+                        <Store size={32} />
+                      </div>
+                      <div>
+                        <span style={{display:'inline-block', padding:'4px 14px', background:'#f1f5f9', color:'#475569', borderRadius: 99, fontSize: '0.8rem', fontWeight: 700, marginBottom: 12}}>
+                          Syarat Menjadi Agen Referral
+                        </span>
+                      </div>
+                      <h3 style={{fontSize:'1.35rem', fontWeight: 800, color:'#0f172a', marginBottom: 10}}>Daftarkan Usaha Anda Terlebih Dahulu</h3>
+                      <p style={{color:'#64748b', fontSize:'0.92rem', lineHeight: 1.6, maxWidth: 520, margin:'0 auto 24px'}}>
+                        Sebagai pengguna biasa, Anda belum memiliki kode referral. Untuk menjadi <strong>Agen Referral Surade</strong> dan mendapatkan komisi bagi hasil, daftarkan usaha Anda terlebih dahulu, kemudian lakukan upgrade ke paket Premium yang terverifikasi.
+                      </p>
+                      <div style={{display:'flex', gap: 12, justifyContent:'center', flexWrap:'wrap'}}>
+                        <Link
+                          to="/add-business"
+                          className="db-action-btn"
+                          style={{padding:'12px 24px', fontSize:'0.92rem', borderRadius: 12, textDecoration:'none', display:'inline-flex', alignItems:'center', gap: 8}}
+                        >
+                          <Store size={18} /> Daftarkan Usaha Sekarang
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status 2: Penjual Usaha Free (Belum Menjadi Agen) */}
+                  {referralStats?.agent_status === "free_seller" && (
+                    <div className="db-card" style={{padding:'40px 24px', textAlign:'center', maxWidth: 680, margin: '20px auto', borderRadius: '16px', border: '1px solid #fef08a', background: 'linear-gradient(180deg, #fffbeb 0%, #ffffff 100%)', boxShadow: '0 4px 20px -2px rgba(245,158,11,0.08)'}}>
+                      <div style={{width: 64, height: 64, borderRadius: '20px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', display:'inline-flex', alignItems:'center', justifyContent:'center', color: '#fff', marginBottom: 16, boxShadow: '0 8px 16px -4px rgba(245,158,11,0.3)'}}>
+                        <Crown size={32} />
+                      </div>
+                      <div>
+                        <span style={{display:'inline-block', padding:'4px 14px', background:'#fef3c7', color:'#92400e', borderRadius: 99, fontSize: '0.8rem', fontWeight: 700, marginBottom: 12}}>
+                          Syarat Menjadi Agen Referral
+                        </span>
+                      </div>
+                      <h3 style={{fontSize:'1.35rem', fontWeight: 800, color:'#0f172a', marginBottom: 10}}>Upgrade Usaha Anda ke Paket Premium</h3>
+                      <p style={{color:'#64748b', fontSize:'0.92rem', lineHeight: 1.6, maxWidth: 520, margin:'0 auto 24px'}}>
+                        Penjual dengan status usaha Free belum menjadi Agen Referral dan belum mendapatkan kode referral. Silakan upgrade usaha Anda ke paket <strong>Premium</strong> dan tunggu pembayaran diverifikasi untuk mengaktifkan kode referral dan menikmati komisi tunai.
+                      </p>
+                      <div style={{display:'flex', gap: 12, justifyContent:'center', flexWrap:'wrap'}}>
+                        <button
+                          type="button"
+                          className="db-action-btn"
+                          style={{padding:'12px 24px', fontSize:'0.92rem', borderRadius: 12, background:'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', display:'inline-flex', alignItems:'center', gap: 8}}
+                          onClick={() => setActiveTab("premium")}
+                        >
+                          <Crown size={18} /> Upgrade ke Premium Sekarang
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status 3: Premium Kedaluwarsa (Nonaktif Sementara) */}
+                  {referralStats?.agent_status === "expired_premium" && (
+                    <div style={{padding:'20px 24px', borderRadius: '14px', border: '1px solid #fecaca', background: '#fff1f2', display:'flex', alignItems:'flex-start', gap: 16, marginBottom: 24}}>
+                      <div style={{width: 44, height: 44, borderRadius: '12px', background: '#fee2e2', display:'flex', alignItems:'center', justifyContent:'center', color: '#dc2626', flexShrink: 0}}>
+                        <AlertTriangle size={24} />
+                      </div>
+                      <div style={{flex: 1}}>
+                        <div style={{display:'flex', alignItems:'center', gap: 8, flexWrap:'wrap', marginBottom: 4}}>
+                          <h4 style={{margin: 0, fontWeight: 800, color: '#991b1b', fontSize: '1.05rem'}}>Status Agen Referral Dinonaktifkan Sementara</h4>
+                          <span style={{padding:'2px 8px', background:'#fee2e2', color:'#b91c1c', borderRadius: 6, fontSize:'0.75rem', fontWeight: 700}}>Premium Kedaluwarsa</span>
                         </div>
+                        <p style={{margin: '0 0 14px', color: '#7f1d1d', fontSize: '0.88rem', lineHeight: 1.5}}>
+                          Masa aktif paket Premium usaha Anda telah berakhir. Status agen referral dan kode referral dinonaktifkan sementara sampai usaha diperpanjang ke paket Premium. Riwayat pengguna dan hubungan referral sebelumnya <strong>tetap aman tersimpan</strong>.
+                        </p>
                         <button
-                          className="db-btn-secondary"
-                          style={{gap:'6px'}}
-                          onClick={() => {
-                            const code = referralStats?.referral_code || user?.referral_code;
-                            if (code) {
-                              navigator.clipboard.writeText(code);
-                              alert('Kode referral berhasil disalin!');
-                            }
-                          }}
+                          type="button"
+                          className="db-action-btn"
+                          style={{padding:'8px 18px', fontSize:'0.85rem', borderRadius: 8, background: '#dc2626'}}
+                          onClick={() => setActiveTab("premium")}
                         >
-                          <Copy size={14} /> Salin Kode
-                        </button>
-                        <button
-                          className="db-btn-secondary"
-                          style={{gap:'6px'}}
-                          onClick={() => {
-                            const code = referralStats?.referral_code || user?.referral_code;
-                            if (!code) { alert('Anda belum memiliki kode referral.'); return; }
-                            const shareUrl = `${window.location.origin}/register?ref=${code}`;
-                            if (navigator.share) {
-                              navigator.share({ title: 'Daftar di Surade.co.id', text: `Gunakan kode referral saya: ${code}`, url: shareUrl }).catch(console.error);
-                            } else {
-                              navigator.clipboard.writeText(shareUrl);
-                              alert('Link referral berhasil disalin!');
-                            }
-                          }}
-                        >
-                          <Share2 size={14} /> Bagikan Link
+                          Perpanjang Masa Premium Usaha
                         </button>
                       </div>
                     </div>
-                    <div className="db-referral-hero__right">
-                      <div className="db-referral-commission-badge">
-                        <span className="db-referral-commission-badge__pct">15%</span>
-                        <span>Komisi per referral</span>
+                  )}
+
+                  {/* Status 4: Agen Premium Aktif (Tampilkan Hero Lengkap) */}
+                  {referralStats?.is_agent && referralStats?.agent_status === "active" && (
+                    <div className="db-referral-hero">
+                      <div className="db-referral-hero__left">
+                        <span className="db-referral-hero__badge">🎁 Agen Referral Resmi</span>
+                        <h3>Dapatkan Komisi <span style={{color:'#f59e0b'}}>10% - 15%</span> Dari Setiap Referral!</h3>
+                        <p>Bagikan kode unik Anda kepada calon mitra usaha. Teman Anda mendapat potongan harga, Anda mendapat komisi tunai otomatis setelah verifikasi pembayaran.</p>
+                        <div className="db-referral-code-row">
+                          <div className="db-referral-code-box">
+                            <span>{referralStats?.referral_code || "KODE-AKTIF"}</span>
+                          </div>
+                          <button
+                            className="db-btn-secondary"
+                            style={{gap:'6px'}}
+                            onClick={() => {
+                              const code = referralStats?.referral_code;
+                              if (code) {
+                                navigator.clipboard.writeText(code);
+                                alert('Kode referral berhasil disalin!');
+                              }
+                            }}
+                          >
+                            <Copy size={14} /> Salin Kode
+                          </button>
+                          <button
+                            className="db-btn-secondary"
+                            style={{gap:'6px'}}
+                            onClick={async () => {
+                              const code = referralStats?.referral_code;
+                              if (!code) { toast.error('Anda belum memiliki kode referral aktif.'); return; }
+                              const shareUrl = referralStats?.referral_link || `https://surade.com/register?ref=${code}`;
+                              const shareText = `🎉 Daftarkan usaha UMKM kamu di Surade.com menggunakan kode referral saya: *${code}* dan nikmati promo diskon spesial!\n\nKlik link pendaftaran instan di sini:\n${shareUrl}`;
+
+                              if (navigator.share) {
+                                try {
+                                  await navigator.share({ title: 'Daftar di Surade.com', text: shareText, url: shareUrl });
+                                  return;
+                                } catch (e) {
+                                  if (e.name !== 'AbortError') console.warn('Share error:', e);
+                                }
+                              }
+                              const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+                              window.open(waUrl, '_blank');
+                            }}
+                          >
+                            <Share2 size={14} /> Bagikan Link
+                          </button>
+                        </div>
+                      </div>
+                      <div className="db-referral-hero__right">
+                        <div className="db-referral-commission-badge">
+                          <span className="db-referral-commission-badge__pct">10%</span>
+                          <span>Komisi per referral</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Stat Cards */}
                   <div className="db-saas-stats-row" style={{marginTop:'24px'}}>
@@ -9380,7 +9945,7 @@ export default function Dashboard() {
                 <div className="db-form-group">
                   <label>Role</label>
                   <select value={uRole} onChange={(e) => setURole(e.target.value)}>
-                    <option value="user">User Biasa</option>
+                    <option value="user">User</option>
                     <option value="reseller">Reseller</option>
                     <option value="admin">Administrator</option>
                   </select>
@@ -9518,12 +10083,185 @@ export default function Dashboard() {
         />
       )}
 
+      {showInboxCamera && (
+        <CameraCaptureModal
+          onCancel={() => setShowInboxCamera(false)}
+          onCapture={(dataUrl) => {
+            setShowInboxCamera(false);
+            // Convert dataUrl to File and send photo
+            fetch(dataUrl)
+              .then((res) => res.blob())
+              .then((blob) => {
+                const file = new File([blob], `inbox-photo-${Date.now()}.png`, { type: "image/png" });
+                handleSendPhoto({ target: { files: [file] } });
+              })
+              .catch((err) => {
+                console.error("Gagal memproses foto kamera:", err);
+                alert("Gagal memproses foto dari kamera.");
+              });
+          }}
+        />
+      )}
+
       {cropperSrc && (
         <AvatarCropperModal
           imageSrc={cropperSrc}
           onCancel={handleCropperCancel}
           onSave={handleCropperSave}
         />
+      )}
+
+      {/* Admin Bisnis Detail Modal */}
+      {showAdminBizDetail && adminBizDetailData && (
+        <div
+          className="db-modal-overlay"
+          onClick={() => setShowAdminBizDetail(false)}
+          style={{ alignItems: 'flex-start', paddingTop: '40px', overflowY: 'auto' }}
+        >
+          <div
+            className="db-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px' }}
+          >
+            <div className="db-modal-header" style={{ background: 'linear-gradient(135deg,#007570,#009688)', color: '#fff' }}>
+              <h3 style={{ color: '#fff', margin: 0 }}>Detail Bisnis & Bukti Transaksi</h3>
+              <button className="db-modal-close" style={{ color: '#fff', fontSize: '22px' }} onClick={() => setShowAdminBizDetail(false)}>×</button>
+            </div>
+            <div className="db-modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Business info card */}
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px', display: 'flex', gap: '16px' }}>
+                <img
+                  src={adminBizDetailData.images?.length > 0 ? getImageUrl(adminBizDetailData.images[0]) : adminBizDetailData.image ? getImageUrl(adminBizDetailData.image) : 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=100&h=80&fit=crop'}
+                  alt={adminBizDetailData.title}
+                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    <span style={{ background: '#d1fae5', color: '#065f46', padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>{adminBizDetailData.category?.name || '-'}</span>
+                    {adminBizDetailData.is_premium && <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>👑 Bisnis Premium</span>}
+                    <span style={{ background: adminBizDetailData.status === 'approved' ? '#d1fae5' : '#fee2e2', color: adminBizDetailData.status === 'approved' ? '#065f46' : '#991b1b', padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>{adminBizDetailData.status === 'approved' ? 'Aktif' : adminBizDetailData.status === 'pending' ? 'Pending' : 'Ditolak'}</span>
+                  </div>
+                  <h3 style={{ margin: '0 0 6px', fontWeight: 800, fontSize: '18px' }}>{adminBizDetailData.title}</h3>
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '13px' }}>📍 {adminBizDetailData.address}</p>
+                </div>
+              </div>
+              {/* Owner & Contact */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', marginBottom: '8px' }}>PEMILIK BISNIS</div>
+                  <div style={{ fontWeight: 700 }}>{adminBizDetailData.user?.name || 'Reseller'}</div>
+                  <div style={{ color: '#6b7280', fontSize: '13px' }}>{adminBizDetailData.user?.email || 'user@surade.com'}</div>
+                </div>
+                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', marginBottom: '8px' }}>KONTAK / TELEPON</div>
+                  <div style={{ fontWeight: 700 }}>{adminBizDetailData.phone || '-'}</div>
+                  <div style={{ color: '#6b7280', fontSize: '13px' }}>{adminBizDetailData.website || 'Tidak ada website'}</div>
+                </div>
+              </div>
+              {/* Description */}
+              {adminBizDetailData.description && (
+                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', marginBottom: '8px' }}>DESKRIPSI USAHA</div>
+                  {/<[a-z][\s\S]*>/i.test(adminBizDetailData.description) ? (
+                    <div
+                      style={{ margin: 0, lineHeight: 1.6, color: '#374151', fontSize: '14px' }}
+                      dangerouslySetInnerHTML={{ __html: adminBizDetailData.description }}
+                    />
+                  ) : (
+                    <p style={{ margin: 0, lineHeight: 1.6, color: '#374151', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
+                      {adminBizDetailData.description}
+                    </p>
+                  )}
+                </div>
+              )}
+              {/* Transaction status */}
+              {(() => {
+                const sub = adminBizDetailData?.subscription || adminBizDetailData?.subscriptions?.[0] || adminBizDetailData?.latest_subscription || adminBizDetailData?.latestSubscription;
+                const pay = adminBizDetailData?.payment || sub?.payment;
+                const rawProof = pay?.proof || sub?.proof_path || sub?.payment?.proof || adminBizDetailData?.proof_document;
+                const proofUrl = rawProof ? getStorageUrl(rawProof) : null;
+                const isPremiumBiz = Boolean(
+                  adminBizDetailData?.is_premium || 
+                  (adminBizDetailData?.package && adminBizDetailData.package !== 'free' && adminBizDetailData.package !== 'reguler') || 
+                  (adminBizDetailData?.premium_plan && !adminBizDetailData.premium_plan.toLowerCase().includes('free'))
+                );
+                const hasPaidSub = Boolean(
+                  sub && (
+                    Number(sub.final_price || sub.price || sub.amount) > 0 || 
+                    (sub.plan && !String(sub.plan?.name || sub.plan).toLowerCase().includes('free'))
+                  )
+                );
+                const hasPaidPay = Boolean(
+                  pay && (Number(pay.amount) > 0 || pay.proof)
+                );
+                const hasProof = Boolean(proofUrl || rawProof);
+                const hasTxInfo = isPremiumBiz || hasPaidSub || hasPaidPay || hasProof;
+
+                if (!hasTxInfo) {
+                  return null;
+                }
+
+                const totalAmount = Number(sub?.final_price || sub?.amount || pay?.amount || sub?.price || 0);
+
+                return (
+                  <div style={{ border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '14px', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'between', gap: '8px', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '18px' }}>💳</span>
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#1e40af', letterSpacing: '0.06em' }}>STATUS TRANSAKSI & BUKTI PEMBAYARAN</span>
+                      </div>
+                    </div>
+                    {adminBizDetailData.is_premium ? (
+                      <div style={{ background: '#d1fae5', borderRadius: '8px', padding: '12px', color: '#065f46', fontSize: '14px' }}>
+                        ✅ Bisnis Premium aktif. Paket berakhir: {adminBizDetailData.premium_expires_at ? new Date(adminBizDetailData.premium_expires_at).toLocaleDateString('id-ID') : 'Tidak diketahui'}
+                      </div>
+                    ) : sub || pay || proofUrl ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', fontSize: '13px' }}>
+                          <div>
+                            <span style={{ color: '#94a3b8', fontSize: '11px', display: 'block' }}>Total Tagihan:</span>
+                            <span style={{ fontWeight: 800, color: '#007570' }}>Rp {totalAmount.toLocaleString('id-ID')}</span>
+                          </div>
+                          <div>
+                            <span style={{ color: '#94a3b8', fontSize: '11px', display: 'block' }}>Status Pembayaran:</span>
+                            <span style={{ fontWeight: 700, color: '#d97706' }}>Menunggu Verifikasi</span>
+                          </div>
+                        </div>
+                        {proofUrl && (
+                          <div style={{ marginTop: '8px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>FOTO BUKTI PEMBAYARAN:</div>
+                            <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#0f172a', display: 'flex', justifyContent: 'center', padding: '4px', maxHeight: '200px' }}>
+                              <img src={proofUrl} alt="Bukti Transfer" style={{ maxHeight: '190px', maxWidth: '100%', objectFit: 'contain' }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ background: '#f1f5f9', borderRadius: '8px', padding: '12px', color: '#475569', fontSize: '14px' }}>
+                        ☑️ Usaha terdaftar pada paket Reguler / Free (Tidak memerlukan bukti transfer).
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button
+                  style={{ flex: 1, padding: '10px', background: '#007570', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}
+                  onClick={() => window.open(`/business/${adminBizDetailData.id}`, '_blank')}
+                >
+                  Buka Halaman Bisnis →
+                </button>
+                <button
+                  style={{ padding: '10px 16px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}
+                  onClick={() => setShowAdminBizDetail(false)}
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Payment Gateway Modal */}

@@ -25,6 +25,10 @@ export default function BlogCreate() {
     eventDate: "",
   });
 
+  useEffect(() => {
+    document.title = `Buat ${formData.type === "blog" ? "Artikel" : "Event"} - Surade.com`;
+  }, [formData.type]);
+
   const [thumbnail, setThumbnail] = useState(null);
   const [banners, setBanners] = useState([]);
   const [gallery, setGallery] = useState([]);
@@ -44,12 +48,21 @@ export default function BlogCreate() {
   const handleThumbnailUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Ukuran file thumbnail maksimal 5MB.");
+        return;
+      }
       setThumbnail({ file, preview: URL.createObjectURL(file) });
     }
   };
 
   const handleBannerUpload = (e) => {
     const files = Array.from(e.target.files);
+    const oversized = files.find(f => f.size > 5 * 1024 * 1024);
+    if (oversized) {
+      setError("Ukuran banner maksimal 5MB per file.");
+      return;
+    }
     if (banners.length + files.length <= 4) {
       const newBanners = files.map((file) => ({ file, preview: URL.createObjectURL(file) }));
       setBanners((prev) => [...prev, ...newBanners]);
@@ -60,6 +73,11 @@ export default function BlogCreate() {
 
   const handleGalleryUpload = (e) => {
     const files = Array.from(e.target.files);
+    const oversized = files.find(f => f.size > 5 * 1024 * 1024);
+    if (oversized) {
+      setError("Ukuran foto galeri maksimal 5MB per file.");
+      return;
+    }
     const newGallery = files.map((file) => ({ file, preview: URL.createObjectURL(file) }));
     setGallery((prev) => [...prev, ...newGallery]);
   };
@@ -155,7 +173,7 @@ export default function BlogCreate() {
               Buat <span className="bc-hero__title-highlight">{isBlog ? "Blog" : "Event"}</span> Baru
             </h1>
             <p className="bc-hero__subtitle">
-              Bagikan informasi, cerita, atau pengetahuan menarik untuk pengunjung Surade.co.id
+              Bagikan informasi, cerita, atau pengetahuan menarik untuk pengunjung Surade.com
             </p>
           </div>
           <div className="bc-hero__illustration">

@@ -14,7 +14,7 @@
 Buka **Command Prompt** atau **Terminal**, lalu jalankan:
 
 ```bash
-cd c:\laragon\www\Surade.co.id\backend
+cd c:\laragon\www\Surade.com\backend
 php artisan cache:clear
 php artisan config:clear
 php artisan view:clear
@@ -32,7 +32,7 @@ php artisan route:clear
 
 #### Lalu jalankan lagi:
 ```bash
-cd c:\laragon\www\Surade.co.id\frontend
+cd c:\laragon\www\Surade.com\frontend
 npm run dev
 ```
 
@@ -65,7 +65,7 @@ npm run dev
 
 ### **Step 1: Buka Terminal**
 ```bash
-cd c:\laragon\www\Surade.co.id\backend
+cd c:\laragon\www\Surade.com\backend
 php artisan tinker
 ```
 
@@ -83,7 +83,7 @@ Buka: **https://mail.google.com/mail/u/0/#inbox**
 
 Anda akan lihat email baru dengan:
 - ✅ Logo "S" di tengah header
-- ✅ Text "Surade.co.id" di sebelah kanan
+- ✅ Text "Surade.com" di sebelah kanan
 - ✅ Design gradient teal
 - ✅ OTP code besar
 - ✅ Warning box kuning
@@ -124,18 +124,18 @@ Anda akan lihat email baru dengan:
 
 ### **Check 1: Verifikasi Email Template**
 ```bash
-cd c:\laragon\www\Surade.co.id\backend\resources\views\emails
+cd c:\laragon\www\Surade.com\backend\resources\views\emails
 notepad otp.blade.php
 ```
 
 **Cari text ini:**
-- `Surade.co.id` → Harus ada di line ~42
+- `Surade.com` → Harus ada di line ~42
 - `Platform UMKM Digital Kecamatan Surade` → Harus ada
 - `<div class="logo">S</div>` → Harus ada
 
 ### **Check 2: Verifikasi PaymentMethodSelector**
 ```bash
-cd c:\laragon\www\Surade.co.id\frontend\src\components
+cd c:\laragon\www\Surade.com\frontend\src\components
 notepad PaymentMethodSelector.jsx
 ```
 
@@ -247,7 +247,7 @@ dir
 ### **1. Clear All Cache (2 menit)**
 ```bash
 # Terminal 1: Backend
-cd c:\laragon\www\Surade.co.id\backend
+cd c:\laragon\www\Surade.com\backend
 php artisan cache:clear
 php artisan config:clear
 php artisan view:clear
@@ -257,14 +257,14 @@ php artisan serve
 
 ```bash
 # Terminal 2: Frontend
-cd c:\laragon\www\Surade.co.id\frontend
+cd c:\laragon\www\Surade.com\frontend
 npm run dev
 ```
 
 ### **2. Test Email (3 menit)**
 ```bash
 # Terminal 3: Tinker
-cd c:\laragon\www\Surade.co.id\backend
+cd c:\laragon\www\Surade.com\backend
 php artisan tinker
 
 # Di tinker, paste ini:
@@ -306,7 +306,7 @@ Mail::to('your-email@gmail.com')->send(new \App\Mail\OtpMail('123456', 'Your Nam
 ### **Email Baru:**
 ```
 ╔════════════════════════════╗
-║   [S]  Surade.co.id       ║  ← LOGO DI TENGAH
+║   [S]  Surade.com       ║  ← LOGO DI TENGAH
 ║   Platform UMKM Digital   ║  ← TEKS BARU
 ╠════════════════════════════╣
 ║  Halo! 👋                 ║
@@ -343,4 +343,4 @@ Mail::to('your-email@gmail.com')->send(new \App\Mail\OtpMail('123456', 'Your Nam
 
 ---
 
-**Need help? Contact: support@surade.co.id**
+**Need help? Contact: support@surade.com**

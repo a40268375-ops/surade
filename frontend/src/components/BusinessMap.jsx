@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from "re
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { findLocationCoords, DEFAULT_LOCATION } from "../data/idLocations";
+import { getScheduleForDay, isOpenNow } from "../utils/businessHours";
 import "./BusinessMap.css";
 
 // Di zoom berapa pin-pin yang berdekatan mulai "dipecah" jadi satu-satu.
@@ -34,14 +35,18 @@ export default function BusinessMap({ businesses = [], fallbackCenter = null, fa
       <MapContainer
         center={fallbackCenter || [-2.5, 118]}
         zoom={fallbackCenter ? fallbackZoom : 5}
-        scrollWheelZoom
+        scrollWheelZoom={false}
+        touchZoom={false}
+        doubleClickZoom={false}
+        boxZoom={false}
+        zoomControl={true}
         className="biz-map__canvas"
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-          subdomains="abcd"
-          maxZoom={20}
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          subdomains={['a', 'b', 'c']}
+          maxZoom={19}
         />
         <InvalidateOnResize />
         <FitBounds points={rawPoints} fallbackCenter={fallbackCenter} fallbackZoom={fallbackZoom} />
@@ -275,6 +280,45 @@ function PopupCard({ biz }) {
   const photos = [biz.img, ...(biz.images || [])].filter(Boolean).slice(0, 2);
   const addressText = biz.address || biz.location || "";
 
+  const todaySchedule = biz.opening_days ? getScheduleForDay(biz.opening_days) : null;
+  const calculatedIsOpen = biz.opening_days ? isOpenNow(biz.opening_days) : null;
+
+  let hoursStr = "";
+  if (todaySchedule && todaySchedule.open && todaySchedule.close) {
+    if (todaySchedule.open === "00:00" && (todaySchedule.close === "23:59" || todaySchedule.close === "24:00" || todaySchedule.close === "00:00")) {
+      hoursStr = "24 Jam";
+    } else {
+      hoursStr = `${todaySchedule.open} - ${todaySchedule.close}`;
+    }
+  } else if (biz.operating_hours || biz.opening_hours || biz.hours) {
+    hoursStr = biz.operating_hours || biz.opening_hours || biz.hours;
+  } else if (biz.open_time && biz.close_time) {
+    hoursStr = `${biz.open_time} - ${biz.close_time}`;
+  }
+  
+  const isOpen = (() => {
+    if (calculatedIsOpen !== null) return calculatedIsOpen;
+    if (hoursStr) {
+      if (/24\s*(jam|hours?)/i.test(hoursStr)) return true;
+      const match = String(hoursStr).match(/(\d{1,2})[:.](\d{2})\s*[-–—]\s*(\d{1,2})[:.](\d{2})/);
+      if (match) {
+        const openMin = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+        const closeMin = parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
+        const now = new Date();
+        const curMin = now.getHours() * 60 + now.getMinutes();
+        if (closeMin >= openMin) return curMin >= openMin && curMin <= closeMin;
+        return curMin >= openMin || curMin <= closeMin;
+      }
+    }
+    if (biz.is_open_now != null) return Boolean(biz.is_open_now);
+    if (biz.status === "Buka Sekarang") return true;
+    if (biz.status === "Tutup") return false;
+    return true;
+  })();
+
+  const statusLabel = isOpen ? "Buka Sekarang" : "Tutup";
+  const displayHours = hoursStr || (isOpen ? "Buka Hari Ini" : "Tutup Hari Ini");
+
   return (
     <div className="biz-map-popup__card">
       {photos.length > 0 && (
@@ -302,10 +346,10 @@ function PopupCard({ biz }) {
           <p className="biz-map-popup__address">{addressText}</p>
         )}
         <p className="biz-map-popup__status">
-          <span className={biz.status === "Buka Sekarang" ? "is-open" : "is-closed"}>
-            {biz.status}
+          <span className={isOpen ? "is-open" : "is-closed"}>
+            {statusLabel}
           </span>
-          {biz.hours ? ` · ${biz.hours}` : ""}
+          {displayHours ? ` · ${displayHours}` : ""}
         </p>
         <a className="biz-map-popup__cta" href={`/business/${biz.id}`}>
           Lihat Detail →

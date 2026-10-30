@@ -49,7 +49,7 @@ class UserRegistrationRequest extends FormRequest
                 'nullable',
                 'string',
                 'exists:users,referral_code',
-                'regex:/^[A-Za-z0-9]{6,12}$/'
+                'regex:/^[A-Za-z0-9\-_]{4,30}$/'
             ],
             'phone' => [
                 'nullable',

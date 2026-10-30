@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo   TEST EMAIL OTP - SURADE.CO.ID
+echo   TEST EMAIL OTP - SURADE.COM
 echo ========================================
 echo.
 echo Masukkan detail untuk test email:

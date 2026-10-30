@@ -2,20 +2,26 @@ import { Link } from "react-router-dom";
 import { useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import coastBg from "../assets/surade-coast.jpg";
 import {
   Target,
   Eye,
-  Award,
+  ShieldCheck,
   Users,
   Globe,
   Zap,
-  Heart,
+  Sparkles,
+  Compass,
+  CheckCircle2,
+  Lock,
+  HeartHandshake
 } from "lucide-react";
 import "./VisionMission.css";
 
 export default function VisionMission() {
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.title = "Visi & Misi - Surade.com";
   }, []);
 
   return (
@@ -23,97 +29,145 @@ export default function VisionMission() {
       {/* NAVBAR */}
       <Navbar />
 
-      {/* HERO SECTION */}
+      {/* HERO SECTION WITH COASTAL BACKGROUND & WAVE DIVIDER */}
       <section className="vm-hero">
-        <div className="vm-hero__bg" />
+        <div 
+          className="vm-hero__bg"
+          style={{ backgroundImage: `url(${coastBg})` }}
+        />
         <div className="vm-hero__overlay" />
+        <div className="vm-hero__glow" />
+
         <div className="vm-hero__content">
-          <h1 className="vm-hero__title">Visi &amp; Misi</h1>
+          <div className="vm-hero__badge">
+            <Sparkles size={14} className="vm-hero__badge-icon" />
+            <span>Arah &amp; Komitmen Surade.com</span>
+          </div>
+
+          <div className="vm-hero__breadcrumb">
+            <Link to="/">Home</Link>
+            <span className="separator">/</span>
+            <span>Visi &amp; Misi</span>
+          </div>
+
+          <h1 className="vm-hero__title">
+            Visi &amp; <span>Misi</span>
+          </h1>
+
           <p className="vm-hero__subtitle">
-            Mendorong kemandirian ekonomi UMKM dan kemajuan digital di 12 Desa Kecamatan Surade
+            Mendorong kemandirian ekonomi UMKM dan kemajuan digital di 12 Desa &amp; Kelurahan Kecamatan Surade
           </p>
+        </div>
+
+        {/* ORGANIC WAVE DIVIDER (GELOMBANG) */}
+        <div className="vm-hero__wave">
+          <svg
+            viewBox="0 0 1440 120"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M0,32L48,42.7C96,53,192,75,288,80C384,85,480,75,576,58.7C672,43,768,21,864,21.3C960,21,1056,43,1152,53.3C1248,64,1344,64,1392,64L1440,64L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"
+              fill="#ffffff"
+            />
+          </svg>
         </div>
       </section>
 
       {/* VISION SECTION */}
       <section className="vm-section vm-section--vision">
-        <div className="vm-section__inner">
-          <div className="vm-section__icon">
-            <Eye size={64} />
+        <div className="vm-container">
+          <div className="vm-vision-card">
+            <div className="vm-section-tag">
+              <Eye size={16} />
+              <span>PANDANGAN KE DEPAN</span>
+            </div>
+
+            <div className="vm-vision-icon">
+              <Eye size={40} />
+            </div>
+
+            <h2 className="vm-vision-title">Visi Kami</h2>
+
+            <div className="vm-vision-quote">
+              <p className="vm-vision-text">
+                &ldquo;Menjadi portal UMKM yang menghubungkan pelaku UMKM dan jasa di 12 desa/kelurahan.&rdquo;
+              </p>
+            </div>
           </div>
-          <h2 className="vm-section__title">Visi Kami</h2>
-          <p className="vm-section__text">
-            Menjadi portal digital terdepan di Kecamatan Surade yang menghubungkan masyarakat, wisatawan, dan pelaku usaha lokal di 12 desa/kelurahan, serta mendorong kemandirian ekonomi daerah melalui integrasi teknologi informasi yang mudah, inklusif, dan berkelanjutan.
-          </p>
         </div>
       </section>
 
       {/* MISSION SECTION */}
       <section className="vm-section vm-section--mission">
-        <div className="vm-section__inner">
-          <div className="vm-section__icon">
-            <Target size={64} />
+        <div className="vm-container">
+          <div className="vm-section-header">
+            <div className="vm-section-tag">
+              <Target size={16} />
+              <span>LANGKAH STRATEGIS</span>
+            </div>
+            <h2 className="vm-section__title">Misi Kami</h2>
+            <p className="vm-section__subtitle">
+              Dedikasi dan aksi nyata Surade.com dalam mendukung kemajuan pelaku UMKM dan kemudahan masyarakat
+            </p>
           </div>
-          <h2 className="vm-section__title">Misi Kami</h2>
-          <div className="vm-mission-list">
-            <div className="vm-mission-item">
-              <div className="vm-mission-item__icon">
-                <Globe size={24} />
+
+          <div className="vm-mission-grid">
+            {/* Mission Item 1 */}
+            <div className="vm-mission-card">
+              <div className="vm-mission-card__header">
+                <div className="vm-mission-card__icon">
+                  <Globe size={26} />
+                </div>
+                <div className="vm-mission-card__num">01</div>
               </div>
-              <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Integrasi 12 Desa</h4>
-                <p className="vm-mission-item__text">
-                  Menyediakan direktori dan akses informasi terpadu untuk seluruh desa dan kelurahan di Kecamatan Surade tanpa terkecuali.
-                </p>
-              </div>
+              <h4 className="vm-mission-card__title">Terhubung dengan 12 Desa/Kelurahan di Surade</h4>
+              <p className="vm-mission-card__text">
+                Menyediakan wadah UMKM dan jasa, serta akses direktori informasi terpadu untuk seluruh desa dan kelurahan di Surade.
+              </p>
             </div>
 
-            <div className="vm-mission-item">
-              <div className="vm-mission-item__icon">
-                <Users size={24} />
+            {/* Mission Item 2 */}
+            <div className="vm-mission-card">
+              <div className="vm-mission-card__header">
+                <div className="vm-mission-card__icon">
+                  <Users size={26} />
+                </div>
+                <div className="vm-mission-card__num">02</div>
               </div>
-              <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Pemberdayaan UMKM Lokal</h4>
-                <p className="vm-mission-item__text">
-                  Mendampingi pedagang, pengrajin, dan pelaku jasa lokal agar memiliki profil bisnis digital, katalog produk, dan akses pasar yang lebih luas.
-                </p>
-              </div>
+              <h4 className="vm-mission-card__title">Pemberdayaan UMKM Lokal</h4>
+              <p className="vm-mission-card__text">
+                Mendampingi pelaku UMKM dan jasa lokal agar memiliki profil bisnis digital yang interaktif, etalase katalog produk, dan akses pasar yang lebih luas.
+              </p>
             </div>
 
-            <div className="vm-mission-item">
-              <div className="vm-mission-item__icon">
-                <Zap size={24} />
+            {/* Mission Item 3 */}
+            <div className="vm-mission-card">
+              <div className="vm-mission-card__header">
+                <div className="vm-mission-card__icon">
+                  <Zap size={26} />
+                </div>
+                <div className="vm-mission-card__num">03</div>
               </div>
-              <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Kemudahan Akses Digital</h4>
-                <p className="vm-mission-item__text">
-                  Mengembangkan platform yang cepat, ringan, dan ramah pengguna smartphone (One Click Service) untuk seluruh lapisan masyarakat.
-                </p>
-              </div>
+              <h4 className="vm-mission-card__title">Kemudahan Akses Digital</h4>
+              <p className="vm-mission-card__text">
+                Mengembangkan platform yang cepat, ringan, dan ramah pengguna smartphone (One Click Service) untuk seluruh lapisan masyarakat.
+              </p>
             </div>
 
-            <div className="vm-mission-item">
-              <div className="vm-mission-item__icon">
-                <Heart size={24} />
+            {/* Mission Item 4 */}
+            <div className="vm-mission-card">
+              <div className="vm-mission-card__header">
+                <div className="vm-mission-card__icon">
+                  <ShieldCheck size={26} />
+                </div>
+                <div className="vm-mission-card__num">04</div>
               </div>
-              <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Dampak Sosial &amp; Komunitas</h4>
-                <p className="vm-mission-item__text">
-                  Membangun kepedulian sosial yang saling menguatkan antarwarga Surade melalui dukungan kegiatan kemasyarakatan dan kepedulian sosial.
-                </p>
-              </div>
-            </div>
-
-            <div className="vm-mission-item">
-              <div className="vm-mission-item__icon">
-                <Award size={24} />
-              </div>
-              <div className="vm-mission-item__content">
-                <h4 className="vm-mission-item__title">Informasi Valid &amp; Terpercaya</h4>
-                <p className="vm-mission-item__text">
-                  Menyajikan data usaha, lokasi, dan kontak yang terverifikasi demi keamanan bertransaksi warga dan para pengunjung.
-                </p>
-              </div>
+              <h4 className="vm-mission-card__title">Informasi Valid &amp; Terverifikasi</h4>
+              <p className="vm-mission-card__text">
+                Menyajikan informasi pelaku UMKM, lokasi, dan kontak yang terhubung langsung dengan UMKM, serta terverifikasi demi keamanan transaksi pengguna Surade.com.
+              </p>
             </div>
           </div>
         </div>
@@ -121,46 +175,56 @@ export default function VisionMission() {
 
       {/* VALUES SECTION */}
       <section className="vm-values">
-        <div className="vm-values__inner">
-          <h2 className="vm-values__title">Nilai-Nilai Kami</h2>
+        <div className="vm-container">
+          <div className="vm-section-header">
+            <div className="vm-section-tag">
+              <Compass size={16} />
+              <span>PRINSIP KERJA</span>
+            </div>
+            <h2 className="vm-values__title">Nilai-Nilai Kami</h2>
+            <p className="vm-section__subtitle">
+              Prinsip dan integritas yang memandu setiap langkah kami dalam melayani masyarakat Surade
+            </p>
+          </div>
+
           <div className="vm-values-grid">
             <div className="vm-value-card">
               <div className="vm-value-card__icon">
-                <Users size={32} />
+                <Users size={28} />
               </div>
               <h4 className="vm-value-card__title">Kolaborasi</h4>
               <p className="vm-value-card__text">
-                Bekerja sama dengan berbagai pihak untuk mencapai tujuan bersama
+                Bekerja sama erat dengan para pelaku UMKM, pemerintah desa, dan masyarakat demi kemajuan bersama
               </p>
             </div>
 
             <div className="vm-value-card">
               <div className="vm-value-card__icon">
-                <Zap size={32} />
+                <Zap size={28} />
               </div>
               <h4 className="vm-value-card__title">Inovasi</h4>
               <p className="vm-value-card__text">
-                Selalu mencari cara baru dan lebih baik untuk melayani pengguna
+                Terus menghadirkan teknologi dan kemudahan fitur digital yang relevan dan praktis digunakan
               </p>
             </div>
 
             <div className="vm-value-card">
               <div className="vm-value-card__icon">
-                <Heart size={32} />
+                <Lock size={28} />
               </div>
               <h4 className="vm-value-card__title">Integritas</h4>
               <p className="vm-value-card__text">
-                Menjunjung tinggi kejujuran dan transparansi dalam setiap aspek
+                Menjunjung tinggi keaslian data, kejujuran, serta keamanan dalam setiap transaksi dan informasi
               </p>
             </div>
 
             <div className="vm-value-card">
               <div className="vm-value-card__icon">
-                <Globe size={32} />
+                <Globe size={28} />
               </div>
               <h4 className="vm-value-card__title">Inklusif</h4>
               <p className="vm-value-card__text">
-                Melayani semua lapisan masyarakat tanpa diskriminasi
+                Melayani seluruh pelaku usaha dari skala mikro terkecil hingga menengah di seluruh desa tanpa terkecuali
               </p>
             </div>
           </div>

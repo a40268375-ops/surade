@@ -1,4 +1,4 @@
-# 🏦 Panduan Integrasi Payment Gateway Universal - Surade.co.id
+# 🏦 Panduan Integrasi Payment Gateway Universal - Surade.com
 
 ## ✅ Update Terbaru (15 September 2026)
 
@@ -9,8 +9,8 @@
 - `backend/resources/views/emails/reset-password-code.blade.php` - Email reset password
 
 **Fitur Baru:**
-- ✅ Logo Surade.co.id di tengah header dengan gradient background
-- ✅ Teks brand "Surade.co.id" di sebelah kanan logo
+- ✅ Logo Surade.com di tengah header dengan gradient background
+- ✅ Teks brand "Surade.com" di sebelah kanan logo
 - ✅ Tagline "Platform UMKM Digital Kecamatan Surade"
 - ✅ OTP code dengan styling modern dan eye-catching
 - ✅ Warning box dengan informasi keamanan lengkap
@@ -36,7 +36,7 @@ POST /api/forgot-password
 ```
 
 **Preview Email:**
-- Header: Logo S di kotak putih + "Surade.co.id" (font besar)
+- Header: Logo S di kotak putih + "Surade.com" (font besar)
 - Subheader: Tagline platform
 - Content: Greeting personal + Kode OTP dalam box gradient
 - Warning: Info keamanan dengan bullet points
@@ -317,7 +317,7 @@ Mail::to('your-email@gmail.com')->send(new \App\Mail\ResetPasswordCode('654321',
 
 ## 🎉 SEMUA FITUR SUDAH BERFUNGSI!
 
-Payment gateway universal Surade.co.id sekarang sudah terintegrasi penuh ke semua fitur platform:
+Payment gateway universal Surade.com sekarang sudah terintegrasi penuh ke semua fitur platform:
 - ✅ Premium Business
 - ✅ Blog & Event Publishing
 - ✅ Advertisement
@@ -327,4 +327,4 @@ Semua menggunakan rekening bank yang sama (Triwala Mitra Bestari) dan bisa dikel
 
 ---
 
-**© 2026 Surade.co.id - Platform UMKM Digital Kecamatan Surade**
+**© 2026 Surade.com - Platform UMKM Digital Kecamatan Surade**

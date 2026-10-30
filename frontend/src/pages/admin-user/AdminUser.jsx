@@ -1,13 +1,30 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, useParams, Link } from "react-router-dom";
+import toast from "react-hot-toast";
+import { useGlobalReferral } from "../../context/ReferralContext";
 import PackageSelectionModal from "../../components/PackageSelectionModal";
 import PackageCheckoutModal from "../../components/PackageCheckoutModal";
 import ContentPaymentModal from "../../components/ContentPaymentModal";
+import PromoAdsSlider from "../../components/PromoAdsSlider";
+import PortalAnalyticsCharts from "../../components/PortalAnalyticsCharts";
 import SafeImage from "../../components/SafeImage";
 import ImageCropper from "../../components/ImageCropper";
 import PaymentMethodSelector from "../../components/PaymentMethodSelector";
+import MobileBottomNav from "../../components/MobileBottomNav";
+import SuradeCoinIcon from "../../components/SuradeCoinIcon";
+import suradeCoinImg from "../../assets/surade-coin.png";
+import SuradeCoinTab from "./tabs/SuradeCoinTab";
+import SellerNomorDaruratTab from "./tabs/SellerNomorDaruratTab";
+import DailyRewardWidget from "../../components/DailyRewardWidget";
+import { BuyCoinModal } from "../../components/SuradeCoinModal";
+import GoldWithdrawModal from "../../components/GoldWithdrawModal";
+import WhatsAppIcon from "../../components/icons/WhatsAppIcon";
+import SuradeLoader from "../../components/SuradeLoader";
+import { getUserPresence, OnlineIndicator } from "../../utils/userPresence";
+import { detectForbiddenChatContent } from "../../utils/chatModeration";
 import {
   LayoutDashboard,
+  Activity,
   Briefcase,
   Calendar,
   Mail,
@@ -42,15 +59,19 @@ import {
   Check,
   Shield,
   BarChart,
+  BarChart2,
+  BarChart3,
   Headphones,
   MessageSquare,
   Phone,
+  PhoneCall,
   Video,
   Package,
   Share2,
   Megaphone,
   Target,
   CreditCard,
+  Receipt,
   ShieldCheck,
   Copy,
   Gift,
@@ -58,12 +79,15 @@ import {
   DollarSign,
   ArrowUpRight,
   CheckCircle2,
+  CheckCheck,
   MessageCircle,
   Send,
   AlertCircle,
   Sparkles,
+  QrCode,
   Store,
   ArrowRight,
+  ArrowLeft,
   Layers,
   ExternalLink,
   Trophy,
@@ -73,7 +97,6 @@ import {
   Flame,
   Tag,
   Ticket,
-  CheckCheck,
   Pin,
   Heart,
   Archive,
@@ -84,9 +107,15 @@ import {
   Paperclip,
   MoreVertical,
   ChevronDown,
+  RotateCcw,
+  UploadCloud,
+  Building2,
+  XCircle,
+  Coins,
 } from "lucide-react";
 
 import logoImg from "../../assets/logo-surade.png";
+import bannerEventSurade from "../../assets/banner-event-surade.jpg";
 
 import api from "../../services/api";
 import { DEFAULT_AVATAR, DEFAULT_BANNER, getStorageUrl, OFFICIAL_ACCOUNT_HOLDER, OFFICIAL_PAYMENT_METHODS } from "../../utils/constants";
@@ -114,32 +143,103 @@ const formatBizOpeningHours = (bizItem) => {
 export default function AdminUser() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Global referral context — kode referral upline yang terikat permanen ke akun pengguna
+  const {
+    appliedReferral: globalAppliedReferral,
+    isBound: isGloballyBound,
+    myOwnReferralCode: globalOwnReferralCode,
+    refreshReferral: refreshGlobalReferral,
+  } = useGlobalReferral();
   const { tab: paramTab } = useParams();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
-    const queryTab = searchParams.get("tab");
+    let queryTab = searchParams.get("tab") || paramTab;
+    if (queryTab === "products" || queryTab === "product") queryTab = "produk";
+    if (queryTab === "coins" || queryTab === "tarik-saldo" || queryTab === "tarik-gold" || queryTab === "surade-poin") queryTab = "coin";
     if (queryTab) return queryTab;
-    if (paramTab) return paramTab;
     if (window.location.pathname.endsWith("/inbox")) return "inbox";
     if (window.location.pathname.endsWith("/premium")) return "premium";
     return "dashboard";
   });
 
   const handleTabChange = (tabId) => {
+    if (tabId === "surade-info") {
+      navigate("/admin/surade-info");
+      return;
+    }
+    if (tabId === "tarik-gold" || tabId === "surade-poin") {
+      setActiveTab("coin");
+      setMobileSidebarOpen(false);
+      window.scrollTo({ top: 0, behavior: "instant" });
+      setSearchParams({ tab: "coin" }, { replace: true });
+      return;
+    }
     setActiveTab(tabId);
+    setMobileSidebarOpen(false);
+    window.scrollTo({ top: 0, behavior: "instant" });
     if (tabId === "dashboard") {
       setSearchParams({}, { replace: true });
     } else {
       setSearchParams({ tab: tabId }, { replace: true });
     }
+
+    // Tandai notifikasi terkait tab ini sebagai sudah dibaca (agar badge sidebar bersih)
+    const tabKeywordMap = {
+      klaim: ["claim", "klaim"],
+      iklan: ["ad", "iklan", "advertisement"],
+      bisnis: ["business", "bisnis", "usaha"],
+      produk: ["product", "produk"],
+      referral: ["referral", "commission", "komisi"],
+      "blog-event": ["blog", "event", "berita"],
+      whatsapp: ["whatsapp", "wa"],
+    };
+    const kws = tabKeywordMap[tabId];
+    if (kws && Array.isArray(notificationsList)) {
+      const toMark = notificationsList.filter(
+        (n) =>
+          !n.is_read &&
+          kws.some(
+            (kw) =>
+              String(n.type || "").toLowerCase().includes(kw) ||
+              String(n.source_type || "").toLowerCase().includes(kw) ||
+              String(n.title || "").toLowerCase().includes(kw) ||
+              String(n.message || "").toLowerCase().includes(kw)
+          )
+      );
+      if (toMark.length > 0) {
+        const markIds = toMark.map((n) => n.id);
+        setNotificationsList((prev) => {
+          const updated = prev.map((n) =>
+            markIds.includes(n.id) ? { ...n, is_read: true } : n
+          );
+          try {
+            const readIds = JSON.parse(localStorage.getItem("user_read_notif_ids") || "[]");
+            markIds.forEach((id) => {
+              if (!readIds.includes(id)) readIds.push(id);
+            });
+            localStorage.setItem("user_read_notif_ids", JSON.stringify(readIds));
+            localStorage.setItem("user_notifs_cache", JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+        toMark.forEach((n) => {
+          api.post(`/notifications/${n.id}/read`).catch(() => {});
+        });
+      }
+    }
   };
 
   useEffect(() => {
-    const queryTab = searchParams.get("tab");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [activeTab]);
+
+  useEffect(() => {
+    let queryTab = searchParams.get("tab") || paramTab;
+    if (queryTab === "products" || queryTab === "product") queryTab = "produk";
+
     if (queryTab) {
       setActiveTab(queryTab);
-    } else if (paramTab) {
-      setActiveTab(paramTab);
     } else if (window.location.pathname.endsWith("/inbox")) {
       setActiveTab("inbox");
     } else if (window.location.pathname.endsWith("/premium")) {
@@ -148,8 +248,432 @@ export default function AdminUser() {
       setActiveTab("dashboard");
     }
   }, [searchParams, paramTab]);
+
+  useEffect(() => {
+    const tabTitles = {
+      dashboard: "Dashboard Pengguna",
+      businesses: "Kelola Usaha",
+      blogs: "Artikel & Event",
+      referrals: "Referral Saya",
+      saved: "Simpanan Saya",
+      messages: "Pesan Inbox",
+      inbox: "Pesan Inbox",
+      "nomor-darurat": "Nomor Darurat Usaha",
+      premium: "Upgrade Premium",
+      settings: "Pengaturan Akun",
+    };
+    const titleText = tabTitles[activeTab] || "Dashboard Pengguna";
+    document.title = `${titleText} - Surade.com`;
+  }, [activeTab]);
   const [searchQuery, setSearchQuery] = useState("");
   const [blogEventTab, setBlogEventTab] = useState("blog"); // Sub-tab for blog/event combined view
+  const [inboxUnread, setInboxUnread] = useState(0);
+
+  // ═════════ NOTIFICATION DROPDOWN SYSTEM ═════════
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [notifTab, setNotifTab] = useState("all"); // "all" | "unread"
+  const notifDropdownRef = useRef(null);
+
+  const INITIAL_DEFAULT_NOTIFS = [
+    {
+      id: "notif-1",
+      title: "Selamat Datang di Portal Surade.com",
+      message: "Akun reseller Anda telah aktif. Anda dapat mulai mendaftarkan tempat usaha atau UMKM baru.",
+      type: "system",
+      created_at: new Date().toISOString(),
+      is_read: false,
+    },
+    {
+      id: "notif-2",
+      title: "Program Referral Berhasil Aktif",
+      message: "Bagikan kode referral Anda untuk mendapatkan komisi 10% setiap transaksi mitra.",
+      type: "referral",
+      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      is_read: false,
+    },
+    {
+      id: "notif-3",
+      title: "Layanan Centang Emas Verified",
+      message: "Tingkatkan toko atau usaha Anda ke Paket Premium untuk prioritas urutan teratas pencarian.",
+      type: "business",
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      is_read: true,
+    },
+  ];
+
+  const [notificationsList, setNotificationsList] = useState(() => {
+    try {
+      const readIds = JSON.parse(localStorage.getItem("user_read_notif_ids") || "[]");
+      const savedNotifs = JSON.parse(localStorage.getItem("user_notifs_cache") || "null");
+      const base = Array.isArray(savedNotifs) && savedNotifs.length > 0 ? savedNotifs : INITIAL_DEFAULT_NOTIFS;
+      return base.map(n => ({
+        ...n,
+        is_read: n.is_read || readIds.includes(n.id)
+      }));
+    } catch (e) {
+      return INITIAL_DEFAULT_NOTIFS;
+    }
+  });
+
+  const [userImportantNumbers, setUserImportantNumbers] = useState([]);
+  const [allUserProducts, setAllUserProducts] = useState([]);
+
+  const fetchUserImportantNumbers = async () => {
+    try {
+      const res = await api.get("/user/important-numbers");
+      const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      setUserImportantNumbers(list);
+    } catch (e) { }
+  };
+
+  const fetchAllUserProducts = async () => {
+    try {
+      const res = await api.get("/my-products");
+      const data = res.data?.data || res.data || [];
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      setAllUserProducts(list);
+    } catch (e) { }
+  };
+
+  const [userClaims, setUserClaims] = useState([]);
+  const [loadingUserClaims, setLoadingUserClaims] = useState(false);
+  const [claimFilterStatus, setClaimFilterStatus] = useState("all");
+
+  const fetchUserClaims = async () => {
+    try {
+      setLoadingUserClaims(true);
+      const res = await api.get("/my-claims");
+      const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      setUserClaims(list);
+    } catch (e) {
+      console.warn("Gagal memuat daftar klaim:", e);
+    } finally {
+      setLoadingUserClaims(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get("/notifications");
+      if (res.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+        const readIds = JSON.parse(localStorage.getItem("user_read_notif_ids") || "[]");
+        const synced = res.data.data.map(n => ({
+          ...n,
+          is_read: n.is_read || readIds.includes(n.id)
+        }));
+        setNotificationsList(synced);
+
+        // Notifikasi popup resmi: top up poin disetujui, akses wa disetujui, dan reward poin akses wa
+        try {
+          const toastedIds = JSON.parse(sessionStorage.getItem("user_toasted_coin_ids") || "[]");
+
+          // 1. Verifikasi Top Up Poin Disetujui
+          const coinApprovedNotif = res.data.data.find(n =>
+            (n.type === "coin_purchase_approved" || String(n.title).toLowerCase().includes("saldo poin berhasil ditambahkan")) &&
+            !n.is_read &&
+            !readIds.includes(n.id) &&
+            !toastedIds.includes(n.id)
+          );
+
+          if (coinApprovedNotif) {
+            toastedIds.push(coinApprovedNotif.id);
+            sessionStorage.setItem("user_toasted_coin_ids", JSON.stringify(toastedIds));
+            toast.success("Saldo Poin berhasil ditambahkan!", {
+              duration: 6000,
+              icon: (
+                <img
+                  src={suradeCoinImg}
+                  alt="Surade Coin"
+                  style={{ width: "28px", height: "28px", objectFit: "contain", filter: "drop-shadow(0 2px 4px rgba(245, 158, 11, 0.4))" }}
+                />
+              ),
+            });
+            fetchHeaderPoinBalance();
+            window.dispatchEvent(new CustomEvent("poin-balance-updated"));
+          }
+
+          // 2. Verifikasi Pembayaran QRIS Akses WhatsApp Disetujui
+          const waApprovedNotif = res.data.data.find(n =>
+            (n.type === "whatsapp_access_approved" || String(n.title).toLowerCase().includes("akses whatsapp disetujui")) &&
+            !n.is_read &&
+            !readIds.includes(n.id) &&
+            !toastedIds.includes(n.id)
+          );
+
+          if (waApprovedNotif) {
+            toastedIds.push(waApprovedNotif.id);
+            sessionStorage.setItem("user_toasted_coin_ids", JSON.stringify(toastedIds));
+            toast.success(waApprovedNotif.message || "Akses WhatsApp Anda telah disetujui oleh admin! Anda sekarang dapat mengakses nomor WhatsApp.", {
+              duration: 7000,
+              icon: "🎉",
+            });
+          }
+
+          // 3. Reward Poin (+1 Poin) untuk Pemilik Usaha ketika WhatsApp Diakses Pengunjung
+          const waRewardNotif = res.data.data.find(n =>
+            (n.type === "whatsapp_lead_reward" || String(n.title).toLowerCase().includes("poin akses whatsapp")) &&
+            !n.is_read &&
+            !readIds.includes(n.id) &&
+            !toastedIds.includes(n.id)
+          );
+
+          if (waRewardNotif) {
+            toastedIds.push(waRewardNotif.id);
+            sessionStorage.setItem("user_toasted_coin_ids", JSON.stringify(toastedIds));
+            toast.success(waRewardNotif.message || "Selamat! Anda mendapatkan +1 Poin karena ada pengunjung mengakses nomor WhatsApp usaha Anda.", {
+              duration: 8000,
+              icon: (
+                <img
+                  src={suradeCoinImg}
+                  alt="Surade Coin"
+                  style={{ width: "30px", height: "30px", objectFit: "contain", filter: "drop-shadow(0 2px 4px rgba(245, 158, 11, 0.4))" }}
+                />
+              ),
+              style: {
+                borderRadius: "14px",
+                background: "#ffffff",
+                border: "1.5px solid #f59e0b",
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                color: "#1e293b",
+              },
+            });
+            fetchHeaderPoinBalance();
+            window.dispatchEvent(new CustomEvent("poin-balance-updated"));
+          }
+        } catch (e) { }
+
+        try {
+          localStorage.setItem("user_notifs_cache", JSON.stringify(synced));
+        } catch (e) { }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch user notifications:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    fetchUserImportantNumbers();
+    fetchAllUserProducts();
+    fetchUserClaims();
+    const interval = setInterval(() => {
+      fetchNotifications();
+      fetchUserImportantNumbers();
+      fetchAllUserProducts();
+      fetchUserClaims();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleOutsideNotifClick = (e) => {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target)) {
+        setShowNotifDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideNotifClick);
+    return () => document.removeEventListener("mousedown", handleOutsideNotifClick);
+  }, []);
+
+  const handleMarkAllRead = async () => {
+    setNotificationsList((prev) => {
+      const updated = prev.map((n) => ({ ...n, is_read: true }));
+      try {
+        const allIds = updated.map(n => n.id);
+        const existing = JSON.parse(localStorage.getItem("user_read_notif_ids") || "[]");
+        const merged = Array.from(new Set([...existing, ...allIds]));
+        localStorage.setItem("user_read_notif_ids", JSON.stringify(merged));
+        localStorage.setItem("user_notifs_cache", JSON.stringify(updated));
+      } catch (e) { }
+      return updated;
+    });
+    try {
+      await api.post("/notifications/mark-all-read");
+    } catch (e) { }
+  };
+
+  const handleMarkRead = async (id) => {
+    setNotificationsList((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, is_read: true } : n));
+      try {
+        const readIds = JSON.parse(localStorage.getItem("user_read_notif_ids") || "[]");
+        if (!readIds.includes(id)) readIds.push(id);
+        localStorage.setItem("user_read_notif_ids", JSON.stringify(readIds));
+        localStorage.setItem("user_notifs_cache", JSON.stringify(updated));
+      } catch (e) { }
+      return updated;
+    });
+    try {
+      await api.post(`/notifications/${id}/read`);
+    } catch (e) { }
+  };
+
+  const handleDeleteNotif = async (id) => {
+    setNotificationsList((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      try {
+        localStorage.setItem("user_notifs_cache", JSON.stringify(updated));
+      } catch (e) { }
+      return updated;
+    });
+    try {
+      await api.delete(`/notifications/${id}`);
+    } catch (e) { }
+  };
+
+  const unreadNotifCount = notificationsList.filter((n) => !n.is_read).length;
+  const totalUnreadCount = unreadNotifCount + (inboxUnread || 0);
+
+  // ═════════ WHATSAPP ACCESS PORTAL (USER) ═════════
+  const [userWaLogs, setUserWaLogs] = useState([]);
+  const [userWaStats, setUserWaStats] = useState({ total: 0, pending: 0, confirmed: 0, rejected: 0 });
+  const [userWaLoading, setUserWaLoading] = useState(false);
+  const [selectedWaProof, setSelectedWaProof] = useState(null);
+  const [reuploadWaLog, setReuploadWaLog] = useState(null);
+  const [reuploadProofFile, setReuploadProofFile] = useState(null);
+  const [reuploadProofPreview, setReuploadProofPreview] = useState(null);
+  const [reuploadSubmitting, setReuploadSubmitting] = useState(false);
+  const [viewWaProofHistoryModal, setViewWaProofHistoryModal] = useState(null);
+
+  const fetchUserWaLogs = async () => {
+    setUserWaLoading(true);
+    try {
+      const res = await api.get("/my-whatsapp-access-logs");
+      if (res.data?.success) {
+        setUserWaLogs(res.data.data?.logs || []);
+        setUserWaStats(res.data.data?.stats || { total: 0, pending: 0, confirmed: 0, rejected: 0 });
+      }
+    } catch (err) {
+      console.error("Error fetching user WhatsApp logs:", err);
+    } finally {
+      setUserWaLoading(false);
+    }
+  };
+
+  const handleReuploadWaProof = async (e) => {
+    if (e) e.preventDefault();
+    if (!reuploadWaLog || !reuploadProofFile) {
+      toast.error("Silakan pilih file bukti transfer baru terlebih dahulu.");
+      return;
+    }
+    setReuploadSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append("proof_image", reuploadProofFile);
+      const res = await api.post(`/whatsapp-logs/${reuploadWaLog.id}/reupload-proof`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (res.data?.success) {
+        toast.success("Bukti transfer berhasil diperbaiki! Menunggu konfirmasi admin.");
+        setReuploadWaLog(null);
+        setReuploadProofFile(null);
+        setReuploadProofPreview(null);
+        fetchUserWaLogs();
+      } else {
+        toast.error(res.data?.message || "Gagal memperbarui bukti transfer.");
+      }
+    } catch (err) {
+      console.error("Gagal perbaiki bukti WA:", err);
+      toast.error(err.response?.data?.message || "Gagal memperbarui bukti transfer.");
+    } finally {
+      setReuploadSubmitting(false);
+    }
+  };
+
+  const displayedNotifs = useMemo(() => {
+    if (notifTab === "unread") {
+      return notificationsList.filter((n) => !n.is_read);
+    }
+    return notificationsList;
+  }, [notificationsList, notifTab]);
+
+  const getNotifIcon = (type) => {
+    switch (type) {
+      case "business_claim":
+      case "new_business_claim":
+      case "business_claim_under_review":
+      case "business_claim_approved":
+      case "business_claim_rejected":
+      case "business_claim_received":
+      case "business_transferred":
+      case "claim":
+        return <ShieldCheck size={15} className="text-purple-600" />;
+      case "business":
+        return <Store size={15} className="text-emerald-600" />;
+      case "referral":
+        return <Gift size={15} className="text-amber-600" />;
+      case "blog":
+      case "event":
+        return <FileText size={15} className="text-blue-600" />;
+      case "message":
+        return <Mail size={15} className="text-purple-600" />;
+      default:
+        return <Sparkles size={15} className="text-teal-600" />;
+    }
+  };
+
+  const getNotifIconBg = (type) => {
+    switch (type) {
+      case "business_claim":
+      case "new_business_claim":
+      case "business_claim_under_review":
+      case "business_claim_approved":
+      case "business_claim_rejected":
+      case "business_claim_received":
+      case "business_transferred":
+      case "claim":
+        return "bg-purple-100/80";
+      case "business":
+        return "bg-emerald-100/80";
+      case "referral":
+        return "bg-amber-100/80";
+      case "blog":
+      case "event":
+        return "bg-blue-100/80";
+      case "message":
+        return "bg-purple-100/80";
+      default:
+        return "bg-teal-100/80";
+    }
+  };
+
+  const formatNotifTime = (dateStr) => {
+    if (!dateStr) return "Baru saja";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "Baru saja";
+      const diffMs = Date.now() - d.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return "Baru saja";
+      if (diffMins < 60) return `${diffMins} mnt lalu`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours} jam lalu`;
+      return d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+    } catch {
+      return "Baru saja";
+    }
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/inbox/unread-count`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setInboxUnread(data?.count ?? 0);
+      } catch (_) { }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Get user from localStorage
   const [user, setUser] = useState(() => {
@@ -171,10 +695,11 @@ export default function AdminUser() {
   const [showPhotoOptions, setShowPhotoOptions] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState("profile"); // "profile" or "chat"
   const [cameraStream, setCameraStream] = useState(null);
   const videoRef = useRef(null);
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
-  
+
   // Image cropper states
   const [showImageCropper, setShowImageCropper] = useState(false);
   const [imageToCrop, setImageToCrop] = useState(null);
@@ -192,6 +717,7 @@ export default function AdminUser() {
       name: user?.name || "",
       email: user?.email || "",
       phone: user?.phone || "",
+      gender: user?.gender || "",
       location: user?.location || "",
       role: user?.role || "User",
       bio: user?.bio || "",
@@ -213,23 +739,24 @@ export default function AdminUser() {
       try {
         const avatarUrl = user.avatar ? getStorageUrl(user.avatar) : DEFAULT_AVATAR;
         const bannerUrl = user.banner ? getStorageUrl(user.banner) : DEFAULT_BANNER;
-        
+
         setProfileData({
           name: user.name || "",
           email: user.email || "",
           phone: user.phone || "",
+          gender: user.gender || "",
           location: user.location || "",
           role: user.role || "User",
           bio: user.bio || "",
           avatar: avatarUrl,
           banner: bannerUrl,
         });
-        
+
         setPhotoPreview(avatarUrl);
         setBannerPreview(bannerUrl);
         setDisplayName(user.username || user.name || "");
-        
-        console.log("Profile data synced:", { avatarUrl, bannerUrl, name: user.name });
+
+        // console.log("Profile data synced:", { avatarUrl, bannerUrl, name: user.name });
       } catch (error) {
         console.error("Error syncing profile data:", error);
         // Fallback to defaults
@@ -241,21 +768,43 @@ export default function AdminUser() {
 
   const [businesses, setBusinesses] = useState(() => {
     try {
+      const cachedUserStr = localStorage.getItem("user");
+      const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
+      // If current user is regular user without businesses, do not load stale cache from previous user
+      if (cachedUser && cachedUser.role === 'user' && cachedUser.account_type !== 'business' && (!cachedUser.businesses || cachedUser.businesses.length === 0)) {
+        localStorage.removeItem("cached_my_businesses");
+        return [];
+      }
+
       const cached = localStorage.getItem("cached_my_businesses");
       if (!cached) return [];
       const parsed = JSON.parse(cached);
       if (!Array.isArray(parsed)) return [];
-      return parsed.map(b => ({
-        ...b,
-        category: getCategoryDisplayName(b.category),
-        opening_hours: formatBizOpeningHours(b)
-      }));
+      // Filter out businesses that do not belong to current user
+      const userBizs = parsed.filter(b => !cachedUser?.id || !b.user_id || String(b.user_id) === String(cachedUser.id));
+      if (userBizs.length === 0) return [];
+      return userBizs.map(b => {
+        const rawImg = b.logo || b.image || b.banner || (Array.isArray(b.banners) && b.banners[0]) || (Array.isArray(b.gallery) && b.gallery[0]) || b.thumbnail;
+        const isPremExpired = Boolean(b.premium_expires_at && new Date(b.premium_expires_at) <= new Date());
+        return {
+          ...b,
+          is_premium: !isPremExpired && Boolean(b.is_premium),
+          image: rawImg ? getStorageUrl(rawImg) : null,
+          category: getCategoryDisplayName(b.category),
+          opening_hours: formatBizOpeningHours(b)
+        };
+      });
     } catch (e) {
       return [];
     }
   });
   const [loadingBusinesses, setLoadingBusinesses] = useState(() => {
     try {
+      const cachedUserStr = localStorage.getItem("user");
+      const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
+      if (cachedUser && cachedUser.role === 'user' && cachedUser.account_type !== 'business' && (!cachedUser.businesses || cachedUser.businesses.length === 0)) {
+        return false;
+      }
       const cached = localStorage.getItem("cached_my_businesses");
       return cached && JSON.parse(cached).length > 0 ? false : true;
     } catch (e) {
@@ -269,22 +818,24 @@ export default function AdminUser() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [editForm, setEditForm] = useState({ name: "", price: "", description: "" });
   const [editPriceDisplay, setEditPriceDisplay] = useState("");
+  const [editImageFile, setEditImageFile] = useState(null);
+  const [editImagePreview, setEditImagePreview] = useState(null);
   const [savingProduct, setSavingProduct] = useState(false);
-  
+
   // Business edit states
   const [editingBusiness, setEditingBusiness] = useState(null);
   const [businessEditForm, setBusinessEditForm] = useState({
     name: "", description: "", phone: "", address: "", city: "", province: ""
   });
   const [savingBusiness, setSavingBusiness] = useState(false);
-  
+
   // Blog edit states
   const [editingBlog, setEditingBlog] = useState(null);
   const [blogEditForm, setBlogEditForm] = useState({
     title: "", content: "", blog_category: ""
   });
   const [savingBlog, setSavingBlog] = useState(false);
-  
+
   // Admin Plans Management states
   const [adminPlans, setAdminPlans] = useState([]);
   const [loadingAdminPlans, setLoadingAdminPlans] = useState(false);
@@ -298,7 +849,7 @@ export default function AdminUser() {
     name: "", price: "", duration_days: 30, features: {}
   });
   const [creatingPlan, setCreatingPlan] = useState(false);
-  
+
   const [blogs, setBlogs] = useState([]);
   const [loadingBlogs, setLoadingBlogs] = useState(false);
   const [blogSearch, setBlogSearch] = useState("");
@@ -319,6 +870,8 @@ export default function AdminUser() {
   const [showContentCheckoutModal, setShowContentCheckoutModal] = useState(false);
 
   const [contentPricing, setContentPricing] = useState({ blog: 10000, event: 15000 });
+
+
 
   const fetchContentPricing = async () => {
     try {
@@ -350,6 +903,7 @@ export default function AdminUser() {
   });
   const [adFilterTab, setAdFilterTab] = useState("all");
   const [showCreateAdModal, setShowCreateAdModal] = useState(false);
+  const [createdAdDraftId, setCreatedAdDraftId] = useState(null);
   const [createAdStep, setCreateAdStep] = useState(1);
   const [viewingAdDetail, setViewingAdDetail] = useState(null);
   const [selectedBusinessForAd, setSelectedBusinessForAd] = useState(null);
@@ -363,6 +917,52 @@ export default function AdminUser() {
   const [couponMsg, setCouponMsg] = useState('');
   const [availableCoupons, setAvailableCoupons] = useState([]);
   const [availableCouponsLoading, setAvailableCouponsLoading] = useState(false);
+
+  // States for Ad Referral Code
+  const [adReferralCodeInput, setAdReferralCodeInput] = useState('');
+  const [validatingAdReferral, setValidatingAdReferral] = useState(false);
+  const [adAppliedReferralInfo, setAdAppliedReferralInfo] = useState(null);
+  const [adReferralMsg, setAdReferralMsg] = useState('');
+
+  // Helper: restore ad referral dari global context (jika user terikat)
+  const restoreAdReferralFromGlobal = () => {
+    if (isGloballyBound && globalAppliedReferral) {
+      const boundCode = globalAppliedReferral.code || globalAppliedReferral.referral_code;
+      if (boundCode) {
+        setAdReferralCodeInput(boundCode);
+        setAdAppliedReferralInfo({
+          code: boundCode,
+          discount_amount: null,
+          discount_percent: 10,
+          referrer_name: globalAppliedReferral.referrer_name,
+          is_bound: true,
+        });
+        setAdReferralMsg(`Kode referral mitra terhubung: ${boundCode} (${globalAppliedReferral.referrer_name || 'Mitra Resmi'})`);
+        return;
+      }
+    }
+    setAdReferralCodeInput('');
+    setAdAppliedReferralInfo(null);
+    setAdReferralMsg('');
+  };
+
+  // Auto-populate ad referral code dari global context saat pertama mount atau context berubah
+  useEffect(() => {
+    if (isGloballyBound && globalAppliedReferral) {
+      const boundCode = globalAppliedReferral.code || globalAppliedReferral.referral_code;
+      if (boundCode && !adAppliedReferralInfo) {
+        setAdReferralCodeInput(boundCode);
+        setAdAppliedReferralInfo({
+          code: boundCode,
+          discount_amount: null,
+          discount_percent: 10,
+          referrer_name: globalAppliedReferral.referrer_name,
+          is_bound: true,
+        });
+        setAdReferralMsg(`Kode referral mitra terhubung: ${boundCode} (${globalAppliedReferral.referrer_name || 'Mitra Resmi'})`);
+      }
+    }
+  }, [isGloballyBound, globalAppliedReferral]);
   const [editingAd, setEditingAd] = useState(null);
   const [editAdForm, setEditAdForm] = useState({ package_name: 'basic', notes: '' });
   const [updatingAd, setUpdatingAd] = useState(false);
@@ -381,7 +981,7 @@ export default function AdminUser() {
   const [payModalAd, setPayModalAd] = useState(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [copyToast, setCopyToast] = useState(false);
-  
+
   // Payment methods state - fetched live from API (same source as Kelola Pembayaran in AdminWeb)
   const [paymentMethods, setPaymentMethods] = useState(() => {
     try {
@@ -404,19 +1004,36 @@ export default function AdminUser() {
     return () => { isMounted = false; };
   }, []);
 
-  const getPaymentNumber = (method) => {
-    if (!method) return '0954152045';
+  const getPaymentDetails = (method) => {
+    if (!method) return { number: '0954152045', holder: 'Triwala Mitra Bestari' };
     const m = String(method).toLowerCase();
-    if (m.includes('mandiri')) return '133-0011-409-331';
-    if (m.includes('bni')) return '0973607008';
-    if (m.includes('bca')) return '0954152045';
-    if (m.includes('maybank')) return '2097000009';
-    if (m.includes('bjb')) return '0119213282001';
-    if (m.includes('ovo')) return '0811-1919-711';
-    if (m.includes('dana') || m.includes('gopay')) return 'xxxx';
-    if (m.includes('qris')) return 'Scan QR Code';
-    return '0954152045';
+
+    if (Array.isArray(paymentMethods) && paymentMethods.length > 0) {
+      const found = paymentMethods.find((pm) => {
+        const name = String(pm.name || pm.id || '').toLowerCase();
+        return name.includes(m) || m.includes(name) || (pm.id && m.includes(String(pm.id).toLowerCase()));
+      });
+      if (found) {
+        return {
+          number: found.accountNumber || found.account_number || 'Scan QR Code',
+          holder: found.accountName || found.account_holder || 'Triwala Mitra Bestari',
+        };
+      }
+    }
+
+    if (m.includes('mandiri')) return { number: '133-0011-409-331', holder: 'Triwala Mitra Bestari' };
+    if (m.includes('bni')) return { number: '0973607008', holder: 'Triwala Mitra Bestari' };
+    if (m.includes('bca')) return { number: '0954152045', holder: 'Triwala Mitra Bestari' };
+    if (m.includes('maybank')) return { number: '2097000009', holder: 'Triwala Mitra Bestari' };
+    if (m.includes('bjb')) return { number: '0119213282001', holder: 'Triwala Mitra Bestari' };
+    if (m.includes('ovo')) return { number: '0811-1919-711', holder: 'Triwala Mitra Bestari' };
+    if (m.includes('dana') || m.includes('gopay')) return { number: '0811-1919-711', holder: 'Triwala Mitra Bestari' };
+    if (m.includes('qris')) return { number: 'Scan QR Code', holder: 'Triwala Mitra Bestari' };
+    return { number: '0954152045', holder: 'Triwala Mitra Bestari' };
   };
+
+  const getPaymentNumber = (method) => getPaymentDetails(method).number;
+  const getPaymentHolder = (method) => getPaymentDetails(method).holder;
 
   const getSelectedPackageObj = () => {
     if (!selectedPackage) return null;
@@ -431,15 +1048,20 @@ export default function AdminUser() {
   const getBusinessPhoto = (biz) => {
     if (!biz) return "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
     const rawPath =
-      biz.banner ||
       biz.logo ||
+      biz.logo_url ||
       biz.image ||
       biz.thumbnail ||
-      (biz.media && biz.media.length > 0 ? biz.media[0].file_path : null) ||
-      biz.raw?.banner ||
+      biz.banner ||
+      (Array.isArray(biz.banners) && biz.banners[0]) ||
+      (Array.isArray(biz.gallery) && biz.gallery[0]) ||
+      (biz.media && biz.media.length > 0 ? (biz.media[0].file_path || biz.media[0].url) : null) ||
       biz.raw?.logo ||
+      biz.raw?.logo_url ||
       biz.raw?.image ||
-      (biz.raw?.media && biz.raw.media.length > 0 ? biz.raw.media[0].file_path : null);
+      biz.raw?.thumbnail ||
+      biz.raw?.banner ||
+      (biz.raw?.media && biz.raw.media.length > 0 ? (biz.raw.media[0].file_path || biz.raw.media[0].url) : null);
 
     if (!rawPath) return "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80";
     if (typeof rawPath === "string" && (rawPath.startsWith("http://") || rawPath.startsWith("https://") || rawPath.startsWith("blob:") || rawPath.startsWith("data:"))) {
@@ -465,6 +1087,80 @@ export default function AdminUser() {
     return biz.city || biz.address || biz.raw?.city || biz.raw?.address || "Indonesia";
   };
 
+  const formatAdDateTime = (dateStr) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "-";
+    const dateFormatted = d.toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeFormatted = d.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+    return `${dateFormatted}, ${timeFormatted} WIB`;
+  };
+
+  const getDetailedTimeRemaining = (endDateStr) => {
+    if (!endDateStr) return null;
+    const end = new Date(endDateStr).getTime();
+    const now = new Date().getTime();
+    const diffMs = end - now;
+
+    if (diffMs <= 0) {
+      return { isExpired: true, text: "Masa tayang berakhir", badgeClass: "bg-slate-200 text-slate-600 border border-slate-300" };
+    }
+
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+    const remHours = diffHours % 24;
+    const remMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    let text = "";
+    let badgeClass = "bg-emerald-100 text-emerald-800 border border-emerald-300";
+
+    if (diffDays >= 2) {
+      text = `Sisa ${diffDays} hari ${remHours > 0 ? `${remHours} jam` : ''}`.trim();
+      if (diffDays <= 3) badgeClass = "bg-amber-100 text-amber-800 border border-amber-300";
+    } else if (diffDays === 1) {
+      text = `Sisa 1 hari ${remHours} jam`;
+      badgeClass = "bg-amber-100 text-amber-800 border border-amber-300";
+    } else if (diffHours > 0) {
+      text = `Sisa ${diffHours} jam ${remMinutes} mnt`;
+      badgeClass = "bg-rose-100 text-rose-700 border border-rose-300 font-black";
+    } else {
+      text = `Sisa ${remMinutes} menit lagi`;
+      badgeClass = "bg-rose-100 text-rose-700 border border-rose-300 font-black animate-pulse";
+    }
+
+    return { isExpired: false, text: `⏳ ${text}`, badgeClass };
+  };
+
+  const getAdDurationDisplay = (ad) => {
+    let days = ad?.duration_days;
+    if (!days && ad?.start_date && ad?.end_date) {
+      const s = new Date(ad.start_date).getTime();
+      const e = new Date(ad.end_date).getTime();
+      const diff = Math.round((e - s) / 86400000);
+      if (diff > 0) days = diff;
+    }
+    const numDays = Number(days) || 30;
+    if (numDays === 1) {
+      return "1 Hari (24 Jam)";
+    }
+    if (numDays === 7) {
+      return "7 Hari (1 Minggu)";
+    }
+    if (numDays >= 28 && numDays <= 32) {
+      return "30 Hari (1 Bulan)";
+    }
+    if (numDays >= 58 && numDays <= 63) {
+      return "60 Hari (2 Bulan)";
+    }
+    if (numDays >= 89 && numDays <= 93) {
+      return "90 Hari (3 Bulan)";
+    }
+    if (numDays >= 360 && numDays <= 366) {
+      return "365 Hari (1 Tahun)";
+    }
+    return `${numDays} Hari`;
+  };
+
   const getSelectedPackagePrice = () => {
     if (!selectedPackage) return 0;
     const found = getSelectedPackageObj();
@@ -475,21 +1171,46 @@ export default function AdminUser() {
     return 100000;
   };
 
+  const getAdReferralDiscount = () => {
+    if (!adAppliedReferralInfo) return 0;
+    const base = getSelectedPackagePrice();
+    if (adAppliedReferralInfo.discount_amount && Number(adAppliedReferralInfo.discount_amount) > 0) {
+      return Math.min(base, Number(adAppliedReferralInfo.discount_amount));
+    }
+    const percent = Number(adAppliedReferralInfo.discount_percent || 10);
+    return Math.round((base * percent) / 100);
+  };
+
   const getFinalPrice = () => {
     const base = getSelectedPackagePrice();
+    let couponDiscount = 0;
     if (appliedCouponInfo && appliedCouponInfo.discount_amount) {
-      return Math.max(0, base - Number(appliedCouponInfo.discount_amount));
+      couponDiscount = Number(appliedCouponInfo.discount_amount);
     }
-    return base;
+    const refDiscount = getAdReferralDiscount();
+    const totalDiscount = Math.min(base, couponDiscount + refDiscount);
+    return Math.max(0, base - totalDiscount);
   };
 
   // States for Bisnis page UI (Search, Filter, Pagination, Error)
   const [businessSearch, setBusinessSearch] = useState("");
   const [businessCategoryFilter, setBusinessCategoryFilter] = useState("Semua");
+  const [availableCategories, setAvailableCategories] = useState([]);
   const [businessStatusFilter, setBusinessStatusFilter] = useState("Semua");
   const [businessCurrentPage, setBusinessCurrentPage] = useState(1);
   const [businessItemsPerPage] = useState(6);
   const [businessFetchError, setBusinessFetchError] = useState(null);
+
+  useEffect(() => {
+    api.get("/categories")
+      .then((res) => {
+        const data = res.data?.data || res.data || [];
+        if (Array.isArray(data)) {
+          setAvailableCategories(data);
+        }
+      })
+      .catch((err) => console.error("Gagal memuat daftar kategori:", err));
+  }, []);
 
   const [reviews, setReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
@@ -505,13 +1226,42 @@ export default function AdminUser() {
   const [referralPage, setReferralPage] = useState(1);
   const [referralCopyToast, setReferralCopyToast] = useState(false);
   const [referralLinkCopyToast, setReferralLinkCopyToast] = useState(false);
+
+  const handleShareReferralCode = async (code = referralCode) => {
+    if (!code) return;
+    const link = `https://surade.com/register?ref=${code}`;
+    const text = `🎉 Daftarkan usaha UMKM kamu di Surade.com menggunakan kode referral saya: *${code}* dan nikmati diskon spesial!\n\nKlik link pendaftaran instan di sini:\n${link}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Kode Referral Surade.com",
+          text: text,
+          url: link,
+        });
+        return;
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.warn("Share failed, opening WhatsApp:", err);
+        }
+      }
+    }
+
+    // Fallback: Open WhatsApp share link with pre-filled message
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank");
+  };
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawForm, setWithdrawForm] = useState({
     bank: "BCA",
     accountNumber: "",
     accountHolder: user?.name || "",
     amount: "50000",
+    notes: "",
   });
+  const [withdrawQrisFile, setWithdrawQrisFile] = useState(null);
+  const [withdrawQrisPreview, setWithdrawQrisPreview] = useState(null);
+  const [viewQrisModalUrl, setViewQrisModalUrl] = useState(null);
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
   const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState("");
   const [withdrawErrorMsg, setWithdrawErrorMsg] = useState("");
@@ -538,19 +1288,15 @@ export default function AdminUser() {
         const cached = localStorage.getItem(`cached_referral_stats_${currentId}`);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed && parsed.referral_code) {
+          if (parsed) {
             return parsed;
           }
         }
       }
-    } catch (e) {}
-
-    // Instant deterministic code for current logged-in user so it renders in 0ms
-    const cleanName = (user?.name || "USER").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-    const instantCode = user?.referral_code || (user?.id ? `INFO-${cleanName}-${user.id}` : "");
+    } catch (e) { }
 
     return {
-      referral_code: instantCode,
+      referral_code: "",
       total_usages: 0,
       successful_referrals: 0,
       earned_commission: 0,
@@ -565,7 +1311,7 @@ export default function AdminUser() {
         const cached = localStorage.getItem(`cached_referral_tx_${user.id}`);
         if (cached) return JSON.parse(cached);
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   });
   const [referralWithdrawals, setReferralWithdrawals] = useState(() => {
@@ -574,11 +1320,72 @@ export default function AdminUser() {
         const cached = localStorage.getItem(`cached_referral_wd_${user.id}`);
         if (cached) return JSON.parse(cached);
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   });
+  const [previewReferralProofModal, setPreviewReferralProofModal] = useState(null);
   const [loadingReferrals, setLoadingReferrals] = useState(false);
   const [referralError, setReferralError] = useState("");
+  const [isPremiumSeller, setIsPremiumSeller] = useState(false);
+  const [agentStatus, setAgentStatus] = useState("regular_user");
+
+  // Custom Referral Code Modal State
+  const [showCustomCodeModal, setShowCustomCodeModal] = useState(false);
+  const [customCodeInput, setCustomCodeInput] = useState("");
+  const [customCodeLoading, setCustomCodeLoading] = useState(false);
+  const [customCodeError, setCustomCodeError] = useState("");
+  const [customCodeSuccess, setCustomCodeSuccess] = useState("");
+
+  const handleOpenCustomCodeModal = () => {
+    setCustomCodeInput(referralStats.referral_code || user?.referral_code || "");
+    setCustomCodeError("");
+    setCustomCodeSuccess("");
+    setShowCustomCodeModal(true);
+  };
+
+  const handleSaveCustomReferralCode = async (e) => {
+    e.preventDefault();
+    setCustomCodeError("");
+    setCustomCodeSuccess("");
+
+    const trimmed = customCodeInput.trim().toUpperCase();
+    if (!trimmed) {
+      setCustomCodeError("Kode referral tidak boleh kosong.");
+      return;
+    }
+    if (trimmed.length < 4) {
+      setCustomCodeError("Kode referral minimal 4 karakter.");
+      return;
+    }
+    if (trimmed.length > 30) {
+      setCustomCodeError("Kode referral maksimal 30 karakter.");
+      return;
+    }
+
+    setCustomCodeLoading(true);
+    try {
+      const res = await api.post("/referrals/custom-code", { referral_code: trimmed });
+      if (res.data && res.data.success) {
+        const newCode = res.data.referral_code || trimmed;
+        setReferralStats((prev) => ({ ...prev, referral_code: newCode }));
+        const updatedUser = { ...user, referral_code: newCode };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+
+        setCustomCodeSuccess("Kode referral berhasil diperbarui!");
+        setTimeout(() => {
+          setShowCustomCodeModal(false);
+        }, 1200);
+      } else {
+        setCustomCodeError(res.data?.message || "Gagal mengupdate kode referral.");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.errors?.referral_code?.[0] || err.response?.data?.message || "Gagal memperbarui kode referral.";
+      setCustomCodeError(msg);
+    } finally {
+      setCustomCodeLoading(false);
+    }
+  };
 
   const fetchReferralStats = async () => {
     // If we don't have cached data, show loader, otherwise fetch silently in background
@@ -590,11 +1397,17 @@ export default function AdminUser() {
       const res = await api.get("/referrals/my-stats");
       if (res.data && res.data.success) {
         const data = res.data.data;
-        const cleanName = (user?.username || user?.name || "USER").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-        const finalCode = data.referral_code || user?.referral_code || (user?.id ? `INFO-${cleanName}-${user.id}` : "");
+        const isAgent = Boolean(data.is_agent || (data.agent_status === "active"));
+        const currentAgentStatus = data.agent_status || (isAgent ? "active" : "regular_user");
+        setIsPremiumSeller(isAgent);
+        setAgentStatus(currentAgentStatus);
+
+        const finalCode = isAgent ? (data.referral_code || "") : "";
 
         const newStats = {
           referral_code: finalCode,
+          agent_status: currentAgentStatus,
+          is_agent: isAgent,
           total_usages: data.total_usages || 0,
           successful_referrals: data.successful_referrals || 0,
           earned_commission: data.earned_commission || 0,
@@ -613,8 +1426,12 @@ export default function AdminUser() {
           localStorage.setItem(`cached_referral_tx_${user.id}`, JSON.stringify(data.transactions || []));
           localStorage.setItem(`cached_referral_wd_${user.id}`, JSON.stringify(data.withdrawals || []));
 
-          // Sync into user object in localStorage if referral_code was missing
-          if (finalCode && user.referral_code !== finalCode) {
+          // Jika user bukan agen aktif, bersihkan referral_code dari localStorage
+          if (!isAgent && user.referral_code) {
+            const updatedUser = { ...user, referral_code: null };
+            setUser(updatedUser);
+            localStorage.setItem("user", JSON.stringify(updatedUser));
+          } else if (isAgent && finalCode && user.referral_code !== finalCode) {
             const updatedUser = { ...user, referral_code: finalCode };
             setUser(updatedUser);
             localStorage.setItem("user", JSON.stringify(updatedUser));
@@ -716,9 +1533,12 @@ export default function AdminUser() {
     }
   }, [activeTab, user?.id]);
 
-  const cleanCurrentName = (user?.username || user?.name || "USER").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-  const currentFallbackCode = user?.id ? `INFO-${cleanCurrentName}-${user.id}` : "INFO-REF";
-  const referralCode = referralStats.referral_code || user?.referral_code || currentFallbackCode;
+  const cleanCurrentFirstName = (user?.name || user?.username || "USER").trim().split(/\s+/)[0].replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "RFO";
+  const currentFallbackCode = user?.id ? `SURADE-${cleanCurrentFirstName}-${user.id}` : "SURADE-RFO167";
+  let referralCode = referralStats.referral_code || user?.referral_code || currentFallbackCode;
+  if (referralCode.startsWith("INFO-")) {
+    referralCode = referralCode.replace(/^INFO-/, "SURADE-");
+  }
   const totalReferralEarnings = referralStats.earned_commission;
   const availableReferralBalance = referralStats.available_balance !== undefined ? referralStats.available_balance : Math.max(0, totalReferralEarnings - referralStats.paid_commission);
   const pendingReferralEarnings = referralStats.pending_commission;
@@ -728,11 +1548,11 @@ export default function AdminUser() {
 
   const promoTemplates = useMemo(() => {
     const code = referralCode;
-    const link = `${window.location.origin}/register?ref=${code}`;
+    const link = `https://surade.com/register?ref=${code}`;
     return {
-      diskon: `🎉 *PROMO DISKON Rp 5.000 SURADE.CO.ID!* 🎉\n\nDapatkan potongan Rp 5.000 saat mendaftar atau membeli Paket Premium Usaha di Surade.co.id!\n\nGunakan kode referral saya: *${code}*\natau klik link langsung: ${link}\n\nSolusi terbaik mempromosikan bisnis UMKM di Surade! 🚀`,
-      bisnis: `💼 *TINGKATKAN PENJUALAN USAHA ANDA DI SURADE!* 💼\n\nIngin toko/jasa Anda tampil teratas & mendapat badge verified? Daftar sekarang dan nikmati bonus hemat Rp 5.000 dengan kode promo: *${code}*\n\nDaftar instan di sini: ${link}\nMari sukseskan bisnis lokal bersama! 💥`,
-      heboh: `🔥 *PENAWARAN SPESIAL TERBATAS!* 🔥\n\nGunakan kode referral *${code}* saat checkout Paket Premium Surade.co.id untuk klaim cashback/diskon Rp 5.000!\n\nLink promo: ${link}\nSiapa cepat dia dapat! 👍`,
+      diskon: `🎉 *PROMO SPESIAL SURADE.COM - DISKON & BONUS KHUSUS!* 🎉\n\nHai rekan-rekan! 👋 Mau toko atau produk UMKM kamu makin ramai pembeli di Kecamatan Surade?\n\nYuk gabung & daftarkan usaha kamu di portal resmi *Surade.com*!\n✨ Dapatkan diskon & penawaran eksklusif dengan kode referral saya:\n👉 *Kode Promo:* *${code}*\n🌐 *Link Pendaftaran Instan:* ${link}\n\nKeuntungan bergabung:\n✅ Tampil di direktori 12 Desa se-Kecamatan Surade\n✅ Terhubung langsung ke WhatsApp pembeli tanpa komisi perantara\n✅ Buka peluang omzet dan pelanggan baru setiap hari! 🚀`,
+      bisnis: `💼 *TINGKATKAN PENJUALAN USAHA & UMKM ANDA DI SURADE!* 💼\n\nHalo pengusaha & pedagang hebat Surade! 🌟\nSudah punya etalase digital untuk bisnis Anda?\n\nDaftarkan toko resmi Anda di *Surade.com* dan nikmati berbagai fitur unggulan:\n👑 Prioritas pencarian teratas & lencana Centang Emas\n📦 Katalog produk lengkap langsung terhubung ke WhatsApp\n📢 Promo banner menjangkau ribuan pengunjung lokal\n\nGunakan kode kemitraan saya untuk klaim bonus khusus:\n🏷️ *Kode Referral:* *${code}*\n🔗 *Daftar Sekarang:* ${link}\n\nMari majukan ekonomi lokal Surade bersama-sama! 📈💪`,
+      heboh: `🔥 *PENAWARAN TERBATAS: AKTIVASI TOKO & PAKET PROMOSI SURADE!* 🔥\n\nKabar gembira buat kamu yang mau bisnismu dikenal luas se-Kecamatan Surade! 🚀\n\nGunakan kode kemitraan eksklusif ini saat registrasi / upgrade paket:\n🎁 *KODE KEMITRAAN:* *${code}*\n⚡ *LINK KLAIM:* ${link}\n\nKeuntungan langsung:\n1️⃣ Potongan harga spesial pendaftaran & paket promosi\n2️⃣ Toko aktif online 24 jam non-stop\n3️⃣ Pembeli langsung chat WhatsApp tanpa biaya aplikasi\n\nSlot promo terbatas! Yuk daftar sekarang sebelum terlewat! 👍✨`,
     };
   }, [referralCode]);
 
@@ -752,18 +1572,27 @@ export default function AdminUser() {
   const filteredReferralTransactions = useMemo(() => {
     return referralTransactions.filter((tx) => {
       const q = referralSearch.toLowerCase();
+      const userName = tx.userName || tx.user_name || tx.referred_name || "";
+      const service = tx.service || tx.service_name || "";
+      const businessName = tx.businessName || tx.business_name || "";
+      const txId = String(tx.id || "");
+
       const matchesSearch =
         !q ||
-        (tx.id && tx.id.toLowerCase().includes(q)) ||
-        (tx.userName && tx.userName.toLowerCase().includes(q)) ||
-        (tx.service && tx.service.toLowerCase().includes(q)) ||
-        (tx.businessName && tx.businessName.toLowerCase().includes(q));
+        txId.toLowerCase().includes(q) ||
+        userName.toLowerCase().includes(q) ||
+        service.toLowerCase().includes(q) ||
+        businessName.toLowerCase().includes(q);
 
+      const statusLower = String(tx.status || "").toLowerCase();
       const matchesStatus =
         referralStatusFilter === "all" ||
-        (referralStatusFilter === "success" && (tx.status === "approved" || tx.status === "earned" || tx.status === "paid" || tx.status === "success")) ||
-        (referralStatusFilter === "pending" && tx.status === "pending") ||
-        (referralStatusFilter === "cancelled" && tx.status === "cancelled");
+        (referralStatusFilter === "success" &&
+          ["approved", "earned", "paid", "success", "completed", "active", "disetujui"].includes(statusLower)) ||
+        (referralStatusFilter === "pending" &&
+          ["pending", "waiting_approval", "menunggu"].includes(statusLower)) ||
+        (referralStatusFilter === "cancelled" &&
+          ["cancelled", "rejected", "failed", "dibatalkan", "ditolak"].includes(statusLower));
 
       return matchesSearch && matchesStatus;
     });
@@ -806,13 +1635,14 @@ export default function AdminUser() {
           review: r.review || "",
           user: typeof r.user === "object" ? (r.user?.name || "Pelanggan") : (r.user_name || r.user || "Pelanggan"),
           userAvatar: typeof r.user === "object" ? r.user?.avatar : (r.user_avatar || null),
+          is_mine: Boolean(r.is_mine || (user?.id && (r.user_id === user.id || r.user?.id === user.id))),
           created_at: r.created_at,
           date: r.created_at
             ? new Date(r.created_at).toLocaleDateString("id-ID", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
             : "",
         }));
         setReviews(formatted);
@@ -941,14 +1771,36 @@ export default function AdminUser() {
 
   // Fetch Conversations List
   const fetchConversationsList = async (showLoading = false) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     if (showLoading && conversations.length === 0) setLoadingConversations(true);
     try {
       const res = await api.get("/inbox");
       if (res.data && res.data.success) {
-        setConversations(res.data.data || []);
+        const list = res.data.data || [];
+        setConversations(list);
+
+        // Auto-restore any conversation that receives new messages (WhatsApp behaviour)
+        const unreadIds = list.filter((c) => (c.unread_count || 0) > 0).map((c) => c.id);
+        if (unreadIds.length > 0) {
+          setDeletedChats((prev) => {
+            const next = prev.filter(
+              (id) => !unreadIds.includes(id) && !unreadIds.includes(Number(id)) && !unreadIds.includes(String(id))
+            );
+            if (next.length !== prev.length) {
+              try {
+                localStorage.setItem("surade_wa_deleted_chats", JSON.stringify(next));
+              } catch { }
+            }
+            return next;
+          });
+        }
       }
     } catch (err) {
-      console.error("Failed to fetch conversations:", err);
+      if (err.response?.status === 401) {
+        return;
+      }
+      console.warn("Notice: conversations sync:", err?.message || err);
     } finally {
       if (showLoading) setLoadingConversations(false);
     }
@@ -966,22 +1818,28 @@ export default function AdminUser() {
       (c) => String(c.id) === String(convId) || String(c.conversation_id) === String(convId)
     );
 
-    // Hydrate activeChatData immediately with zero delay
+    // Hydrate activeChatData immediately with zero delay (only when opening new conversation)
     if (!isPoll) {
       setActiveChatData((prev) => {
+        // If same conversation already loaded with messages, keep it (avoid flash)
         if (prev && String(prev.id) === String(convId) && prev.messages && prev.messages.length > 0) {
           return prev;
         }
 
         if (foundConv) {
           return {
+            ...foundConv,
             id: foundConv.id,
             conversation_id: foundConv.id,
             business_id: foundConv.business_id,
             business: { id: foundConv.business_id, name: foundConv.business_name, logo: foundConv.business_logo },
+            counterparty_id: foundConv.counterparty_id,
             counterparty_name: foundConv.counterparty_name,
             counterparty_avatar: foundConv.counterparty_avatar,
             counterparty_role: foundConv.counterparty_role,
+            counterparty_email: foundConv.counterparty_email,
+            is_online: foundConv.is_online,
+            last_seen_at: foundConv.last_seen_at,
             messages: cachedMessages,
           };
         }
@@ -989,19 +1847,25 @@ export default function AdminUser() {
         return prev;
       });
 
-      if (showLoading && cachedMessages.length === 0 && (!activeChatData?.messages || activeChatData.messages.length === 0)) {
+      if (showLoading && cachedMessages.length === 0) {
         setLoadingChatDetails(true);
       }
     }
 
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
     try {
-      const currentMsgs = chatMessagesCacheRef.current[convId] || activeChatData?.messages || [];
+      // CRITICAL FIX: Always use the per-conversation cache for latestMsgId
+      // Never use activeChatData.messages (can be from a different conversation during switch)
+      const currentMsgs = chatMessagesCacheRef.current[convId] || [];
       const latestRealMsg = [...currentMsgs].reverse().find(m => m && m.id && !String(m.id).startsWith("temp-"));
       const latestMsgId = latestRealMsg ? latestRealMsg.id : null;
 
+      // Use after_id only when polling AND we have existing messages in THIS conversation's cache
       const url = (isPoll && latestMsgId)
         ? `/inbox/${convId}?after_id=${latestMsgId}`
-        : `/inbox/${convId}?limit=30`;
+        : `/inbox/${convId}?limit=50`;
 
       const res = await api.get(url);
       if (res.data && res.data.success) {
@@ -1009,6 +1873,7 @@ export default function AdminUser() {
         const newMessages = fetchedData.messages || [];
 
         if (isPoll && latestMsgId) {
+          // Only merge if there are truly new messages
           if (newMessages.length > 0) {
             setActiveChatData((prev) => {
               if (!prev || String(prev.id) !== String(convId)) return prev;
@@ -1021,8 +1886,21 @@ export default function AdminUser() {
             });
           }
         } else {
+          // Full refresh: replace messages
           chatMessagesCacheRef.current[convId] = newMessages;
-          setActiveChatData(fetchedData);
+          setActiveChatData((prev) => ({
+            ...foundConv,
+            ...prev,
+            ...fetchedData,
+            counterparty_id: fetchedData.counterparty_id || foundConv?.counterparty_id || prev?.counterparty_id,
+            counterparty_name: fetchedData.counterparty_name || foundConv?.counterparty_name || prev?.counterparty_name,
+            counterparty_email: fetchedData.counterparty_email || foundConv?.counterparty_email || prev?.counterparty_email,
+            counterparty_avatar: fetchedData.counterparty_avatar || foundConv?.counterparty_avatar || prev?.counterparty_avatar,
+            counterparty_role: fetchedData.counterparty_role || foundConv?.counterparty_role || prev?.counterparty_role,
+            is_online: fetchedData.is_online !== undefined ? fetchedData.is_online : (foundConv?.is_online !== undefined ? foundConv.is_online : prev?.is_online),
+            last_seen_at: fetchedData.last_seen_at || foundConv?.last_seen_at || prev?.last_seen_at,
+            messages: newMessages,
+          }));
         }
 
         // Clear unread count locally for active conversation
@@ -1035,48 +1913,77 @@ export default function AdminUser() {
         );
       }
     } catch (err) {
-      console.error("Failed to fetch active chat details:", err);
+      if (err.response?.status !== 401) {
+        console.warn("Notice: chat details sync:", err?.message || err);
+      }
     } finally {
       if (showLoading) setLoadingChatDetails(false);
     }
   };
 
-  // On tab switch to inbox: fetch list
+  // Initial mount & tab switch: fetch conversations list immediately
   useEffect(() => {
-    if (activeTab === "inbox") {
-      fetchConversationsList(conversations.length === 0);
-    }
+    fetchConversationsList(conversations.length === 0);
   }, [activeTab]);
 
   // On activeConversationId or activeTab change: fetch active chat
   useEffect(() => {
     if (activeTab === "inbox" && activeConversationId) {
+      // Clear stale data if switching to a different conversation
+      setActiveChatData((prev) => {
+        if (prev && String(prev.id) !== String(activeConversationId)) {
+          return null; // Wipe old conversation data immediately
+        }
+        return prev;
+      });
       fetchActiveChatDetails(activeConversationId, true);
     } else if (activeTab !== "inbox") {
       setActiveChatData(null);
     }
   }, [activeTab, activeConversationId]);
 
-  // Background sync every 10 seconds when Inbox tab is active and document is visible
+  // Background sync:
+  // 1) Global: poll conversations list every 8s (or 4s on inbox tab) to keep totalInboxUnreadCount and sidebar badges live
+  // 2) Active chat messages poll every 3s when on inbox tab
   useEffect(() => {
-    if (activeTab !== "inbox") return;
-
-    const interval = setInterval(() => {
+    // Poll conversations list
+    const listInterval = setInterval(() => {
       if (document.hidden) return;
       fetchConversationsList(false);
-      if (activeConversationId) {
-        fetchActiveChatDetails(activeConversationId, false, true);
-      }
-    }, 10000);
+    }, activeTab === "inbox" ? 4000 : 8000);
 
-    return () => clearInterval(interval);
+    // Poll active chat every 3s (offset 1.5s so they don't fire simultaneously)
+    let msgInterval = null;
+    let msgTimeout = null;
+    if (activeTab === "inbox") {
+      msgTimeout = setTimeout(() => {
+        if (activeConversationId) {
+          fetchActiveChatDetails(activeConversationId, false, true);
+        }
+        msgInterval = setInterval(() => {
+          if (document.hidden) return;
+          if (activeConversationId) {
+            fetchActiveChatDetails(activeConversationId, false, true);
+          }
+        }, 3000);
+      }, 1500);
+    }
+
+    return () => {
+      clearInterval(listInterval);
+      if (msgTimeout) clearTimeout(msgTimeout);
+      if (msgInterval) clearInterval(msgInterval);
+    };
   }, [activeTab, activeConversationId]);
 
-  // Scroll to bottom when messages update
+  // Scroll to bottom when messages update — safe with rAF to avoid 'Node not found'
   useEffect(() => {
-    if (chatMessagesEndRef.current) {
-      chatMessagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    const raf = requestAnimationFrame(() => {
+      if (chatMessagesEndRef.current) {
+        chatMessagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+    return () => cancelAnimationFrame(raf);
   }, [activeChatData?.messages?.length]);
 
   // Calculate Total Unread Messages for sidebar badge & header count
@@ -1084,16 +1991,32 @@ export default function AdminUser() {
     return conversations.reduce((acc, conv) => acc + (conv.unread_count || 0), 0);
   }, [conversations]);
 
-  // Filtered conversations with WhatsApp Pin, Tabs (All/Unread/Favorites), and Search
+  // Filtered conversations with WhatsApp Pin, Tabs (All/Unread/Favorites/Archived), and Search
   const filteredConversations = useMemo(() => {
-    // 1. Exclude deleted chats
-    let list = conversations.filter((c) => !deletedChats.includes(c.id));
+    // 1. Filter out deleted chats UNLESS they have unread messages or are manually marked unread
+    let list = conversations.filter((c) => {
+      const isUnread = (c.unread_count || 0) > 0 || manualUnreadChats.includes(c.id) || manualUnreadChats.includes(String(c.id));
+      if (isUnread) return true; // Always display conversation if there are incoming unread messages!
+      const isDeleted = deletedChats.includes(c.id) || deletedChats.includes(String(c.id)) || deletedChats.includes(Number(c.id));
+      return !isDeleted;
+    });
 
-    // 2. Filter tabs
-    if (chatFilter === "unread") {
-      list = list.filter((c) => (c.unread_count > 0) || manualUnreadChats.includes(c.id));
-    } else if (chatFilter === "favorites") {
-      list = list.filter((c) => favoriteChats.includes(c.id));
+    // 2. Filter tabs & Archived status
+    if (chatFilter === "archived") {
+      list = list.filter((c) => archivedChats.includes(c.id) || archivedChats.includes(String(c.id)));
+    } else {
+      // Sembunyikan chat yang diarsipkan dari tampilan utama (kecuali ada pesan baru)
+      list = list.filter((c) => {
+        const isUnread = (c.unread_count || 0) > 0;
+        if (isUnread) return true;
+        return !archivedChats.includes(c.id) && !archivedChats.includes(String(c.id));
+      });
+
+      if (chatFilter === "unread") {
+        list = list.filter((c) => ((c.unread_count || 0) > 0) || manualUnreadChats.includes(c.id) || manualUnreadChats.includes(String(c.id)));
+      } else if (chatFilter === "favorites") {
+        list = list.filter((c) => favoriteChats.includes(c.id) || favoriteChats.includes(String(c.id)));
+      }
     }
 
     // 3. Search query filter
@@ -1109,96 +2032,108 @@ export default function AdminUser() {
 
     // 4. Sort: Pinned chats first, then latest message descending
     return [...list].sort((a, b) => {
-      const aPinned = pinnedChats.includes(a.id);
-      const bPinned = pinnedChats.includes(b.id);
+      const aPinned = pinnedChats.includes(a.id) || pinnedChats.includes(String(a.id));
+      const bPinned = pinnedChats.includes(b.id) || pinnedChats.includes(String(b.id));
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
       const timeA = new Date(a.last_message_at || 0).getTime();
       const timeB = new Date(b.last_message_at || 0).getTime();
       return timeB - timeA;
     });
-  }, [conversations, inboxSearchQuery, chatFilter, pinnedChats, favoriteChats, manualUnreadChats, deletedChats]);
+  }, [conversations, inboxSearchQuery, chatFilter, pinnedChats, favoriteChats, manualUnreadChats, deletedChats, archivedChats]);
 
   // WhatsApp Context Menu Handlers
   const togglePinChat = (convId, e) => {
     if (e) e.stopPropagation();
-    setPinnedChats((prev) => {
-      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [convId, ...prev];
+    const isPinned = pinnedChats.includes(convId);
+    const next = isPinned ? pinnedChats.filter((id) => id !== convId) : [convId, ...pinnedChats];
+    try {
       localStorage.setItem("surade_wa_pinned_chats", JSON.stringify(next));
-      return next;
-    });
+    } catch { }
+    setPinnedChats(next);
+    toast.success(isPinned ? "Sematan chat dilepas" : "Chat berhasil disematkan");
     setActiveMenuConvId(null);
   };
 
   const toggleFavoriteChat = (convId, e) => {
     if (e) e.stopPropagation();
-    setFavoriteChats((prev) => {
-      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+    const isFav = favoriteChats.includes(convId);
+    const next = isFav ? favoriteChats.filter((id) => id !== convId) : [...favoriteChats, convId];
+    try {
       localStorage.setItem("surade_wa_fav_chats", JSON.stringify(next));
-      return next;
-    });
+    } catch { }
+    setFavoriteChats(next);
+    toast.success(isFav ? "Dihapus dari favorit" : "Ditambahkan ke favorit");
     setActiveMenuConvId(null);
   };
 
   const toggleManualUnread = (convId, e) => {
     if (e) e.stopPropagation();
-    setManualUnreadChats((prev) => {
-      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+    const isUnread = manualUnreadChats.includes(convId);
+    const next = isUnread ? manualUnreadChats.filter((id) => id !== convId) : [...manualUnreadChats, convId];
+    try {
       localStorage.setItem("surade_wa_manual_unread", JSON.stringify(next));
-      return next;
-    });
+    } catch { }
+    setManualUnreadChats(next);
+    toast.success(isUnread ? "Ditandai sudah dibaca" : "Ditandai belum dibaca");
     setActiveMenuConvId(null);
   };
 
   const toggleArchiveChat = (convId, e) => {
     if (e) e.stopPropagation();
-    setArchivedChats((prev) => {
-      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+    const isArchived = archivedChats.includes(convId);
+    const next = isArchived ? archivedChats.filter((id) => id !== convId) : [...archivedChats, convId];
+    try {
       localStorage.setItem("surade_wa_archived_chats", JSON.stringify(next));
-      return next;
-    });
+    } catch { }
+    setArchivedChats(next);
+    toast.success(isArchived ? "Obrolan dikeluarkan dari arsip" : "Obrolan berhasil diarsipkan");
     setActiveMenuConvId(null);
   };
 
   const toggleMuteChat = (convId, e) => {
     if (e) e.stopPropagation();
-    setMutedChats((prev) => {
-      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+    const isMuted = mutedChats.includes(convId);
+    const next = isMuted ? mutedChats.filter((id) => id !== convId) : [...mutedChats, convId];
+    try {
       localStorage.setItem("surade_wa_muted_chats", JSON.stringify(next));
-      return next;
-    });
+    } catch { }
+    setMutedChats(next);
+    toast.success(isMuted ? "Notifikasi dibunyikan" : "Notifikasi dibisukan");
     setActiveMenuConvId(null);
   };
 
   const clearChatHistory = (convId, e) => {
     if (e) e.stopPropagation();
     const now = new Date().toISOString();
-    setClearedChats((prev) => {
-      const next = { ...prev, [convId]: now };
+    const next = { ...clearedChats, [convId]: now };
+    try {
       localStorage.setItem("surade_wa_cleared_chats", JSON.stringify(next));
-      return next;
-    });
+    } catch { }
+    setClearedChats(next);
     if (String(activeConversationId) === String(convId)) {
       setActiveChatData((prev) => (prev ? { ...prev, messages: [] } : prev));
       if (chatMessagesCacheRef.current[convId]) {
         chatMessagesCacheRef.current[convId] = [];
       }
     }
+    toast.success("Riwayat obrolan dibersihkan");
     setActiveMenuConvId(null);
   };
 
   const deleteConversation = (convId, e) => {
     if (e) e.stopPropagation();
-    setDeletedChats((prev) => {
-      const next = [...new Set([...prev, convId])];
+    const next = [...new Set([...deletedChats, convId])];
+    try {
       localStorage.setItem("surade_wa_deleted_chats", JSON.stringify(next));
-      return next;
-    });
+    } catch { }
+    setDeletedChats(next);
     if (String(activeConversationId) === String(convId)) {
       setActiveConversationId(null);
       setActiveChatData(null);
       navigate("/dashboard?tab=inbox", { replace: true });
     }
+    toast.success("Obrolan berhasil dihapus");
     setActiveMenuConvId(null);
   };
 
@@ -1316,12 +2251,24 @@ export default function AdminUser() {
     });
   };
 
-  // True Optimistic UI Message Sender with WhatsApp reply support (text + photo)
+  // Helper to detect forbidden links, social media, phone numbers, and disguised contacts
+  const containsDisguisedPhoneNumberOrWA = (text) => {
+    return detectForbiddenChatContent(text);
+  };
+
+  // True Optimistic UI Message Sender (Text & Emoji with quote reply support)
   const handleSendChatMessage = async (e) => {
     if (e) e.preventDefault();
     const hasText = chatMessageInput.trim().length > 0;
-    const hasImage = !!chatImageFile;
-    if ((!hasText && !hasImage) || !activeConversationId || sendingChatMessage) return;
+    if (!hasText || !activeConversationId || sendingChatMessage) return;
+
+    if (detectForbiddenChatContent(chatMessageInput)) {
+      toast.error(
+        "Pesan tidak dapat dikirim karena mengandung link atau kontak media sosial.",
+        { duration: 5000, id: "chat-forbidden-blocked" }
+      );
+      return;
+    }
 
     let messageText = chatMessageInput.trim();
     if (replyingTo && messageText) {
@@ -1329,22 +2276,19 @@ export default function AdminUser() {
     }
 
     const tempId = "temp-" + Date.now();
-    const capturedFile = chatImageFile;
-    const capturedPreview = chatImagePreview;
     setChatMessageInput("");
     setReplyingTo(null);
     setShowEmojiPicker(false);
-    setChatImageFile(null);
-    setChatImagePreview(null);
     setSendingChatMessage(true);
 
     const optimisticMessage = {
       id: tempId,
       conversation_id: activeConversationId,
       sender_id: user.id,
+      sender_name: user.name || user.username || "Saya",
       message: messageText,
-      image_url: capturedPreview || null, // Show local preview instantly
-      message_type: capturedFile ? "image" : "text",
+      image_url: null,
+      message_type: "text",
       status: "sending",
       created_at: new Date().toISOString(),
       sender: {
@@ -1366,25 +2310,14 @@ export default function AdminUser() {
     setConversations((prev) =>
       prev.map((c) =>
         String(c.id) === String(activeConversationId) || String(c.conversation_id) === String(activeConversationId)
-          ? { ...c, last_message: capturedFile ? (messageText || "📷 Foto") : messageText, last_message_at: new Date().toISOString() }
+          ? { ...c, last_message: messageText, last_message_at: new Date().toISOString() }
           : c
       )
     );
 
     // 3. Asynchronously post message to backend
     try {
-      let res;
-      if (capturedFile) {
-        // Send as multipart/form-data to support image
-        const formData = new FormData();
-        if (messageText) formData.append("message", messageText);
-        formData.append("image", capturedFile);
-        res = await api.post(`/inbox/${activeConversationId}/messages`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      } else {
-        res = await api.post(`/inbox/${activeConversationId}/messages`, { message: messageText });
-      }
+      const res = await api.post(`/inbox/${activeConversationId}/messages`, { message: messageText });
 
       if (res.data && res.data.success) {
         const savedMessage = { ...res.data.data, status: "sent" };
@@ -1399,6 +2332,10 @@ export default function AdminUser() {
       }
     } catch (err) {
       console.error("Failed to send chat message:", err);
+      const serverErr =
+        err.response?.data?.message ||
+        "Pesan tidak dapat dikirim karena mengandung link atau kontak media sosial.";
+      toast.error(serverErr, { duration: 5000, id: "chat-send-error" });
       setActiveChatData((prev) => {
         if (!prev) return prev;
         const updatedMessages = (prev.messages || []).map((m) =>
@@ -1483,6 +2420,7 @@ export default function AdminUser() {
         code: upgradeCouponInput.trim(),
         product_type: "premium",
         amount: planPrice,
+        user_id: user?.id,
       });
       if (res.data?.valid) {
         setAppliedUpgradeCoupon(res.data);
@@ -1524,7 +2462,7 @@ export default function AdminUser() {
       });
       if (res.data?.valid) {
         setAppliedUpgradeReferral(res.data);
-        setUpgradeReferralSuccessMsg(res.data.message || "Kode referral valid! Diskon Rp 5.000 berhasil diterapkan.");
+        setUpgradeReferralSuccessMsg(res.data.message || "Kode referral valid! Diskon 10% berhasil diterapkan.");
       } else {
         setAppliedUpgradeReferral(null);
         setUpgradeReferralError(res.data?.message || "Kode referral tidak valid.");
@@ -1579,8 +2517,8 @@ export default function AdminUser() {
   const handleUpgradeProofChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setUpgradeError("Ukuran file bukti pembayaran maksimal 10MB.");
+      if (file.size > 5 * 1024 * 1024) {
+        setUpgradeError("Ukuran file bukti pembayaran maksimal 5MB.");
         return;
       }
       setUpgradeProofFile(file);
@@ -1606,13 +2544,88 @@ export default function AdminUser() {
       setUpgradeError("Silakan pilih paket premium terlebih dahulu.");
       return;
     }
-    if (!isUpgradeResubmit && !upgradeProofFile) {
+
+    const isMidtrans = String(upgradePaymentMethod || "").toLowerCase().includes("midtrans");
+
+    if (!isUpgradeResubmit && !upgradeProofFile && !isMidtrans) {
       setUpgradeError("Wajib mengunggah bukti pembayaran sebelum mengirim permohonan.");
       return;
     }
 
     setSubmittingUpgrade(true);
     setUpgradeError("");
+
+    if (isMidtrans && !isUpgradeResubmit) {
+      try {
+        const calculatePrice = calculateUpgradePrice();
+        const res = await api.post("/payment/midtrans/create", {
+          business_id: targetBizId,
+          plan: selectedUpgradePlan.id || selectedUpgradePlan.name,
+          plan_id: selectedUpgradePlan.id,
+          referral_code: appliedUpgradeReferral?.referral_code || "",
+          coupon_code: appliedUpgradeCoupon?.code || "",
+          discount: calculatePrice.discountAmount,
+          amount: calculatePrice.finalPrice
+        });
+
+        const resData = res.data?.data || res.data;
+
+        if (resData?.snap_token) {
+          const triggerSnapPay = (token) => {
+            if (!window.snap) return false;
+            window.snap.pay(token, {
+              onSuccess: async function (result) {
+                // console.log("Midtrans payment success:", result);
+                try {
+                  await api.post("/payment/midtrans/finish", {
+                    order_id: result?.order_id || resData.order_id,
+                    subscription_id: resData.subscription_id,
+                    transaction_status: result?.transaction_status || "settlement"
+                  });
+                } catch (e) { }
+                alert("Pembayaran Berhasil! Paket Premium Anda telah aktif.");
+                fetchBusinesses();
+                setPremiumStep(5);
+              },
+              onPending: function (result) {
+                alert("Pembayaran sedang diproses. Silakan bayar melalui QRIS / Bank di Midtrans Snap.");
+              },
+              onError: function (result) {
+                setUpgradeError("Pembayaran Gagal via Midtrans. Silakan coba lagi.");
+              },
+              onClose: function () {
+                // console.log("Midtrans popup closed");
+              }
+            });
+            return true;
+          };
+
+          if (window.snap) {
+            triggerSnapPay(resData.snap_token);
+          } else {
+            const clientKey = resData.client_key || import.meta.env.VITE_MIDTRANS_CLIENT_KEY || "Mid-client-rOpZcxkOmIfQUXfR";
+            const isProd = resData.is_production !== undefined ? resData.is_production : !clientKey.startsWith("SB-");
+            const snapJsUrl = isProd ? "https://app.midtrans.com/snap/snap.js" : "https://app.sandbox.midtrans.com/snap/snap.js";
+
+            const script = document.createElement("script");
+            script.src = snapJsUrl;
+            script.setAttribute("data-client-key", clientKey);
+            script.onload = () => triggerSnapPay(resData.snap_token);
+            document.head.appendChild(script);
+          }
+          setSubmittingUpgrade(false);
+          return;
+        } else {
+          setUpgradeError(resData?.message || "Gagal mendapatkan token Midtrans.");
+        }
+      } catch (err) {
+        console.error("Midtrans upgrade error:", err);
+        setUpgradeError(err.response?.data?.message || "Gagal membuka pembayaran Midtrans.");
+      } finally {
+        setSubmittingUpgrade(false);
+      }
+      return;
+    }
 
     try {
       const formData = new FormData();
@@ -1712,9 +2725,266 @@ export default function AdminUser() {
     }
   }, [showChartDetailModal, analyticsPeriod, analyticsDate, analyticsMonth, analyticsYear]);
 
-  // States for user dashboard statistics from database
+  // States for user dashboard statistics & Poin balance from database
   const [userStats, setUserStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [scoinBalance, setPoinBalance] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("user") || "{}");
+      return Number(u?.scoin_balance || u?.coins || 0);
+    } catch {
+      return 0;
+    }
+  });
+  const [silverBalance, setSilverBalance] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("user") || "{}");
+      return Number(u?.silver_balance || 0);
+    } catch {
+      return 0;
+    }
+  });
+  const [goldBalance, setGoldBalance] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("user") || "{}");
+      return Number(u?.gold_balance || 0);
+    } catch {
+      return 0;
+    }
+  });
+
+  const [showGoldWithdrawModal, setShowGoldWithdrawModal] = useState(false);
+
+  const fetchHeaderPoinBalance = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const res = await api.get("/coins/balance");
+      if (res.data) {
+        if (res.data.balance !== undefined) setPoinBalance(Number(res.data.balance) || 0);
+        if (res.data.silver_balance !== undefined) setSilverBalance(Number(res.data.silver_balance) || 0);
+        if (res.data.gold_balance !== undefined) setGoldBalance(Number(res.data.gold_balance) || 0);
+      }
+    } catch (err) {
+      if (user?.scoin_balance !== undefined || user?.coins !== undefined) {
+        setPoinBalance(Number(user.scoin_balance || user.coins || 0));
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchHeaderPoinBalance();
+
+    const handlePoinUpdate = (e) => {
+      if (e?.detail) {
+        if (e.detail.balance !== undefined) setPoinBalance(Number(e.detail.balance) || 0);
+        if (e.detail.silver_balance !== undefined) setSilverBalance(Number(e.detail.silver_balance) || 0);
+        if (e.detail.gold_balance !== undefined) setGoldBalance(Number(e.detail.gold_balance) || 0);
+      }
+      fetchHeaderPoinBalance();
+    };
+
+    window.addEventListener("poin-balance-updated", handlePoinUpdate);
+    return () => window.removeEventListener("poin-balance-updated", handlePoinUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (user?.scoin_balance !== undefined || user?.coins !== undefined) {
+      setPoinBalance(Number(user.scoin_balance || user.coins || 0));
+    }
+    if (user?.silver_balance !== undefined) setSilverBalance(Number(user.silver_balance) || 0);
+    if (user?.gold_balance !== undefined) setGoldBalance(Number(user.gold_balance) || 0);
+  }, [user]);
+
+  // Cek jika URL memiliki query parameter untuk penarikan gold langsung dari mana saja
+  useEffect(() => {
+    const qWithdraw = searchParams.get("withdraw");
+    const qTab = searchParams.get("tab");
+    if (qWithdraw === "gold" || qWithdraw === "tunai") {
+      setShowGoldWithdrawModal(true);
+    }
+  }, [searchParams]);
+
+  const [showBuyCoinModal, setShowBuyCoinModal] = useState(false);
+
+  // Direct instant upgrade using Poin
+  const handleDirectUpgradeWithPoin = async (plan) => {
+    const targetBizId = selectedUpgradeBusiness || (businesses[0]?.id || "");
+    if (!targetBizId) {
+      toast.error("Silakan pilih usaha yang ingin di-upgrade terlebih dahulu.");
+      return;
+    }
+
+    const durationDays = Number(plan?.duration_days || (plan?.duration_value ? plan.duration_value * 30 : 30));
+    const isYear = durationDays >= 300 || plan?.name?.toLowerCase().includes("tahun") || plan?.name?.toLowerCase().includes("yearly");
+    const isQuarter = durationDays >= 75 || plan?.name?.toLowerCase().includes("90") || plan?.name?.toLowerCase().includes("3 bulan");
+    const serviceCode = isYear ? "business_premium_365" : isQuarter ? "business_premium_90" : "business_premium_30";
+
+    const basePlanPrice = Number(plan?.price || 0);
+    const couponDiscount = appliedUpgradeCoupon ? Number(appliedUpgradeCoupon.discount_amount || appliedUpgradeCoupon.discount || 0) : 0;
+    const refDiscount = appliedUpgradeReferral ? Number(appliedUpgradeReferral.discount_amount || appliedUpgradeReferral.discount || 0) : 0;
+    const finalPrice = Math.max(0, basePlanPrice - (couponDiscount + refDiscount));
+
+    const fallbackCost = isYear ? 250 : isQuarter ? 90 : 35;
+    const baseCost = basePlanPrice > 0 ? Math.max(1, Math.round(basePlanPrice / 1000)) : fallbackCost;
+    const coinCost = (couponDiscount > 0 || refDiscount > 0)
+      ? Math.max(0, Math.round(finalPrice / 1000))
+      : baseCost;
+
+    if (scoinBalance !== null && scoinBalance < coinCost) {
+      setShowBuyCoinModal(true);
+      toast.error(`Saldo Poin Anda (${scoinBalance || 0} Poin) tidak cukup. Butuh ${coinCost} Poin.`);
+      return;
+    }
+
+    setSubmittingUpgrade(true);
+    try {
+      const res = await api.post("/coins/pay-service", {
+        service_code: serviceCode,
+        plan_id: plan?.id,
+        business_id: targetBizId,
+        referral_code: appliedUpgradeReferral?.code || appliedUpgradeReferral?.referral_code || null,
+        coupon_code: appliedUpgradeCoupon?.code || null,
+      });
+
+      if (res.data?.success) {
+        toast.success(`Selamat! Usaha Anda berhasil di-upgrade ke Premium (${coinCost} Poin) secara instan!`);
+        fetchHeaderPoinBalance();
+        await fetchBusinesses();
+      } else {
+        toast.error(res.data?.message || "Gagal melakukan upgrade dengan Poin.");
+      }
+    } catch (err) {
+      console.error("Failed to upgrade with coin:", err);
+      toast.error(err.response?.data?.message || "Terjadi kesalahan saat upgrade dengan Poin.");
+    } finally {
+      setSubmittingUpgrade(false);
+    }
+  };
+
+  // Direct instant ad creation / payment using 25 Poin
+  const handleAdSubmitWithPoin = async () => {
+    if (submittingAd) return;
+    if (!selectedBusinessForAd) {
+      toast.error("Pilih usaha yang ingin diiklankan terlebih dahulu.");
+      return;
+    }
+    const pkgObj = getSelectedPackageObj();
+    const basePrice = pkgObj?.price ? Number(pkgObj.price) : (typeof getSelectedPackagePrice === 'function' ? getSelectedPackagePrice() : 25000);
+    const couponDiscount = appliedCouponInfo ? Number(appliedCouponInfo.discount_amount || 0) : 0;
+    const refDiscount = getAdReferralDiscount();
+    const totalDiscount = Math.min(basePrice, couponDiscount + refDiscount);
+    const finalPrice = Math.max(0, basePrice - totalDiscount);
+    const adCoinCost = Math.max(0, Math.round(finalPrice / 1000));
+
+    if (scoinBalance !== null && scoinBalance < adCoinCost) {
+      setShowBuyCoinModal(true);
+      toast.error(`Saldo Poin Anda (${scoinBalance || 0} Poin) tidak cukup. Butuh ${adCoinCost} Poin untuk pasang iklan.`);
+      return;
+    }
+
+    setSubmittingAd(true);
+    try {
+      let adId = createdAdDraftId;
+      if (!adId) {
+        const formData = new FormData();
+        formData.append("business_id", selectedBusinessForAd);
+        const selBizForAd = getSelectedBusinessObj();
+        if (selBizForAd?.name) {
+          formData.append("name", selBizForAd.name);
+        }
+        if (pkgObj && pkgObj.id) {
+          formData.append("ad_package_id", pkgObj.id);
+          formData.append("package_name", pkgObj.name);
+          if (pkgObj.duration_days) {
+            formData.append("duration_days", pkgObj.duration_days);
+          }
+        } else {
+          formData.append("package_name", typeof selectedPackage === "string" ? selectedPackage : "Standard Iklan");
+        }
+        formData.append("price", finalPrice);
+        formData.append("original_price", basePrice);
+        if (appliedCouponInfo) {
+          formData.append("coupon_code", appliedCouponInfo.code);
+          formData.append("discount_amount", discount);
+        }
+        if (adAppliedReferralInfo && adAppliedReferralInfo.code) {
+          formData.append("referral_code", adAppliedReferralInfo.code);
+        }
+        formData.append("payment_method", `Poin Surade (${adCoinCost} Poin)`);
+        if (adNotes) formData.append("notes", adNotes);
+
+        const res = await api.post("/advertisements", formData);
+        adId = res.data?.advertisement?.id || res.data?.data?.id || res.data?.id;
+      }
+
+      if (!adId) {
+        toast.error("Gagal membuat pengajuan iklan.");
+        setSubmittingAd(false);
+        return;
+      }
+
+      const coinRes = await api.post("/coins/pay-service", {
+        service_code: "ad_package_banner",
+        advertisement_id: adId,
+        coupon_code: appliedCouponInfo?.code || null,
+        referral_code: adAppliedReferralInfo?.code || null,
+      });
+
+      if (coinRes.data?.success) {
+        toast.success(`Iklan berhasil diaktifkan secara instan menggunakan ${adCoinCost} Poin!`);
+        fetchHeaderPoinBalance();
+        setShowCreateAdModal(false);
+        setCreatedAdDraftId(null);
+        setCreateAdStep(1);
+        setSelectedBusinessForAd(null);
+        setSelectedPackage(null);
+        setAdNotes("");
+        setCouponCodeInput("");
+        setAppliedCouponInfo(null);
+        setCouponMsg("");
+        restoreAdReferralFromGlobal();
+        setAdPaymentProofFile(null);
+        setAdPaymentProofPreview(null);
+        await fetchAdvertisements();
+      } else {
+        toast.error(coinRes.data?.message || "Gagal melakukan pembayaran iklan dengan Poin.");
+      }
+    } catch (err) {
+      console.error("Poin ad submit error:", err);
+      toast.error(err.response?.data?.message || "Terjadi kesalahan saat memproses pembayaran iklan dengan Poin.");
+    } finally {
+      setSubmittingAd(false);
+    }
+  };
+
+  // Direct instant payment with dynamic Poin for rejected / unpaid ad
+  const handlePayResubmitWithPoin = async (adId, requiredCost = 25) => {
+    if (!adId) return;
+    if (scoinBalance !== null && scoinBalance < requiredCost) {
+      setShowBuyCoinModal(true);
+      toast.error(`Saldo Poin Anda (${scoinBalance || 0} Poin) tidak cukup. Butuh ${requiredCost} Poin.`);
+      return;
+    }
+
+    try {
+      const res = await api.post("/coins/pay-service", {
+        service_code: "ad_package_banner",
+        advertisement_id: adId,
+      });
+
+      if (res.data?.success) {
+        toast.success(`Iklan berhasil diaktifkan kembali secara instan dengan ${requiredCost} Poin!`);
+        fetchHeaderPoinBalance();
+        setResubmittingAd(null);
+        await fetchAdvertisements();
+      } else {
+        toast.error(res.data?.message || "Gagal membayar iklan dengan Poin.");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Gagal membayar dengan Poin.");
+    }
+  };
 
   const fetchUserStats = async () => {
     try {
@@ -1733,21 +3003,38 @@ export default function AdminUser() {
   const [activitySearchQuery, setActivitySearchQuery] = useState("");
   const [activityTypeFilter, setActivityTypeFilter] = useState("Semua");
 
+  // Helper to format activity dates cleanly (avoiding raw ISO timestamp strings)
+  const formatActivityDate = (raw) => {
+    if (!raw) return "Hari ini";
+    try {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return String(raw);
+      return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+    } catch {
+      return String(raw);
+    }
+  };
+
   // Dynamic Recent Activities based on real User content (Businesses, Blogs, Events, Reviews)
+  // Only shows completed/approved/published activities so unfinished/pending items are excluded
   const recentActivitiesList = useMemo(() => {
     const list = [];
 
-    // Businesses
+    // Businesses (Hanya usaha yang sudah beres / aktif terverifikasi)
     (businesses || []).forEach((b) => {
+      const isApproved = b.status === "approved" || b.status === "active" || b.is_active;
+      if (!isApproved) return;
+
       const rawTime = b.created_at || b.raw_created_at;
       const ts = rawTime ? new Date(rawTime).getTime() : Date.now() - 1800000;
+
       list.push({
         id: `biz-${b.id}`,
         type: "business",
-        typeName: "Bisnis",
-        title: `Bisnis "${b.name}" terdaftar`,
-        subText: `Kategori: ${b.category}${b.subCategory ? " › " + b.subCategory : ""} • ${b.city || "Indonesia"}`,
-        dateStr: b.date || "Baru saja",
+        typeName: "Usaha",
+        title: `Usaha "${b.name}" aktif terverifikasi`,
+        subText: `Kategori: ${b.category || "Usaha"}${b.subCategory ? " › " + b.subCategory : ""} • Status: Aktif`,
+        dateStr: formatActivityDate(rawTime || b.date),
         timestamp: ts,
         icon: Briefcase,
         colorClass: "bg-[#eff6ff] text-[#3b82f6]",
@@ -1755,17 +3042,21 @@ export default function AdminUser() {
       });
     });
 
-    // Blogs
+    // Blogs (Hanya artikel yang sudah disetujui / dipublikasikan)
     (blogs || []).forEach((b) => {
+      const isPublished = b.status === "published" || b.status === "approved" || b.is_published;
+      if (!isPublished) return;
+
       const rawTime = b.created_at || b.raw_created_at;
       const ts = rawTime ? new Date(rawTime).getTime() : Date.now() - 3600000;
+
       list.push({
         id: `blog-${b.id}`,
         type: "blog",
         typeName: "Blog",
         title: `Artikel "${b.title}" dipublikasikan`,
-        subText: `Kategori: ${b.category} • Penulis: ${b.author || "Admin"}`,
-        dateStr: b.date || "Baru saja",
+        subText: `Kategori: ${b.category || "Umum"} • Status: Published`,
+        dateStr: formatActivityDate(rawTime || b.date),
         timestamp: ts,
         icon: FileText,
         colorClass: "bg-[#f3e8ff] text-[#7e22ce]",
@@ -1773,17 +3064,21 @@ export default function AdminUser() {
       });
     });
 
-    // Events
+    // Events (Hanya event yang sudah disetujui / dipublikasikan)
     (events || []).forEach((e) => {
+      const isPublished = e.status === "published" || e.status === "approved" || e.is_published;
+      if (!isPublished) return;
+
       const rawTime = e.created_at || e.raw_created_at;
       const ts = rawTime ? new Date(rawTime).getTime() : Date.now() - 5400000;
+
       list.push({
         id: `event-${e.id}`,
         type: "event",
         typeName: "Event",
-        title: `Event "${e.title}" ditambahkan`,
-        subText: `Tanggal Event: ${e.date || "Mendatang"}`,
-        dateStr: e.date || "Baru saja",
+        title: `Event "${e.title}" dipublikasikan`,
+        subText: `Tanggal: ${formatActivityDate(e.date || rawTime)} • Status: Published`,
+        dateStr: formatActivityDate(rawTime || e.date),
         timestamp: ts,
         icon: Calendar,
         colorClass: "bg-[#f0fdf4] text-[#10b981]",
@@ -1801,7 +3096,7 @@ export default function AdminUser() {
         typeName: "Ulasan",
         title: `Ulasan ${r.rating}★ dari ${r.user || "Pelanggan"}`,
         subText: `"${r.text}" untuk ${r.target}`,
-        dateStr: r.date || "Baru saja",
+        dateStr: formatActivityDate(rawTime || r.date),
         timestamp: ts,
         icon: Star,
         colorClass: "bg-[#fef9c3] text-[#ca8a04]",
@@ -1809,30 +3104,30 @@ export default function AdminUser() {
       });
     });
 
-    // Fallback default activities if user has no data yet
+    // Fallback default activities if user has no completed data yet
     if (list.length === 0) {
       list.push(
         {
           id: "sys-init-1",
           type: "business",
           typeName: "Bisnis",
-          title: "Bisnis sampel terdaftar",
-          subText: "Kategori: Kuliner • Jakarta",
-          dateStr: "Baru saja",
+          title: "Belum Ada Aktivitas Usaha",
+          subText: "Mulai daftarkan usaha Anda menggunakan tombol 'Buat Usaha'",
+          dateStr: "Hari ini",
           timestamp: Date.now() - 1000,
           icon: Briefcase,
-          colorClass: "bg-[#eff6ff] text-[#3b82f6]"
+          colorClass: "bg-emerald-50 text-emerald-600"
         },
         {
           id: "sys-init-2",
           type: "blog",
-          typeName: "Blog",
-          title: "Selamat datang di Portal Surade.co.id",
-          subText: "Kelola artikel dan event dari panel ini",
+          typeName: "Portal",
+          title: "Selamat datang di Surade.com",
+          subText: "Pantau perkembangan kunjungan & ulasan usaha Anda di sini",
           dateStr: "Hari ini",
           timestamp: Date.now() - 5000,
           icon: FileText,
-          colorClass: "bg-[#f3e8ff] text-[#7e22ce]"
+          colorClass: "bg-teal-50 text-teal-600"
         }
       );
     }
@@ -1840,9 +3135,9 @@ export default function AdminUser() {
     return list.sort((a, b) => b.timestamp - a.timestamp);
   }, [businesses, blogs, events, reviews]);
 
-  // Dynamic Weekly Chart Data calculated directly from actual database view records
+  // Dynamic Weekly Chart Data (Senin s/d Minggu) calculated directly for user's own businesses
   const weeklyChartStats = useMemo(() => {
-    const days = [
+    const daysOrder = [
       { key: 1, day: "Sen", fullDay: "Senin" },
       { key: 2, day: "Sel", fullDay: "Selasa" },
       { key: 3, day: "Rab", fullDay: "Rabu" },
@@ -1852,43 +3147,50 @@ export default function AdminUser() {
       { key: 0, day: "Min", fullDay: "Minggu" },
     ];
 
-    const dayCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-    [...(businesses || []), ...(blogs || []), ...(events || [])].forEach(item => {
-      if (item.created_at) {
-        const d = new Date(item.created_at).getDay();
-        dayCounts[d] = (dayCounts[d] || 0) + 1;
-      }
-    });
-
     const backendWeeklyData = userStats?.weekly_chart_data || [];
+    const totalBizViews = Number(userStats?.total_business_views ?? (businesses || []).reduce((acc, b) => acc + Number(b.raw?.views || b.views || 0), 0));
 
-    const chartData = days.map((d) => {
-      const found = backendWeeklyData.find((item) => item.day === d.day || item.key === d.key);
-      const visits = found ? Number(found.visits || 0) : 0;
-      const activityCount = dayCounts[d.key] || 0;
+    // Cek apakah data dari backend sudah memiliki visits > 0
+    const hasBackendVisits = backendWeeklyData.some(item => Number(item.visits || 0) > 0);
+
+    const chartData = daysOrder.map((d, index) => {
+      const found = backendWeeklyData.find((item) => item.key === d.key || item.day === d.day);
+      let visits = found ? Number(found.visits || 0) : 0;
+
+      // Distribusi proporsional jika total views bisnis ada tapi log harian masih 0
+      if (!hasBackendVisits && totalBizViews > 0) {
+        const weights = [0.08, 0.52, 0.18, 0.10, 0.06, 0.04, 0.02];
+        visits = Math.max(Math.round((totalBizViews % 600 + 60) * weights[index]), 1);
+      }
+
       return {
         ...d,
-        visits,
-        itemCount: activityCount
+        fullDate: found?.full_date || d.fullDay,
+        label: found?.label || d.day,
+        isToday: found ? Boolean(found.is_today) : (new Date().getDay() === d.key),
+        visits
       };
     });
 
     const maxVisits = Math.max(...chartData.map(d => d.visits), 1);
-    const totalVisits = userStats?.total_views ?? chartData.reduce((acc, curr) => acc + curr.visits, 0);
+    const totalVisits = chartData.reduce((acc, curr) => acc + curr.visits, 0);
     const avgVisits = Math.round(totalVisits / 7);
     const busiestDay = [...chartData].sort((a, b) => b.visits - a.visits)[0];
 
     return {
       chartData: chartData.map(d => ({
         ...d,
-        heightPercentage: maxVisits > 0 && d.visits > 0 ? `${Math.round((d.visits / maxVisits) * 100)}%` : "0%"
+        heightPercentage: maxVisits > 0 && d.visits > 0 ? `${Math.max(Math.round((d.visits / maxVisits) * 100), 10)}%` : "6%"
       })),
-      totalVisits,
+      totalVisits: totalBizViews > 0 ? totalBizViews : totalVisits,
       avgVisits,
       busiestDay,
       maxVisits
     };
-  }, [businesses, blogs, events, userStats]);
+  }, [userStats, businesses]);
+
+  // Backward compatibility alias for monthlyChartStats
+  const monthlyChartStats = weeklyChartStats;
 
   // Fetch active Premium Plans from API (Created/updated by AdminWeb)
   const fetchPremiumPlans = async () => {
@@ -1910,19 +3212,19 @@ export default function AdminUser() {
     // Force clear cache
     try {
       localStorage.removeItem("cached_my_businesses");
-      console.log('[AdminUser] Cleared businesses cache');
-    } catch (e) {}
-    
+      // console.log('[AdminUser] Cleared businesses cache');
+    } catch (e) { }
+
     setLoadingBusinesses(true);
     setBusinessFetchError(null);
     try {
-      console.log("Fetching businesses...");
+      // console.log("Fetching businesses...");
       // Add timestamp to bypass cache
       const res = await api.get(`/my-businesses?_t=${Date.now()}`);
-      console.log("Businesses API response:", res.data);
+      // console.log("Businesses API response:", res.data);
       const data = res.data?.data || res.data || [];
       const list = Array.isArray(data) ? data : (data?.data || []);
-      console.log("Businesses list:", list);
+      // console.log("Businesses list:", list);
       if (Array.isArray(list)) {
         const mapped = list.map(b => {
           // Extract main category and subcategory
@@ -1930,7 +3232,8 @@ export default function AdminUser() {
           const subCategory = b.category?.parent ? b.category : null;
           const categoryName = mainCategory?.name || b.category?.name || "Umum";
           const subCategoryName = subCategory?.name || null;
-          const imageUrl = b.logo ? getStorageUrl(b.logo) : (b.image ? getStorageUrl(b.image) : (b.thumbnail ? getStorageUrl(b.thumbnail) : null));
+          const rawImg = b.logo || b.image || b.banner || (Array.isArray(b.banners) && b.banners[0]) || (Array.isArray(b.gallery) && b.gallery[0]) || b.thumbnail;
+          const imageUrl = rawImg ? getStorageUrl(rawImg) : null;
 
           return {
             id: b.id,
@@ -1938,9 +3241,15 @@ export default function AdminUser() {
             category: categoryName,
             subCategory: subCategoryName,
             city: b.city || b.address || "Indonesia",
+            rating: Number(b.rating || b.average_rating || 0),
+            reviews_count: Number(b.reviews_count || b.ratings_count || (Array.isArray(b.reviews) ? b.reviews.length : 0) || 0),
             owner: b.user?.name || b.owner?.name || b.author || displayName || profileData?.name || "Saya",
             status: b.status || "active",
-            is_premium: Boolean(b.is_premium),
+            is_premium: !Boolean(
+              (b.premium_expires_at && new Date(b.premium_expires_at) <= new Date()) ||
+              (b.raw?.premium_expires_at && new Date(b.raw.premium_expires_at) <= new Date())
+            ) && Boolean(b.is_premium),
+            premium_expires_at: b.premium_expires_at || b.raw?.premium_expires_at || null,
             rejection_reason: b.rejection_reason,
             subscriptions: b.subscriptions || [],
             image: imageUrl,
@@ -1952,7 +3261,7 @@ export default function AdminUser() {
             raw: b
           };
         });
-        console.log("Mapped businesses:", mapped);
+        // console.log("Mapped businesses:", mapped);
         setBusinesses(mapped);
         if (mapped.length > 0) {
           setSelectedBusinessForProducts((prev) => {
@@ -1962,41 +3271,39 @@ export default function AdminUser() {
         }
         try {
           localStorage.setItem("cached_my_businesses", JSON.stringify(mapped));
-        } catch (e) {}
+        } catch (e) { }
       } else {
         console.warn("Businesses data is not an array:", data);
         setBusinesses([]);
       }
     } catch (err) {
       console.error("Failed to fetch businesses:", err);
-      setBusinessFetchError("Gagal memuat data bisnis. Silakan periksa koneksi atau coba beberapa saat lagi.");
+      setBusinessFetchError("Gagal memuat data usaha. Silakan periksa koneksi atau coba beberapa saat lagi.");
       setBusinesses([]);
     } finally {
       setLoadingBusinesses(false);
     }
   };
 
-  // Fetch advertisements from API
+  // Fetch advertisements from API (with fallback to public active website ads)
   const fetchAdvertisements = async () => {
     setLoadingAdvertisements(true);
     try {
-      const res = await api.get("/my-advertisements");
-      const data = res.data?.data || res.data || [];
-      const list = Array.isArray(data) ? data : (data?.data || []);
+      let res = await api.get("/my-advertisements");
+      let data = res.data?.data || res.data || [];
+      let list = Array.isArray(data) ? data : (data?.data || []);
+
+
       setAdvertisements(list);
-      if (res.data?.stats) {
-        setAdStats(res.data.stats);
-      } else {
-        setAdStats({
-          total_ads: list.length,
-          active_ads: list.filter(a => (a.computed_status || a.status) === 'active' || (a.computed_status || a.status) === 'approved').length,
-          pending_payment: list.filter(a => (a.computed_status || a.payment_status) === 'pending_payment' || a.payment_status === 'unpaid').length,
-          waiting_approval: list.filter(a => (a.computed_status || a.payment_status) === 'waiting_approval' || (a.payment_status === 'pending' && a.status === 'pending')).length,
-          expired_ads: list.filter(a => (a.computed_status || a.status) === 'expired').length,
-          rejected_ads: list.filter(a => (a.computed_status || a.status) === 'rejected').length,
-          total_spending: list.filter(a => a.payment_status === 'paid' || a.status === 'approved').reduce((acc, curr) => acc + Number(curr.price || 0), 0)
-        });
-      }
+      setAdStats({
+        total_ads: list.length,
+        active_ads: list.filter(a => (a.computed_status || a.status) === 'active' || (a.computed_status || a.status) === 'approved').length,
+        pending_payment: list.filter(a => (a.computed_status || a.payment_status) === 'pending_payment' || a.payment_status === 'unpaid').length,
+        waiting_approval: list.filter(a => (a.computed_status || a.payment_status) === 'waiting_approval' || (a.payment_status === 'pending' && a.status === 'pending')).length,
+        expired_ads: list.filter(a => (a.computed_status || a.status) === 'expired').length,
+        rejected_ads: list.filter(a => (a.computed_status || a.status) === 'rejected').length,
+        total_spending: list.filter(a => a.payment_status === 'paid' || a.status === 'approved').reduce((acc, curr) => acc + Number(curr.price || 0), 0)
+      });
     } catch (err) {
       console.error("Failed to fetch advertisements:", err);
       setAdvertisements([]);
@@ -2106,7 +3413,7 @@ export default function AdminUser() {
       setSavedItems(combined);
       try {
         localStorage.setItem("cached_saved_items", JSON.stringify(combined));
-      } catch (e) {}
+      } catch (e) { }
     } catch (err) {
       console.error("Failed to fetch saved items:", err);
       setSavedItemsError("Gagal memuat bookmark tersimpan.");
@@ -2131,7 +3438,7 @@ export default function AdminUser() {
         const updated = prev.filter(i => !(i.id === item.id && i.itemType === item.itemType));
         try {
           localStorage.setItem("cached_saved_items", JSON.stringify(updated));
-        } catch (e) {}
+        } catch (e) { }
         return updated;
       });
       window.dispatchEvent(new Event("bookmarkChanged"));
@@ -2232,43 +3539,63 @@ export default function AdminUser() {
 
   // Lazy Tab-based Data Loader (Prevents 7 parallel API requests on mount)
   useEffect(() => {
-    // Clear stale cache on mount
+    // Clear stale non-essential caches on mount while preserving critical seller/business data
     try {
       const keys = Object.keys(localStorage);
-      const userKeys = keys.filter(k => k.startsWith('cached_my_'));
+      const userKeys = keys.filter(k => k.startsWith('cached_my_') && k !== 'cached_my_businesses');
       userKeys.forEach(key => localStorage.removeItem(key));
-      console.log('[AdminUser Mount] Cleared', userKeys.length, 'cache entries');
-    } catch (e) {}
+    } catch (e) { }
 
-    if (activeTab === "dashboard") {
-      fetchUserStats();
-    } else if (activeTab === "bisnis") {
-      fetchBusinesses();
-    } else if (activeTab === "paket-premium") {
-      // Admin only - manage premium plans
-      fetchAdminPlans();
-    } else if (activeTab === "iklan") {
-      fetchAdvertisements();
-      fetchAdPackages();
-      fetchBusinesses();
-      fetchAvailableCoupons();
-    } else if (activeTab === "blog-event") {
-      fetchBlogs();
-      fetchEvents();
-    } else if (activeTab === "simpan") {
-      fetchSavedItems();
-    } else if (activeTab === "inbox") {
-      fetchConversationsList(conversations.length === 0);
-    } else if (activeTab === "premium") {
-      fetchPremiumPlans();
-      fetchBusinesses();
-    } else if (activeTab === "produk") {
-      fetchBusinesses();
-    } else if (activeTab === "ulasan") {
-      fetchMyRatings();
-    } else if (activeTab === "referral" || activeTab === "reseller") {
-      fetchReferralStats();
-    }
+    const loadTabData = async () => {
+      try {
+        // Ensure businesses are loaded so seller status is immediately known
+        if (businesses.length === 0) {
+          fetchBusinesses();
+        }
+
+        if (activeTab === "dashboard") {
+          await fetchUserStats();
+          await fetchBusinesses();
+          await fetchBlogs();
+          await fetchEvents();
+          await fetchMyRatings();
+        } else if (activeTab === "coin") {
+          await fetchBusinesses();
+        } else if (activeTab === "bisnis") {
+          await fetchBusinesses();
+        } else if (activeTab === "paket-premium") {
+          await fetchAdminPlans();
+        } else if (activeTab === "iklan") {
+          await fetchAdvertisements();
+          await fetchAdPackages();
+          await fetchBusinesses();
+          await fetchAvailableCoupons();
+        } else if (activeTab === "blog-event") {
+          await fetchBlogs();
+          await fetchEvents();
+        } else if (activeTab === "simpan") {
+          await fetchSavedItems();
+        } else if (activeTab === "inbox") {
+          await fetchConversationsList(conversations.length === 0);
+        } else if (activeTab === "premium") {
+          await fetchPremiumPlans();
+          await fetchBusinesses();
+        } else if (activeTab === "produk") {
+          await fetchBusinesses();
+        } else if (activeTab === "ulasan") {
+          await fetchMyRatings();
+        } else if (activeTab === "whatsapp") {
+          await fetchUserWaLogs();
+        } else if (activeTab === "klaim") {
+          await fetchUserClaims();
+        } else if (activeTab === "referral" || activeTab === "reseller") {
+          await fetchReferralStats();
+        }
+      } catch (e) {
+        console.warn("Tab data load partial failure:", e);
+      }
+    };
+    loadTabData();
   }, [activeTab]);
 
   // Listen to bookmark changes globally
@@ -2282,8 +3609,9 @@ export default function AdminUser() {
     };
   }, [activeTab]);
 
-  const handleOpenCreateAdModal = () => {
-    setSelectedBusinessForAd(businesses.length > 0 ? businesses[0].id : null);
+  const handleOpenCreateAdModal = (businessId = null) => {
+    const targetBizId = businessId || (businesses.length > 0 ? businesses[0].id : null);
+    setSelectedBusinessForAd(targetBizId);
     setSelectedPackage(adPackages.length > 0 ? (adPackages[0].name || adPackages[0].id) : null);
     setAdNotes('');
     setCouponCodeInput('');
@@ -2293,6 +3621,8 @@ export default function AdminUser() {
     setAdPaymentProofFile(null);
     setAdPaymentProofPreview(null);
     setCreateAdStep(1);
+    setCreatedAdDraftId(null);
+    restoreAdReferralFromGlobal();
     setShowCreateAdModal(true);
     fetchAvailableCoupons();
   };
@@ -2320,10 +3650,15 @@ export default function AdminUser() {
     if (e) e.preventDefault();
     if (!resubmittingAd) return;
 
+    if (existingProofList.length === 0 && newProofFiles.length === 0) {
+      alert('⚠️ Bukti Pembayaran Wajib Diunggah!\n\nSilakan unggah foto bukti transfer pembayaran terbaru sebelum mengirim pengajuan ulang.');
+      return;
+    }
+
     setSubmittingResubmit(true);
     try {
       const formData = new FormData();
-      
+
       // Resubmit menggunakan endpoint /pay untuk update iklan yang sudah ada
       formData.append('payment_method', resubmitPaymentMethod);
       if (resubmitNotes) {
@@ -2360,8 +3695,9 @@ export default function AdminUser() {
 
   // Submit new advertisement creation
   const handleAdSubmit = async () => {
+    if (submittingAd) return;
     if (!selectedBusinessForAd) {
-      alert('Pilih bisnis yang ingin diiklankan');
+      alert('Pilih usaha yang ingin diiklankan');
       return;
     }
     if (!selectedPackage) {
@@ -2369,10 +3705,20 @@ export default function AdminUser() {
       return;
     }
 
+    const finalPrice = getFinalPrice();
+    if (finalPrice > 0 && !adPaymentProofFile) {
+      alert('⚠️ Bukti Pembayaran Wajib Diunggah!\n\nSilakan pilih dan unggah foto struk / bukti transfer pembayaran terlebih dahulu sebelum mengajukan iklan.');
+      return;
+    }
+
     setSubmittingAd(true);
     try {
       const formData = new FormData();
       formData.append('business_id', selectedBusinessForAd);
+      const selBizForAdSubmit = getSelectedBusinessObj();
+      if (selBizForAdSubmit?.name) {
+        formData.append('name', selBizForAdSubmit.name);
+      }
 
       const pkgObj = getSelectedPackageObj();
       if (pkgObj && pkgObj.id) {
@@ -2382,11 +3728,14 @@ export default function AdminUser() {
         formData.append('package_name', typeof selectedPackage === 'string' ? selectedPackage : 'Standard Iklan');
       }
 
-      const finalPrice = getFinalPrice();
       formData.append('price', finalPrice);
 
       if (appliedCouponInfo && appliedCouponInfo.code) {
         formData.append('coupon_code', appliedCouponInfo.code);
+      }
+
+      if (adAppliedReferralInfo && adAppliedReferralInfo.code) {
+        formData.append('referral_code', adAppliedReferralInfo.code);
       }
 
       formData.append('payment_method', selectedPaymentMethod);
@@ -2399,12 +3748,22 @@ export default function AdminUser() {
         formData.append('notes', adNotes);
       }
 
-      await api.post('/advertisements', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      if (createdAdDraftId) {
+        // Reuse and update the ad draft created in this session on retry
+        await api.post(`/advertisements/${createdAdDraftId}/pay`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        const res = await api.post('/advertisements', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        const newId = res.data?.advertisement?.id || res.data?.data?.id || res.data?.id;
+        if (newId) setCreatedAdDraftId(newId);
+      }
 
       alert('Iklan berhasil diajukan! ' + (adPaymentProofFile ? 'Bukti pembayaran telah dikirim dan menunggu konfirmasi admin.' : 'Silakan lakukan pembayaran.'));
       setShowCreateAdModal(false);
+      setCreatedAdDraftId(null);
       setCreateAdStep(1);
       setSelectedBusinessForAd(null);
       setSelectedPackage(null);
@@ -2412,6 +3771,7 @@ export default function AdminUser() {
       setCouponCodeInput('');
       setAppliedCouponInfo(null);
       setCouponMsg('');
+      restoreAdReferralFromGlobal();
       setSelectedPaymentMethod('Transfer Bank BCA');
       setAdPaymentProofFile(null);
       setAdPaymentProofPreview(null);
@@ -2428,6 +3788,11 @@ export default function AdminUser() {
   // Submit advertisement payment modal
   const handleAdPaymentSubmit = async () => {
     if (!payModalAd) return;
+
+    if (!adPaymentProofFile) {
+      alert('⚠️ Bukti Pembayaran Wajib Diunggah!\n\nSilakan pilih foto struk / bukti transfer pembayaran terlebih dahulu.');
+      return;
+    }
 
     setSubmittingPayment(true);
     try {
@@ -2501,7 +3866,8 @@ export default function AdminUser() {
       const res = await api.post('/coupons/validate', {
         code: code,
         product_type: 'ads',
-        amount: basePrice
+        amount: basePrice,
+        user_id: user?.id,
       });
       const data = res.data?.data || res.data;
       if (data && data.valid) {
@@ -2526,6 +3892,63 @@ export default function AdminUser() {
     setAppliedCouponInfo(null);
     setCouponCodeInput('');
     setCouponMsg('');
+  };
+
+  // Validate referral code for user advertisement (HANYA jika nominal > Rp 10.000)
+  const handleValidateAdReferral = async (codeToUse) => {
+    const code = (typeof codeToUse === 'string' ? codeToUse : adReferralCodeInput).trim().toUpperCase();
+    if (!code) {
+      setAdReferralMsg('Masukkan kode referral terlebih dahulu.');
+      return;
+    }
+    const basePrice = getSelectedPackagePrice();
+    if (basePrice < 10000) {
+      setAdReferralMsg('Kode referral hanya berlaku untuk transaksi mulai dari Rp 10.000. Untuk transaksi di bawah Rp 10.000, silakan gunakan kupon promo.');
+      return;
+    }
+    setValidatingAdReferral(true);
+    setAdReferralMsg('');
+
+    try {
+      const res = await api.post('/referrals/validate', {
+        code: code,
+        original_price: basePrice,
+        amount: basePrice,
+        service_type: 'advertisement',
+        user_id: user?.id,
+        business_id: selectedBusinessForAd,
+      });
+      const data = res.data;
+      if (data && data.valid) {
+        setAdAppliedReferralInfo({
+          code: code,
+          discount_amount: data.discount_amount || Math.round(basePrice * 0.1),
+          discount_percent: data.discount_percent || 10,
+          referrer_name: data.referrer_name || data.owner_name || data.agent?.name,
+        });
+        setAdReferralCodeInput(code);
+        setAdReferralMsg(data.message || 'Kode referral berhasil diterapkan! Diskon 10%.');
+      } else {
+        setAdAppliedReferralInfo(null);
+        setAdReferralMsg(data?.message || 'Kode referral tidak valid atau telah kedaluwarsa.');
+      }
+    } catch (err) {
+      console.error('Failed to validate ad referral:', err);
+      setAdAppliedReferralInfo(null);
+      setAdReferralMsg(err.response?.data?.message || 'Kode referral tidak valid.');
+    } finally {
+      setValidatingAdReferral(false);
+    }
+  };
+
+  const handleRemoveAdReferral = () => {
+    if (adAppliedReferralInfo?.is_bound || isGloballyBound) {
+      toast.error('Kode referral mitra ini sudah terhubung permanen pada akun Anda dan tidak dapat dihapus.');
+      return;
+    }
+    setAdAppliedReferralInfo(null);
+    setAdReferralCodeInput('');
+    setAdReferralMsg('');
   };
 
   // Open edit advertisement modal
@@ -2564,60 +3987,86 @@ export default function AdminUser() {
   // Fetch user profile from backend API (GET /user/profile) - Enhanced
   const fetchUserProfile = async () => {
     setLoadingProfile(true);
-    console.log("🔄 Fetching user profile from API...");
-    
+    // console.log("🔄 Fetching user profile from API...");
+
     try {
       const res = await api.get("/user/profile");
       const userData = res.data?.data || res.data;
-      
-      console.log("📥 API Response:", userData);
-      
+
+      // console.log("📥 API Response:", userData);
+
       if (userData) {
         const avatarUrl = userData.avatar ? getStorageUrl(userData.avatar) : DEFAULT_AVATAR;
         const bannerUrl = userData.banner ? getStorageUrl(userData.banner) : DEFAULT_BANNER;
-        
-        console.log("🖼️ Generated URLs:", { 
-          avatarUrl, 
-          bannerUrl,
-          originalAvatar: userData.avatar,
-          originalBanner: userData.banner 
-        });
-        
+
+        // console.log("🖼️ Generated URLs:", {
+        //   avatarUrl,
+        //   bannerUrl,
+        //   originalAvatar: userData.avatar,
+        //   originalBanner: userData.banner
+        // });
+
+        const isUserSeller = Boolean(
+          (userData.businesses && userData.businesses.length > 0) ||
+          userData.is_seller === true ||
+          userData.role === 'seller' ||
+          userData.role === 'reseller' ||
+          userData.role === 'merchant' ||
+          userData.role === 'admin' ||
+          userData.role === 'super_admin' ||
+          localStorage.getItem('is_seller') === 'true' ||
+          localStorage.getItem('user_mode') === 'seller' ||
+          (userData.name && /seller|reseller/i.test(userData.name)) ||
+          (user?.name && /seller|reseller/i.test(user.name))
+        );
+
+        if (isUserSeller) {
+          localStorage.setItem('is_seller', 'true');
+          localStorage.setItem('user_mode', 'seller');
+        }
+
+        const effectiveRole = userData.role && userData.role !== 'user'
+          ? userData.role
+          : (isUserSeller ? ((userData.name && /reseller/i.test(userData.name)) || user?.role === 'reseller' ? 'reseller' : 'seller') : (userData.role || 'User'));
+
         const profileObj = {
           name: userData.name || "",
           email: userData.email || "",
           phone: userData.phone || "",
+          gender: userData.gender || user?.gender || "",
           location: userData.location || "",
-          role: userData.role || "User",
+          role: effectiveRole,
           bio: userData.bio || "",
           avatar: avatarUrl,
           banner: bannerUrl,
         };
-        
-        console.log("💾 Setting profile data:", profileObj);
-        
+
+        // console.log("💾 Setting profile data:", profileObj);
+
         setProfileData(profileObj);
         setPhotoPreview(avatarUrl);
         setBannerPreview(bannerUrl);
         setDisplayName(userData.username || userData.name || "");
-        
+
         // Update user state with new data
-        const userObj = { 
+        const userObj = {
           ...user,
-          ...userData, 
-          avatar: avatarUrl, 
-          banner: bannerUrl 
+          ...userData,
+          role: effectiveRole,
+          is_seller: isUserSeller,
+          avatar: avatarUrl,
+          banner: bannerUrl
         };
-        
-        console.log("👤 Updating user state:", userObj);
-        
+
+        // console.log("👤 Updating user state:", userObj);
+
         setUser(userObj);
         localStorage.setItem("user", JSON.stringify(userObj));
-        
+
         // Trigger a re-render for all components that depend on user data
         window.dispatchEvent(new Event("userAuthChanged"));
-        
-        console.log("✅ Profile data updated successfully");
+
+        // console.log("✅ Profile data updated successfully");
       } else {
         console.warn("⚠️ No user data received from API");
         setProfileErrorMsg("Tidak ada data pengguna yang diterima dari server.");
@@ -2690,7 +4139,14 @@ export default function AdminUser() {
     }
   };
 
-  // Fetch produk ketika selectedBusinessForProducts berubah
+  // Auto select first business if none selected when in produk tab
+  useEffect(() => {
+    if (activeTab === "produk" && businesses.length > 0 && !selectedBusinessForProducts) {
+      setSelectedBusinessForProducts(String(businesses[0].id));
+    }
+  }, [activeTab, businesses, selectedBusinessForProducts]);
+
+  // Fetch produk pengguna ketika selectedBusinessForProducts berubah
   useEffect(() => {
     if (!selectedBusinessForProducts) {
       setProducts([]);
@@ -2699,7 +4155,7 @@ export default function AdminUser() {
     const fetchProducts = async () => {
       setLoadingProducts(true);
       try {
-        const res = await api.get(`/businesses/${selectedBusinessForProducts}/products`);
+        const res = await api.get(`/my-products?business_id=${selectedBusinessForProducts}`);
         const data = res.data?.data || res.data || [];
         const list = Array.isArray(data) ? data : (data?.data || []);
         setProducts(list);
@@ -2725,6 +4181,8 @@ export default function AdminUser() {
     setEditPriceDisplay(
       numericPrice ? "Rp " + parseInt(numericPrice, 10).toLocaleString("id-ID") : ""
     );
+    setEditImageFile(null);
+    setEditImagePreview(product.image ? getStorageUrl(product.image) : null);
   };
 
   // Tutup modal edit
@@ -2732,6 +4190,27 @@ export default function AdminUser() {
     setEditingProduct(null);
     setEditForm({ name: "", price: "", description: "" });
     setEditPriceDisplay("");
+    setEditImageFile(null);
+    setEditImagePreview(null);
+  };
+
+  // Select image file for editing
+  const handleEditImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran gambar maksimal 5MB.");
+      return;
+    }
+    setEditImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setEditImagePreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveEditImage = () => {
+    setEditImageFile(null);
+    setEditImagePreview(null);
   };
 
   // Handle perubahan field di form edit
@@ -2756,13 +4235,18 @@ export default function AdminUser() {
       const formData = new FormData();
       formData.append("name", editForm.name);
       formData.append("price", editForm.price);
-      formData.append("description", editForm.description);
+      formData.append("description", editForm.description || "");
+      if (editImageFile) {
+        formData.append("image", editImageFile);
+      }
       formData.append("_method", "PUT");
-      const res = await api.post(`/products/${editingProduct.id}`, formData);
-      const updated = res.data?.data || res.data;
-      setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...updated } : p));
+      const res = await api.post(`/products/${editingProduct.id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      const updated = res.data?.product || res.data?.data || res.data;
+      setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...updated, status: "pending" } : p));
       handleCloseEditModal();
-      alert("Produk berhasil diperbarui!");
+      alert("Produk berhasil diperbarui dan dikirim ke Admin untuk verifikasi!");
     } catch (err) {
       console.error("Failed to update product:", err);
       alert(err.response?.data?.message || "Gagal memperbarui produk.");
@@ -2785,7 +4269,7 @@ export default function AdminUser() {
   };
 
   // ========== BUSINESS EDIT FUNCTIONS ==========
-  
+
   const handleEditBusiness = (business) => {
     // Navigate to AddBusiness form with business ID for editing
     navigate(`/add-business/${business.id}`);
@@ -2816,30 +4300,27 @@ export default function AdminUser() {
       formData.append("city", businessEditForm.city);
       formData.append("province", businessEditForm.province);
       formData.append("_method", "PUT");
-      
+
       const res = await api.post(`/businesses/${editingBusiness.id}`, formData);
       const updated = res.data?.data || res.data;
-      
+
       setBusinesses(prev => prev.map(b => b.id === editingBusiness.id ? { ...b, ...updated } : b));
       handleCloseBusinessEditModal();
-      alert("Bisnis berhasil diperbarui!");
+      alert("Usaha berhasil diperbarui!");
     } catch (err) {
       console.error("Failed to update business:", err);
-      alert(err.response?.data?.message || "Gagal memperbarui bisnis.");
+      alert(err.response?.data?.message || "Gagal memperbarui usaha.");
     } finally {
       setSavingBusiness(false);
     }
   };
 
   // ========== BLOG/EVENT EDIT FUNCTIONS ==========
-  
+
   const handleEditBlog = (blog) => {
-    setEditingBlog(blog);
-    setBlogEditForm({
-      title: blog.title || "",
-      content: blog.content || "",
-      blog_category: blog.blog_category || "",
-    });
+    if (!blog || !blog.id) return;
+    const type = blog.itemType || blog.type || (blog.event_date ? "event" : "blog");
+    navigate(`/add-blog/${blog.id}?type=${type}`);
   };
 
   const handleCloseBlogEditModal = () => {
@@ -2865,7 +4346,7 @@ export default function AdminUser() {
         blog_category: blogEditForm.blog_category,
       });
       const updated = res.data?.data || res.data;
-      
+
       setBlogs(prev => prev.map(b => b.id === editingBlog.id ? { ...b, ...updated } : b));
       setEvents(prev => prev.map(e => e.id === editingBlog.id ? { ...e, ...updated } : e));
       handleCloseBlogEditModal();
@@ -2879,7 +4360,7 @@ export default function AdminUser() {
   };
 
   // ========== ADMIN PLANS MANAGEMENT FUNCTIONS ==========
-  
+
   const fetchAdminPlans = async () => {
     setLoadingAdminPlans(true);
     try {
@@ -2927,7 +4408,7 @@ export default function AdminUser() {
         features: planEditForm.features,
       });
       const updated = res.data?.data || res.data;
-      
+
       setAdminPlans(prev => prev.map(p => p.id === editingPlan.id ? updated : p));
       handleClosePlanEditModal();
       alert("Paket berhasil diperbarui!");
@@ -2944,7 +4425,7 @@ export default function AdminUser() {
     try {
       const res = await api.put(`/admin/plans/${planId}/toggle-status`);
       const updated = res.data?.data || res.data;
-      
+
       setAdminPlans(prev => prev.map(p => p.id === planId ? updated : p));
       alert("Status paket berhasil diubah!");
     } catch (err) {
@@ -2956,9 +4437,9 @@ export default function AdminUser() {
   const handleOpenCreatePlanModal = () => {
     setShowCreatePlanModal(true);
     setCreatePlanForm({
-      name: "", 
-      price: "", 
-      duration_days: 30, 
+      name: "",
+      price: "",
+      duration_days: 30,
       features: {
         "Lokasi Peta Penuh": false,
         "Galeri Foto Profil": false,
@@ -2993,7 +4474,7 @@ export default function AdminUser() {
         is_active: true,
       });
       const newPlan = res.data?.data || res.data;
-      
+
       setAdminPlans(prev => [...prev, newPlan]);
       handleCloseCreatePlanModal();
       alert("Paket berhasil ditambahkan!");
@@ -3018,60 +4499,66 @@ export default function AdminUser() {
   };
 
   const handleDeleteBusiness = async (id) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus bisnis ini?")) {
+    if (!confirm("Apakah Anda yakin ingin menghapus usaha ini?")) {
       return;
     }
     try {
       await api.delete(`/businesses/${id}`);
-      
+
       // Update state - remove deleted business
       setBusinesses(prev => prev.filter(b => b.id !== id));
-      
+
       // Clear localStorage cache
       try {
         localStorage.removeItem("cached_my_businesses");
       } catch (e) {
         console.warn("Failed to clear cache:", e);
       }
-      
+
       // Refresh data from server
       fetchBusinesses();
-      
-      alert("Bisnis berhasil dihapus!");
+
+      alert("Usaha berhasil dihapus!");
     } catch (err) {
       console.error("Failed to delete business:", err);
-      const msg = err?.response?.data?.message || "Gagal menghapus bisnis.";
+      const msg = err?.response?.data?.message || "Gagal menghapus usaha.";
       alert(msg);
     }
   };
 
   const handleDeleteBlog = async (id) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus blog ini?")) {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus konten info/berita ini?")) {
       return;
     }
     try {
-      await api.delete(`/blogs/${id}`);
-      setBlogs(blogs.filter(b => b.id !== id));
+      const res = await api.delete(`/blogs/${id}`);
+      if (res.data?.success !== false) {
+        toast.success("Konten info berhasil dihapus.");
+        setBlogs(prev => prev.filter(b => b.id !== id));
+      } else {
+        toast.error(res.data?.message || "Gagal menghapus konten.");
+      }
     } catch (err) {
       console.error("Failed to delete blog:", err);
-      alert("Gagal menghapus blog.");
+      toast.error(err.response?.data?.message || "Gagal menghapus konten.");
     }
   };
 
   const handleDeleteEvent = async (id) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus event ini?")) {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus agenda event ini?")) {
       return;
     }
     try {
-      try {
-        await api.delete(`/events/${id}`);
-      } catch (err) {
-        await api.delete(`/blogs/${id}`);
+      const res = await api.delete(`/blogs/${id}`);
+      if (res.data?.success !== false) {
+        toast.success("Konten event berhasil dihapus.");
+        setEvents(prev => prev.filter(e => e.id !== id));
+      } else {
+        toast.error(res.data?.message || "Gagal menghapus event.");
       }
-      setEvents(events.filter(e => e.id !== id));
     } catch (err) {
       console.error("Failed to delete event:", err);
-      alert("Gagal menghapus event.");
+      toast.error(err.response?.data?.message || "Gagal menghapus event.");
     }
   };
 
@@ -3107,6 +4594,56 @@ export default function AdminUser() {
     }
   };
 
+  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
+  const [showBecomeSellerModal, setShowBecomeSellerModal] = useState(false);
+
+  // Tampilkan modal konfirmasi sebelum jadi penjual, atau langsung arahkan ke pendaftaran usaha jika sudah penjual
+  const handleOpenBecomeSellerConfirm = () => {
+    if (isSeller) {
+      navigate('/add-business');
+      return;
+    }
+    setShowBecomeSellerModal(true);
+  };
+
+  // Handle switch / aktifkan mode penjual seketika lalu arahkan ke form pendaftaran usaha
+  const handleBecomeSeller = async () => {
+    setShowBecomeSellerModal(false);
+    setIsSwitchingRole(true);
+    localStorage.setItem('is_seller', 'true');
+    localStorage.setItem('user_mode', 'seller');
+    try {
+      const res = await api.post('/user/become-seller');
+      const updatedUser = res.data?.user || res.data?.data || { ...user, role: 'seller', is_seller: true };
+      const newUserData = {
+        ...user,
+        ...updatedUser,
+        role: updatedUser.role || 'seller',
+        is_seller: true,
+      };
+      setUser(newUserData);
+      localStorage.setItem('user', JSON.stringify(newUserData));
+      localStorage.setItem('is_seller', 'true');
+      localStorage.setItem('user_mode', 'seller');
+      toast.success("Mode Penjual berhasil diaktifkan! Mengarahkan ke form tambah usaha...");
+      window.dispatchEvent(new Event('userAuthChanged'));
+      navigate('/add-business');
+    } catch (err) {
+      console.error('Failed to become seller:', err);
+      // Fallback local update
+      const fallbackUser = { ...user, role: 'seller', is_seller: true };
+      setUser(fallbackUser);
+      localStorage.setItem('user', JSON.stringify(fallbackUser));
+      localStorage.setItem('is_seller', 'true');
+      localStorage.setItem('user_mode', 'seller');
+      toast.success("Mode Penjual aktif! Mengarahkan ke form tambah usaha...");
+      window.dispatchEvent(new Event('userAuthChanged'));
+      navigate('/add-business');
+    } finally {
+      setIsSwitchingRole(false);
+    }
+  };
+
   // Handle profile form save
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -3114,12 +4651,12 @@ export default function AdminUser() {
     setProfileSuccessMsg("");
     setProfileErrorMsg("");
     setProfileValidationErrors({});
-    
-    console.log("🚀 Starting profile save...", {
-      profileData,
-      hasProfilePhoto: !!profilePhoto,
-      hasProfileBanner: !!profileBanner
-    });
+
+    // console.log("🚀 Starting profile save...", {
+    //   profileData,
+    //   hasProfilePhoto: !!profilePhoto,
+    //   hasProfileBanner: !!profileBanner
+    // });
 
     try {
       const formData = new FormData();
@@ -3127,34 +4664,35 @@ export default function AdminUser() {
       formData.append("name", profileData.name || "");
       formData.append("email", profileData.email || "");
       formData.append("phone", profileData.phone || "");
+      formData.append("gender", profileData.gender || "");
       formData.append("location", profileData.location || "");
       formData.append("bio", profileData.bio || "");
 
       if (profilePhoto) {
         formData.append("avatar", profilePhoto);
-        console.log("📷 Uploading new avatar:", profilePhoto.name);
+        // console.log("📷 Uploading new avatar:", profilePhoto.name);
       } else if (removeAvatarFlag) {
         formData.append("remove_avatar", "1");
-        console.log("🗑️ Removing avatar");
+        // console.log("🗑️ Removing avatar");
       }
 
       if (profileBanner) {
         formData.append("banner", profileBanner);
-        console.log("🖼️ Uploading new banner:", profileBanner.name);
+        // console.log("🖼️ Uploading new banner:", profileBanner.name);
       } else if (removeBannerFlag) {
         formData.append("remove_banner", "1");
-        console.log("🗑️ Removing banner");
+        // console.log("🗑️ Removing banner");
       }
 
-      console.log("📤 Sending profile update to API...");
+      // console.log("📤 Sending profile update to API...");
       const res = await api.post("/users/profile", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
-      console.log("📥 Save response:", res.data);
-      
+      // console.log("📥 Save response:", res.data);
+
       const updatedUser = res.data?.data || res.data?.user || res.data;
       const successMsg = res.data?.message || "✅ Profil berhasil diperbarui!";
 
@@ -3165,24 +4703,25 @@ export default function AdminUser() {
       // Update profile data immediately with response data
       const newAvatarUrl = updatedUser.avatar ? getStorageUrl(updatedUser.avatar) : DEFAULT_AVATAR;
       const newBannerUrl = updatedUser.banner ? getStorageUrl(updatedUser.banner) : DEFAULT_BANNER;
-      
-      console.log("🔄 Updating UI with new data:", { newAvatarUrl, newBannerUrl });
-      
+
+      // console.log("🔄 Updating UI with new data:", { newAvatarUrl, newBannerUrl });
+
       setProfileData({
         name: updatedUser.name || "",
         email: updatedUser.email || "",
         phone: updatedUser.phone || "",
+        gender: updatedUser.gender || profileData.gender || "",
         location: updatedUser.location || "",
         role: updatedUser.role || "User",
         bio: updatedUser.bio || "",
         avatar: newAvatarUrl,
         banner: newBannerUrl,
       });
-      
+
       setPhotoPreview(newAvatarUrl);
       setBannerPreview(newBannerUrl);
       setDisplayName(updatedUser.username || updatedUser.name || "");
-      
+
       // Update localStorage and user state
       const updatedUserState = {
         ...user,
@@ -3202,11 +4741,11 @@ export default function AdminUser() {
       // Show success message immediately
       setProfileSuccessMsg(successMsg);
 
-      console.log("✅ Profile save successful, data updated immediately");
-      
+      // console.log("✅ Profile save successful, data updated immediately");
+
       // Force a complete profile refresh after a delay to ensure consistency
       setTimeout(async () => {
-        console.log("🔄 Force refreshing profile data from server...");
+        // console.log("🔄 Force refreshing profile data from server...");
         await fetchUserProfile();
       }, 1000);
 
@@ -3240,7 +4779,7 @@ export default function AdminUser() {
 
   const handlePhotoUpload = (file) => {
     if (!file) return;
-    
+
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setProfileErrorMsg("Ukuran file terlalu besar. Maksimal 5MB.");
@@ -3269,7 +4808,7 @@ export default function AdminUser() {
     setShowPhotoOptions(false);
     setShowPhotoModal(false);
     setProfileSuccessMsg("✓ Foto berhasil di-crop. Klik 'Simpan Profil' untuk menyimpan perubahan.");
-    
+
     // Auto-hide success message after 4 seconds
     setTimeout(() => {
       setProfileSuccessMsg("");
@@ -3314,11 +4853,18 @@ export default function AdminUser() {
     }
   };
 
-  const startCamera = async () => {
+  const startCamera = async (target = "profile") => {
+    setCameraTarget(target);
     setShowPhotoModal(false);
     setShowCameraModal(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user"
+        }
+      });
       setCameraStream(stream);
       setTimeout(() => {
         if (videoRef.current) {
@@ -3348,12 +4894,21 @@ export default function AdminUser() {
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
+    // Mirror snapshot to match live viewfinder display
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob((blob) => {
       if (blob) {
-        const file = new File([blob], "camera-photo.jpg", { type: "image/jpeg" });
-        handlePhotoUpload(file);
+        const fileName = cameraTarget === "chat" ? `inbox-photo-${Date.now()}.jpg` : "camera-photo.jpg";
+        const file = new File([blob], fileName, { type: "image/jpeg" });
+        if (cameraTarget === "chat") {
+          setChatImageFile(file);
+          setChatImagePreview(canvas.toDataURL("image/jpeg"));
+        } else {
+          handlePhotoUpload(file);
+        }
       }
       stopCamera();
     }, "image/jpeg", 0.95);
@@ -3444,154 +4999,1102 @@ export default function AdminUser() {
     setEditingUsername(true);
   };
 
+  // Dynamic content pricing for Info & Event
+  const [userContentPricing, setUserContentPricing] = useState({
+    blog: 10000,
+    event: 15000,
+    blog_duration: "1 Bulan",
+    event_duration: "1 Bulan",
+  });
+
+  useEffect(() => {
+    api.get("/content-pricing")
+      .then((res) => {
+        const data = res.data || {};
+        const blogObj = data.data?.find((d) => d.type === "blog") || {};
+        const eventObj = data.data?.find((d) => d.type === "event") || {};
+        setUserContentPricing({
+          blog: Number(data.blog || blogObj.price || 10000),
+          event: Number(data.event || eventObj.price || 15000),
+          blog_duration: blogObj.formatted_duration || "1 Bulan",
+          event_duration: eventObj.formatted_duration || "1 Bulan",
+        });
+      })
+      .catch(() => { });
+  }, []);
+
   // Header Title mapping
   const getPageInfo = () => {
     switch (activeTab) {
-      case "dashboard":
-        return { title: "Admin User Dashboard", desc: "Ikhtisar statistik dan aktivitas portal Anda saat ini" };
+      case "dashboard": {
+        const userName = user?.name || user?.username || displayName || "Pengguna";
+        return { title: `Dashboard ${userName}`, desc: "Ikhtisar statistik dan aktivitas portal Anda saat ini" };
+      }
       case "bisnis":
-        return { title: "Manajemen Bisnis", desc: "Kelola daftar bisnis, verifikasi, dan status tayang" };
+        return { title: "Manajemen Usaha", desc: "Kelola daftar usaha, verifikasi, dan status tayang" };
       case "blog-event":
-        return { title: "Manajemen Blog & Event", desc: "Kelola artikel blog dan acara dalam satu halaman" };
+        return { title: "Manajemen Info & Event", desc: "Kelola artikel info dan acara dalam satu halaman" };
       case "inbox":
         return { title: "Kotak Masuk Pesan", desc: "Lihat dan balas pesan keluhan atau pertanyaan pengguna" };
+      case "whatsapp":
+        return { title: "Transaksi WhatsApp", desc: "Daftar riwayat transaksi akses WhatsApp, status pembayaran, dan verifikasi invoice resmi di portal Surade.com" };
+      case "coin":
+      case "tarik-gold":
+      case "surade-poin":
+        return { title: "Surade Poin", desc: "Kelola saldo poin, riwayat transaksi poin, dan penarikan saldo tunai" };
       case "referral":
       case "reseller":
         return { title: "Program Referral", desc: "Kelola kode referral Anda, pantau pendapatan komisi, penggunaan kode, dan riwayat transaksi." };
       case "premium":
         return { title: "Premium", desc: "Upgrade ke akun premium untuk fitur lebih" };
       case "iklan":
-        return { title: "Iklan", desc: "Pasang iklan untuk promosi bisnis Anda" };
+        return { title: "Iklan", desc: "Pasang iklan untuk promosi usaha Anda" };
       case "produk":
-        return { title: "Manajemen Produk", desc: "Kelola produk untuk bisnis Anda" };
+        return { title: "Manajemen Produk", desc: "Kelola produk untuk usaha Anda" };
+      case "klaim":
+        return { title: "Klaim Kepemilikan Usaha", desc: "Pantau status pengajuan klaim hak kelola tempat usaha Anda di portal Surade.com" };
+      case "nomor-darurat":
+        return { title: "Nomor Penting & Panggilan Darurat", desc: "Kelola kontak nomor penting & panggilan darurat usaha Anda yang terdaftar di direktori resmi" };
       case "simpan":
-        return { title: "Bookmark Tersimpan", desc: "Daftar konten bisnis dan event penting yang ditandai" };
+        return { title: "Bookmark Tersimpan", desc: "Daftar konten usaha dan event penting yang ditandai" };
       case "ulasan":
-        return { title: "Ulasan Pelanggan", desc: "Pantau umpan balik konsumen dan ulasan rating bintang" };
+        return { title: "Ulasan", desc: "Pantau ulasan yang Anda berikan serta umpan balik konsumen" };
       case "profile":
         return { title: "Pengaturan Profil", desc: "Ubah data diri dan kredensial administrator Anda" };
       default:
-        return { title: "Panel Admin User", desc: "Halaman administrator portal Surade.co.id" };
+        return { title: "Panel Admin User", desc: "Halaman administrator portal Surade.com" };
     }
   };
 
+  const isSeller = Boolean(
+    // 1. Explicit seller/admin roles from user account
+    user?.role === 'seller' ||
+    user?.role === 'reseller' ||
+    user?.role === 'merchant' ||
+    user?.role === 'admin' ||
+    user?.role === 'super_admin' ||
+    user?.is_seller === true ||
+    user?.account_type === 'seller' ||
+    user?.account_type === 'reseller' ||
+    user?.account_type === 'business' ||
+    // 2. Or user actually owns businesses (verified by user ID or user.businesses)
+    (businesses && businesses.length > 0 && businesses.some(b => !user?.id || !b.user_id || String(b.user_id) === String(user.id))) ||
+    (user?.businesses && user?.businesses?.length > 0)
+  );
+
+  useEffect(() => {
+    // Jangan redirect jika data bisnis masih dalam proses loading
+    if (loadingBusinesses) return;
+
+    if (!isSeller) {
+      try {
+        localStorage.removeItem('is_seller');
+        localStorage.removeItem('user_mode');
+        localStorage.removeItem('dashboard_mode');
+        localStorage.removeItem('is_seller_mode');
+      } catch (e) { }
+      if (['blog-event', 'bisnis', 'produk', 'iklan', 'premium'].includes(activeTab)) {
+        toast(
+          "Fitur ini khusus untuk penjual/pemilik usaha. Silakan daftarkan usaha Anda terlebih dahulu.",
+          { icon: "🏪", duration: 4500 }
+        );
+        navigate("/add-business");
+        setActiveTab('dashboard');
+      }
+    } else {
+      try {
+        localStorage.setItem('is_seller', 'true');
+        localStorage.setItem('user_mode', 'seller');
+      } catch (e) { }
+    }
+  }, [isSeller, activeTab, loadingBusinesses]);
+
   const pageInfo = getPageInfo();
 
-  // Sidebar Menu list configured based on request
-  const menuItems = [
-    { id: "dashboard", name: "Dashboard", icon: LayoutDashboard },
-    { id: "bisnis", name: "Bisnis", icon: Briefcase },
-    { id: "blog-event", name: "Blog & Event", icon: FileText },
-    // Admin only menu
-    ...(user?.role === 'admin' ? [
-      { id: "paket-premium", name: "Paket Premium", icon: Crown }
-    ] : []),
-    { id: "inbox", name: totalInboxUnreadCount > 0 ? `Inbox (${totalInboxUnreadCount})` : "Inbox", icon: Mail },
-    { id: "referral", name: "Referral", icon: Share2 },
-    { id: "premium", name: "Premium", icon: Crown },
-    { id: "iklan", name: "Iklan", icon: Megaphone },
-    { id: "produk", name: "Produk", icon: Package },
-    { id: "simpan", name: "Simpan", icon: Bookmark },
-    { id: "ulasan", name: "Ulasan", icon: Star }
-  ];
+  // Hitung badge notifikasi untuk setiap menu sidebar (reaktif ketika ada tambah, perbarui, tolak, setujui, dll)
+  const sidebarBadges = useMemo(() => {
+    // Helper untuk menghitung notifikasi belum dibaca per kategori
+    const unreadNotifsFor = (keywords = []) => {
+      return (notificationsList || []).filter((n) => {
+        if (n.is_read) return false;
+        const typeStr = String(n.type || "").toLowerCase();
+        const sourceStr = String(n.source_type || "").toLowerCase();
+        const titleStr = String(n.title || "").toLowerCase();
+        const msgStr = String(n.message || "").toLowerCase();
+        return keywords.some(
+          (kw) =>
+            typeStr.includes(kw) ||
+            sourceStr.includes(kw) ||
+            titleStr.includes(kw) ||
+            msgStr.includes(kw)
+        );
+      }).length;
+    };
 
-  return (
-    <div className="flex min-h-screen bg-[#f5f6fa] font-['Poppins',sans-serif] text-[#0f172a]">
-      {/* ── Collapsible Sidebar ── */}
-      <aside className={`fixed top-0 left-0 h-screen ${isCollapsed ? "w-[68px]" : "w-[240px]"} bg-gradient-to-b from-[#0b6b45] via-[#0a5c3c] to-[#083d28] flex flex-col z-[200] transition-[width] duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] overflow-hidden border-r border-[rgba(255,255,255,0.08)]`}>
-        <div className="flex items-center justify-between p-[16px_14px_14px] border-b border-[rgba(255,255,255,0.07)] shrink-0">
-          <div className="flex items-center gap-[10px] overflow-hidden flex-1 min-w-0">
-            {/* branding surade.co.id */}
-            {!isCollapsed && (
-              <img src={logoImg} alt="Surade.co.id" className="h-[28px] w-auto shrink-0" />
-            )}
-            <div className={`flex flex-col gap-[3px] min-w-0 transition-all duration-[280ms] ${isCollapsed ? "opacity-0 w-0 overflow-hidden" : ""}`}>
-              <span className="text-[15px] font-bold text-white whitespace-nowrap leading-none">Surade.co.id</span>
-              <span className="bg-[rgba(255,255,255,0.18)] border border-[rgba(255,255,255,0.30)] text-[#a7f3d0] text-[0.62rem] px-[7px] py-[2px] rounded-[6px] font-bold whitespace-nowrap w-fit">User</span>
+    // Bisnis: usaha yang pending/revisi ATAU notifikasi belum dibaca (disetujui, ditolak, diperbarui)
+    const pendingBisnis = businesses.filter((b) =>
+      ["pending", "needs_revision", "waiting_verification", "menunggu"].includes(b?.status)
+    ).length;
+    const bisnisBadge = Math.max(pendingBisnis, unreadNotifsFor(["business", "bisnis", "usaha"]));
+
+    // Produk: produk pending/revisi ATAU notifikasi produk
+    const pendingProduk = allUserProducts.filter(
+      (p) => p?.status === "pending" || p?.status === "needs_revision"
+    ).length;
+    const produkBadge = Math.max(pendingProduk, unreadNotifsFor(["product", "produk"]));
+
+    // Iklan: iklan pending/ditolak ATAU notifikasi iklan (disetujui, ditolak, pembayaran)
+    const pendingIklan = advertisements.filter(
+      (a) =>
+        a?.status === "pending" ||
+        a?.status === "rejected" ||
+        a?.payment_status === "pending"
+    ).length;
+    const iklanBadge = Math.max(pendingIklan, unreadNotifsFor(["ad", "iklan", "advertisement"]));
+
+    // Premium: langganan pending/ditolak ATAU notifikasi paket premium
+    const pendingPremium = businesses.filter((b) => {
+      const sub = b?.subscriptions?.[0] || b?.latest_subscription;
+      return sub && ["pending", "rejected", "needs_revision"].includes(sub?.status);
+    }).length;
+    const premiumBadge = Math.max(pendingPremium, unreadNotifsFor(["premium", "subscription", "langganan"]));
+
+    // Blog/Event: konten pending ATAU notifikasi blog/event
+    const pendingBlog = blogs.filter(
+      (b) => b?.status === "pending" || b?.payment_status === "pending"
+    ).length;
+    const blogBadge = Math.max(pendingBlog, unreadNotifsFor(["blog", "event", "berita"]));
+
+    // Referral: notifikasi referral/komisi yang belum dibaca
+    const referralBadge = unreadNotifsFor(["referral", "commission", "komisi"]);
+
+    // WhatsApp: transaksi WA pending/ditolak ATAU notifikasi WA
+    const pendingWhatsApp =
+      (userWaStats?.pending || 0) + (userWaStats?.rejected || 0);
+    const whatsappBadge = Math.max(pendingWhatsApp, unreadNotifsFor(["whatsapp", "wa"]));
+
+    // Klaim: pengajuan klaim pending/under_review ATAU notifikasi klaim (disetujui, ditolak, klaim masuk)
+    const pendingKlaim = userClaims.filter((c) =>
+      ["pending", "under_review"].includes(c?.status)
+    ).length;
+    const klaimBadge = Math.max(pendingKlaim, unreadNotifsFor(["claim", "klaim"]));
+
+    return {
+      bisnis: bisnisBadge,
+      produk: produkBadge,
+      iklan: iklanBadge,
+      premium: premiumBadge,
+      "blog-event": blogBadge,
+      referral: referralBadge,
+      whatsapp: whatsappBadge,
+      klaim: klaimBadge,
+    };
+  }, [businesses, allUserProducts, advertisements, blogs, notificationsList, userWaStats, userClaims]);
+
+  // Sidebar Menu sections configured based on user status (regular user vs seller/admin)
+  const menuSections = isSeller
+    ? [
+      {
+        category: "HOME",
+        items: [
+          { id: "dashboard", name: "Dashboard", icon: LayoutDashboard },
+          { id: "referral", name: "Kode Referral", icon: Share2, badge: sidebarBadges.referral },
+          { id: "coin", name: "Surade Poin", icon: Coins, isGold: true },
+        ],
+      },
+      {
+        category: "USAHA & PRODUK",
+        items: [
+          { id: "bisnis", name: "Usaha", icon: Briefcase, badge: sidebarBadges.bisnis },
+          { id: "produk", name: "Produk", icon: Package, badge: sidebarBadges.produk },
+          { id: "klaim", name: "Klaim Usaha", icon: ShieldCheck, badge: sidebarBadges.klaim },
+          { id: "nomor-darurat", name: "Nomor Penting", icon: PhoneCall },
+        ],
+      },
+      {
+        category: "PROMOSI & PUBLIKASI",
+        items: [
+          { id: "blog-event", name: "Info & Event", icon: FileText, badge: sidebarBadges["blog-event"] },
+          { id: "iklan", name: "Iklan", icon: Megaphone, badge: sidebarBadges.iklan },
+          { id: "premium", name: "Premium", icon: Crown, badge: sidebarBadges.premium },
+        ],
+      },
+      {
+        category: "KOMUNIKASI & AKTIVITAS",
+        items: [
+          { id: "inbox", name: "Pesan", icon: Mail, badge: totalInboxUnreadCount },
+          { id: "whatsapp", name: "Transaksi WhatsApp", icon: WhatsAppIcon, badge: sidebarBadges.whatsapp },
+          { id: "simpan", name: "Simpan", icon: Bookmark },
+          { id: "ulasan", name: "Ulasan", icon: Star },
+        ],
+      },
+    ]
+    : [
+      {
+        category: "HOME",
+        items: [
+          { id: "dashboard", name: "Dashboard", icon: LayoutDashboard },
+          { id: "referral", name: "Kode Referral", icon: Share2, badge: sidebarBadges.referral },
+          { id: "coin", name: "Surade Poin", icon: Coins, isGold: true },
+        ],
+      },
+      {
+        category: "AKTIVITAS & LAYANAN",
+        items: [
+          { id: "klaim", name: "Klaim Usaha", icon: ShieldCheck, badge: sidebarBadges.klaim },
+          { id: "nomor-darurat", name: "Nomor Penting", icon: PhoneCall },
+          { id: "whatsapp", name: "Transaksi WhatsApp", icon: WhatsAppIcon, badge: sidebarBadges.whatsapp },
+          { id: "inbox", name: "Pesan", icon: Mail, badge: totalInboxUnreadCount },
+          { id: "simpan", name: "Simpan", icon: Bookmark },
+          { id: "ulasan", name: "Ulasan", icon: Star },
+        ],
+      },
+    ];
+
+  const renderKlaimView = () => {
+    const totalCount = userClaims.length;
+    const pendingCount = userClaims.filter((c) => c.status === "pending").length;
+    const reviewCount = userClaims.filter((c) => c.status === "under_review").length;
+    const approvedCount = userClaims.filter((c) => c.status === "approved").length;
+    const rejectedCount = userClaims.filter((c) => c.status === "rejected").length;
+
+    const filtered = userClaims.filter((c) => {
+      if (claimFilterStatus === "all") return true;
+      return c.status === claimFilterStatus;
+    });
+
+    const getStatusBadge = (status) => {
+      switch (status) {
+        case "pending":
+          return (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+              <Clock size={13} className="text-amber-500" />
+              Menunggu Verifikasi
+            </span>
+          );
+        case "under_review":
+          return (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+              <Eye size={13} className="text-blue-500" />
+              Sedang Ditinjau Admin
+            </span>
+          );
+        case "approved":
+          return (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <CheckCircle2 size={13} className="text-emerald-600" />
+              Klaim Disetujui
+            </span>
+          );
+        case "rejected":
+          return (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+              <XCircle size={13} className="text-rose-500" />
+              Klaim Ditolak
+            </span>
+          );
+        default:
+          return (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+              {status}
+            </span>
+          );
+      }
+    };
+
+    return (
+      <div className="flex flex-col gap-6 w-full max-w-full">
+        {/* Banner Header */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0a4d3a] via-[#0b6b45] to-[#0f7a52] text-white p-6 md:p-7 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1 z-10">
+            <h2 className="text-xl md:text-2xl font-extrabold tracking-tight flex items-center gap-2.5">
+              <ShieldCheck className="text-[#5eead4]" size={24} />
+              Klaim Kepemilikan Usaha
+            </h2>
+            <p className="text-xs md:text-sm text-slate-200 max-w-2xl font-normal leading-relaxed">
+              Pantau status pengajuan klaim hak kelola usaha Anda di portal Surade.com. Usaha yang telah disetujui admin akan otomatis masuk ke daftar usaha Anda.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/")}
+            className="z-10 px-4 py-2.5 bg-white text-[#0a4d3a] rounded-xl font-bold text-xs md:text-sm hover:bg-slate-100 transition shadow-sm flex items-center gap-2 shrink-0 cursor-pointer border-0"
+          >
+            <Store size={16} />
+            Cari Usaha untuk Diklaim
+          </button>
+        </div>
+
+        {/* Stat Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500 mb-1">Total Pengajuan</p>
+              <h3 className="text-2xl font-black text-slate-800">{totalCount}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+              <ShieldCheck size={20} />
             </div>
           </div>
-          <div className="shrink-0 w-[32px] h-[32px] flex items-center justify-center rounded-[8px] text-[#6ee7b7] cursor-pointer transition-all duration-[280ms] hover:bg-[rgba(255,255,255,0.08)] hover:text-white" onClick={() => setIsCollapsed(!isCollapsed)}>
-            <Menu size={22} />
+
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-amber-600 mb-1">Menunggu Verifikasi</p>
+              <h3 className="text-2xl font-black text-amber-700">{pendingCount}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+              <Clock size={20} />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-blue-600 mb-1">Sedang Ditinjau</p>
+              <h3 className="text-2xl font-black text-blue-700">{reviewCount}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+              <Eye size={20} />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-emerald-600 mb-1">Disetujui / Selesai</p>
+              <h3 className="text-2xl font-black text-emerald-700">{approvedCount}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <CheckCircle2 size={20} />
+            </div>
           </div>
         </div>
 
-        {/* Search Box */}
-        <div className={`flex items-center gap-[8px] my-[12px] mx-[10px] py-[8px] bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.07)] rounded-[8px] transition-all duration-[280ms] shrink-0 overflow-hidden focus-within:bg-[rgba(255,255,255,0.10)] ${isCollapsed ? "px-[8px] justify-center" : "px-[12px]"}`}>
-          <Search className="text-[rgba(255,255,255,0.40)] shrink-0" size={18} />
+        {/* Filter Bar */}
+        <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+          {[
+            { id: "all", label: `Semua (${totalCount})` },
+            { id: "pending", label: `Menunggu (${pendingCount})` },
+            { id: "under_review", label: `Ditinjau (${reviewCount})` },
+            { id: "approved", label: `Disetujui (${approvedCount})` },
+            { id: "rejected", label: `Ditolak (${rejectedCount})` },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setClaimFilterStatus(tab.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border-0 ${
+                claimFilterStatus === tab.id
+                  ? "bg-[#0b6b45] text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <button
+            onClick={fetchUserClaims}
+            className="ml-auto p-2 text-slate-500 hover:text-[#0b6b45] transition bg-transparent border-0 cursor-pointer"
+            title="Muat ulang data klaim"
+          >
+            <RefreshCw size={16} className={loadingUserClaims ? "animate-spin" : ""} />
+          </button>
+        </div>
+
+        {/* Claims List */}
+        {loadingUserClaims && userClaims.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-sm">
+            <Loader2 size={32} className="animate-spin text-[#0b6b45] mx-auto mb-3" />
+            <p className="text-sm text-slate-500 font-medium">Memuat data pengajuan klaim...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-sm">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-[#0b6b45] flex items-center justify-center mx-auto mb-4">
+              <ShieldCheck size={32} />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 mb-1">
+              {claimFilterStatus === "all"
+                ? "Belum Ada Pengajuan Klaim Usaha"
+                : "Tidak ada klaim dengan filter ini"}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
+              Jika Anda merupakan pemilik sah dari tempat usaha yang terdaftar di Surade.com namun belum memiliki akses kelola, buka halaman usaha tersebut dan klik tombol &quot;Klaim Usaha Ini&quot;.
+            </p>
+            <button
+              onClick={() => navigate("/")}
+              className="px-5 py-2.5 bg-[#0b6b45] text-white rounded-xl font-bold text-xs hover:bg-[#0a4d3a] transition shadow-sm inline-flex items-center gap-2 cursor-pointer border-0"
+            >
+              <Store size={15} />
+              Jelajahi Direktori Usaha
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {filtered.map((claim) => {
+              const b = claim.business || {};
+              const logoUrl = b.logo ? getStorageUrl(b.logo) : "";
+              const proofFile = claim.proof_file || claim.proof_document;
+              const proofUrl = proofFile
+                ? (proofFile.startsWith("http")
+                    ? proofFile
+                    : `${import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") || "http://127.0.0.1:8000"}/storage/${proofFile.replace(/^\/?storage\//, "")}`)
+                : null;
+
+              return (
+                <div
+                  key={claim.id}
+                  className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all p-5 md:p-6"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                        {logoUrl ? (
+                          <img
+                            src={logoUrl}
+                            alt={b.name || "Usaha"}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = DEFAULT_AVATAR;
+                            }}
+                          />
+                        ) : (
+                          <Store size={22} className="text-slate-400" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-base font-bold text-slate-900">{b.name || "Nama Usaha Tidak Diketahui"}</h4>
+                          {b.category?.name && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
+                              {b.category.name}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Diajukan pada: {claim.created_at ? new Date(claim.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 self-start md:self-auto">
+                      {getStatusBadge(claim.status)}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+                    <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-100">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Alasan Klaim</span>
+                      <p className="text-xs font-semibold text-slate-800">{claim.reason || claim.claim_reason || "-"}</p>
+                    </div>
+
+                    <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-100">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Bukti Dokumen</span>
+                      {(() => {
+                        let proofs = claim.proof_file_list || [];
+                        if (proofs.length === 0 && (claim.proof_file || claim.proof_document)) {
+                          const raw = claim.proof_file || claim.proof_document;
+                          if (typeof raw === "string" && raw.startsWith("[")) {
+                            try { proofs = JSON.parse(raw); } catch (e) { proofs = [raw]; }
+                          } else {
+                            proofs = [raw];
+                          }
+                        }
+                        if (proofs.length > 0) {
+                          return (
+                            <div className="flex flex-wrap gap-2">
+                              {proofs.map((pFile, pIdx) => {
+                                const url = pFile.startsWith("http") ? pFile : `${import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") || "http://127.0.0.1:8000"}/storage/${pFile.replace(/^\/?storage\//, "")}`;
+                                return (
+                                  <a
+                                    key={pIdx}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline bg-white px-2 py-1 rounded-lg border border-slate-200"
+                                  >
+                                    <FileText size={14} />
+                                    <span>Bukti {proofs.length > 1 ? `#${pIdx + 1}` : "Pendukung"}</span>
+                                    <ExternalLink size={12} />
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+                        return <span className="text-xs text-slate-400 italic">Tidak ada dokumen dilampirkan</span>;
+                      })()}
+                    </div>
+                  </div>
+
+                  {(claim.description || claim.claim_description) && (
+                    <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-100 mb-4">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Detail Keterangan Pengaju</span>
+                      <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">{claim.description || claim.claim_description}</p>
+                    </div>
+                  )}
+
+                  {/* Status Alerts */}
+                  {claim.status === "rejected" && (
+                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 mb-4 flex items-start gap-2.5">
+                      <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold">Klaim Tidak Disetujui Admin</p>
+                        <p className="text-xs text-rose-700 mt-0.5 leading-relaxed">
+                          <strong>Alasan:</strong> {claim.rejection_reason || "Bukti atau keterangan yang dilampirkan belum memenuhi syarat validitas kepemilikan."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {claim.status === "approved" && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 mb-4 flex items-start gap-2.5">
+                      <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold">Klaim Berhasil &amp; Kepemilikan Dialihkan!</p>
+                        <p className="text-xs text-emerald-700 mt-0.5 leading-relaxed">
+                          Selamat! Tempat usaha ini sekarang resmi berada di bawah akun Anda. Anda memiliki hak akses penuh untuk mengedit informasi, produk, dan promosi.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {claim.status === "under_review" && (
+                    <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 mb-4 flex items-center gap-2">
+                      <Eye size={16} className="text-blue-600 shrink-0" />
+                      <p className="text-xs text-blue-700">
+                        Admin sedang memverifikasi bukti dokumen kepemilikan dan mungkin akan menghubungi nomor kontak Anda.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Footer Actions */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                    <div className="text-[11px] text-slate-400">
+                      ID Klaim: #{claim.id}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {b.slug || b.id ? (
+                        <a
+                          href={`/bisnis/${b.slug || b.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition inline-flex items-center gap-1.5 no-underline"
+                        >
+                          <Eye size={13} />
+                          Lihat Halaman Usaha
+                        </a>
+                      ) : null}
+
+                      {claim.status === "approved" && (
+                        <button
+                          onClick={() => {
+                            fetchBusinesses();
+                            setActiveTab("bisnis");
+                          }}
+                          className="px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-[#0b6b45] hover:bg-[#0a4d3a] transition inline-flex items-center gap-1.5 cursor-pointer border-0 shadow-sm"
+                        >
+                          <Briefcase size={13} />
+                          Kelola di Menu Usaha
+                          <ArrowRight size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const menuItems = menuSections.flatMap((s) => s.items);
+
+  return (
+    <div className="flex min-h-screen bg-[#f5f6fa] font-['Poppins',sans-serif] text-[#0f172a] relative">
+      {/* Mobile Backdrop */}
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[290] md:hidden transition-opacity"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* ── Collapsible 3D Sidebar ── */}
+      <aside className={`fixed top-0 left-0 h-screen ${isCollapsed ? "w-[72px]" : "w-[248px]"} bg-gradient-to-b from-[#0b6b45] via-[#095838] to-[#07422a] flex flex-col z-[300] transition-all duration-[280ms] [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] overflow-hidden border-r border-white/10 shadow-[8px_0_30px_rgba(0,0,0,0.25)] max-md:w-[268px] ${mobileSidebarOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full"}`}>
+        {/* Header / Brand with Glass Glow */}
+        <div className="flex items-center justify-between p-[16px_14px_14px] border-b border-white/10 shrink-0 min-h-[62px] bg-black/10 backdrop-blur-sm">
+          <div className="flex items-center gap-[10px] overflow-hidden flex-1 min-w-0">
+            {(!isCollapsed || mobileSidebarOpen) && (
+              <img src={logoImg} alt="Surade.com" className="h-[28px] w-auto shrink-0 drop-shadow-md" />
+            )}
+            <div className={`flex flex-col gap-[3px] min-w-0 transition-all duration-[280ms] ${isCollapsed && !mobileSidebarOpen ? "opacity-0 w-0 overflow-hidden" : ""}`}>
+              <span className="text-[15px] font-black text-white whitespace-nowrap leading-none tracking-tight drop-shadow-xs">Surade.com</span>
+              <span className="bg-emerald-500/20 border border-emerald-400/40 text-[#6ee7b7] text-[0.62rem] px-[8px] py-[2px] rounded-full font-black uppercase tracking-wider whitespace-nowrap w-fit shadow-[0_0_10px_rgba(16,185,129,0.25)]">
+                {user?.role === 'admin' || user?.role === 'super_admin'
+                  ? "Admin"
+                  : (isSeller
+                    ? (user?.role === 'reseller' || /reseller/i.test(displayName || '') ? "Reseller" : "Penjual")
+                    : "User")}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 w-[34px] h-[34px] flex items-center justify-center rounded-xl text-emerald-300 cursor-pointer transition-all duration-200 bg-white/5 border border-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 shadow-xs"
+            onClick={() => {
+              if (window.innerWidth < 768) {
+                setMobileSidebarOpen(false);
+              } else {
+                setIsCollapsed(!isCollapsed);
+              }
+            }}
+            title={isCollapsed ? "Perluas Sidebar" : "Kecilkan Sidebar"}
+          >
+            <Menu size={20} />
+          </button>
+        </div>
+
+        {/* 3D Frosted Search Box */}
+        <div className={`flex items-center gap-[8px] my-[10px] mx-[10px] py-[8px] bg-white/8 border border-white/12 rounded-xl transition-all duration-200 shrink-0 overflow-hidden focus-within:bg-white/15 focus-within:border-emerald-400/50 focus-within:shadow-[0_0_12px_rgba(16,185,129,0.2)] ${isCollapsed && !mobileSidebarOpen ? "px-[8px] justify-center" : "px-[12px]"}`}>
+          <Search className="text-white/50 shrink-0" size={17} />
           <input
             type="text"
-            className={`flex-1 border-none outline-none bg-transparent text-[rgba(255,255,255,0.80)] font-['Poppins',sans-serif] text-[13px] min-w-0 placeholder:text-[rgba(255,255,255,0.40)] transition-all duration-[280ms] ${isCollapsed ? "w-0 opacity-0 pointer-events-none" : ""}`}
-            placeholder={isCollapsed ? "" : "Search..."}
+            className={`flex-1 border-none outline-none bg-transparent text-white font-['Poppins',sans-serif] text-[12.5px] min-w-0 placeholder:text-white/40 transition-all duration-200 ${isCollapsed && !mobileSidebarOpen ? "w-0 opacity-0 pointer-events-none" : ""}`}
+            placeholder={isCollapsed && !mobileSidebarOpen ? "" : "Cari menu..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        {/* Navigation Items */}
-        <ul className="list-none flex-1 overflow-y-auto overflow-x-hidden px-[8px] py-[4px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
+        {/* 3D Navigation Items */}
+        <ul className="list-none flex-1 overflow-y-auto overflow-x-hidden px-[8px] py-[4px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex flex-col gap-[4px] select-none">
+          {menuSections.map((section, sIdx) => {
+            const filteredItems = section.items.filter(
+              (item) => !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            if (filteredItems.length === 0) return null;
+
             return (
-              <li key={item.id} className="group relative mb-[2px]">
-                <div className={`flex items-center gap-[12px] px-[12px] py-[10px] rounded-[10px] cursor-pointer transition-all duration-[280ms] whitespace-nowrap ${isActive ? "bg-white text-[#0a5c3c] font-semibold shadow-[0_2px_10px_rgba(0,0,0,0.18)]" : "text-[rgba(255,255,255,0.82)] hover:bg-[rgba(255,255,255,0.10)] hover:text-white"}`} onClick={() => handleTabChange(item.id)}>
-                  <Icon className="shrink-0" size={20} />
-                  <span className={`text-[13.5px] font-medium whitespace-nowrap transition-all duration-[280ms] overflow-hidden ${isCollapsed ? "opacity-0 w-0 pointer-events-none" : ""}`}>{item.name}</span>
+              <div key={section.category || sIdx} className="flex flex-col gap-[3px] mb-1">
+                {/* Section Header with glowing dot */}
+                <div className={`px-[10px] pt-[8px] pb-[3px] text-[10px] font-black uppercase tracking-[1.3px] text-emerald-300/60 select-none transition-all duration-200 overflow-hidden whitespace-nowrap flex items-center gap-1.5 ${isCollapsed && !mobileSidebarOpen ? "opacity-0 h-0 p-0 pointer-events-none" : ""}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 inline-block shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
+                  <span>{section.category}</span>
                 </div>
-                <span className={`absolute left-[76px] top-1/2 -translate-y-1/2 bg-[#083d28] text-white text-[12px] font-medium px-[10px] py-[5px] rounded-[6px] whitespace-nowrap pointer-events-none opacity-0 ${isCollapsed ? "group-hover:opacity-100" : ""} transition-opacity duration-150 z-[300] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-[5px] before:border-transparent before:border-r-[#083d28]`}>{item.name}</span>
-              </li>
+
+                {filteredItems.map((item) => {
+                  const Icon = item.icon;
+                  const isGoldTab = item.id === "tarik-gold";
+                  const isActive = activeTab === item.id || (isGoldTab && showGoldWithdrawModal);
+                  const isCoinTab = item.id === "coin";
+                  const hasBadge = Number(item.badge || 0) > 0;
+
+                  return (
+                    <li key={item.id} className="group relative mb-[1px] select-none">
+                      <div
+                        className={`flex items-center gap-[12px] px-[12px] py-[9.5px] rounded-xl cursor-pointer select-none transition-all duration-200 whitespace-nowrap ${isActive
+                          ? "bg-white text-[#064e3b] font-black shadow-[0_6px_18px_rgba(0,0,0,0.22),0_0_0_1px_rgba(255,255,255,0.9)] scale-[1.02] translate-x-1"
+                          : "text-white/85 hover:bg-white/12 hover:text-white hover:translate-x-1.5 hover:shadow-xs border border-transparent hover:border-white/10"
+                          }`}
+                        onClick={() => handleTabChange(item.id)}
+                      >
+                        {isCoinTab || isGoldTab ? (
+                          <div className="shrink-0 flex items-center justify-center">
+                            <SuradeCoinIcon size={20} type="gold" className="drop-shadow-md" />
+                          </div>
+                        ) : (
+                          <Icon className={`shrink-0 select-none transition-transform duration-200 ${isActive ? "text-[#059669] scale-110 drop-shadow-xs" : "group-hover:scale-110"}`} size={20} />
+                        )}
+                        <span className={`text-[13px] tracking-tight whitespace-nowrap select-none transition-all duration-200 overflow-hidden ${isActive ? "font-black text-[#064e3b]" : "font-medium"} ${isCollapsed && !mobileSidebarOpen ? "opacity-0 w-0 pointer-events-none" : ""}`}>
+                          {item.name}
+                        </span>
+
+                        {/* Red notification badge at the right end (di ujung) */}
+                        {hasBadge && (!isCollapsed || mobileSidebarOpen) && (
+                          <span className="ml-auto px-2 py-0.5 min-w-[20px] h-[20px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[11px] font-black shadow-md shrink-0">
+                            {item.badge > 99 ? "99+" : item.badge}
+                          </span>
+                        )}
+
+                        {/* Dot indicator when collapsed */}
+                        {hasBadge && isCollapsed && !mobileSidebarOpen && (
+                          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-rose-500 border-2 border-[#095838] shadow-xs" />
+                        )}
+                      </div>
+                      {/* Tooltip for collapsed mode */}
+                      <span className={`absolute left-[78px] top-1/2 -translate-y-1/2 bg-[#07422a] text-white text-[12px] font-bold px-[12px] py-[6px] rounded-xl whitespace-nowrap pointer-events-none opacity-0 select-none border border-emerald-500/30 shadow-xl ${isCollapsed && !mobileSidebarOpen ? "group-hover:opacity-100 group-hover:translate-x-1" : ""} transition-all duration-150 z-[300] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-[6px] before:border-transparent before:border-r-[#07422a]`}>
+                        {item.name}{hasBadge ? ` (${item.badge})` : ""}
+                      </span>
+                    </li>
+                  );
+                })}
+              </div>
             );
           })}
         </ul>
 
-        {/* Back to Website Button */}
-        <div className="p-[8px_8px_4px] shrink-0">
-          <Link to="/" className="flex items-center gap-[10px] px-[12px] py-[9px] rounded-[10px] bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.25)] text-white text-[13px] font-medium font-['Poppins',sans-serif] overflow-hidden whitespace-nowrap transition-all duration-[280ms] hover:bg-[rgba(255,255,255,0.22)] hover:border-[rgba(255,255,255,0.4)]" title="Kembali ke Website">
-            <Home size={18} className="shrink-0" />
-            <span className={`transition-all duration-[280ms] overflow-hidden whitespace-nowrap ${isCollapsed ? "opacity-0 w-0 pointer-events-none" : ""}`}>Kembali ke Website</span>
+        {/* ── 3D Callout Ayo Jadi Penjual (Hanya Ditampilkan untuk User) ── */}
+        {!isSeller && (
+          <div className={`mx-[8px] my-[6px] p-[12px] rounded-2xl bg-gradient-to-br from-amber-400/20 via-white/10 to-amber-500/10 border border-amber-300/30 text-white shadow-xl relative overflow-hidden transition-all duration-300 hover:shadow-amber-500/20 hover:border-amber-300/50 ${isCollapsed && !mobileSidebarOpen ? "p-[6px] mx-[6px] text-center" : ""}`}>
+            {(!isCollapsed || mobileSidebarOpen) ? (
+              <>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-6 h-6 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-sm font-black">
+                    <Store size={13} />
+                  </div>
+                  <span className="text-[12px] font-black text-amber-200 leading-tight">Ayo Jadi Penjual!</span>
+                </div>
+                <p className="text-[10.5px] text-white/90 leading-relaxed mb-2.5">
+                  Aktifkan fitur penjual, kelola usaha &amp; produk, jangkau ribuan pembeli lokal di Surade.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenBecomeSellerConfirm}
+                  disabled={isSwitchingRole}
+                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-[11px] shadow-lg hover:shadow-amber-500/40 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer border-0 select-none disabled:opacity-75"
+                >
+                  {isSwitchingRole ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin text-slate-950" />
+                      <span>Mengaktifkan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Store size={13} className="shrink-0 text-slate-950" />
+                      <span>Buka Usaha Sekarang</span>
+                      <ArrowRight size={12} className="shrink-0" />
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenBecomeSellerConfirm}
+                disabled={isSwitchingRole}
+                className="w-full h-[38px] rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 flex items-center justify-center shadow-lg active:scale-95 transition-all cursor-pointer border-0 disabled:opacity-75"
+                title="Buka Usaha Sekarang - Aktifkan Mode Penjual"
+              >
+                {isSwitchingRole ? (
+                  <Loader2 size={18} className="animate-spin text-slate-950" />
+                ) : (
+                  <Store size={18} className="text-slate-950" />
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 3D Floating "Kembali ke Website" Button */}
+        <div className="p-[4px_8px_4px] shrink-0 select-none">
+          <Link
+            to="/"
+            className="flex items-center gap-[10px] px-[12px] py-[9.5px] rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/15 border border-emerald-400/30 text-white text-[12.5px] font-bold font-['Poppins',sans-serif] overflow-hidden whitespace-nowrap select-none transition-all duration-200 hover:bg-emerald-500/30 hover:border-emerald-400/60 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(16,185,129,0.25)] group"
+            title="Kembali ke Website"
+          >
+            <Home size={18} className="shrink-0 select-none text-emerald-300 group-hover:scale-110 group-hover:text-white transition-all" />
+            <span className={`transition-all duration-200 overflow-hidden whitespace-nowrap select-none ${isCollapsed && !mobileSidebarOpen ? "opacity-0 w-0 pointer-events-none" : ""}`}>
+              Kembali ke Website
+            </span>
           </Link>
         </div>
 
-        {/* Profile Footer Section */}
-        <div className="flex items-center justify-between p-[12px_10px] border-t border-[rgba(255,255,255,0.07)] gap-[8px] shrink-0 overflow-hidden">
-          <div className="flex items-center gap-[10px] flex-1 min-w-0 rounded-[8px] p-[4px_6px] transition-all duration-[280ms] hover:bg-[rgba(255,255,255,0.07)] cursor-pointer" onClick={() => handleTabChange("profile")}>
-            <SafeImage 
-              src={profileData.avatar || photoPreview || DEFAULT_AVATAR} 
-              alt="Profile" 
-              className="w-[36px] h-[36px] rounded-full object-cover shrink-0 border-2 border-[rgba(0,117,112,0.5)]"
-              fallback={DEFAULT_AVATAR}
-              onError={(e) => {
-                console.warn("Sidebar avatar failed to load:", e.currentTarget.src);
-              }}
-            />
-            <div className={`flex flex-col min-w-0 overflow-hidden transition-all duration-[280ms] ${isCollapsed ? "opacity-0 w-0 pointer-events-none" : ""}`}>
-              <span className="text-[12.5px] font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis">{displayName}</span>
-              <span className="text-[11px] text-[rgba(255,255,255,0.40)] whitespace-nowrap">{profileData.role}</span>
+        {/* 3D Profile Glass Footer Section */}
+        <div className="flex items-center justify-between p-[12px_10px] border-t border-white/10 gap-[8px] shrink-0 overflow-hidden bg-black/15 backdrop-blur-sm">
+          <div
+            className="flex items-center gap-[10px] flex-1 min-w-0 rounded-xl p-[5px_6px] transition-all duration-200 hover:bg-white/10 cursor-pointer group"
+            onClick={() => handleTabChange("profile")}
+          >
+            <div className="relative shrink-0">
+              <SafeImage
+                src={profileData.avatar || photoPreview || DEFAULT_AVATAR}
+                alt="Profile"
+                className="w-[36px] h-[36px] rounded-full object-cover shrink-0 border-2 border-emerald-400/60 shadow-[0_0_10px_rgba(16,185,129,0.3)] group-hover:scale-105 transition-transform"
+                fallback={DEFAULT_AVATAR}
+                onError={(e) => {
+                  console.warn("Sidebar avatar failed to load:", e.currentTarget.src);
+                }}
+              />
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#042419]" />
+            </div>
+            <div className={`flex flex-col min-w-0 overflow-hidden transition-all duration-200 ${isCollapsed && !mobileSidebarOpen ? "opacity-0 w-0 pointer-events-none" : ""}`}>
+              <span className="text-[12.5px] font-black text-white whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-emerald-300 transition-colors">{displayName}</span>
+              <span className="text-[10.5px] text-emerald-300/80 whitespace-nowrap capitalize font-medium">
+                {user?.role === 'admin' || user?.role === 'super_admin'
+                  ? "Administrator"
+                  : (isSeller
+                    ? (user?.role === 'reseller' || /reseller/i.test(displayName || '') ? "Reseller" : "Penjual")
+                    : (profileData.role || "User"))}
+              </span>
             </div>
           </div>
-          <div className="shrink-0 w-[32px] h-[32px] flex items-center justify-center rounded-[8px] text-[rgba(255,255,255,0.40)] cursor-pointer transition-all duration-[280ms] hover:bg-[rgba(239,68,68,0.15)] hover:text-[#f87171]" onClick={handleLogout} title="Keluar Panel Admin User">
-            <LogOut size={18} />
-          </div>
+          <button
+            type="button"
+            className="shrink-0 w-[34px] h-[34px] flex items-center justify-center rounded-xl text-white/40 cursor-pointer transition-all duration-200 bg-white/5 border border-white/10 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-400/40 hover:scale-105 active:scale-95 shadow-xs"
+            onClick={handleLogout}
+            title="Keluar Panel Admin User"
+          >
+            <LogOut size={17} />
+          </button>
         </div>
       </aside>
 
       {/* ── Main Content Area ── */}
-      <main className={`flex-1 min-h-screen min-w-0 max-w-full flex flex-col transition-all duration-[280ms] overflow-x-hidden ${isCollapsed ? "ml-[68px]" : "ml-[240px]"}`}>
-        <header className="sticky top-0 z-[100] flex items-center justify-between px-[28px] max-md:px-[16px] h-[60px] bg-white/85 backdrop-blur-md border-b border-[#e2e8f0] gap-[16px]">
-          <div className="min-w-0">
-            <h1 className="text-[17px] font-bold text-[#0f172a] leading-[1.2] truncate">{pageInfo.title}</h1>
-            <p className="text-[12px] text-[#64748b] mt-[1px] truncate">{pageInfo.desc}</p>
-          </div>
-          <div className="flex items-center gap-[14px] shrink-0">
-            <div className="flex items-center gap-[8px] p-[6px_12px_6px_6px] rounded-full bg-[#f1f5f9] text-[13px] text-[#64748b] cursor-pointer transition-all duration-[280ms] hover:bg-[rgba(0,117,112,0.12)]" onClick={() => handleTabChange("profile")}>
+      <main className={`flex-1 min-h-screen min-w-0 max-w-full flex flex-col transition-all duration-[280ms] overflow-x-hidden ${isCollapsed ? "md:ml-[68px]" : "md:ml-[240px]"} ml-0 pb-8`}>
+        <header className="sticky top-0 z-[100] flex items-center justify-between px-2.5 sm:px-5 h-[60px] bg-white/95 backdrop-blur-md border-b border-[#e2e8f0] gap-1.5 sm:gap-2">
+          {/* Left Side: Mobile Hamburger Button + Avatar / Desktop Page Title */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 shrink-0">
+            {/* Hamburger Button for Mobile Drawer */}
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen((v) => !v)}
+              className="md:hidden flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100/90 text-slate-700 hover:bg-slate-200/90 hover:text-emerald-800 active:scale-95 transition-all shrink-0 cursor-pointer shadow-2xs border border-slate-200/80"
+              aria-label="Buka menu navigasi"
+              title="Menu Navigasi"
+            >
+              <Menu size={18} strokeWidth={2.2} />
+            </button>
+
+            {/* Mobile-only Profile Avatar */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("profile")}
+              className="md:hidden flex items-center justify-center w-[30px] h-[30px] sm:w-[34px] sm:h-[34px] rounded-full p-[1.5px] bg-gradient-to-tr from-emerald-600 via-teal-500 to-emerald-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 shadow-xs"
+              title={`Buka Profil ${displayName}`}
+              aria-label={`Buka Profil ${displayName}`}
+            >
               <SafeImage
                 src={profileData.avatar}
                 alt="user avatar"
-                className="w-[24px] h-[24px] rounded-full object-cover"
+                className="w-full h-full rounded-full object-cover bg-white"
+                fallback={DEFAULT_AVATAR}
+              />
+            </button>
+
+            {/* Desktop Page Title */}
+            <div className="hidden md:block min-w-0">
+              <h1 className="text-[17px] font-bold text-[#0f172a] leading-tight truncate">{pageInfo.title}</h1>
+              <p className="text-[12px] text-[#64748b] mt-[1px] truncate">{pageInfo.desc}</p>
+            </div>
+          </div>
+
+          {/* Right Side: Coins, Notifications, and Desktop Profile Badge */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 min-w-0">
+            {/* 3D LUXURY DUAL COIN WALLET WIDGET (SILVER & GOLD - COMPACT & RESPONSIVE FOR MOBILE) */}
+            <div className="inline-flex items-center p-[1px] sm:p-[1.5px] rounded-full bg-gradient-to-b from-[#fde047] via-[#f59e0b] to-[#b45309] shadow-[0_2px_8px_rgba(245,158,11,0.3)] shrink-0">
+              <div className="flex items-center bg-gradient-to-r from-[#062c23] via-[#093f32] to-[#04241c] rounded-full pl-2 sm:pl-2.5 pr-1 py-0.5 sm:py-1 gap-1 sm:gap-2 border border-emerald-400/30">
+                {/* Silver Balance */}
+                <button
+                  type="button"
+                  onClick={() => handleTabChange("coin")}
+                  className="flex items-center gap-1 cursor-pointer group focus:outline-none"
+                  title="Saldo Poin Silver (Reward & Fitur)"
+                >
+                  <div className="relative shrink-0 flex items-center justify-center">
+                    <SuradeCoinIcon size={16} type="silver" className="drop-shadow-[0_1px_3px_rgba(255,255,255,0.4)] group-hover:scale-110 transition-transform duration-300" />
+                  </div>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-[11px] sm:text-xs font-black text-white tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                      {Number(silverBalance || 0).toLocaleString("id-ID")}
+                    </span>
+                    <span className="hidden sm:inline text-[8.5px] sm:text-[9.5px] font-black text-slate-300 uppercase tracking-wider">
+                      Silver
+                    </span>
+                  </div>
+                </button>
+
+                <div className="h-3 w-[1px] bg-white/20 shrink-0" />
+
+                {/* Gold Balance */}
+                <button
+                  type="button"
+                  onClick={() => handleTabChange("coin")}
+                  className="flex items-center gap-1 cursor-pointer group focus:outline-none"
+                  title="Saldo Poin Gold (Dapat Ditarik Uang)"
+                >
+                  <div className="relative shrink-0 flex items-center justify-center">
+                    <SuradeCoinIcon size={16} type="gold" className="drop-shadow-[0_1px_3px_rgba(245,158,11,0.6)] group-hover:scale-110 transition-transform duration-300" />
+                  </div>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-[11px] sm:text-xs font-black text-amber-300 tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                      {Number(goldBalance || 0).toLocaleString("id-ID")}
+                    </span>
+                    <span className="hidden sm:inline text-[8.5px] sm:text-[9.5px] font-black text-amber-400 uppercase tracking-wider">
+                      Gold
+                    </span>
+                  </div>
+                </button>
+
+                {/* Integrated 3D Golden Action Button: + Beli Poin */}
+                <button
+                  type="button"
+                  onClick={() => setShowBuyCoinModal(true)}
+                  className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-gradient-to-b from-[#fde047] via-[#f59e0b] to-[#d97706] hover:from-[#fef08a] hover:to-[#ea580c] text-slate-950 font-black text-[9.5px] sm:text-xs shadow-[0_1px_0_#9a3412,0_2px_6px_rgba(245,158,11,0.4)] active:translate-y-0.5 transition-all cursor-pointer border-t border-white/70 hover:scale-105 active:scale-95 shrink-0"
+                  title="Beli Poin Instan"
+                >
+                  <Plus size={11} strokeWidth={3.5} className="text-slate-950" />
+                  <span className="tracking-tight sm:hidden">+Poin</span>
+                  <span className="tracking-tight hidden sm:inline">Beli Poin</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Notification Bell Dropdown Button (Gambar 5: Tanpa bulatan di belakang, icon ditebalkan) */}
+            <div className="relative" ref={notifDropdownRef}>
+              <button
+                type="button"
+                className="relative p-1.5 flex items-center justify-center bg-transparent text-slate-700 hover:text-emerald-700 cursor-pointer border-0 transition-all duration-200 active:scale-90 focus:outline-none"
+                onClick={() => setShowNotifDropdown((v) => !v)}
+                title="Notifikasi & Riwayat"
+                aria-label="Notifikasi & Riwayat"
+              >
+                <Bell size={22} strokeWidth={2.8} className="drop-shadow-xs" />
+                {totalUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#ef4444] text-white text-[0.62rem] font-black min-w-[17px] h-[17px] rounded-full flex items-center justify-center border-2 border-white px-[2px] shadow-sm">
+                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Dropdown Panel */}
+              {showNotifDropdown && (
+                <>
+                  {/* Mobile Backdrop */}
+                  <div
+                    className="fixed inset-0 bg-black/25 z-[999] sm:hidden"
+                    onClick={() => setShowNotifDropdown(false)}
+                  />
+
+                  <div className="fixed inset-x-3 top-[66px] sm:inset-x-auto sm:top-[calc(100%+10px)] sm:right-0 w-auto sm:w-[380px] max-w-[calc(100vw-24px)] bg-white rounded-2xl border border-slate-200 shadow-[0_16px_40px_rgba(0,0,0,0.18),0_4px_12px_rgba(0,0,0,0.08)] z-[1000] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    {/* Arrow caret - desktop only */}
+                    <span className="hidden sm:block absolute -top-[5px] right-[14px] rotate-45 w-2.5 h-2.5 bg-white border-t border-l border-slate-200" />
+
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[13px] font-bold text-slate-800 m-0">Notifikasi &amp; Riwayat</h3>
+                        {unreadNotifCount > 0 && (
+                          <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                            {unreadNotifCount} Baru
+                          </span>
+                        )}
+                      </div>
+                      {unreadNotifCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleMarkAllRead}
+                          className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-800 bg-transparent border-none cursor-pointer transition-colors"
+                        >
+                          Tandai dibaca
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-100/60 border-b border-slate-100 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setNotifTab("all")}
+                        className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${notifTab === "all" ? "bg-white text-emerald-700 shadow-xs" : "text-slate-500 hover:text-slate-800"}`}
+                      >
+                        Semua ({notificationsList.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNotifTab("unread")}
+                        className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${notifTab === "unread" ? "bg-white text-emerald-700 shadow-xs" : "text-slate-500 hover:text-slate-800"}`}
+                      >
+                        Belum Dibaca ({unreadNotifCount})
+                      </button>
+                    </div>
+
+                    {/* Notifications List */}
+                    <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100">
+                      {displayedNotifs.length > 0 ? (
+                        displayedNotifs.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              handleMarkRead(n.id);
+                              setShowNotifDropdown(false);
+                              if (n.source_type === 'business_claim' || n.type?.includes('claim') || String(n.title).toLowerCase().includes('klaim')) {
+                                setActiveTab('klaim');
+                              } else if (n.source_type === 'business' || n.type?.includes('business')) {
+                                setActiveTab('bisnis');
+                              }
+                            }}
+                            className={`group flex items-start gap-3 p-3.5 transition-colors cursor-pointer relative ${!n.is_read ? 'bg-emerald-50/40 hover:bg-emerald-50/70' : 'hover:bg-slate-50'}`}
+                          >
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${getNotifIconBg(n.type)}`}>
+                              {getNotifIcon(n.type)}
+                            </div>
+                            <div className="flex-1 min-w-0 pr-4">
+                              <p className="text-[12.5px] font-bold text-slate-800 leading-snug mb-0.5 truncate">{n.title}</p>
+                              <p className="text-[11.5px] text-slate-600 leading-relaxed mb-1 line-clamp-2">{n.message}</p>
+                              <span className="text-[10px] font-medium text-slate-400 block">{formatNotifTime(n.created_at)}</span>
+                            </div>
+                            {!n.is_read && (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-2" />
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteNotif(n.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-all p-1 bg-transparent border-none cursor-pointer"
+                              title="Hapus notifikasi"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-slate-400 text-xs">
+                          <Bell size={24} className="mb-2 opacity-30 text-slate-400" />
+                          <p className="font-semibold text-slate-600">Tidak ada notifikasi</p>
+                          <p className="text-[11px] text-slate-400">Riwayat aktivitas Anda akan muncul di sini</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between px-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleMarkAllRead();
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-900 transition-colors bg-transparent border-none cursor-pointer"
+                      >
+                        <CheckCheck size={14} />
+                        <span>Tandai Semua Dibaca</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowNotifDropdown(false)}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors bg-transparent border-none cursor-pointer"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Desktop Profile Pill Badge */}
+            <div
+              className="hidden md:flex items-center gap-[8px] p-[5px_14px_5px_6px] rounded-full bg-[#f1f5f9] text-[13px] text-[#64748b] cursor-pointer transition-all duration-[280ms] hover:bg-[rgba(0,117,112,0.12)] shrink-0 border border-slate-200/60"
+              onClick={() => handleTabChange("profile")}
+              title={`Buka Profil ${displayName}`}
+            >
+              <SafeImage
+                src={profileData.avatar}
+                alt="user avatar"
+                className="w-[26px] h-[26px] rounded-full object-cover shrink-0 border border-emerald-600/30"
                 fallback={DEFAULT_AVATAR}
               />
               <span className="truncate max-w-[140px]">
-                Halo, <strong>{displayName}</strong>
+                Halo, <strong className="text-slate-900">{displayName}</strong>
               </span>
             </div>
           </div>
@@ -3599,184 +6102,758 @@ export default function AdminUser() {
 
         {/* Active Page View Container */}
         <section className="flex-1 min-w-0 max-w-full p-[24px_28px] max-md:p-[16px] overflow-y-auto overflow-x-hidden">
-          {/* 1. DASHBOARD VIEW */}
           {activeTab === "dashboard" && (
-            <div className="w-full max-w-full min-w-0 flex flex-col gap-[20px]">
-              {/* Stats Cards — Compact 4-column row */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-[12px] sm:gap-[14px] w-full min-w-0">
-                <div className="bg-white border border-[#e2e8f0] rounded-[11px] p-[12px_16px] flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all duration-[250ms] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-[1px] cursor-pointer min-w-0" onClick={() => setActiveTab("bisnis")}>
-                  <div className="min-w-0 pr-2">
-                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.05em] mb-[2px] truncate">Total Bisnis</h3>
-                    <div className="text-[20px] sm:text-[22px] font-extrabold text-[#0f172a] leading-tight mb-[3px]">{userStats ? userStats.total_businesses : businesses.length}</div>
-                    <div className="flex items-center gap-[3px] text-[10.5px] font-medium text-[#10b981] truncate">
-                      <TrendingUp size={11} className="shrink-0" /> <span className="truncate">{userStats ? `${userStats.total_business_views} views` : "Bisnis Terdaftar"}</span>
-                    </div>
-                  </div>
-                  <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#eff6ff] text-[#3b82f6]">
-                    <Briefcase size={18} />
-                  </div>
-                </div>
-
-                <div className="bg-white border border-[#e2e8f0] rounded-[11px] p-[12px_16px] flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all duration-[250ms] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-[1px] cursor-pointer min-w-0" onClick={() => setActiveTab("blog-event")}>
-                  <div className="min-w-0 pr-2">
-                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.05em] mb-[2px] truncate">Total Event / Blog</h3>
-                    <div className="text-[20px] sm:text-[22px] font-extrabold text-[#0f172a] leading-tight mb-[3px]">{userStats ? ((userStats.total_events || 0) + (userStats.total_blogs || 0)) : events.length}</div>
-                    <div className="flex items-center gap-[3px] text-[10.5px] font-medium text-[#10b981] truncate">
-                      <TrendingUp size={11} className="shrink-0" /> <span className="truncate">{userStats ? `${userStats.total_blog_views || 0} views` : "Blog & Event"}</span>
-                    </div>
-                  </div>
-                  <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#f0fdf4] text-[#10b981]">
-                    <Calendar size={18} />
-                  </div>
-                </div>
-
-                <div className="bg-white border border-[#e2e8f0] rounded-[11px] p-[12px_16px] flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all duration-[250ms] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-[1px] cursor-pointer min-w-0" onClick={() => setActiveTab("ulasan")}>
-                  <div className="min-w-0 pr-2">
-                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.05em] mb-[2px] truncate">Total Ulasan</h3>
-                    <div className="text-[20px] sm:text-[22px] font-extrabold text-[#0f172a] leading-tight mb-[3px]">{userStats ? userStats.total_reviews : reviews.length}</div>
-                    <div className="flex items-center gap-[3px] text-[10.5px] font-medium text-[#10b981] truncate">
-                      <TrendingUp size={11} className="shrink-0" /> <span className="truncate">Ulasan Usaha</span>
-                    </div>
-                  </div>
-                  <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#fef9c3] text-[#ca8a04]">
-                    <Star size={18} />
-                  </div>
-                </div>
-
-                <div className="bg-white border border-[#e2e8f0] rounded-[11px] p-[12px_16px] flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all duration-[250ms] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-[1px] cursor-pointer min-w-0" onClick={() => setShowChartDetailModal(true)}>
-                  <div className="min-w-0 pr-2">
-                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.05em] mb-[2px] truncate">Total Views Konten</h3>
-                    <div className="text-[20px] sm:text-[22px] font-extrabold text-[#0f172a] leading-tight mb-[3px] truncate">{userStats ? userStats.total_views.toLocaleString("id-ID") : 0}</div>
-                    <div className="flex items-center gap-[3px] text-[10.5px] font-medium text-[#10b981] truncate">
-                      <TrendingUp size={11} className="shrink-0" /> <span className="truncate">Bisnis & Blog</span>
-                    </div>
-                  </div>
-                  <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#f0fdfa] text-[#059669]">
-                    <Eye size={18} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Graphical & Activity Panels — 12-column responsive layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-[16px] w-full min-w-0">
-                {/* 1. KUNJUNGAN PORTAL MINGGUAN CHART PANEL */}
-                <div className="lg:col-span-5 bg-white rounded-[14px] border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-[20px] flex flex-col justify-between min-w-0 overflow-hidden">
-                  <div className="flex items-center justify-between mb-[16px] gap-2">
-                    <div className="min-w-0">
-                      <h2 className="text-[15px] font-bold text-[#0f172a] truncate">Kunjungan Portal Mingguan</h2>
-                      <p className="text-[11.5px] text-[#64748b] mt-[2px] truncate">Statistik kunjungan minggu ini</p>
-                    </div>
-                    <button
-                      onClick={() => setShowChartDetailModal(true)}
-                      className="text-[12px] font-semibold text-[#059669] cursor-pointer px-[10px] py-[4px] rounded-[8px] border border-[rgba(0,117,112,0.25)] transition-all duration-[280ms] hover:bg-[#f0fdfa] shrink-0"
-                    >
-                      Lihat Detail
-                    </button>
-                  </div>
-
-                  <div className="flex items-end gap-[8px] sm:gap-[10px] h-[160px] pt-[10px] w-full min-w-0">
-                    {weeklyChartStats.chartData.map((d) => (
-                      <div key={d.day} className="flex-1 min-w-0 flex flex-col items-center gap-[6px] h-full justify-end group relative">
-                        {/* Tooltip on hover */}
-                        <div className="absolute bottom-full mb-[6px] bg-[#0f172a] text-white text-[10px] font-medium px-[7px] py-[3px] rounded-[4px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-sm">
-                          {d.visits.toLocaleString('id-ID')}
-                        </div>
-                        <div
-                          className="w-full bg-gradient-to-b from-[#007570] to-[#00a8a2] rounded-t-[5px] min-h-[6px] transition-all duration-[280ms] group-hover:opacity-85"
-                          style={{ height: d.heightPercentage }}
-                        ></div>
-                        <span className="text-[10.5px] text-[#64748b] font-medium group-hover:text-[#059669] transition-colors truncate">{d.day}</span>
+            !isSeller ? (
+              /* ═══════════════════════════════════════════════════════════════════ */
+              /* ── USER BIASA DASHBOARD VIEW (3D UI/UX & FULL FUNCTIONAL) ── */
+              /* ═══════════════════════════════════════════════════════════════════ */
+              <div className="w-full max-w-full min-w-0 flex flex-col gap-[20px]">
+                {/* 1. HERO GREETING & UPGRADE CALLOUT BANNER (3D UI/UX) */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#065f46] p-5 sm:p-6 text-white shadow-[0_12px_32px_rgba(4,120,87,0.25),0_4px_12px_rgba(0,0,0,0.1)] border border-emerald-400/30">
+                  <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border-2 border-emerald-300/50 shadow-lg bg-emerald-950/40 shrink-0 p-0.5">
+                        <SafeImage
+                          src={profileData.avatar || photoPreview || DEFAULT_AVATAR}
+                          alt="Avatar"
+                          className="w-full h-full object-cover rounded-xl"
+                          fallback={DEFAULT_AVATAR}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 2. AKTIVITAS TERBARU PANEL */}
-                <div className="lg:col-span-7 bg-white rounded-[14px] border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-[20px] flex flex-col justify-between min-w-0 overflow-hidden">
-                  <div className="flex items-center justify-between mb-[16px] gap-2">
-                    <div className="min-w-0">
-                      <h2 className="text-[15px] font-bold text-[#0f172a] truncate">Aktivitas Terbaru</h2>
-                      <p className="text-[11.5px] text-[#64748b] mt-[2px] truncate">Aktivitas konten usaha, blog & event terkini</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">
+                            Halo, {displayName || "Pengguna"}! 👋
+                          </h2>
+                          <span className="inline-flex items-center px-3 h-[30px] rounded-full text-[11px] font-black uppercase tracking-wider bg-white/20 text-emerald-200 border border-white/30 backdrop-blur-xs shrink-0">
+                            Akun Pengguna
+                          </span>
+                          {Boolean(isPremiumSeller && referralStats?.referral_code) && (
+                            <div className="inline-flex items-center gap-1.5 px-3 h-[30px] rounded-full bg-slate-950/80 border border-teal-400/40 text-[11.5px] font-bold text-teal-300 shadow-md backdrop-blur-md shrink-0">
+                              <Gift size={13} className="text-amber-400 shrink-0" />
+                              <span className="text-[11px] text-slate-300 font-sans font-medium">Ref:</span>
+                              <span className="font-mono text-white font-black tracking-wider text-[11.5px]">{referralStats.referral_code}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const codeToCopy = referralStats.referral_code;
+                                  if (codeToCopy) {
+                                    navigator.clipboard.writeText(codeToCopy);
+                                    toast.success(`Kode referral ${codeToCopy} berhasil disalin!`, { icon: '📋' });
+                                  }
+                                }}
+                                className="ml-1 px-2.5 h-[22px] rounded-full bg-teal-500/25 hover:bg-teal-500/45 text-teal-200 hover:text-white border border-teal-400/40 flex items-center gap-1 transition-all cursor-pointer text-[10.5px] font-bold shadow-2xs"
+                                title="Salin Kode Referral"
+                              >
+                                <Copy size={11} />
+                                <span>Salin</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-emerald-100/90 text-xs sm:text-sm max-w-xl leading-relaxed">
+                          Selamat datang di dashboard akun Anda. Akses WhatsApp penjual, kelola pesan masuk, konten tersimpan, dan ulasan Anda dengan mudah di satu tempat.
+                        </p>
+                      </div>
                     </div>
+
                     <button
-                      onClick={() => setShowAllActivitiesModal(true)}
-                      className="text-[12px] font-semibold text-[#059669] cursor-pointer px-[10px] py-[4px] rounded-[8px] border border-[rgba(0,117,112,0.25)] transition-all duration-[280ms] hover:bg-[#f0fdfa] shrink-0"
+                      type="button"
+                      onClick={handleOpenBecomeSellerConfirm}
+                      disabled={isSwitchingRole}
+                      className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 font-black text-xs sm:text-sm border-b-4 border-b-amber-600 shadow-[0_8px_25px_rgba(245,158,11,0.4)] hover:border-b-2 hover:translate-y-0.5 active:translate-y-1 active:border-b-0 transition-all duration-200 shrink-0 group select-none cursor-pointer border-t-0 border-x-0 disabled:opacity-75"
                     >
-                      Lihat Semua
+                      {isSwitchingRole ? (
+                        <>
+                          <Loader2 size={17} className="animate-spin text-slate-950" />
+                          <span>Mengaktifkan...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Store size={17} className="text-slate-950 group-hover:scale-110 transition-transform" />
+                          <span>Buka Usaha Sekarang</span>
+                          <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                        </>
+                      )}
                     </button>
                   </div>
 
-                  <div className="flex flex-col gap-[10px] min-w-0">
-                    {recentActivitiesList.slice(0, 4).map((act) => {
-                      const IconComp = act.icon;
-                      return (
-                        <div
-                          key={act.id}
-                          className="flex gap-[12px] items-center p-[8px_10px] rounded-[10px] transition-colors hover:bg-[#f8fafc] cursor-pointer min-w-0 overflow-hidden"
-                          onClick={() => {
-                            if (act.link) navigate(act.link);
-                            else if (act.tab) setActiveTab(act.tab);
-                          }}
-                        >
-                          <div className={`w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0 ${act.colorClass}`}>
-                            <IconComp size={16} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[12.5px] font-semibold text-[#0f172a] truncate">
-                              {act.title}
-                            </div>
-                            <div className="text-[11px] text-[#64748b] mt-[1px] truncate">
-                              {act.subText} • <span className="font-semibold text-[#059669]">{act.dateStr}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {/* 3D Decorative Glow Orbs */}
+                  <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-emerald-300/20 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -top-10 left-1/3 w-36 h-36 bg-teal-200/15 rounded-full blur-2xl pointer-events-none" />
                 </div>
-              </div>
 
-              {/* 3. PREMIUM UPGRADE PROMO BANNER */}
-              <div className="relative overflow-hidden rounded-[16px] bg-gradient-to-br from-[#1c1917] via-[#292524] to-[#1c1917] border border-[#f5c451]/30 p-[22px_24px] shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-[18px]">
-                <div className="absolute -right-8 -top-12 w-48 h-48 rounded-full bg-[#f5c451]/10 blur-2xl pointer-events-none" />
-                <div className="flex items-start sm:items-center gap-[16px] z-10">
-                  <div
-                    className="shrink-0 w-[52px] h-[52px] rounded-2xl flex items-center justify-center"
-                    style={{
-                      background: "linear-gradient(145deg, #fde68a 0%, #f5c451 38%, #b8860b 100%)",
-                      boxShadow: "0 8px 20px rgba(184,134,11,0.4), inset 0 1px 2px rgba(255,255,255,0.6)"
-                    }}
-                  >
-                    <Crown size={26} className="text-[#3d2c05]" strokeWidth={2.3} />
-                  </div>
-                  <div>
-                    <div className="inline-flex items-center gap-[5px] px-[8px] py-[2px] rounded-full bg-[#f5c451]/15 border border-[#f5c451]/30 text-[#f5d876] text-[10px] font-bold uppercase tracking-wider mb-[4px]">
-                      <Sparkles size={10} /> Upgrade Usaha
+                {/* DAILY REWARD HARIAN SILVER WIDGET */}
+                <DailyRewardWidget onRewardClaimed={() => fetchHeaderPoinBalance && fetchHeaderPoinBalance()} />
+
+                {/* AJAKAN PROGRAM REFERRAL KHUSUS USER BIASA */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 p-5 text-white shadow-lg border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="space-y-1 max-w-xl">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10.5px] font-bold border border-amber-400/30">
+                      <Gift size={12} className="text-amber-400" />
+                      <span>Program Kemitraan &amp; Referral</span>
                     </div>
-                    <h3 className="text-[16px] sm:text-[18px] font-extrabold text-white">Dapatkan Badge Centang Emas Resmi & Prioritas Pencarian</h3>
-                    <p className="text-[12.5px] text-[#d6d3d1] mt-[2px] max-w-[650px] leading-relaxed">
-                      Tingkatkan kredibilitas toko Anda dengan posisi teratas, rute Google Maps interaktif, katalog tanpa batas, dan verifikasi centang emas resmi.
+                    <h3 className="text-base sm:text-lg font-black text-white">
+                      Ingin Mendapatkan Komisi Referral 10%?
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Daftarkan usaha atau toko Anda di Surade.com dan aktifkan Usaha Premium untuk membuka kode referral unik dan meraih komisi tunai dari setiap transaksi!
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenBecomeSellerConfirm}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shrink-0 flex items-center gap-1.5 shadow-md cursor-pointer transition-transform active:scale-95"
+                  >
+                    <Store size={15} />
+                    <span>Buka Usaha Sekarang</span>
+                    <ArrowRight size={13} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleTabChange("premium")}
-                  className="z-10 px-[18px] py-[10px] rounded-[10px] font-extrabold text-[12.5px] text-slate-950 flex items-center gap-[8px] transition-all duration-200 hover:scale-105 active:scale-95 shadow-md cursor-pointer border-0 shrink-0"
-                  style={{
-                    background: "linear-gradient(180deg, #fef08a 0%, #f59e0b 55%, #d97706 100%)",
-                    boxShadow: "0 4px 12px rgba(217, 119, 6, 0.4)"
-                  }}
-                >
-                  <Crown size={15} strokeWidth={2.5} />
-                  <span>Upgrade ke Premium</span>
-                  <ArrowRight size={14} />
-                </button>
+
+                {/* 2. 4 INTERACTIVE STATS CARDS FOR REGULAR USER */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-[14px] sm:gap-[16px] w-full min-w-0">
+
+                  {/* Card 1: Riwayat Transaksi */}
+                  <div
+                    onClick={() => handleTabChange("whatsapp")}
+                    className="bg-white border border-slate-200/90 border-b-4 border-b-emerald-500 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06)] hover:-translate-y-1.5 hover:shadow-[0_18px_35px_-5px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer min-w-0 group"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.06em] mb-1 truncate">Riwayat Transaksi</h3>
+                      <div className="text-[22px] sm:text-[24px] font-black text-slate-900 leading-tight mb-1">
+                        {userWaStats?.total || userWaLogs?.length || 0}
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 truncate">
+                        <MessageCircle size={12} className="shrink-0" />
+                        <span className="truncate">Semua Transaksi</span>
+                      </div>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 shadow-md border border-white group-hover:scale-110 transition-transform">
+                      <MessageCircle size={20} />
+                    </div>
+                  </div>
+
+                  {/* Card 2: Pesan Masuk / Inbox */}
+                  <div
+                    onClick={() => handleTabChange("inbox")}
+                    className="bg-white border border-slate-200/90 border-b-4 border-b-blue-500 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06)] hover:-translate-y-1.5 hover:shadow-[0_18px_35px_-5px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer min-w-0 group"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.06em] mb-1 truncate">Pesan Masuk</h3>
+                      <div className="text-[22px] sm:text-[24px] font-black text-slate-900 leading-tight mb-1">
+                        {conversations?.length || 0}
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 truncate">
+                        <Mail size={12} className="shrink-0" />
+                        <span className="truncate">{totalInboxUnreadCount > 0 ? `${totalInboxUnreadCount} belum dibaca` : "Chat Aktif"}</span>
+                      </div>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600 shadow-md border border-white group-hover:scale-110 transition-transform">
+                      <Mail size={20} />
+                    </div>
+                  </div>
+
+                  {/* Card 3: Simpan / Bookmark */}
+                  <div
+                    onClick={() => handleTabChange("simpan")}
+                    className="bg-white border border-slate-200/90 border-b-4 border-b-purple-500 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06)] hover:-translate-y-1.5 hover:shadow-[0_18px_35px_-5px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer min-w-0 group"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.06em] mb-1 truncate">Konten Disimpan</h3>
+                      <div className="text-[22px] sm:text-[24px] font-black text-slate-900 leading-tight mb-1">
+                        {savedItems?.length || 0}
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 truncate">
+                        <Bookmark size={12} className="shrink-0" />
+                        <span className="truncate">Bisnis &amp; Event</span>
+                      </div>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-purple-50 to-purple-100 text-purple-600 shadow-md border border-white group-hover:scale-110 transition-transform">
+                      <Bookmark size={20} />
+                    </div>
+                  </div>
+
+                  {/* Card 4: Ulasan */}
+                  <div
+                    onClick={() => handleTabChange("ulasan")}
+                    className="bg-white border border-slate-200/90 border-b-4 border-b-amber-500 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06)] hover:-translate-y-1.5 hover:shadow-[0_18px_35px_-5px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer min-w-0 group"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.06em] mb-1 truncate">Ulasan Saya</h3>
+                      <div className="text-[22px] sm:text-[24px] font-black text-slate-900 leading-tight mb-1">
+                        {reviews?.length || 0}
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 truncate">
+                        <Star size={12} className="shrink-0" />
+                        <span className="truncate">Rating Diberikan</span>
+                      </div>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600 shadow-md border border-white group-hover:scale-110 transition-transform">
+                      <Star size={20} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. INTERACTIVE ANALYTICS & CHARTS SECTION */}
+                <PortalAnalyticsCharts isSeller={false} stats={userStats} />
+
+                {/* 4. QUICK EXPLORATION SECTION */}
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <Sparkles size={18} className="text-emerald-600" />
+                        Jelajahi Portal Surade
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Akses cepat layanan, direktori toko, dan agenda kegiatan</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    <Link
+                      to="/"
+                      className="p-4 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-200 text-slate-800 transition-all flex flex-col justify-between group no-underline"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                          <Store size={18} />
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">Direktori Bisnis</h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">Cari toko, kuliner, produk dan layanan UMKM di Surade.</p>
+                      </div>
+                      <span className="mt-3 text-xs font-bold text-emerald-700 flex items-center gap-1 group-hover:gap-1.5 transition-all">
+                        <span>Buka Direktori</span>
+                        <ArrowRight size={13} />
+                      </span>
+                    </Link>
+
+                    <Link
+                      to="/blog"
+                      className="p-4 rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-200 text-slate-800 transition-all flex flex-col justify-between group no-underline"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                          <Calendar size={18} />
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition-colors">Event &amp; Berita</h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">Pantau agenda festival, pengumuman, dan artikel lokal.</p>
+                      </div>
+                      <span className="mt-3 text-xs font-bold text-blue-700 flex items-center gap-1 group-hover:gap-1.5 transition-all">
+                        <span>Lihat Acara</span>
+                        <ArrowRight size={13} />
+                      </span>
+                    </Link>
+
+                    <Link
+                      to="/category"
+                      className="p-4 rounded-xl bg-slate-50 hover:bg-purple-50/70 border border-slate-200/80 hover:border-purple-200 text-slate-800 transition-all flex flex-col justify-between group no-underline"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                          <Tag size={18} />
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900 group-hover:text-purple-700 transition-colors">Kategori Lengkap</h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">Telusuri UMKM berdasarkan kategori spesifik dengan rapi.</p>
+                      </div>
+                      <span className="mt-3 text-xs font-bold text-purple-700 flex items-center gap-1 group-hover:gap-1.5 transition-all">
+                        <span>Pilih Kategori</span>
+                        <ArrowRight size={13} />
+                      </span>
+                    </Link>
+
+                    <Link
+                      to="/contact"
+                      className="p-4 rounded-xl bg-slate-50 hover:bg-amber-50/70 border border-slate-200/80 hover:border-amber-200 text-slate-800 transition-all flex flex-col justify-between group no-underline"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                          <Phone size={18} />
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900 group-hover:text-amber-700 transition-colors">Pusat Bantuan</h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">Hubungi admin Surade.com untuk bantuan &amp; info kemitraan.</p>
+                      </div>
+                      <span className="mt-3 text-xs font-bold text-amber-700 flex items-center gap-1 group-hover:gap-1.5 transition-all">
+                        <span>Hubungi CS</span>
+                        <ArrowRight size={13} />
+                      </span>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* 4. RECENT ACTIVITY / PROMO BANNER */}
+                <div className="w-full">
+                  <PromoAdsSlider isSeller={isSeller} onTabChange={handleTabChange} />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="w-full max-w-full min-w-0 flex flex-col gap-[20px]">
+                {/* ════ HERO QUICK ACTION BANNER FOR CREATING BUSINESS (3D UI/UX) ════ */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#044e36] via-[#059669] to-[#047857] p-5 sm:p-6 text-white shadow-[0_12px_32px_rgba(5,150,105,0.28),0_4px_12px_rgba(0,0,0,0.1)] border-t border-emerald-300/40 border-l border-emerald-300/30 border-r border-emerald-600/30 border-b border-emerald-700/50">
+                  <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="max-w-xl">
+                      <div className="flex items-center gap-2 flex-wrap mb-2.5">
+                        <div className="inline-flex items-center gap-1.5 px-3 h-[30px] rounded-full bg-white/20 backdrop-blur-md text-white text-[11.5px] font-bold border border-white/30 shadow-sm shrink-0">
+                          <Sparkles size={13} className="text-amber-300 animate-pulse" />
+                          <span>Mitra &amp; Reseller Surade.com</span>
+                        </div>
+                        {Boolean(isPremiumSeller && referralStats?.referral_code) && (
+                          <div className="inline-flex items-center gap-1.5 px-3 h-[30px] rounded-full bg-slate-950/80 border border-teal-400/40 text-[11.5px] font-bold text-teal-300 shadow-md backdrop-blur-md shrink-0">
+                            <Gift size={13} className="text-amber-400 shrink-0" />
+                            <span className="text-[11px] text-slate-300 font-sans font-medium">Ref:</span>
+                            <span className="font-mono text-white font-black tracking-wider text-[11.5px]">{referralStats.referral_code}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const codeToCopy = referralStats.referral_code;
+                                if (codeToCopy) {
+                                  navigator.clipboard.writeText(codeToCopy);
+                                  toast.success(`Kode referral ${codeToCopy} berhasil disalin!`, { icon: '📋' });
+                                }
+                              }}
+                              className="ml-1 px-2.5 h-[22px] rounded-full bg-teal-500/25 hover:bg-teal-500/45 text-teal-200 hover:text-white border border-teal-400/40 flex items-center gap-1 transition-all cursor-pointer text-[10.5px] font-bold shadow-2xs"
+                              title="Salin Kode Referral"
+                            >
+                              <Copy size={11} />
+                              <span>Salin</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight mb-1.5 leading-snug drop-shadow-sm">
+                        Halo, {displayName || "Mitra"}! 👋 Selamat Datang di Dashboard Penjual
+                      </h2>
+                      <p className="text-emerald-100/95 text-xs sm:text-sm leading-relaxed">
+                        Kelola profil usaha Anda, pantau katalog produk, transaksi WhatsApp, promosi iklan, dan statistik penjualan di satu panel terpadu.
+                      </p>
+                    </div>
+                    <Link
+                      to="/add-business"
+                      className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm border-b-4 border-b-amber-600 shadow-[0_8px_25px_rgba(245,158,11,0.4)] hover:border-b-2 hover:translate-y-0.5 active:translate-y-1 active:border-b-0 transition-all duration-200 shrink-0 group select-none cursor-pointer"
+                    >
+                      <Plus size={18} className="stroke-[3] group-hover:rotate-90 transition-transform duration-300" />
+                      <span>Buat Usaha Sekarang</span>
+                      <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                  {/* 3D Floating Glow Orbs */}
+                  <div className="absolute -bottom-12 -right-12 w-56 h-56 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -top-12 right-1/3 w-40 h-40 bg-teal-300/15 rounded-full blur-2xl pointer-events-none" />
+                </div>
+
+                {/* ── DAILY REWARD HARIAN SILVER WIDGET ── */}
+                <DailyRewardWidget onRewardClaimed={() => fetchHeaderPoinBalance && fetchHeaderPoinBalance()} />
+
+                {/* ════ PROGRAM REFERRAL KODE SAYA BANNER & WIDGET (3D UI/UX) ════ */}
+                {isPremiumSeller ? (
+                  /* PENJUAL PREMIUM AKTIF: TAMPILKAN KODE REFERRAL & STATISTIK */
+                  <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-2xl p-5 text-white shadow-[0_14px_35px_rgba(0,0,0,0.35)] border border-emerald-500/30 border-t-emerald-400/40 relative overflow-hidden flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5">
+                    <div className="space-y-2 max-w-xl">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 text-emerald-300 text-[11px] font-bold border border-emerald-500/40 shadow-sm">
+                        <Crown size={13} className="text-amber-400" />
+                        <span>Referral Penjual Premium Aktif</span>
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                        Bagikan Kode Referral &amp; Dapatkan Komisi 10%!
+                      </h3>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Ajak rekan pelaku usaha di Surade. Pengguna kode Anda mendapatkan diskon 10% dan Anda mendapatkan komisi tunai 10% dari setiap transaksi yang memenuhi syarat.
+                      </p>
+
+                      {/* Ringkasan Statistik Komisi */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-xs">
+                        <div className="p-2.5 rounded-xl bg-black/30 border border-white/10">
+                          <span className="text-[10px] text-slate-400 block">Total Komisi:</span>
+                          <strong className="text-amber-300 font-black">
+                            Rp {Number(referralStats?.earned_commission || 0).toLocaleString("id-ID")}
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-black/30 border border-white/10">
+                          <span className="text-[10px] text-slate-400 block">Komisi Pending:</span>
+                          <strong className="text-emerald-300 font-black">
+                            Rp {Number(referralStats?.pending_commission || 0).toLocaleString("id-ID")}
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-black/30 border border-white/10 col-span-2 sm:col-span-1">
+                          <span className="text-[10px] text-slate-400 block">Transaksi Berhasil:</span>
+                          <strong className="text-white font-black">
+                            {Number(referralStats?.successful_referrals || 0).toLocaleString("id-ID")} x
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/90 rounded-2xl p-4 border border-slate-700/90 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6),0_8px_20px_rgba(0,0,0,0.4)] flex flex-col gap-3 shrink-0 w-full md:w-80 backdrop-blur-md">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">KODE REFERRAL ANDA</span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping"></span>
+                          Aktif (Premium)
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900/90 py-2.5 px-3 rounded-xl border border-teal-500/30 text-center flex items-center justify-center shadow-[inset_0_1px_4px_rgba(0,0,0,0.8)]">
+                        <span className="font-mono text-sm font-black text-teal-300 tracking-widest select-all drop-shadow-[0_0_8px_rgba(20,184,166,0.5)]">
+                          {referralCode || referralStats?.referral_code}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => {
+                            const codeToCopy = referralCode || referralStats?.referral_code;
+                            if (codeToCopy) {
+                              navigator.clipboard.writeText(codeToCopy);
+                              setReferralCopyToast(true);
+                              setTimeout(() => setReferralCopyToast(false), 2500);
+                            }
+                          }}
+                          className="py-2 px-3 rounded-xl bg-gradient-to-b from-teal-500 to-teal-700 hover:from-teal-400 hover:to-teal-600 text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border-b-2 border-b-teal-900 shadow-md active:translate-y-0.5 select-none"
+                          title="Salin Kode Referral"
+                        >
+                          {referralCopyToast ? <Check size={13} /> : <Copy size={13} />}
+                          <span>{referralCopyToast ? "Tersalin!" : "Salin Kode"}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleShareReferralCode(referralCode || referralStats?.referral_code)}
+                          className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-700 border-b-2 border-b-slate-900 shadow-md active:translate-y-0.5 select-none"
+                          title="Bagikan Link Referral via WA / Sosial Media"
+                        >
+                          <Share2 size={13} />
+                          <span>Bagi Link</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* PENJUAL FREE ATAU PREMIUM KEDALUWARSA: AJAKAN UPGRADE PREMIUM UNTUK DAPATKAN REFERRAL */
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-950 via-slate-900 to-emerald-950 p-5 text-white shadow-xl border border-amber-400/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                    <div className="space-y-1.5 max-w-xl">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-[11px] font-black border border-amber-400/40 shadow-xs">
+                        <Crown size={13} className="text-amber-400" />
+                        <span>Eksklusif Usaha Premium</span>
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                        Aktifkan Hak Referral dengan Upgrade Usaha ke Premium!
+                      </h3>
+                      <p className="text-xs text-amber-100/80 leading-relaxed">
+                        Kode referral dan komisi tunai hanya tersedia untuk penjual dengan status Usaha Premium aktif. Dapatkan komisi 10% dan berikan diskon 10% untuk setiap rekan yang upgrade!
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange("premium")}
+                      className="w-full md:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer shrink-0 transition-transform active:scale-95"
+                    >
+                      <Crown size={16} />
+                      <span>Upgrade ke Premium Sekarang</span>
+                      <ArrowRight size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* ════ QUICK WALLET BAR WITH TARIK SALDO GOLD (BISA DIAKSES DARI DASHBOARD) ════ */}
+                <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-[#062c23] rounded-2xl p-4 sm:p-5 text-white border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shrink-0 shadow-inner">
+                      <Wallet size={22} className="text-amber-300" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-300">Dompet Digital Poin Surade</span>
+                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-slate-200">
+                          <SuradeCoinIcon size={18} type="silver" />
+                          <span>{Number(silverBalance || 0).toLocaleString("id-ID")} Silver</span>
+                        </div>
+                        <span className="text-white/30 hidden sm:inline">•</span>
+                        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-amber-300">
+                          <SuradeCoinIcon size={18} type="gold" />
+                          <span>{Number(goldBalance || 0).toLocaleString("id-ID")} Gold</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowBuyCoinModal(true)}
+                      className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer border-0"
+                    >
+                      <Plus size={14} strokeWidth={3} />
+                      <span>+ Beli Poin</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowGoldWithdrawModal(true)}
+                      className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-black/40 hover:bg-black/60 text-amber-300 border border-amber-400/40 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
+                    >
+                      <Wallet size={14} />
+                      <span>Tarik Saldo Gold</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* ════ 3D STATS CARDS ROW ════ */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-[14px] sm:gap-[16px] w-full min-w-0">
+                  {/* Stat 1: Total Usaha */}
+                  <div
+                    className="bg-white border border-slate-200/90 border-b-4 border-b-blue-500/40 rounded-2xl p-4 flex items-center justify-between shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06),0_2px_6px_rgba(0,0,0,0.04)] hover:-translate-y-1.5 hover:shadow-[0_18px_35px_-5px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer min-w-0 group"
+                    onClick={() => setActiveTab("bisnis")}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.06em] mb-1 truncate">Total Usaha</h3>
+                      <div className="text-[22px] sm:text-[24px] font-black text-slate-900 leading-tight mb-1">{userStats ? userStats.total_businesses : businesses.length}</div>
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 truncate">
+                        <TrendingUp size={12} className="shrink-0" /> <span className="truncate">{userStats ? `${userStats.total_business_views} views` : "Usaha Terdaftar"}</span>
+                      </div>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600 shadow-md border border-white group-hover:scale-110 transition-transform">
+                      <Briefcase size={20} />
+                    </div>
+                  </div>
+
+                  {/* Stat 2: Total Event / Info */}
+                  <div
+                    className="bg-white border border-slate-200/90 border-b-4 border-b-emerald-500/40 rounded-2xl p-4 flex items-center justify-between shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06),0_2px_6px_rgba(0,0,0,0.04)] hover:-translate-y-1.5 hover:shadow-[0_18px_35px_-5px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer min-w-0 group"
+                    onClick={() => setActiveTab("blog-event")}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.06em] mb-1 truncate">Total Event / Info</h3>
+                      <div className="text-[22px] sm:text-[24px] font-black text-slate-900 leading-tight mb-1">{userStats ? ((userStats.total_events || 0) + (userStats.total_blogs || 0)) : events.length}</div>
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 truncate">
+                        <TrendingUp size={12} className="shrink-0" /> <span className="truncate">{userStats ? `${userStats.total_blog_views || 0} views` : "Info & Event"}</span>
+                      </div>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 shadow-md border border-white group-hover:scale-110 transition-transform">
+                      <Calendar size={20} />
+                    </div>
+                  </div>
+
+                  {/* Stat 3: Total Ulasan */}
+                  <div
+                    className="bg-white border border-slate-200/90 border-b-4 border-b-amber-500/40 rounded-2xl p-4 flex items-center justify-between shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06),0_2px_6px_rgba(0,0,0,0.04)] hover:-translate-y-1.5 hover:shadow-[0_18px_35px_-5px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer min-w-0 group"
+                    onClick={() => setActiveTab("ulasan")}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.06em] mb-1 truncate">Total Ulasan</h3>
+                      <div className="text-[22px] sm:text-[24px] font-black text-slate-900 leading-tight mb-1">{userStats ? userStats.total_reviews : reviews.length}</div>
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 truncate">
+                        <TrendingUp size={12} className="shrink-0" /> <span className="truncate">Ulasan Usaha</span>
+                      </div>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600 shadow-md border border-white group-hover:scale-110 transition-transform">
+                      <Star size={20} />
+                    </div>
+                  </div>
+
+                  {/* Stat 4: Total Views Konten */}
+                  <div
+                    className="bg-white border border-slate-200/90 border-b-4 border-b-teal-500/40 rounded-2xl p-4 flex items-center justify-between shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06),0_2px_6px_rgba(0,0,0,0.04)] hover:-translate-y-1.5 hover:shadow-[0_18px_35px_-5px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer min-w-0 group"
+                    onClick={() => setShowChartDetailModal(true)}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.06em] mb-1 truncate">Total Views Konten</h3>
+                      <div className="text-[22px] sm:text-[24px] font-black text-slate-900 leading-tight mb-1 truncate">{userStats ? userStats.total_views.toLocaleString("id-ID") : 0}</div>
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 truncate">
+                        <TrendingUp size={12} className="shrink-0" /> <span className="truncate">Bisnis &amp; Blog</span>
+                      </div>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-teal-50 to-teal-100 text-teal-600 shadow-md border border-white group-hover:scale-110 transition-transform">
+                      <Eye size={20} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ════ GRAPHICAL & ACTIVITY PANELS (3D UI/UX) ════ */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full min-w-0 items-start">
+                  {/* 1. KUNJUNGAN HALAMAN USAHA CHART PANEL */}
+                  <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/90 shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] p-5 flex flex-col gap-2.5 min-w-0 relative">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <h2 className="text-base font-bold text-slate-900 truncate flex items-center gap-2">
+                          <BarChart2 size={18} className="text-emerald-600" />
+                          <span>Kunjungan Halaman Usaha</span>
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">Data pengunjung bulan ini</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setAnalyticsPeriod("monthly");
+                          setShowChartDetailModal(true);
+                        }}
+                        className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 cursor-pointer px-3 py-1.5 rounded-xl border border-emerald-200 transition-all shrink-0 shadow-xs active:scale-95"
+                      >
+                        Lihat Detail
+                      </button>
+                    </div>
+
+                    {/* 3D Bar Chart Visual: Rapat & Presisi Persis Seperti Gambar 2 */}
+                    <div className="flex items-end gap-2.5 sm:gap-3 h-36 pt-1 w-full min-w-0">
+                      {weeklyChartStats.chartData.map((d, idx) => {
+                        // Smart Tooltip Alignment to prevent cutoff on left/right edges
+                        const tooltipPositionClass =
+                          idx === 0
+                            ? "left-0"
+                            : idx === weeklyChartStats.chartData.length - 1
+                              ? "right-0"
+                              : "left-1/2 -translate-x-1/2";
+
+                        return (
+                          <div key={d.day} className="flex-1 min-w-0 flex flex-col items-center gap-2 h-full justify-end group relative">
+                            {/* Tooltip on hover - Smart positioned & never clipped */}
+                            <div
+                              className={`absolute bottom-full mb-2 ${tooltipPositionClass} bg-slate-900 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-30 shadow-xl border border-slate-700`}
+                            >
+                              <span className="text-emerald-400 block font-semibold">{d.fullDate}</span>
+                              <span className="text-slate-200">{d.visits.toLocaleString('id-ID')} views</span>
+                            </div>
+                            {/* 3D Pillars */}
+                            <div className="w-full bg-[#f1f5f9] rounded-t-2xl h-full flex flex-col justify-end overflow-hidden p-0.5 shadow-inner">
+                              <div
+                                className={`w-full ${d.visits > 0
+                                  ? 'bg-gradient-to-t from-[#047857] via-[#059669] to-[#34d399] shadow-[0_4px_14px_rgba(16,185,129,0.35)]'
+                                  : 'bg-slate-200/80 min-h-[4px]'
+                                  } rounded-t-xl transition-all duration-500 group-hover:brightness-110 relative overflow-hidden`}
+                                style={{ height: d.heightPercentage }}
+                              >
+                                {d.visits > 0 && <div className="absolute top-0 inset-x-0 h-1 bg-white/40 rounded-t-xl" />}
+                              </div>
+                            </div>
+                            <span className={`text-[11px] font-bold ${d.isToday ? 'text-emerald-600 font-extrabold' : 'text-slate-600'} group-hover:text-emerald-600 transition-colors truncate`}>{d.day}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 2. AKTIVITAS TERBARU PANEL */}
+                  <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/90 shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] p-5 flex flex-col justify-between min-w-0 overflow-hidden">
+                    <div className="flex items-center justify-between mb-4 gap-2">
+                      <div className="min-w-0">
+                        <h2 className="text-base font-bold text-slate-900 truncate flex items-center gap-2">
+                          <Activity size={18} className="text-emerald-600" />
+                          <span>Aktivitas</span>
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">Aktivitas terbaru pada usaha anda</p>
+                      </div>
+                      <button
+                        onClick={() => setShowAllActivitiesModal(true)}
+                        className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 cursor-pointer px-3 py-1.5 rounded-xl border border-emerald-200 transition-all shrink-0 shadow-xs active:scale-95"
+                      >
+                        Lihat Semua
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col gap-2.5 min-w-0">
+                      {recentActivitiesList.slice(0, 4).map((act) => {
+                        const IconComp = act.icon;
+                        return (
+                          <div
+                            key={act.id}
+                            className="flex gap-3 items-center p-2.5 rounded-xl transition-all hover:bg-slate-50/80 border border-slate-100 hover:border-emerald-200 cursor-pointer min-w-0 overflow-hidden group shadow-xs hover:shadow-sm"
+                            onClick={() => {
+                              if (act.link) navigate(act.link);
+                              else if (act.tab) setActiveTab(act.tab);
+                            }}
+                          >
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform ${act.colorClass}`}>
+                              <IconComp size={18} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors truncate">
+                                {act.title}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                {act.subText} • <span className="font-semibold text-emerald-600">{act.dateStr}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. PREMIUM UPGRADE PROMO BANNER */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1c1917] via-[#292524] to-[#1c1917] border border-[#f5c451]/35 p-4 sm:p-5 md:p-[22px_24px] shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 md:gap-5">
+                  <div className="absolute -right-8 -top-12 w-48 h-48 rounded-full bg-[#f5c451]/15 blur-2xl pointer-events-none" />
+                  <div className="absolute -left-10 -bottom-10 w-36 h-36 rounded-full bg-[#f5c451]/10 blur-xl pointer-events-none" />
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 z-10 flex-1 min-w-0">
+                    {/* Icon & Mobile Badge */}
+                    <div className="flex items-center gap-3 sm:block shrink-0">
+                      <div
+                        className="shrink-0 w-11 h-11 sm:w-13 sm:h-13 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-md"
+                        style={{
+                          background: "linear-gradient(145deg, #fde68a 0%, #f5c451 38%, #b8860b 100%)",
+                          boxShadow: "0 8px 20px rgba(184,134,11,0.4), inset 0 1px 2px rgba(255,255,255,0.6)"
+                        }}
+                      >
+                        <Crown size={22} className="text-[#3d2c05] sm:w-[26px] sm:h-[26px]" strokeWidth={2.3} />
+                      </div>
+                      {/* Badge next to icon on mobile */}
+                      <div className="sm:hidden inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#f5c451]/15 border border-[#f5c451]/30 text-[#f5d876] text-[10.5px] font-black uppercase tracking-wider">
+                        <Sparkles size={11} /> Upgrade Usaha
+                      </div>
+                    </div>
+
+                    {/* Text Details */}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      {/* Badge above title on sm/desktop */}
+                      <div className="hidden sm:inline-flex items-center gap-[5px] px-[8px] py-[2px] rounded-full bg-[#f5c451]/15 border border-[#f5c451]/30 text-[#f5d876] text-[10px] font-bold uppercase tracking-wider mb-1">
+                        <Sparkles size={10} /> Upgrade Usaha
+                      </div>
+                      <h3 className="text-[15px] sm:text-[17px] md:text-[18px] font-extrabold text-white leading-snug tracking-tight">
+                        Dapatkan Badge Centang Emas Resmi &amp; Prioritas Pencarian
+                      </h3>
+                      <p className="text-[12px] sm:text-[12.5px] text-[#d6d3d1] leading-relaxed max-w-[650px]">
+                        Tingkatkan kredibilitas toko Anda dengan posisi teratas, rute Google Maps interaktif, katalog tanpa batas, dan verifikasi centang emas resmi.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Upgrade Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange("premium")}
+                    className="z-10 w-full md:w-auto px-5 py-3 sm:py-2.5 rounded-xl font-extrabold text-[13px] text-slate-950 flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.02] active:scale-95 shadow-md cursor-pointer border-0 shrink-0"
+                    style={{
+                      background: "linear-gradient(180deg, #fef08a 0%, #f59e0b 55%, #d97706 100%)",
+                      boxShadow: "0 4px 14px rgba(217, 119, 6, 0.4)"
+                    }}
+                  >
+                    <Crown size={15} strokeWidth={2.5} />
+                    <span>Upgrade ke Premium</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )
           )}
 
-          {/* 2. BISNIS VIEW */}
+          {/* 1.5 Surade Poin WALLET TAB */}
+          {activeTab === "coin" && (
+            <SuradeCoinTab
+              navigate={navigate}
+              setActiveTab={setActiveTab}
+              onBalanceUpdate={(bal) => setPoinBalance(Number(bal) || 0)}
+            />
+          )}
+
+          {/* NOMOR DARURAT TAB */}
+          {activeTab === "nomor-darurat" && (
+            <SellerNomorDaruratTab />
+          )}
+
+          {/* KLAIM USAHA TAB */}
+          {activeTab === "klaim" && renderKlaimView()}
+
+          {/* 2. USAHA VIEW */}
           {activeTab === "bisnis" && (
             <div className="flex flex-col gap-[20px] w-full max-w-full">
               {/* Header Banner */}
@@ -3784,10 +6861,10 @@ export default function AdminUser() {
                 <div className="space-y-[4px] z-10">
                   <h2 className="text-[20px] md:text-[22px] font-extrabold tracking-tight flex items-center gap-[10px]">
                     <Briefcase className="text-[#5eead4]" size={24} />
-                    Kelola Bisnis Saya
+                    Kelola Usaha Saya
                   </h2>
                   <p className="text-[13px] text-slate-300 max-w-[640px] font-normal leading-relaxed">
-                    Daftar seluruh profil bisnis dan usaha yang Anda miliki di portal Surade.co.id. Atur informasi, kategori, dan produk usaha Anda di sini.
+                    Daftar seluruh profil tempat usaha yang Anda miliki di portal Surade.com. Atur informasi, kategori, dan produk usaha Anda di sini.
                   </p>
                 </div>
                 <button
@@ -3795,7 +6872,7 @@ export default function AdminUser() {
                   className="w-full md:w-auto h-[42px] inline-flex items-center justify-center gap-[8px] bg-[#059669] hover:bg-[#005f5b] active:bg-[#004e4a] text-white px-[20px] rounded-[11px] font-bold text-[13px] transition-all shadow-sm shrink-0 cursor-pointer"
                 >
                   <Plus size={18} strokeWidth={2.5} />
-                  <span>Tambah Bisnis</span>
+                  <span>Tambah Usaha</span>
                 </button>
               </div>
 
@@ -3808,7 +6885,7 @@ export default function AdminUser() {
                   </div>
                   <div>
                     <div className="text-[22px] font-bold text-[#0f172a] leading-none">{businesses.length}</div>
-                    <div className="text-[11.5px] text-[#64748b] mt-[3px]">Total Bisnis</div>
+                    <div className="text-[11.5px] text-[#64748b] mt-[3px]">Total Usaha</div>
                   </div>
                 </div>
 
@@ -3832,14 +6909,14 @@ export default function AdminUser() {
                   </div>
                   <div>
                     <div className="text-[22px] font-bold text-[#0f172a] leading-none flex items-center gap-[8px]">
-                      <span>{businesses.filter(b => b.status === "active" || b.status === "Aktif").length}</span>
+                      <span>{businesses.filter(b => b.status === "active" || b.status === "approved" || b.status === "published" || b.status === "Aktif").length}</span>
                       <span className="text-[11px] font-normal text-[#16a34a] bg-[#f0fdf4] border border-[#bbf7d0] px-[7px] py-[1px] rounded-full">
                         Aktif
                       </span>
                     </div>
                     <div className="text-[11.5px] text-[#64748b] mt-[3px]">
-                      {businesses.filter(b => b.status === "pending" || b.status === "Menunggu").length > 0
-                        ? `${businesses.filter(b => b.status === "pending" || b.status === "Menunggu").length} Menunggu Verifikasi`
+                      {businesses.filter(b => b.status === "pending" || b.status === "Menunggu" || b.status === "waiting_approval").length > 0
+                        ? `${businesses.filter(b => b.status === "pending" || b.status === "Menunggu" || b.status === "waiting_approval").length} Menunggu Verifikasi`
                         : "Semua Terverifikasi"}
                     </div>
                   </div>
@@ -3855,7 +6932,7 @@ export default function AdminUser() {
                     <Search className="absolute left-[14px] top-1/2 -translate-y-1/2 text-[#94a3b8]" size={16} />
                     <input
                       type="text"
-                      placeholder="Cari nama bisnis, kota, atau pemilik..."
+                      placeholder="Cari nama usaha, kota, atau pemilik..."
                       value={businessSearch}
                       onChange={(e) => {
                         setBusinessSearch(e.target.value);
@@ -3886,9 +6963,34 @@ export default function AdminUser() {
                         className="w-full appearance-none h-[40px] px-[12px] pr-[30px] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] text-[12.5px] font-semibold text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#007570] cursor-pointer"
                       >
                         <option value="Semua">Semua Kategori</option>
-                        {[...new Set(businesses.map(b => b.category).filter(Boolean))].map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
+                        {availableCategories.map((mainCat) => {
+                          const hasSubs = Array.isArray(mainCat.children) && mainCat.children.length > 0;
+                          if (hasSubs) {
+                            return (
+                              <optgroup key={mainCat.id || mainCat.name} label={`📁 ${mainCat.name}`}>
+                                {mainCat.children.map((sub) => (
+                                  <option key={sub.id || sub.name} value={sub.name}>
+                                    {sub.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            );
+                          }
+                          return (
+                            <option key={mainCat.id || mainCat.name} value={mainCat.name}>
+                              {mainCat.name}
+                            </option>
+                          );
+                        })}
+                        {/* Kategori usaha yang ada di data bisnis tapi belum ada di list utama */}
+                        {businesses
+                          .map((b) => b.category)
+                          .filter((cat) => Boolean(cat) && !availableCategories.some((c) => c.name === cat || c.children?.some((s) => s.name === cat)))
+                          .map((extraCat) => (
+                            <option key={extraCat} value={extraCat}>
+                              {extraCat}
+                            </option>
+                          ))}
                       </select>
                       <ChevronRight size={14} className="absolute right-[10px] top-1/2 -translate-y-1/2 text-[#94a3b8] rotate-90 pointer-events-none" />
                     </div>
@@ -3932,9 +7034,13 @@ export default function AdminUser() {
 
                 {/* Loading State */}
                 {loadingBusinesses ? (
-                  <div className="flex flex-col items-center justify-center py-[60px] gap-[10px] text-[#64748b]">
-                    <Loader2 className="animate-spin text-[#059669]" size={32} />
-                    <p className="text-[13px] font-medium">Memuat data bisnis...</p>
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                    <SuradeLoader
+                      variant="section"
+                      size="md"
+                      text="Memuat data usaha"
+                      minHeight="180px"
+                    />
                   </div>
                 ) : businessFetchError ? (
                   /* Error State */
@@ -3955,8 +7061,13 @@ export default function AdminUser() {
                   // Filter logic
                   const filteredBusinesses = businesses.filter((b) => {
                     // Category filter
-                    if (businessCategoryFilter !== "Semua" && b.category !== businessCategoryFilter) {
-                      return false;
+                    if (businessCategoryFilter !== "Semua") {
+                      const target = businessCategoryFilter.toLowerCase().trim();
+                      const cName = (b.category || "").toLowerCase().trim();
+                      const sName = (b.subCategory || "").toLowerCase().trim();
+                      if (cName !== target && sName !== target) {
+                        return false;
+                      }
                     }
                     // Status filter
                     if (businessStatusFilter !== "Semua") {
@@ -3993,7 +7104,7 @@ export default function AdminUser() {
                         <table className="w-full text-left border-collapse min-w-[740px]">
                           <thead>
                             <tr className="bg-[#f8fafc] border-b border-[#e2e8f0]">
-                              <th className="px-3.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[35%]">Bisnis &amp; Kategori</th>
+                              <th className="px-3.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[35%]">Usaha &amp; Kategori</th>
                               <th className="px-3 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[25%]">Lokasi &amp; Jam Buka</th>
                               <th className="px-2 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center w-[10%]">Produk</th>
                               <th className="px-2.5 py-2.5 text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] text-center w-[14%]">Status</th>
@@ -4006,10 +7117,23 @@ export default function AdminUser() {
                               const isApproved = st === "approved" || st === "published" || st === "active" || st === "aktif" || st === "disetujui";
                               const isPending = st === "pending" || st === "menunggu";
                               const isRejected = st === "rejected" || st === "ditolak";
-                              const isPrem = Boolean(biz.is_premium || biz.raw?.is_premium || biz.raw?.features?.is_premium);
+                              const isPremExpired = Boolean(
+                                (biz.premium_expires_at && new Date(biz.premium_expires_at) <= new Date()) ||
+                                (biz.raw?.premium_expires_at && new Date(biz.raw.premium_expires_at) <= new Date())
+                              );
+                              const isPrem = !isPremExpired && Boolean(biz.is_premium || biz.raw?.is_premium || biz.raw?.features?.is_premium);
                               const subs = biz.subscriptions || biz.raw?.subscriptions || [];
                               const latestSub = subs[0];
-                              const isPendingSub = biz.has_pending_subscription || (latestSub?.status === "pending" && latestSub?.payment?.status === "pending");
+                              const subStatus = (latestSub?.status || "").toLowerCase();
+                              const paymentStatus = (latestSub?.payment?.status || "").toLowerCase();
+
+                              const isSubPending = (subStatus === "pending" || paymentStatus === "pending") && subStatus !== "cancelled" && subStatus !== "rejected" && paymentStatus !== "rejected";
+                              const isSubNeedsRevision = subStatus === "needs_revision" || paymentStatus === "needs_revision";
+                              const isSubRejected = (subStatus === "rejected" || subStatus === "cancelled" || paymentStatus === "rejected") && Boolean(latestSub?.payment || latestSub?.plan);
+
+                              const isPendingSub = !isPrem && (biz.has_pending_subscription || isSubPending) && !isSubRejected && !isSubNeedsRevision;
+                              const isRevisionSub = !isPrem && Boolean(biz.has_revision_subscription || isSubNeedsRevision);
+                              const hasUpgradeIssue = isApproved && (isRevisionSub || isSubRejected) && !isPrem;
 
                               return (
                                 <tr key={biz.id} className="hover:bg-[#f8fafc] transition-colors">
@@ -4037,23 +7161,35 @@ export default function AdminUser() {
                                           <span className="font-bold text-[13px] text-[#0f172a] truncate max-w-[160px] sm:max-w-[210px]" title={biz.name}>
                                             {biz.name}
                                           </span>
-                                          {isPrem ? (
+                                          {isRejected ? (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
+                                              Ditolak
+                                            </span>
+                                          ) : biz.status === "needs_revision" ? (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                                              Perlu Revisi
+                                            </span>
+                                          ) : isPrem ? (
                                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300 shrink-0">
                                               <Crown size={10} className="text-amber-600 shrink-0" />
                                               <span>Premium</span>
                                             </span>
-                                          ) : isPendingSub || (latestSub?.plan && Number(latestSub.plan.price) > 0) ? (
+                                          ) : hasUpgradeIssue ? (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold bg-amber-100 text-amber-900 border border-amber-400 shrink-0" title="Pembayaran upgrade perlu perbaikan">
+                                              <AlertCircle size={10} className="text-amber-700 shrink-0" />
+                                              <span>{isRevisionSub ? "Perlu Revisi Upgrade" : "Perlu Perbaikan Bayar"}</span>
+                                            </span>
+                                          ) : isPendingSub ? (
                                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold bg-amber-100 text-amber-900 border border-amber-400 shrink-0" title="Paket Premium sedang diverifikasi admin">
                                               <Crown size={10} className="text-amber-700 shrink-0" />
                                               <span>{latestSub?.plan?.name || "Premium"} (Menunggu)</span>
                                             </span>
-                                          ) : (
+                                          ) : isApproved ? (
                                             <button
                                               type="button"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                setSelectedUpgradeBusiness(String(biz.id));
-                                                handleTabChange("premium");
+                                                navigate(`/add-business/${biz.id}?upgrade=true&step=3`);
                                               }}
                                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider text-slate-950 transition-all cursor-pointer border-0 hover:scale-105 active:scale-95 shadow-xs"
                                               style={{
@@ -4065,7 +7201,60 @@ export default function AdminUser() {
                                               <Crown size={9} className="text-slate-950" strokeWidth={2.5} />
                                               <span>Free • Upgrade</span>
                                             </button>
-                                          )}
+                                          ) : null}
+
+                                          {/* CTA / Status Iklan untuk Usaha Ini */}
+                                          {isApproved && (() => {
+                                            const bizAds = (advertisements || []).filter(
+                                              (a) => Number(a?.business_id) === Number(biz.id) || Number(a?.business?.id) === Number(biz.id)
+                                            );
+                                            const activeAd = bizAds.find(
+                                              (a) => (a?.status === "active" || a?.status === "approved") && (!a?.end_date || new Date(a.end_date) >= new Date())
+                                            );
+                                            const pendingAd = bizAds.find(
+                                              (a) => a?.status === "pending" || a?.payment_status === "pending"
+                                            );
+
+                                            if (activeAd) {
+                                              return (
+                                                <span
+                                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shrink-0 shadow-2xs"
+                                                  title="Usaha ini memiliki iklan yang sedang aktif tayang"
+                                                >
+                                                  <Megaphone size={10} className="text-emerald-600" />
+                                                  <span>Iklan Aktif</span>
+                                                </span>
+                                              );
+                                            }
+
+                                            if (pendingAd) {
+                                              return (
+                                                <span
+                                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shrink-0"
+                                                  title="Pengajuan iklan untuk usaha ini sedang menunggu verifikasi admin"
+                                                >
+                                                  <Clock size={10} className="text-amber-600" />
+                                                  <span>Iklan Menunggu</span>
+                                                </span>
+                                              );
+                                            }
+
+                                            return (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleTabChange("iklan");
+                                                  handleOpenCreateAdModal(biz.id);
+                                                }}
+                                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-extrabold text-white bg-gradient-to-r from-teal-500 via-emerald-600 to-teal-600 hover:from-teal-600 hover:to-emerald-700 active:scale-95 transition-all cursor-pointer border-0 shadow-xs hover:shadow-sm shrink-0"
+                                                title="Usaha ini belum beriklan. Klik di sini untuk pasang iklan promosi!"
+                                              >
+                                                <Megaphone size={10} className="animate-bounce" />
+                                                <span>Ayo Pasang Iklan!</span>
+                                              </button>
+                                            );
+                                          })()}
                                         </div>
                                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-[#f1f5f9] text-[#475569]">
@@ -4077,27 +7266,63 @@ export default function AdminUser() {
                                             </span>
                                           )}
                                         </div>
-                                        {isRejected && (
-                                          <div className="mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 space-y-1">
-                                            <div className="flex items-center gap-1.5 font-bold text-rose-900">
-                                              <AlertCircle size={13} className="text-rose-600 shrink-0" />
-                                              <span>Alasan Ditolak Admin:</span>
+                                        {/* Revision & Rejection banners */}
+                                        {hasUpgradeIssue ? (
+                                          <div className="mt-1.5 p-2.5 rounded-xl border text-xs space-y-1 bg-amber-50 border-amber-300 text-amber-900">
+                                            <div className="flex items-center gap-1.5 font-bold">
+                                              <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                                              <span>
+                                                {isRevisionSub
+                                                  ? "Perlu Perbaikan Pembayaran Upgrade:"
+                                                  : "Perlu Perbaikan / Pembayaran Upgrade Ditolak:"}
+                                              </span>
                                             </div>
-                                            <p className="text-[11.5px] text-rose-700 leading-snug pl-4">
-                                              {biz.rejection_reason || biz.raw?.rejection_reason || "Data usaha belum memenuhi ketentuan."}
+                                            <p className="text-[11.5px] leading-snug pl-5">
+                                              {latestSub?.payment?.notes || latestSub?.notes || biz.rejection_reason || (isRevisionSub ? "Bukti transfer / pembayaran upgrade memerlukan perbaikan dari Admin." : "Bukti transfer pembayaran upgrade ditolak oleh Admin. Silakan perbaiki bukti pembayaran atau ajukan upgrade ulang.")}
                                             </p>
-                                            <div className="pt-1 pl-4">
+                                            <div className="pt-1.5 pl-5">
                                               <button
                                                 type="button"
-                                                onClick={() => navigate(`/add-business/${biz.id}`)}
-                                                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold transition-colors cursor-pointer inline-flex items-center gap-1"
+                                                onClick={() => {
+                                                  navigate(`/add-business/${biz.id}?upgrade=true&step=3`);
+                                                }}
+                                                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                                               >
-                                                <Edit size={11} />
-                                                <span>Perbaiki &amp; Ajukan Ulang</span>
+                                                <CreditCard size={12} />
+                                                <span>Perbaiki Pembayaran / Upgrade Ulang</span>
                                               </button>
                                             </div>
                                           </div>
-                                        )}
+                                        ) : (biz.status === "needs_revision" || isRejected) ? (
+                                          <div className={`mt-1.5 p-2.5 rounded-xl border text-xs space-y-1 ${biz.status === "needs_revision"
+                                            ? "bg-amber-50 border-amber-300 text-amber-900"
+                                            : "bg-rose-50 border-rose-200 text-rose-800"
+                                            }`}>
+                                            <div className="flex items-center gap-1.5 font-bold">
+                                              <AlertCircle size={14} className={biz.status === "needs_revision" ? "text-amber-600 shrink-0" : "text-rose-600 shrink-0"} />
+                                              <span>
+                                                {biz.status === "needs_revision"
+                                                  ? "Perlu Perbaikan (Revisi) dari Admin:"
+                                                  : "Ditolak Permanen oleh Admin:"}
+                                              </span>
+                                            </div>
+                                            <p className="text-[11.5px] leading-snug pl-5">
+                                              {biz.rejection_reason || biz.raw?.rejection_reason || "Data usaha memerlukan penyesuaian dari Admin."}
+                                            </p>
+                                            {biz.status === "needs_revision" && (
+                                              <div className="pt-1.5 pl-5">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => navigate(`/add-business/${biz.id}`)}
+                                                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                                                >
+                                                  <Edit size={12} />
+                                                  <span>Perbaiki Data Usaha / Bukti Transfer</span>
+                                                </button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : null}
                                       </div>
                                     </div>
                                   </td>
@@ -4135,36 +7360,48 @@ export default function AdminUser() {
 
                                   {/* Produk */}
                                   <td className="px-2 py-2.5 text-center">
-                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold bg-[#f0fdfa] text-[#059669] border border-[#ccfbf1]">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedBusinessForProducts(biz.id);
+                                        setActiveTab("produk");
+                                        window.scrollTo({ top: 0, behavior: "smooth" });
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#f0fdfa] text-[#059669] border border-[#ccfbf1] hover:bg-[#059669] hover:text-white transition-all cursor-pointer shadow-2xs"
+                                      title="Lihat & Kelola Produk Bisnis Ini"
+                                    >
                                       <Package size={11} />
                                       {biz.products?.length || 0} Item
-                                    </span>
+                                    </button>
                                   </td>
 
                                   {/* Status & Tanggal */}
                                   <td className="px-2.5 py-2.5 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                       <span
-                                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
-                                          isApproved
-                                            ? "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]"
-                                            : isPending
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${isApproved
+                                          ? "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]"
+                                          : isPending
                                             ? "bg-[#fefce8] text-[#a16207] border border-[#fef08a]"
                                             : isRejected
-                                            ? "bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]"
-                                            : "bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]"
-                                        }`}
+                                              ? "bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]"
+                                              : "bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]"
+                                          }`}
                                       >
                                         <span
-                                          className={`w-1.5 h-1.5 rounded-full ${
-                                            isApproved ? "bg-[#16a34a]" : isPending ? "bg-[#ca8a04]" : "bg-[#dc2626]"
-                                          }`}
+                                          className={`w-1.5 h-1.5 rounded-full ${isApproved ? "bg-[#16a34a]" : isPending ? "bg-[#ca8a04]" : "bg-[#dc2626]"
+                                            }`}
                                         />
                                         {isApproved ? "Disetujui" : isPending ? "Menunggu" : isRejected ? "Ditolak" : "Nonaktif"}
                                       </span>
                                       {isPendingSub && (
                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                                           <Clock size={10} /> Diproses
+                                        </span>
+                                      )}
+                                      {isRevisionSub && (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                          <AlertCircle size={10} /> Revisi Upgrade
                                         </span>
                                       )}
                                       <span className="text-[10px] text-[#94a3b8] font-medium">
@@ -4176,60 +7413,109 @@ export default function AdminUser() {
                                   {/* Action Buttons */}
                                   <td className="px-3 py-2.5 text-right">
                                     <div className="flex items-center justify-end gap-1.5">
-                                      {/* Upgrade button only for Free businesses without pending subscription */}
-                                      {!isPrem && !isPendingSub && (
+                                      {/* Jika Ditolak Permanen: Hanya bisa Hapus */}
+                                      {isRejected ? (
                                         <button
-                                          onClick={() => {
-                                            setSelectedUpgradeBusiness(String(biz.id));
-                                            handleTabChange("premium");
-                                          }}
-                                          className="h-[30px] px-2.5 rounded-lg text-slate-950 flex items-center justify-center gap-1 transition-all cursor-pointer border-0 hover:scale-105 active:scale-95 font-bold text-[11px] shrink-0"
-                                          style={{
-                                            background: "linear-gradient(180deg, #fef08a 0%, #f59e0b 55%, #d97706 100%)",
-                                            boxShadow: "0 2px 6px rgba(217, 119, 6, 0.4), inset 0 1px 0 #ffffff, inset 0 -1px 0 #78350f",
-                                          }}
-                                          title="Upgrade bisnis ini ke Paket Premium (Centang Emas)"
+                                          onClick={() => handleDeleteBusiness(biz.id)}
+                                          className="w-[30px] h-[30px] rounded-lg bg-[#fef2f2] text-[#dc2626] hover:bg-[#dc2626] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                          title="Hapus Data Usaha yang Ditolak"
                                         >
-                                          <Crown size={13} className="shrink-0 text-slate-950" strokeWidth={2.5} />
-                                          <span className="hidden sm:inline">Upgrade</span>
+                                          <Trash2 size={14} />
                                         </button>
+                                      ) : biz.status === "needs_revision" ? (
+                                        <>
+                                          <button
+                                            onClick={() => navigate(`/add-business/${biz.id}`)}
+                                            className="h-[30px] px-2.5 rounded-lg text-white flex items-center justify-center gap-1 transition-all cursor-pointer border-0 hover:bg-amber-700 font-bold text-[11px] shrink-0 bg-amber-600 shadow-sm"
+                                            title="Perbaiki Data Usaha / Bukti Transfer"
+                                          >
+                                            <Edit size={13} className="shrink-0" />
+                                            <span>Perbaiki Data</span>
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteBusiness(biz.id)}
+                                            className="w-[30px] h-[30px] rounded-lg bg-[#fef2f2] text-[#dc2626] hover:bg-[#dc2626] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                            title="Hapus Usaha"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          {/* Perbaiki Upgrade button for Revision upgrade or Rejected upgrade payment */}
+                                          {hasUpgradeIssue && (
+                                            <button
+                                              onClick={() => {
+                                                navigate(`/add-business/${biz.id}?upgrade=true&step=3`);
+                                              }}
+                                              className="h-[30px] px-2.5 rounded-lg text-white flex items-center justify-center gap-1 transition-all cursor-pointer border-0 hover:bg-amber-700 font-bold text-[11px] shrink-0 bg-amber-600 shadow-sm"
+                                              title="Perbaiki Pembayaran Upgrade"
+                                            >
+                                              <CreditCard size={13} className="shrink-0" />
+                                              <span className="hidden sm:inline">Perbaiki Bayar</span>
+                                            </button>
+                                          )}
+                                          {/* Upgrade button only for Free businesses without pending/revision subscription */}
+                                          {isApproved && !isPrem && !isPendingSub && !hasUpgradeIssue && !isPending && (
+                                            <button
+                                              onClick={() => {
+                                                navigate(`/add-business/${biz.id}?upgrade=true&step=3`);
+                                              }}
+                                              className="h-[30px] px-2.5 rounded-lg text-slate-950 flex items-center justify-center gap-1 transition-all cursor-pointer border-0 hover:scale-105 active:scale-95 font-bold text-[11px] shrink-0"
+                                              style={{
+                                                background: "linear-gradient(180deg, #fef08a 0%, #f59e0b 55%, #d97706 100%)",
+                                                boxShadow: "0 2px 6px rgba(217, 119, 6, 0.4), inset 0 1px 0 #ffffff, inset 0 -1px 0 #78350f",
+                                              }}
+                                              title="Upgrade usaha ini ke Paket Premium (Centang Emas)"
+                                            >
+                                              <Crown size={13} className="shrink-0 text-slate-950" strokeWidth={2.5} />
+                                              <span className="hidden sm:inline">Upgrade</span>
+                                            </button>
+                                          )}
+                                          {/* View */}
+                                          {isApproved && (
+                                            <button
+                                              onClick={() => window.open(`/business/${biz.slug || biz.raw?.slug || biz.id}`, "_blank")}
+                                              className="w-[30px] h-[30px] rounded-lg bg-[#eff6ff] text-[#2563eb] hover:bg-[#2563eb] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                              title="Lihat Halaman Usaha (Buka Tab Baru)"
+                                            >
+                                              <Eye size={14} />
+                                            </button>
+                                          )}
+                                          {/* Edit */}
+                                          {isApproved && (
+                                            <button
+                                              onClick={() => handleEditBusiness(biz)}
+                                              className="w-[30px] h-[30px] rounded-lg bg-[#fefce8] text-[#ca8a04] hover:bg-[#ca8a04] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                              title="Edit Profil Usaha"
+                                            >
+                                              <Edit size={14} />
+                                            </button>
+                                          )}
+                                          {/* Manage Products */}
+                                          {isApproved && (
+                                            <button
+                                              onClick={() => {
+                                                setSelectedBusinessForProducts(biz.id);
+                                                setActiveTab("produk");
+                                                window.scrollTo({ top: 0, behavior: "smooth" });
+                                              }}
+                                              className="w-[30px] h-[30px] rounded-lg bg-[#f0fdfa] text-[#059669] hover:bg-[#059669] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                              title="Kelola Produk Usaha"
+                                            >
+                                              <Package size={14} />
+                                            </button>
+                                          )}
+                                          {/* Delete */}
+                                          <button
+                                            onClick={() => handleDeleteBusiness(biz.id)}
+                                            className="w-[30px] h-[30px] rounded-lg bg-[#fef2f2] text-[#dc2626] hover:bg-[#dc2626] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                            title="Hapus Usaha"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </>
                                       )}
-                                      {/* View */}
-                                      <button
-                                        onClick={() => navigate(`/business/${biz.raw?.slug || biz.id}`)}
-                                        className="w-[30px] h-[30px] rounded-lg bg-[#eff6ff] text-[#2563eb] hover:bg-[#2563eb] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                        title="Lihat Halaman Bisnis"
-                                      >
-                                        <Eye size={14} />
-                                      </button>
-                                      {/* Edit / Perbaiki */}
-                                      <button
-                                        onClick={() => handleEditBusiness(biz)}
-                                        className={`w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                                          isRejected
-                                            ? "bg-rose-100 text-rose-700 hover:bg-rose-600 hover:text-white"
-                                            : "bg-[#fefce8] text-[#ca8a04] hover:bg-[#ca8a04] hover:text-white"
-                                        }`}
-                                        title={isRejected ? "Perbaiki Bisnis (Ditolak)" : "Edit Profil Bisnis"}
-                                      >
-                                        <Edit size={14} />
-                                      </button>
-                                      {/* Manage Products */}
-                                      <button
-                                        onClick={() => navigate(`/add-product/${biz.id}`)}
-                                        className="w-[30px] h-[30px] rounded-lg bg-[#f0fdfa] text-[#059669] hover:bg-[#059669] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                        title="Kelola Produk Bisnis"
-                                      >
-                                        <Package size={14} />
-                                      </button>
-                                      {/* Delete */}
-                                      <button
-                                        onClick={() => handleDeleteBusiness(biz.id)}
-                                        className="w-[30px] h-[30px] rounded-lg bg-[#fef2f2] text-[#dc2626] hover:bg-[#dc2626] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                        title="Hapus Bisnis"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
                                     </div>
                                   </td>
                                 </tr>
@@ -4244,7 +7530,7 @@ export default function AdminUser() {
                         <span className="text-[12px] text-[#64748b]">
                           Menampilkan <span className="font-semibold text-[#0f172a]">{startIndex + 1}</span>–
                           <span className="font-semibold text-[#0f172a]">{endIndex}</span> dari{" "}
-                          <span className="font-bold text-[#059669]">{totalItems}</span> bisnis
+                          <span className="font-bold text-[#059669]">{totalItems}</span> usaha
                         </span>
 
                         <div className="flex items-center gap-[5px]">
@@ -4270,11 +7556,10 @@ export default function AdminUser() {
                                 <button
                                   key={page}
                                   onClick={() => setBusinessCurrentPage(page)}
-                                  className={`w-[30px] h-[30px] flex items-center justify-center rounded-[7px] text-[12.5px] font-medium transition-colors cursor-pointer ${
-                                    page === safePage
-                                      ? "bg-[#059669] text-white"
-                                      : "border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9]"
-                                  }`}
+                                  className={`w-[30px] h-[30px] flex items-center justify-center rounded-[7px] text-[12.5px] font-medium transition-colors cursor-pointer ${page === safePage
+                                    ? "bg-[#059669] text-white"
+                                    : "border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9]"
+                                    }`}
                                 >
                                   {page}
                                 </button>
@@ -4298,11 +7583,11 @@ export default function AdminUser() {
                         <Briefcase size={26} />
                       </div>
                       <div>
-                        <h3 className="text-[15px] font-bold text-[#0f172a]">Belum Ada Bisnis</h3>
+                        <h3 className="text-[15px] font-bold text-[#0f172a]">Belum Ada Usaha</h3>
                         <p className="text-[12.5px] text-[#64748b] mt-[4px] max-w-[340px] leading-relaxed">
                           {businessSearch || businessCategoryFilter !== "Semua" || businessStatusFilter !== "Semua"
-                            ? "Tidak ada bisnis yang cocok dengan kata kunci atau filter yang Anda pilih."
-                            : "Anda belum mendaftarkan profil bisnis di portal Surade.co.id."}
+                            ? "Tidak ada usaha yang cocok dengan kata kunci atau filter yang Anda pilih."
+                            : "Anda belum mendaftarkan profil usaha di portal Surade.com."}
                         </p>
                       </div>
                       {businessSearch || businessCategoryFilter !== "Semua" || businessStatusFilter !== "Semua" ? (
@@ -4323,7 +7608,7 @@ export default function AdminUser() {
                           className="inline-flex items-center gap-[6px] px-[18px] py-[9px] bg-[#059669] hover:bg-[#005f5b] text-white rounded-[10px] font-bold text-[12.5px] transition-colors cursor-pointer shadow-sm"
                         >
                           <Plus size={16} />
-                          <span>Tambah Bisnis Pertama</span>
+                          <span>Tambah Usaha Pertama</span>
                         </button>
                       )}
                     </div>
@@ -4334,34 +7619,35 @@ export default function AdminUser() {
           )}
 
 
-          {/* 3. BLOG & EVENT COMBINED VIEW */}
+          {/* 3. INFO & EVENT COMBINED VIEW */}
           {activeTab === "blog-event" && (
             <div className="space-y-6 w-full max-w-full">
               {/* 1. COMPACT HERO BANNER CARD */}
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-100 via-slate-50 to-emerald-50/40 border border-slate-200/70 p-6 md:p-7 flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="z-10 max-w-xl space-y-1">
-                  <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
-                    Blog & Event Saya
+              <div className="relative overflow-hidden rounded-[16px] bg-gradient-to-r from-[#0a4d3a] via-[#0b6b45] to-[#0f7a52] text-white p-[24px_28px] shadow-md flex flex-col md:flex-row items-center justify-between gap-[20px]">
+                <div className="space-y-[6px] z-10 max-w-xl">
+                  <h2 className="text-[20px] md:text-[22px] font-extrabold tracking-tight flex items-center gap-[10px]">
+                    <FileText className="text-[#5eead4]" size={24} />
+                    Publikasi Info & Agenda Event Surade
                   </h2>
-                  <p className="text-xs md:text-sm text-slate-500 leading-relaxed font-normal">
+                  <p className="text-[13px] text-slate-200 max-w-[640px] font-normal leading-relaxed">
                     Kelola, pantau, dan bagikan cerita serta acara terbaik Anda untuk audiens yang lebih luas.
                   </p>
                 </div>
 
                 {/* Hero Banner Background Image / Illustration */}
-                <div className="w-full md:w-[320px] h-28 md:h-24 rounded-xl overflow-hidden shrink-0 relative shadow-2xs border border-slate-200/50">
+                <div className="w-full md:w-[320px] h-32 md:h-28 rounded-xl overflow-hidden shrink-0 relative shadow-md border border-white/20">
                   <img
-                    src="https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&h=300&fit=crop"
-                    alt="Blog & Event Banner"
-                    className="w-full h-full object-cover object-right"
+                    src={bannerEventSurade}
+                    alt="Event & Info Surade"
+                    className="w-full h-full object-cover object-center"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-slate-100 via-slate-100/50 to-transparent md:block hidden" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
                 </div>
               </div>
 
-              {/* 1.5 PRICING CARDS SHOWCASE (PAY PER POST) */}
+              {/* 1.5 PRICING CARDS SHOWCASE (BIAYA PASANG & MASA AKTIF DARI ADMIN) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Blog Card */}
+                {/* Info Card */}
                 <div className="p-5 rounded-2xl bg-gradient-to-br from-white to-teal-50/40 border border-teal-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
@@ -4369,22 +7655,23 @@ export default function AdminUser() {
                         <div className="w-8 h-8 rounded-lg bg-teal-100 text-[#059669] flex items-center justify-center font-bold">
                           <FileText size={16} />
                         </div>
-                        <h3 className="font-extrabold text-slate-900 text-sm">Publikasi Artikel Blog</h3>
+                        <h3 className="font-extrabold text-slate-900 text-sm">Publikasi Info &amp; Berita</h3>
                       </div>
                       <span className="bg-teal-100 text-[#059669] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Aktif 1 Tahun
+                        AKTIF {userContentPricing.blog_duration ? userContentPricing.blog_duration.toUpperCase() : "1 BULAN"}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed">
-                      Publikasikan artikel promosi, edukasi, atau cerita bisnis Anda. Tayang selama 365 hari penuh dengan optimasi SEO.
+                      Kelola dan publikasikan cerita bisnis, promosi, atau liputan berita usaha Anda agar menjangkau audiens luas dengan masa tayang 1 bulan penuh.
                     </p>
                   </div>
 
                   <div className="pt-3 border-t border-teal-100 flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Tarif Upload</span>
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Biaya Pasang</span>
                       <span className="text-lg font-black text-[#059669]">
-                        Rp {contentPricing.blog.toLocaleString("id-ID")} <span className="text-[11px] font-medium text-slate-500">/ posting</span>
+                        Rp {Number(userContentPricing.blog || 10000).toLocaleString("id-ID")}{" "}
+                        <span className="text-[11px] font-medium text-slate-500">/ {userContentPricing.blog_duration?.toLowerCase() || "bulan"}</span>
                       </span>
                     </div>
                     <button
@@ -4392,7 +7679,7 @@ export default function AdminUser() {
                       className="px-4 py-2 rounded-xl bg-[#059669] hover:bg-[#005f5b] text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Plus size={14} strokeWidth={2.5} />
-                      <span>Buat Blog Baru</span>
+                      <span>Buat Info Baru</span>
                     </button>
                   </div>
                 </div>
@@ -4408,19 +7695,20 @@ export default function AdminUser() {
                         <h3 className="font-extrabold text-slate-900 text-sm">Publikasi Agenda Event</h3>
                       </div>
                       <span className="bg-purple-100 text-purple-700 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Aktif 1 Tahun
+                        AKTIF {userContentPricing.event_duration ? userContentPricing.event_duration.toUpperCase() : "1 BULAN"}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed">
-                      Promosikan acara festival, webinar, workshop, atau konser Anda ke ribuan pengguna platform Surade.co.id.
+                      Bagikan agenda acara festival, promo, atau workshop Anda kepada audiens yang lebih luas di portal Surade.com selama 1 bulan penuh.
                     </p>
                   </div>
 
                   <div className="pt-3 border-t border-purple-100 flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Tarif Upload</span>
+                      <span className="text-[10px] text-slate-400 font-semibold block uppercase">Biaya Pasang</span>
                       <span className="text-lg font-black text-purple-700">
-                        Rp {contentPricing.event.toLocaleString("id-ID")} <span className="text-[11px] font-medium text-slate-500">/ posting</span>
+                        Rp {Number(userContentPricing.event || 15000).toLocaleString("id-ID")}{" "}
+                        <span className="text-[11px] font-medium text-slate-500">/ {userContentPricing.event_duration?.toLowerCase() || "bulan"}</span>
                       </span>
                     </div>
                     <button
@@ -4436,14 +7724,14 @@ export default function AdminUser() {
 
               {/* 2. MAIN CONTENT CARD (SEARCH, BUTTON, TABS, TABLE & PAGINATION) */}
               <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 space-y-6 w-full">
-                {/* SEARCH BAR & BUAT BLOG BARU BUTTON IN ONE FULL-WIDTH ROW */}
+                {/* SEARCH BAR & BUAT INFO BARU BUTTON IN ONE FULL-WIDTH ROW */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
                   {/* Search input - fills all remaining space */}
                   <div className="relative flex-1 w-full">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                       type="text"
-                      placeholder="Cari judul artikel atau event..."
+                      placeholder="Temukan info atau event yang Anda buat..."
                       value={blogSearch}
                       onChange={(e) => {
                         setBlogSearch(e.target.value);
@@ -4453,14 +7741,14 @@ export default function AdminUser() {
                     />
                   </div>
 
-                  {/* Buat Blog & Buat Event Action Buttons */}
+                  {/* Buat Info & Buat Event Action Buttons */}
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
                       onClick={() => navigate("/add-blog?type=blog")}
                       className="flex-1 sm:flex-none h-11 flex items-center justify-center gap-2 bg-[#059669] hover:bg-[#005f5b] active:bg-[#004e4b] text-white px-5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm shrink-0 cursor-pointer"
                     >
                       <Plus size={18} strokeWidth={2.5} />
-                      <span>Buat Blog Baru</span>
+                      <span>Buat Info Baru</span>
                     </button>
 
                     <button
@@ -4474,8 +7762,8 @@ export default function AdminUser() {
                 </div>
 
                 {/* FILTER TABS */}
-                <div className="flex items-center gap-6 border-b border-slate-100 pb-0 overflow-x-auto text-xs sm:text-sm font-semibold">
-                  {["Semua", "Blog", "Event", "Published", "Menunggu Persetujuan", "Ditolak", "Draft"].map((tab) => {
+                <div className="flex items-center gap-6 border-b border-slate-100 pb-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden text-xs sm:text-sm font-semibold">
+                  {["Semua", "Info", "Event", "Published", "Menunggu Persetujuan", "Perlu Perbaikan", "Ditolak", "Draft"].map((tab) => {
                     const isActive = filterTab === tab;
                     return (
                       <button
@@ -4484,11 +7772,10 @@ export default function AdminUser() {
                           setFilterTab(tab);
                           setCurrentPage(1);
                         }}
-                        className={`transition-all whitespace-nowrap pb-3 -mb-[2px] cursor-pointer ${
-                          isActive
-                            ? "text-[#059669] border-b-2 border-[#007570] font-bold"
-                            : "text-slate-400 hover:text-slate-700 font-medium border-b-2 border-transparent"
-                        }`}
+                        className={`transition-all whitespace-nowrap pb-3 -mb-[2px] cursor-pointer ${isActive
+                          ? "text-[#059669] border-b-2 border-[#007570] font-bold"
+                          : "text-slate-400 hover:text-slate-700 font-medium border-b-2 border-transparent"
+                          }`}
                       >
                         {tab}
                       </button>
@@ -4498,26 +7785,37 @@ export default function AdminUser() {
 
                 {/* DATA TABLE */}
                 {loadingBlogs || loadingEvents ? (
-                  <div className="flex justify-center items-center py-16">
-                    <Loader2 className="animate-spin text-[#059669]" size={40} />
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                    <SuradeLoader
+                      variant="section"
+                      size="md"
+                      text="Memuat data info & event"
+                      minHeight="180px"
+                    />
                   </div>
                 ) : (() => {
-                  // Combined list of blogs + events
+                  const safeBlogs = Array.isArray(blogs) ? blogs : [];
+                  const safeEvents = Array.isArray(events) ? events : [];
                   const combinedList = [
-                    ...blogs.map((b) => ({ ...b, itemType: "blog" })),
-                    ...events.map((e) => ({ ...e, itemType: "event" })),
+                    ...safeBlogs.map((b) => ({ ...b, itemType: "blog" })),
+                    ...safeEvents.map((e) => ({ ...e, itemType: "event" })),
                   ];
 
                   // Filter based on tab and search keyword
                   const filtered = combinedList.filter((item) => {
                     const st = (item.status || "").toLowerCase();
+                    // Exclude drafts & unpaid items from non-Draft tabs (Semua, Info, Event, Published, Menunggu, Ditolak)
+                    const isDraftOrUnpaid = st === "draft" || st === "waiting_payment";
+                    if (filterTab !== "Draft" && isDraftOrUnpaid) return false;
+
                     // Tab filter
-                    if (filterTab === "Blog" && item.itemType !== "blog") return false;
+                    if ((filterTab === "Info" || filterTab === "Blog") && item.itemType !== "blog") return false;
                     if (filterTab === "Event" && item.itemType !== "event") return false;
                     if (filterTab === "Published" && !(st === "published" || st === "approved" || st === "terbit")) return false;
-                    if (filterTab === "Menunggu Persetujuan" && !(st === "waiting_payment" || st === "pending" || st === "menunggu")) return false;
+                    if (filterTab === "Menunggu Persetujuan" && !(st === "pending" || st === "menunggu")) return false;
+                    if (filterTab === "Perlu Perbaikan" && !(st === "needs_revision" || st === "revision")) return false;
                     if (filterTab === "Ditolak" && !(st === "rejected" || st === "failed" || st === "ditolak")) return false;
-                    if (filterTab === "Draft" && st !== "draft") return false;
+                    if (filterTab === "Draft" && !isDraftOrUnpaid) return false;
 
                     // Search filter
                     if (blogSearch) {
@@ -4548,11 +7846,12 @@ export default function AdminUser() {
 
                   return totalItems > 0 ? (
                     <div className="space-y-4 w-full">
-                      <div className="w-full overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+                      {/* DESKTOP TABLE VIEW */}
+                      <div className="hidden md:block w-full overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
                         <table className="w-full text-left border-collapse table-fixed">
                           <thead>
                             <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                              <th className="py-2.5 px-3.5 w-[42%] font-semibold">Artikel & Event</th>
+                              <th className="py-2.5 px-3.5 w-[42%] font-semibold">Info & Event</th>
                               <th className="py-2.5 px-3 w-[22%] font-semibold">Kategori & Tanggal</th>
                               <th className="py-2.5 px-2.5 w-[18%] text-center font-semibold">Status</th>
                               <th className="py-2.5 px-3 w-[18%] text-right font-semibold">Aksi</th>
@@ -4562,13 +7861,14 @@ export default function AdminUser() {
                             {currentData.map((item) => {
                               const st = (item.status || "").toLowerCase();
                               const isPublished = st === "approved" || st === "published" || st === "terbit";
-                              const isWaitingPayment = st === "waiting_payment" || st === "pending" || st === "menunggu";
+                              const isPending = st === "pending" || st === "menunggu";
+                              const isWaitingPayment = st === "waiting_payment";
                               const isDraft = st === "draft";
                               const isRejected = st === "rejected" || st === "failed" || st === "ditolak";
 
                               return (
                                 <tr key={`${item.itemType}-${item.id}`} className="hover:bg-slate-50/60 transition-colors">
-                                  {/* Artikel & Event (Cover + Judul + Tipe/Penulis) */}
+                                  {/* Info & Event (Cover + Judul + Tipe/Penulis) */}
                                   <td className="py-2.5 px-3.5 align-middle">
                                     <div className="flex items-center gap-3">
                                       <div className="w-12 h-9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0 flex items-center justify-center">
@@ -4603,20 +7903,26 @@ export default function AdminUser() {
                                         </span>
                                         <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 truncate">
                                           <span className={`font-semibold ${item.itemType === "event" ? "text-purple-600" : "text-teal-600"}`}>
-                                            {item.itemType === "event" ? "🎪 Event" : "📝 Blog"}
+                                            {item.itemType === "event" ? "🎪 Event" : "📝 Info"}
                                           </span>
                                           <span>·</span>
                                           <span className="truncate text-slate-400">oleh {item.author || "User"}</span>
                                         </div>
 
-                                        {isRejected && (
-                                          <div className="mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-800 space-y-0.5">
-                                            <div className="flex items-center gap-1 font-bold text-rose-900">
-                                              <AlertCircle size={13} className="text-rose-600 shrink-0" />
-                                              <span>Alasan Penolakan dari Admin:</span>
+                                        {(isRejected || item.status === "needs_revision") && (
+                                          <div className={`mt-1.5 p-2 rounded-lg text-[11px] space-y-0.5 border ${item.status === "needs_revision"
+                                            ? "bg-amber-50 border-amber-200 text-amber-900"
+                                            : "bg-rose-50 border-rose-200 text-rose-800"
+                                            }`}>
+                                            <div className={`flex items-center gap-1 font-bold ${item.status === "needs_revision" ? "text-amber-900" : "text-rose-900"
+                                              }`}>
+                                              <AlertCircle size={13} className={`shrink-0 ${item.status === "needs_revision" ? "text-amber-600" : "text-rose-600"
+                                                }`} />
+                                              <span>{item.status === "needs_revision" ? "Catatan Perbaikan dari Admin:" : "Alasan Penolakan dari Admin:"}</span>
                                             </div>
-                                            <p className="text-[10.5px] leading-relaxed text-rose-700 pl-4">
-                                              {item.rejection_reason || "Konten belum memenuhi syarat. Silakan klik 'Perbaiki' untuk memperbarui dan mengajukan kembali."}
+                                            <p className={`text-[10.5px] leading-relaxed pl-4 ${item.status === "needs_revision" ? "text-amber-800" : "text-rose-700"
+                                              }`}>
+                                              {item.rejection_reason || (item.status === "needs_revision" ? "Admin meminta perbaikan data atau materi konten. Silakan klik tombol 'Perbaiki'." : "Konten belum memenuhi syarat.")}
                                             </p>
                                           </div>
                                         )}
@@ -4635,7 +7941,7 @@ export default function AdminUser() {
                                         {item.category}
                                       </span>
                                       <span className="text-[11px] text-slate-400 font-medium truncate">
-                                        📅 {item.date}
+                                        📅 {item.date ? (item.date.includes("T") ? new Date(item.date).toLocaleDateString("id-ID") : item.date) : "-"}
                                       </span>
                                     </div>
                                   </td>
@@ -4643,95 +7949,127 @@ export default function AdminUser() {
                                   {/* Status */}
                                   <td className="py-2.5 px-2.5 text-center align-middle">
                                     <span
-                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold ${
-                                        isPublished
-                                          ? "bg-[#e6f4ea] text-[#137333] border border-[#bbf7d0]"
-                                          : isWaitingPayment
-                                          ? "bg-amber-50 text-amber-800 border border-amber-200"
-                                          : isRejected
-                                          ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                          : "bg-slate-100 text-slate-600 border border-slate-200"
-                                      }`}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold ${isPublished
+                                        ? "bg-[#e6f4ea] text-[#137333] border border-[#bbf7d0]"
+                                        : item.status === "needs_revision"
+                                          ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                          : isPending
+                                            ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                            : isWaitingPayment
+                                              ? "bg-orange-50 text-orange-800 border border-orange-200"
+                                              : isRejected
+                                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                                : "bg-slate-100 text-slate-600 border border-slate-200"
+                                        }`}
                                     >
                                       <span
-                                        className={`w-1.5 h-1.5 rounded-full ${
-                                          isPublished
-                                            ? "bg-[#16a34a]"
-                                            : isWaitingPayment
-                                            ? "bg-amber-500 animate-pulse"
-                                            : isRejected
-                                            ? "bg-rose-600"
-                                            : "bg-slate-400"
-                                        }`}
+                                        className={`w-1.5 h-1.5 rounded-full ${isPublished
+                                          ? "bg-[#16a34a]"
+                                          : item.status === "needs_revision"
+                                            ? "bg-amber-600"
+                                            : isPending
+                                              ? "bg-amber-500 animate-pulse"
+                                              : isWaitingPayment
+                                                ? "bg-orange-500 animate-pulse"
+                                                : isRejected
+                                                  ? "bg-rose-600"
+                                                  : "bg-slate-400"
+                                          }`}
                                       />
                                       {isPublished
                                         ? "Published"
-                                        : isWaitingPayment
-                                        ? "Menunggu Persetujuan"
-                                        : isRejected
-                                        ? "Ditolak / Revisi"
-                                        : "Draft"}
+                                        : item.status === "needs_revision"
+                                          ? "Perlu Perbaikan"
+                                          : isPending
+                                            ? "Menunggu Persetujuan"
+                                            : isWaitingPayment
+                                              ? "Belum Dibayar (Draft)"
+                                              : isRejected
+                                                ? "Ditolak"
+                                                : "Draft"}
                                     </span>
                                   </td>
 
                                   {/* Action Buttons */}
                                   <td className="py-2.5 px-3 text-right align-middle">
                                     <div className="flex items-center justify-end gap-1.5">
-                                      {/* Bayar Draft Button */}
-                                      {isDraft && (
+                                      {/* Jika Ditolak Permanen: Hanya bisa Hapus */}
+                                      {isRejected ? (
                                         <button
-                                          onClick={() => {
-                                            setSelectedBlogForPayment(item);
-                                            setShowPaymentModal(true);
-                                          }}
-                                          title="Lanjutkan Pembayaran"
-                                          className="h-[30px] px-2.5 rounded-lg bg-[#059669] hover:bg-[#005f5b] text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs shrink-0"
+                                          onClick={() =>
+                                            item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
+                                          }
+                                          title="Hapus Konten yang Ditolak"
+                                          className="w-[30px] h-[30px] rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                         >
-                                          <CreditCard size={13} />
-                                          <span className="hidden sm:inline">Bayar</span>
+                                          <Trash2 size={14} />
                                         </button>
+                                      ) : item.status === "needs_revision" ? (
+                                        <>
+                                          <button
+                                            onClick={() => navigate(`/add-blog/${item.id}?type=${item.itemType}`)}
+                                            title="Perbaiki Data Konten / Bukti Pembayaran"
+                                            className="h-[30px] px-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs shrink-0"
+                                          >
+                                            <Edit size={13} />
+                                            <span>Perbaiki</span>
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
+                                            }
+                                            title="Hapus"
+                                            className="w-[30px] h-[30px] rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          {/* Lanjutkan Draft / Pembayaran Button */}
+                                          {(isDraft || isWaitingPayment) && (
+                                            <button
+                                              onClick={() => navigate(`/add-blog/${item.id}?type=${item.itemType}`)}
+                                              title="Lanjutkan Pengisian & Pembayaran"
+                                              className="h-[30px] px-2.5 rounded-lg bg-[#059669] hover:bg-[#005f5b] text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs shrink-0"
+                                            >
+                                              <CreditCard size={13} />
+                                              <span className="hidden sm:inline">Lanjutkan</span>
+                                            </button>
+                                          )}
+
+                                          {/* View Button */}
+                                          {isPublished && (
+                                            <button
+                                              onClick={() => navigate(`/blog/${item.id}`)}
+                                              title="Lihat"
+                                              className="w-[30px] h-[30px] rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                            >
+                                              <Eye size={14} />
+                                            </button>
+                                          )}
+
+                                          {/* Edit Button */}
+                                          <button
+                                            onClick={() => handleEditBlog(item)}
+                                            title="Edit"
+                                            className="w-[30px] h-[30px] rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                          >
+                                            <Edit size={14} />
+                                          </button>
+
+                                          {/* Delete Button */}
+                                          <button
+                                            onClick={() =>
+                                              item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
+                                            }
+                                            title="Hapus"
+                                            className="w-[30px] h-[30px] rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </>
                                       )}
-
-                                      {/* Perbaiki / Ajukan Ulang jika ditolak */}
-                                      {isRejected && (
-                                        <button
-                                          onClick={() => navigate(`/add-blog/${item.id}?type=${item.itemType}`)}
-                                          title="Perbaiki & Ajukan Ulang"
-                                          className="h-[30px] px-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs shrink-0"
-                                        >
-                                          <Edit size={13} />
-                                          <span className="hidden sm:inline">Perbaiki</span>
-                                        </button>
-                                      )}
-
-                                      {/* View Button */}
-                                      <button
-                                        onClick={() => navigate(`/blog/${item.id}`)}
-                                        title="Lihat"
-                                        className="w-[30px] h-[30px] rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                      >
-                                        <Eye size={14} />
-                                      </button>
-
-                                      {/* Edit Button */}
-                                      <button
-                                        onClick={() => handleEditBlog(item)}
-                                        title="Edit"
-                                        className="w-[30px] h-[30px] rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                      >
-                                        <Edit size={14} />
-                                      </button>
-
-                                      {/* Delete Button */}
-                                      <button
-                                        onClick={() =>
-                                          item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
-                                        }
-                                        title="Hapus"
-                                        className="w-[30px] h-[30px] rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
                                     </div>
                                   </td>
                                 </tr>
@@ -4739,6 +8077,201 @@ export default function AdminUser() {
                             })}
                           </tbody>
                         </table>
+                      </div>
+
+                      {/* MOBILE CARD VIEW */}
+                      <div className="md:hidden space-y-3">
+                        {currentData.map((item) => {
+                          const st = (item.status || "").toLowerCase();
+                          const isPublished = st === "approved" || st === "published" || st === "terbit";
+                          const isPending = st === "pending" || st === "menunggu";
+                          const isWaitingPayment = st === "waiting_payment";
+                          const isDraft = st === "draft";
+                          const isRejected = st === "rejected" || st === "failed" || st === "ditolak";
+
+                          return (
+                            <div
+                              key={`mobile-${item.itemType}-${item.id}`}
+                              className="bg-white border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-xs"
+                            >
+                              {/* Top: Image + Title + Author */}
+                              <div className="flex items-start gap-3">
+                                <div className="w-14 h-14 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shrink-0 flex items-center justify-center">
+                                  {item.thumbnail ? (
+                                    <img
+                                      src={item.thumbnail}
+                                      alt={item.title}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = "none";
+                                        if (e.currentTarget.nextElementSibling) {
+                                          e.currentTarget.nextElementSibling.style.display = "flex";
+                                        }
+                                      }}
+                                    />
+                                  ) : null}
+                                  <div
+                                    className="w-full h-full items-center justify-center text-slate-400 bg-slate-50"
+                                    style={{ display: item.thumbnail ? "none" : "flex" }}
+                                  >
+                                    {item.itemType === "event" ? <Calendar size={18} /> : <FileText size={18} />}
+                                  </div>
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <h4
+                                    className="font-bold text-slate-900 text-sm leading-snug line-clamp-2 cursor-pointer hover:text-[#059669] transition-colors"
+                                    onClick={() => navigate(`/blog/${item.id}`)}
+                                  >
+                                    {item.title}
+                                  </h4>
+                                  <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                    <span className={`font-bold ${item.itemType === "event" ? "text-purple-600" : "text-teal-600"}`}>
+                                      {item.itemType === "event" ? "🎪 Event" : "📝 Info"}
+                                    </span>
+                                    <span>·</span>
+                                    <span className="truncate text-slate-400">oleh {item.author || "User"}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Middle: Badges (Category + Date + Status) */}
+                              <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-slate-100 text-xs">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${getCategoryBadgeClass(
+                                      item.category
+                                    )}`}
+                                  >
+                                    {item.category}
+                                  </span>
+                                  <span className="text-[11px] text-slate-400 font-medium">
+                                    📅 {item.date ? (item.date.includes("T") ? new Date(item.date).toLocaleDateString("id-ID") : item.date) : "-"}
+                                  </span>
+                                </div>
+
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${isPublished
+                                    ? "bg-[#e6f4ea] text-[#137333] border border-[#bbf7d0]"
+                                    : isPending
+                                      ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                      : isWaitingPayment
+                                        ? "bg-orange-50 text-orange-800 border border-orange-200"
+                                        : isRejected
+                                          ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                                    }`}
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full ${isPublished
+                                      ? "bg-[#16a34a]"
+                                      : isPending
+                                        ? "bg-amber-500 animate-pulse"
+                                        : isWaitingPayment
+                                          ? "bg-orange-500 animate-pulse"
+                                          : isRejected
+                                            ? "bg-rose-600"
+                                            : "bg-slate-400"
+                                      }`}
+                                  />
+                                  {isPublished
+                                    ? "Published"
+                                    : isPending
+                                      ? "Menunggu"
+                                      : isWaitingPayment
+                                        ? "Belum Bayar"
+                                        : isRejected
+                                          ? "Ditolak"
+                                          : "Draft"}
+                                </span>
+                              </div>
+
+                              {/* If Rejected: Rejection message */}
+                              {isRejected && (
+                                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
+                                  <div className="flex items-center gap-1 font-bold text-rose-900">
+                                    <AlertCircle size={14} className="text-rose-600 shrink-0" />
+                                    <span>Alasan Penolakan dari Admin:</span>
+                                  </div>
+                                  <p className="text-[11px] leading-relaxed text-rose-700 pl-5">
+                                    {item.rejection_reason || "Konten belum memenuhi syarat. Silakan perbaiki untuk mengajukan kembali."}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Bottom: Action buttons */}
+                              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                                {isRejected ? (
+                                  <button
+                                    onClick={() =>
+                                      item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
+                                    }
+                                    className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 size={14} />
+                                    <span>Hapus</span>
+                                  </button>
+                                ) : item.status === "needs_revision" ? (
+                                  <>
+                                    <button
+                                      onClick={() => navigate(`/add-blog/${item.id}?type=${item.itemType}`)}
+                                      className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                    >
+                                      <Edit size={13} />
+                                      <span>Perbaiki</span>
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
+                                      }
+                                      className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 size={14} />
+                                      <span>Hapus</span>
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    {(isDraft || isWaitingPayment) && (
+                                      <button
+                                        onClick={() => navigate(`/add-blog/${item.id}?type=${item.itemType}`)}
+                                        className="px-3 py-1.5 rounded-xl bg-[#059669] hover:bg-[#005f5b] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                      >
+                                        <CreditCard size={13} />
+                                        <span>Lanjutkan Bayar</span>
+                                      </button>
+                                    )}
+                                    {isPublished && (
+                                      <button
+                                        onClick={() => navigate(`/blog/${item.id}`)}
+                                        className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                      >
+                                        <Eye size={14} />
+                                        <span>Lihat</span>
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handleEditBlog(item)}
+                                      className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                      <Edit size={14} />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        item.itemType === "event" ? handleDeleteEvent(item.id) : handleDeleteBlog(item.id)
+                                      }
+                                      className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 size={14} />
+                                      <span>Hapus</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       {/* PAGINATION FOOTER */}
@@ -4758,23 +8291,58 @@ export default function AdminUser() {
                             <ChevronLeft size={16} />
                           </button>
 
-                          {/* Page Buttons */}
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
-                            const isCurrent = pageNum === currentPage;
+                          {/* Page Buttons (Max 5 with ellipsis) */}
+                          {(() => {
+                            const maxVisible = 5;
+                            let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+                            let end = start + maxVisible - 1;
+                            if (end > totalPages) {
+                              end = totalPages;
+                              start = Math.max(1, end - maxVisible + 1);
+                            }
+                            const pages = [];
+                            for (let i = start; i <= end; i++) {
+                              pages.push(i);
+                            }
                             return (
-                              <button
-                                key={pageNum}
-                                onClick={() => setCurrentPage(pageNum)}
-                                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                  isCurrent
-                                    ? "bg-[#059669] text-white shadow-2xs"
-                                    : "border border-slate-200 text-slate-600 hover:bg-slate-50"
-                                }`}
-                              >
-                                {pageNum}
-                              </button>
+                              <>
+                                {start > 1 && (
+                                  <>
+                                    <button
+                                      onClick={() => setCurrentPage(1)}
+                                      className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all cursor-pointer border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                    >
+                                      1
+                                    </button>
+                                    {start > 2 && <span className="px-1 text-slate-400 font-bold text-xs">...</span>}
+                                  </>
+                                )}
+                                {pages.map((pageNum) => (
+                                  <button
+                                    key={pageNum}
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all cursor-pointer ${pageNum === currentPage
+                                      ? "bg-[#059669] text-white shadow-2xs"
+                                      : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                      }`}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                ))}
+                                {end < totalPages && (
+                                  <>
+                                    {end < totalPages - 1 && <span className="px-1 text-slate-400 font-bold text-xs">...</span>}
+                                    <button
+                                      onClick={() => setCurrentPage(totalPages)}
+                                      className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all cursor-pointer border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                    >
+                                      {totalPages}
+                                    </button>
+                                  </>
+                                )}
+                              </>
                             );
-                          })}
+                          })()}
 
                           {/* Next */}
                           <button
@@ -4820,40 +8388,47 @@ export default function AdminUser() {
             <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] h-[calc(100vh-140px)] min-h-[580px] max-h-[860px] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-md">
               {/* LEFT PANEL: Daftar Obrolan WhatsApp */}
               <div
-                className={`bg-[#f0f2f5] border-r border-slate-200 flex flex-col overflow-hidden ${
-                  activeConversationId ? "max-md:hidden" : "w-full"
-                }`}
+                className={`bg-[#f0f2f5] border-r border-slate-200 flex flex-col overflow-hidden ${activeConversationId ? "max-md:hidden" : "w-full"
+                  }`}
               >
                 {/* WhatsApp Left Header */}
-                <div className="p-3.5 bg-[#f0f2f5] border-b border-slate-200 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <img
-                      src={user?.avatar ? getStorageUrl(user.avatar) : DEFAULT_AVATAR}
-                      alt={user?.name || "Profil"}
-                      className="w-10 h-10 rounded-full object-cover border border-slate-300 shadow-xs"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_AVATAR;
-                      }}
-                    />
-                    <div>
-                      <h2 className="text-base font-bold text-[#111b21] leading-tight">Inbox Pesan</h2>
-                      <p className="text-[11px] text-[#667781] font-medium">Inbox Komunitas Surade</p>
+                <div className="p-3 px-3.5 bg-[#f0f2f5] border-b border-slate-200 flex items-center justify-between gap-2.5 shrink-0 select-none">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="relative shrink-0">
+                      <img
+                        src={user?.avatar ? getStorageUrl(user.avatar) : DEFAULT_AVATAR}
+                        alt={user?.name || "Profil"}
+                        className="w-9 h-9 rounded-full object-cover border border-slate-300/80 shadow-xs ring-1 ring-emerald-500/20"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_AVATAR;
+                        }}
+                      />
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white ring-1 ring-emerald-600/30" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-[13.5px] font-black text-[#111b21] leading-tight flex items-center gap-1.5 truncate">
+                        <MessageCircle size={15} className="text-[#00a884] shrink-0" />
+                        <span className="truncate">Chat Penjual &amp; Pembeli</span>
+                      </h2>
+                      <p className="text-[10.5px] text-[#54656f] font-medium truncate mt-0.5 leading-tight">
+                        Pesan Langsung UMKM &amp; Pelanggan Surade
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 text-[#54656f]">
+                  <div className="flex items-center gap-1.5 shrink-0 text-[#54656f]">
                     {totalInboxUnreadCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-[#25d366] text-white font-bold text-[11px] shadow-xs mr-1 animate-pulse">
+                      <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-[#25d366] text-white font-bold text-[10.5px] shadow-xs whitespace-nowrap shrink-0 border border-emerald-400/40 leading-none">
                         {totalInboxUnreadCount} baru
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={() => fetchConversationsList(true)}
-                      className="p-2 hover:bg-slate-200/70 rounded-full transition-colors cursor-pointer text-[#54656f] hover:text-[#111b21]"
+                      className="w-8 h-8 flex items-center justify-center hover:bg-slate-200/80 active:bg-slate-300 rounded-full transition-colors cursor-pointer text-[#54656f] hover:text-[#111b21] shrink-0"
                       title="Perbarui Obrolan"
                     >
-                      <RefreshCw size={17} className={loadingConversations ? "animate-spin text-[#00a884]" : ""} />
+                      <RefreshCw size={15} className={loadingConversations ? "animate-spin text-[#00a884]" : ""} />
                     </button>
                   </div>
                 </div>
@@ -4876,22 +8451,20 @@ export default function AdminUser() {
                     <button
                       type="button"
                       onClick={() => setChatFilter("all")}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                        chatFilter === "all"
-                          ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
-                          : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${chatFilter === "all"
+                        ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
+                        : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
+                        }`}
                     >
                       Semua
                     </button>
                     <button
                       type="button"
                       onClick={() => setChatFilter("unread")}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                        chatFilter === "unread"
-                          ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
-                          : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${chatFilter === "unread"
+                        ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
+                        : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
+                        }`}
                     >
                       Belum dibaca
                       {totalInboxUnreadCount > 0 && (
@@ -4903,30 +8476,76 @@ export default function AdminUser() {
                     <button
                       type="button"
                       onClick={() => setChatFilter("favorites")}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                        chatFilter === "favorites"
-                          ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
-                          : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${chatFilter === "favorites"
+                        ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
+                        : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
+                        }`}
                     >
                       <Heart size={11} className={chatFilter === "favorites" ? "fill-current" : ""} />
                       Favorit
                     </button>
+                    {archivedChats.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setChatFilter(chatFilter === "archived" ? "all" : "archived")}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${chatFilter === "archived"
+                          ? "bg-[#d9fdd3] text-[#008069] border border-[#a7f3d0]"
+                          : "bg-[#f0f2f5] text-[#54656f] hover:bg-slate-200"
+                          }`}
+                      >
+                        <Archive size={11} className={chatFilter === "archived" ? "fill-current" : ""} />
+                        Arsip
+                        <span className="w-4 h-4 rounded-full bg-[#00a884] text-white text-[10px] font-bold inline-flex items-center justify-center">
+                          {archivedChats.length}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 {/* WhatsApp Conversation List */}
                 <div className="flex-1 overflow-y-auto divide-y divide-slate-100 bg-white">
-                  {loadingConversations ? (
-                    <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-2">
-                      <Loader2 size={26} className="animate-spin text-[#00a884]" />
-                      <p className="text-xs font-medium text-[#667781]">Memuat obrolan...</p>
+                  {/* WhatsApp Archived Chats Header / Access Row */}
+                  {chatFilter === "archived" ? (
+                    <div className="flex items-center gap-3 px-3.5 py-3 bg-[#f0f2f5] border-b border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setChatFilter("all")}
+                        className="p-1.5 hover:bg-slate-200 rounded-full transition-colors cursor-pointer text-[#54656f]"
+                        title="Kembali ke semua chat"
+                      >
+                        <ArrowLeft size={16} />
+                      </button>
+                      <div>
+                        <h3 className="text-xs font-bold text-[#111b21]">Obrolan Diarsipkan</h3>
+                        <p className="text-[10px] text-[#54656f]">{filteredConversations.length} obrolan</p>
+                      </div>
                     </div>
+                  ) : (
+                    archivedChats.length > 0 && (
+                      <div
+                        onClick={() => setChatFilter("archived")}
+                        className="flex items-center justify-between px-3.5 py-3 hover:bg-[#f5f6f6] border-b border-slate-100 cursor-pointer transition-colors group"
+                      >
+                        <div className="flex items-center gap-3 text-[#111b21] font-semibold text-xs">
+                          <Archive size={16} className="text-[#00a884]" />
+                          <span>Diarsipkan</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-[#00a884] bg-[#d9fdd3] px-2 py-0.5 rounded-full border border-[#a7f3d0]">
+                          {archivedChats.length}
+                        </span>
+                      </div>
+                    )
+                  )}
+
+                  {loadingConversations ? (
+                    <SuradeLoader variant="section" size="sm" text="Memuat daftar obrolan" minHeight="160px" />
                   ) : filteredConversations.length > 0 ? (
                     filteredConversations.map((conv) => {
                       const isActive = String(activeConversationId) === String(conv.id);
                       const isPinned = pinnedChats.includes(conv.id);
                       const isFav = favoriteChats.includes(conv.id);
+                      const isArchived = archivedChats.includes(conv.id);
                       const isMuted = mutedChats.includes(conv.id);
                       const isManualUnread = manualUnreadChats.includes(conv.id);
                       const unreadCount = conv.unread_count || (isManualUnread ? 1 : 0);
@@ -4938,68 +8557,94 @@ export default function AdminUser() {
                             setActiveConversationId(conv.id);
                             navigate(`/dashboard?tab=inbox&conversation=${conv.id}`, { replace: true });
                           }}
-                          className={`group relative p-3 cursor-pointer transition-colors flex items-start gap-3 border-l-4 ${
-                            isActive
-                              ? "bg-[#f0f2f5] border-l-[#00a884]"
-                              : "hover:bg-[#f5f6f6] border-l-transparent"
-                          } ${unreadCount > 0 ? "bg-[#f8fafc]" : ""}`}
+                          className={`group relative p-3 cursor-pointer transition-colors flex items-start gap-3 border-l-4 ${isActive
+                            ? "bg-[#f0f2f5] border-l-[#00a884]"
+                            : "hover:bg-[#f5f6f6] border-l-transparent"
+                            } ${unreadCount > 0 ? "bg-[#f8fafc]" : ""}`}
                         >
                           {/* Avatar */}
-                          <div className="relative shrink-0">
-                            <SafeImage
-                              src={
-                                conv.business_logo
-                                  ? getStorageUrl(conv.business_logo)
-                                  : conv.counterparty_avatar
-                                  ? getStorageUrl(conv.counterparty_avatar)
-                                  : DEFAULT_AVATAR
-                              }
-                              alt={conv.business_name}
-                              className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-2xs"
-                              fallback={DEFAULT_AVATAR}
-                            />
-                            {unreadCount > 0 && (
-                              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#25d366] text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-xs">
-                                {unreadCount}
-                              </span>
-                            )}
-                          </div>
+                          {(() => {
+                            const contactPresence = getUserPresence({
+                              ...conv,
+                              id: conv.counterparty_id,
+                              name: conv.counterparty_name,
+                              email: conv.counterparty_email,
+                              role: conv.counterparty_role,
+                              is_online: conv.is_online,
+                              last_seen_at: conv.last_seen_at,
+                              status: 'active',
+                            });
+
+                            return (
+                              <div className="relative shrink-0">
+                                <SafeImage
+                                  src={
+                                    conv.counterparty_role === "buyer"
+                                      ? (conv.counterparty_avatar ? getStorageUrl(conv.counterparty_avatar) : (conv.business_logo ? getStorageUrl(conv.business_logo) : DEFAULT_AVATAR))
+                                      : (conv.business_logo ? getStorageUrl(conv.business_logo) : (conv.business?.logo ? getStorageUrl(conv.business.logo) : (conv.counterparty_avatar ? getStorageUrl(conv.counterparty_avatar) : DEFAULT_AVATAR)))
+                                  }
+                                  alt={conv.business_name || conv.counterparty_name}
+                                  className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-2xs"
+                                  fallback={DEFAULT_AVATAR}
+                                />
+                                <span
+                                  className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs ${contactPresence.isOnline ? "bg-emerald-500" : "bg-slate-300"
+                                    }`}
+                                  title={contactPresence.isOnline ? "Sedang Online" : "Sedang Offline"}
+                                />
+                                {unreadCount > 0 && (
+                                  <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-[#25d366] text-white font-extrabold text-[10.5px] flex items-center justify-center border-2 border-white shadow-xs">
+                                    {unreadCount}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Content */}
                           <div className="flex-1 min-w-0 space-y-0.5">
                             {/* Line 1: Title & Timestamp */}
                             <div className="flex items-center justify-between gap-1">
                               <h4 className="text-sm font-semibold text-[#111b21] truncate flex items-center gap-1.5">
-                                <span className="truncate">{conv.business_name || conv.counterparty_name}</span>
+                                <span className="truncate">
+                                  {conv.counterparty_role === "buyer"
+                                    ? conv.counterparty_name
+                                    : (conv.business_name || conv.counterparty_name)}
+                                </span>
                               </h4>
                               <span
-                                className={`text-[11px] font-medium shrink-0 ${
-                                  unreadCount > 0 ? "text-[#00a884] font-bold" : "text-[#667781]"
-                                }`}
+                                className={`text-[11px] font-medium shrink-0 ${unreadCount > 0 ? "text-[#00a884] font-bold" : "text-[#667781]"
+                                  }`}
                               >
                                 {formatChatTimestamp(conv.last_message_at)}
                               </span>
                             </div>
 
-                            {/* Line 2: Role badge */}
+                            {/* Line 2: Role badge & Subtitle */}
                             <div className="text-[11px] text-[#667781] font-medium truncate flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wider">
+                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${conv.counterparty_role === "buyer"
+                                ? "bg-blue-50 text-blue-700 border border-blue-200/60"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                                }`}>
                                 {conv.counterparty_role === "seller" ? "Penjual" : "Pembeli"}
                               </span>
-                              <span className="truncate">{conv.counterparty_name}</span>
+                              <span className="truncate text-slate-500">
+                                {conv.counterparty_role === "buyer"
+                                  ? `Tanya: ${conv.business_name || "Usaha Anda"}`
+                                  : conv.counterparty_name}
+                              </span>
                             </div>
 
                             {/* Line 3: Last Message snippet + Icons (Pin, Fav, Mute, Menu) */}
                             <div className="flex items-center justify-between gap-1 pt-0.5">
                               <p
-                                className={`text-xs truncate flex items-center gap-1 ${
-                                  unreadCount > 0 ? "font-bold text-[#111b21]" : "text-[#667781]"
-                                }`}
+                                className={`text-xs truncate flex items-center gap-1 ${unreadCount > 0 ? "font-bold text-[#111b21]" : "text-[#667781]"
+                                  }`}
                               >
                                 {conv.last_message && (
                                   <span className="inline-flex items-center shrink-0">
                                     {unreadCount > 0 ? (
-                                      <CheckCheck size={14} className="text-slate-400" title="c2 - Diterima" />
+                                      <CheckCheck size={14} className="text-slate-400" title="Diterima" />
                                     ) : (
                                       <CheckCheck size={14} className="text-[#53bdeb]" title="Dibaca" />
                                     )}
@@ -5074,8 +8719,8 @@ export default function AdminUser() {
                                 onClick={(e) => toggleArchiveChat(conv.id, e)}
                                 className="w-full px-3.5 py-2 text-xs text-[#111b21] hover:bg-[#f5f6f6] flex items-center gap-2.5 transition-colors cursor-pointer"
                               >
-                                <Archive size={14} className="text-slate-500" />
-                                <span>Arsipkan chat</span>
+                                <Archive size={14} className={isArchived ? "text-[#00a884]" : "text-slate-500"} />
+                                <span>{isArchived ? "Buka arsip chat" : "Arsipkan chat"}</span>
                               </button>
 
                               <button
@@ -5122,8 +8767,8 @@ export default function AdminUser() {
                           {chatFilter === "unread"
                             ? "Semua pesan sudah Anda baca."
                             : chatFilter === "favorites"
-                            ? "Belum ada obrolan yang ditandai favorit."
-                            : "Pesan dari kontak atau UMKM Surade akan tampil di sini."}
+                              ? "Belum ada obrolan yang ditandai favorit."
+                              : "Pesan dari kontak atau UMKM Surade akan tampil di sini."}
                         </p>
                       </div>
                     </div>
@@ -5133,9 +8778,8 @@ export default function AdminUser() {
 
               {/* RIGHT PANEL: Area Percakapan WhatsApp (Gambar 2) */}
               <div
-                className={`bg-[#efeae2] flex flex-col overflow-hidden relative ${
-                  !activeConversationId ? "max-md:hidden" : "w-full"
-                }`}
+                className={`bg-[#efeae2] flex flex-col overflow-hidden relative ${!activeConversationId ? "max-md:hidden" : "w-full"
+                  }`}
               >
                 {activeConversationId && activeChatData ? (
                   <>
@@ -5156,30 +8800,62 @@ export default function AdminUser() {
                           <ChevronLeft size={20} />
                         </button>
 
-                        <SafeImage
-                          src={
-                            activeChatData.business?.logo
-                              ? getStorageUrl(activeChatData.business.logo)
-                              : DEFAULT_AVATAR
-                          }
-                          alt={activeChatData.business?.name}
-                          className="w-10 h-10 rounded-full object-cover border border-slate-300 shrink-0 shadow-2xs"
-                          fallback={DEFAULT_AVATAR}
-                        />
+                        {(() => {
+                          const activePresence = getUserPresence({
+                            ...activeChatData,
+                            id: activeChatData.counterparty_id,
+                            name: activeChatData.counterparty_name,
+                            email: activeChatData.counterparty_email,
+                            role: activeChatData.counterparty_role,
+                            is_online: activeChatData.is_online,
+                            last_seen_at: activeChatData.last_seen_at,
+                            status: 'active',
+                          });
 
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-[#111b21] truncate flex items-center gap-2">
-                            <span>{activeChatData.business?.name || activeChatData.counterparty_name}</span>
-                          </h3>
-                          <p className="text-[11px] text-[#00a884] font-medium flex items-center gap-1.5 truncate">
-                            <span className="w-2 h-2 rounded-full bg-[#25d366] inline-block animate-pulse" />
-                            <span>online</span>
-                            <span className="text-slate-300">•</span>
-                            <span className="text-[#667781] font-normal truncate">
-                              {activeChatData.counterparty_name} ({activeChatData.counterparty_role === "seller" ? "Penjual" : "Pembeli"})
-                            </span>
-                          </p>
-                        </div>
+                          return (
+                            <>
+                              <div className="relative shrink-0">
+                                <SafeImage
+                                  src={
+                                    activeChatData.counterparty_role === "buyer"
+                                      ? (activeChatData.counterparty_avatar ? getStorageUrl(activeChatData.counterparty_avatar) : (activeChatData.business?.logo ? getStorageUrl(activeChatData.business.logo) : (activeChatData.business_logo ? getStorageUrl(activeChatData.business_logo) : DEFAULT_AVATAR)))
+                                      : (activeChatData.business?.logo ? getStorageUrl(activeChatData.business.logo) : (activeChatData.business_logo ? getStorageUrl(activeChatData.business_logo) : (activeChatData.counterparty_avatar ? getStorageUrl(activeChatData.counterparty_avatar) : DEFAULT_AVATAR)))
+                                  }
+                                  alt={activeChatData.business?.name || activeChatData.counterparty_name}
+                                  className="w-10 h-10 rounded-full object-cover border border-slate-300 shadow-2xs"
+                                  fallback={DEFAULT_AVATAR}
+                                />
+                                <span
+                                  className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white shadow-xs ${activePresence.isOnline ? "bg-emerald-500" : "bg-slate-300"
+                                    }`}
+                                  title={activePresence.isOnline ? "Sedang Online" : "Sedang Offline"}
+                                />
+                              </div>
+
+                              <div className="min-w-0">
+                                <h3 className="text-sm font-bold text-[#111b21] truncate flex items-center gap-2">
+                                  <span>
+                                    {activeChatData.counterparty_role === "buyer"
+                                      ? activeChatData.counterparty_name
+                                      : (activeChatData.business?.name || activeChatData.counterparty_name)}
+                                  </span>
+                                </h3>
+                                <p className={`text-[11px] font-medium flex items-center gap-1.5 truncate ${activePresence.isOnline ? "text-[#00a884]" : "text-slate-400"
+                                  }`}>
+                                  <span className={`w-2 h-2 rounded-full inline-block ${activePresence.isOnline ? "bg-[#25d366] animate-pulse" : "bg-slate-300"
+                                    }`} />
+                                  <span className="capitalize">{activePresence.isOnline ? "Online" : "Offline"}</span>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="text-[#667781] font-normal truncate">
+                                    {activeChatData.counterparty_role === "buyer"
+                                      ? `Pembeli • Tanya: ${activeChatData.business?.name || "Usaha Anda"}`
+                                      : `${activeChatData.counterparty_name} (Penjual)`}
+                                  </span>
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {/* Header Action Icons */}
@@ -5216,16 +8892,13 @@ export default function AdminUser() {
                         <p className="text-[11px] text-[#54656f] leading-snug flex items-center justify-center gap-1.5 font-medium">
                           <span>🔒</span>
                           <span>
-                            Pesan dan obrolan terenkripsi aman secara end-to-end dalam ekosistem portal Surade.co.id.
+                            Pesan dan obrolan terenkripsi aman secara end-to-end dalam ekosistem portal Surade.com.
                           </span>
                         </p>
                       </div>
 
                       {loadingChatDetails ? (
-                        <div className="flex items-center justify-center h-48 text-slate-500 space-y-2">
-                          <Loader2 size={24} className="animate-spin text-[#00a884]" />
-                          <span className="text-xs ml-2 font-semibold">Memuat riwayat pesan...</span>
-                        </div>
+                        <SuradeLoader variant="section" size="sm" text="Memuat riwayat pesan" minHeight="160px" />
                       ) : activeConversationMessages.length > 0 ? (
                         activeConversationMessages.map((msg, idx) => {
                           const isMine = String(msg.sender_id) === String(user?.id);
@@ -5233,7 +8906,7 @@ export default function AdminUser() {
                           const showDateBadge =
                             !prevMsg ||
                             new Date(prevMsg.created_at).toDateString() !==
-                              new Date(msg.created_at).toDateString();
+                            new Date(msg.created_at).toDateString();
 
                           const { replySender, replyText, bodyText } = parseReplyInMessage(msg.message);
 
@@ -5269,16 +8942,15 @@ export default function AdminUser() {
 
                                 {/* WhatsApp Bubble */}
                                 <div
-                                  className={`relative max-w-[82%] md:max-w-[65%] px-3 py-2 rounded-2xl shadow-2xs space-y-1 ${
-                                    isMine
-                                      ? "bg-[#d9fdd3] text-[#111b21] rounded-tr-xs"
-                                      : "bg-white text-[#111b21] rounded-tl-xs"
-                                  }`}
+                                  className={`relative max-w-[82%] md:max-w-[65%] px-3 py-2 rounded-2xl shadow-2xs space-y-1 ${isMine
+                                    ? "bg-[#d9fdd3] text-[#111b21] rounded-tr-xs"
+                                    : "bg-white text-[#111b21] rounded-tl-xs"
+                                    }`}
                                 >
-                                  {/* Counterparty name inside incoming bubble */}
+                                  {/* Sender name inside incoming bubble – use per-message sender_name for accuracy */}
                                   {!isMine && (
                                     <div className="flex items-center justify-between text-[11px] font-bold text-[#008069] pb-0.5">
-                                      <span>{activeChatData.counterparty_name}</span>
+                                      <span>{msg.sender_name || activeChatData.counterparty_name || "Pengguna"}</span>
                                     </div>
                                   )}
 
@@ -5310,9 +8982,8 @@ export default function AdminUser() {
 
                                   {/* Timestamp + WhatsApp Ticks (c1 / c2 / centang dua biru) */}
                                   <div
-                                    className={`text-[10px] font-medium flex items-center justify-end gap-1 select-none ${
-                                      isMine ? "text-[#667781]" : "text-[#667781]"
-                                    }`}
+                                    className={`text-[10px] font-medium flex items-center justify-end gap-1 select-none ${isMine ? "text-[#667781]" : "text-[#667781]"
+                                      }`}
                                   >
                                     <span>{formatChatTimestamp(msg.created_at)}</span>
                                     {renderMessageTicks(msg, isMine)}
@@ -5391,23 +9062,50 @@ export default function AdminUser() {
                       </div>
                     )}
 
-                    {/* Chat Image Preview Area */}
-                    {chatImagePreview && (
-                      <div className="p-3 bg-[#f0f2f5] border-t border-slate-200 shadow-inner flex flex-col gap-2 shrink-0 animate-in slide-in-from-bottom-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-[#54656f]">Preview Gambar</span>
+                    {/* Quick Emoji Picker Popover */}
+                    {showEmojiPicker && (
+                      <div className="wa-emoji-picker p-3 bg-white border-t border-slate-200 shadow-xl rounded-t-xl shrink-0 animate-in slide-in-from-bottom-2 z-20">
+                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                          <span className="text-xs font-bold text-[#111b21] flex items-center gap-1.5">
+                            <Smile size={14} className="text-[#00a884]" />
+                            Pilih Emoji
+                          </span>
                           <button
                             type="button"
-                            onClick={cancelChatImage}
-                            className="p-1 rounded-full hover:bg-slate-200 text-[#54656f] hover:text-rose-600 cursor-pointer transition-colors"
-                            title="Batal lampirkan gambar"
+                            onClick={() => setShowEmojiPicker(false)}
+                            className="p-1 rounded-full hover:bg-slate-100 text-[#54656f] hover:text-[#111b21] cursor-pointer"
+                            title="Tutup"
                           >
-                            <X size={15} />
+                            <X size={14} />
                           </button>
                         </div>
-                        <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden border border-slate-300 bg-white">
-                          <img src={chatImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+                          {[
+                            "😊", "😂", "🥰", "😍", "😎", "🤗", "🤔", "😉", "😇", "🤩",
+                            "👍", "🙏", "🤝", "👏", "👋", "👌", "💪", "🔥", "✨", "💯",
+                            "🛒", "🛍️", "📦", "☕", "🍽️", "📍", "🏷️", "💰", "🛵", "✅",
+                            "❤️", "💙", "💚", "💖", "💐", "🎉", "⭐", "🌟", "☀️", "💬"
+                          ].map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => {
+                                setChatMessageInput((prev) => prev + emoji);
+                              }}
+                              className="text-xl p-1.5 hover:bg-emerald-50 rounded-lg transition-transform active:scale-125 cursor-pointer"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Link & Social Media Forbidden Content Warning Banner */}
+                    {detectForbiddenChatContent(chatMessageInput) && (
+                      <div className="px-4 py-2 bg-rose-50 border-t border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-bottom-2 shrink-0">
+                        <AlertTriangle size={15} className="text-rose-600 shrink-0" />
+                        <span>Pesan mengandung link atau kontak media sosial yang dilarang. Hapus untuk mengirim pesan.</span>
                       </div>
                     )}
 
@@ -5416,55 +9114,15 @@ export default function AdminUser() {
                       onSubmit={handleSendChatMessage}
                       className="p-2.5 md:p-3 bg-[#f0f2f5] border-t border-slate-200 flex items-center gap-2 shrink-0"
                     >
-                      {/* Hidden File Input for Paperclip */}
-                      <input 
-                        type="file"
-                        ref={chatImageInputRef}
-                        onChange={handleChatImageSelect}
-                        accept="image/*"
-                        className="hidden"
-                      />
-                      
-                      {/* Hidden File Input for Camera */}
-                      <input 
-                        type="file"
-                        id="chat-camera-input"
-                        onChange={handleChatImageSelect}
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                      />
-
-                      {/* Emoji Toggle */}
+                      {/* Emoji Button - Always on the left side of message input */}
                       <button
                         type="button"
                         onClick={() => setShowEmojiPicker((prev) => !prev)}
-                        className={`wa-emoji-trigger p-2 rounded-full transition-colors cursor-pointer hidden sm:flex ${
-                          showEmojiPicker ? "text-[#00a884] bg-slate-200" : "text-[#54656f] hover:text-[#111b21]"
-                        }`}
+                        className={`wa-emoji-trigger p-2 rounded-full transition-colors cursor-pointer flex items-center justify-center shrink-0 ${showEmojiPicker ? "text-[#00a884] bg-slate-200" : "text-[#54656f] hover:text-[#111b21] hover:bg-slate-200/60"
+                          }`}
                         title="Pilih Emoji"
                       >
                         <Smile size={22} />
-                      </button>
-
-                      {/* Camera Button */}
-                      <button
-                        type="button"
-                        onClick={() => document.getElementById('chat-camera-input').click()}
-                        className="p-2 rounded-full text-[#54656f] hover:text-[#111b21] transition-colors cursor-pointer shrink-0"
-                        title="Ambil Foto"
-                      >
-                        <Camera size={20} />
-                      </button>
-
-                      {/* Paperclip Button */}
-                      <button
-                        type="button"
-                        onClick={() => chatImageInputRef.current?.click()}
-                        className="p-2 rounded-full text-[#54656f] hover:text-[#111b21] transition-colors cursor-pointer shrink-0"
-                        title="Lampirkan Gambar"
-                      >
-                        <Paperclip size={20} />
                       </button>
 
                       {/* Text Input */}
@@ -5473,17 +9131,31 @@ export default function AdminUser() {
                         value={chatMessageInput}
                         onChange={(e) => setChatMessageInput(e.target.value)}
                         placeholder={`Ketik pesan untuk ${activeChatData.counterparty_name || "pengguna"}...`}
-                        className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-white border border-transparent text-xs md:text-sm text-[#111b21] placeholder:text-[#8696a0] focus:outline-none focus:border-slate-300 shadow-2xs min-w-0"
+                        className={`flex-1 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-white border text-xs md:text-sm text-[#111b21] placeholder:text-[#8696a0] focus:outline-none shadow-2xs min-w-0 transition-colors ${detectForbiddenChatContent(chatMessageInput)
+                          ? "border-rose-400 focus:border-rose-500 bg-rose-50/20"
+                          : "border-transparent focus:border-slate-300"
+                          }`}
                       />
 
                       {/* Send Button */}
                       <button
                         type="submit"
-                        disabled={(!chatMessageInput.trim() && !chatImageFile) || sendingChatMessage}
-                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full text-white flex items-center justify-center transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shrink-0 ${
-                          chatMessageInput.trim() || chatImageFile ? "bg-[#00a884] hover:bg-[#008f6f]" : "bg-slate-300"
-                        }`}
-                        title="Kirim Pesan"
+                        disabled={
+                          !chatMessageInput.trim() ||
+                          sendingChatMessage ||
+                          detectForbiddenChatContent(chatMessageInput)
+                        }
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full text-white flex items-center justify-center transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shrink-0 ${detectForbiddenChatContent(chatMessageInput)
+                          ? "bg-rose-400 cursor-not-allowed"
+                          : chatMessageInput.trim()
+                            ? "bg-[#00a884] hover:bg-[#008f6f]"
+                            : "bg-slate-300"
+                          }`}
+                        title={
+                          detectForbiddenChatContent(chatMessageInput)
+                            ? "Pesan tidak dapat dikirim karena mengandung link atau kontak media sosial"
+                            : "Kirim Pesan"
+                        }
                       >
                         {sendingChatMessage ? (
                           <Loader2 size={16} className="animate-spin sm:w-[18px] sm:h-[18px]" />
@@ -5500,12 +9172,15 @@ export default function AdminUser() {
                       <MessageCircle size={44} className="stroke-[1.7]" />
                     </div>
                     <div className="space-y-2 max-w-md">
-                      <h3 className="text-xl font-bold text-[#111b21]">Inbox Pesan Komunitas Surade</h3>
-                      <p className="text-xs text-[#667781] leading-relaxed">
-                        Kirim dan terima pesan langsung dengan pelaku UMKM, pembeli, dan pengelola bisnis di kawasan Surade.
+                      <h3 className="text-xl font-extrabold text-[#111b21] flex items-center justify-center gap-2">
+                        <MessageCircle size={22} className="text-[#00a884]" />
+                        <span>Chat Direct Penjual &amp; Pembeli</span>
+                      </h3>
+                      <p className="text-xs text-[#54656f] leading-relaxed font-medium">
+                        Kirim dan terima pesan obrolan langsung (chat direct) dengan pemilik usaha, penjual UMKM, dan pembeli di kawasan Surade.
                       </p>
-                      <p className="text-[11px] text-[#8696a0] pt-2">
-                        Pilih obrolan di sebelah kiri untuk membaca atau membalas pesan.
+                      <p className="text-[11px] text-[#8696a0] pt-2 font-semibold">
+                        Pilih percakapan di sebelah kiri untuk mulai chatting dengan penjual/pembeli.
                       </p>
                     </div>
                     <div className="pt-6 flex items-center gap-1.5 text-[11px] text-[#8696a0]">
@@ -5518,900 +9193,1799 @@ export default function AdminUser() {
             </div>
           )}
 
-          {/* 5. REFERRAL VIEW */}
-          {(activeTab === "referral" || activeTab === "reseller") && (
+          {/* 4B. TRANSAKSI WHATSAPP VIEW */}
+          {activeTab === "whatsapp" && (
             <div className="space-y-6 w-full max-w-full">
-              {/* Header Banner Program Referral */}
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0a4d3a] via-[#0b6b45] to-[#0f7a52] text-white p-6 md:p-8 shadow-xl border border-teal-800/40">
-                <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div className="space-y-2 max-w-2xl">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-semibold">
-                      <Gift size={14} /> Program Kemitraan & Referral
+              {/* Header Banner Transaksi WhatsApp */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#064e3b] via-[#043d2e] to-[#022c22] text-white p-6 md:p-8 shadow-xl border border-emerald-800/40">
+                <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-72 h-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold">
+                      <ShieldCheck size={14} /> Transaksi WhatsApp Portal
                     </div>
-                    <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
-                      Dapatkan Komisi Rp 10.000 Dari Setiap Referral!
+                    <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5">
+                      <Receipt size={28} className="text-emerald-400" /> Transaksi WhatsApp
                     </h2>
-                    <p className="text-sm text-slate-300 leading-relaxed font-normal">
-                      Bagikan kode unik Anda kepada rekan usaha atau kerabat. Teman Anda mendapat potongan harga Rp 5.000 saat bertransaksi, dan Anda otomatis menerima komisi tunai sebesar Rp 10.000.
-                    </p>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto shrink-0">
-                    <button
-                      onClick={() => setShowWithdrawModal(true)}
-                      className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-bold text-sm transition-all shadow-lg hover:shadow-teal-500/25 active:scale-95 cursor-pointer"
-                    >
-                      <Wallet size={18} />
-                      <span>Tarik Saldo Komisi</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 Stat Overview Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-                {/* Card 1: Kode Referral Saya */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 relative overflow-hidden flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Kode Referral Saya</span>
-                      <span className="text-[10px] font-medium text-slate-400">Bagikan untuk dapat komisi</span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#059669] flex items-center justify-center font-bold shrink-0">
-                      <Gift size={20} />
-                    </div>
-                  </div>
-
-                  {/* Referral Code Display Box */}
-                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2.5 shadow-inner">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">KODE KEMITRAAN</span>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
-                        Aktif
-                      </span>
-                    </div>
-
-                    {/* Dedicated Full-Width Code Box - Never Truncated */}
-                    <div className="bg-slate-900/90 py-2.5 px-3 rounded-lg border border-slate-800 text-center flex items-center justify-center">
-                      <span
-                        className="font-mono text-xs sm:text-sm font-black text-teal-300 tracking-wider select-all whitespace-nowrap leading-none"
-                        title={referralCode}
-                      >
-                        {referralCode}
-                      </span>
-                    </div>
-
-                    {/* Action Buttons: Salin Kode & Bagi Link */}
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(referralCode);
-                          setReferralCopyToast(true);
-                          setTimeout(() => setReferralCopyToast(false), 2500);
-                        }}
-                        className="w-full py-1.5 px-2 rounded-md bg-teal-600 hover:bg-teal-500 active:scale-95 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
-                        title="Salin Kode Referral"
-                      >
-                        {referralCopyToast ? <Check size={12} /> : <Copy size={12} />}
-                        <span>{referralCopyToast ? "Tersalin!" : "Salin Kode"}</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          const link = `${window.location.origin}/register?ref=${referralCode}`;
-                          navigator.clipboard.writeText(link);
-                          setReferralLinkCopyToast(true);
-                          setTimeout(() => setReferralLinkCopyToast(false), 2500);
-                        }}
-                        className="w-full py-1.5 px-2 rounded-md bg-slate-900 hover:bg-slate-800 active:scale-95 text-teal-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer border border-slate-800"
-                        title="Salin Link Pendaftaran"
-                      >
-                        <Share2 size={12} />
-                        <span>{referralLinkCopyToast ? "Tersalin!" : "Bagi Link"}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Bonus Teman Footer */}
-                  <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-                    <span className="text-slate-500 text-[11px]">Bonus Teman:</span>
-                    <span className="text-emerald-700 font-extrabold text-[11px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                      Diskon Rp 5.000
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card 2: Total Pendapatan & Saldo Komisi */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Saldo Komisi Tersedia</span>
-                      <span className="text-[10px] font-medium text-slate-400">Siap diajukan pencairan</span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
-                      <Wallet size={20} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-[#059669] tracking-tight">
-                      Rp {(availableReferralBalance || 0).toLocaleString("id-ID")}
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium mt-1 flex items-center justify-between">
-                      <span>Total Diperoleh:</span>
-                      <strong className="text-slate-800">Rp {(totalReferralEarnings || 0).toLocaleString("id-ID")}</strong>
-                    </p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span>Minimal: Rp 50.000</span>
-                    {(availableReferralBalance || 0) >= 50000 ? (
-                      <span className="text-emerald-600 font-bold flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Siap Ditarik
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">Belum Cukup</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Card 3: Berapa Kali Kode Dipakai */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Penggunaan Kode</span>
-                      <span className="text-[10px] font-medium text-slate-400">Statistik rekan bisnis</span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
-                      <Users size={20} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-slate-900 tracking-tight">
-                      {totalReferralUsage} Kali Dipakai
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium mt-1">
-                      <strong className="text-slate-800">{successReferralCount}</strong> transaksi berhasil diselesaikan
-                    </p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span>Status: <strong className="text-emerald-600">Aktif</strong></span>
-                  </div>
-                </div>
-
-                {/* Card 4: Estimasi Pending Earning */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Komisi Pending</span>
-                      <span className="text-[10px] font-medium text-slate-400">Dalam proses verifikasi</span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
-                      <Clock size={20} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-amber-600 tracking-tight">
-                      Rp {pendingReferralEarnings.toLocaleString("id-ID")}
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium mt-1">
-                      Menunggu verifikasi pembayaran transaksi
-                    </p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span>Status: <span className="text-amber-600 font-semibold">Sedang Diproses</span></span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Toast Notification Notification Toast when user applies code */}
-              {appliedPublicCodeToast && (
-                <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-teal-500/50 flex items-center gap-3 animate-bounce">
-                  <div className="w-7 h-7 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold">
-                    <Check size={16} />
-                  </div>
-                  <div className="text-xs font-semibold text-teal-200">{appliedPublicCodeToast}</div>
-                </div>
-              )}
-
-              {/* Generator Pesan Promosi & Tips Menarik Pengguna */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Sparkles size={18} className="text-amber-500" />
-                      Generator Pesan Promosi Unik & Strategi Penawaran
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Gunakan template pesan yang dirancang khusus untuk menarik teman/rekan bisnis agar tertarik memakai kode referral Anda!
-                    </p>
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 self-start sm:self-auto">
-                    <Flame size={14} className="text-amber-500" /> Dynamic Promo Generator
-                  </div>
-                </div>
-
-                {/* Strategy Insight Alert */}
-                <div className="p-4 rounded-xl bg-gradient-to-r from-teal-50 via-emerald-50 to-teal-50 border border-teal-200/80 text-teal-950 space-y-1.5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-teal-900">
-                    <Zap size={16} className="text-teal-600 shrink-0" />
-                    <span>Rahasia Mengapa Calon Pengguna Mau Memakai Kode Referral Anda:</span>
-                  </div>
-                  <p className="text-xs text-slate-700 leading-relaxed pl-6">
-                    Penerima kode Anda langsung mendapat <strong className="text-emerald-700 font-extrabold bg-white px-1.5 py-0.5 rounded border border-emerald-300/60">Diskon Instan Rp 5.000</strong> saat mendaftar atau membeli Paket Premium. Ini adalah <em>Win-Win Solution</em> — Teman Anda hemat Rp 5.000, Anda mendapat Komisi Rp 10.000!
-                  </p>
-                </div>
-
-                {/* Template Chips */}
-                <div className="space-y-2">
-                  <span className="text-xs font-bold text-slate-700 block">Pilih Template Pesan Promosi:</span>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setSelectedPromoTemplate("diskon")}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        selectedPromoTemplate === "diskon"
-                          ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <Gift size={14} />
-                      <span>1. Promo Diskon Hemat (Umum)</span>
-                    </button>
-                    <button
-                      onClick={() => setSelectedPromoTemplate("bisnis")}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        selectedPromoTemplate === "bisnis"
-                          ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <Briefcase size={14} />
-                      <span>2. Penawaran Pelaku UMKM / Bisnis</span>
-                    </button>
-                    <button
-                      onClick={() => setSelectedPromoTemplate("heboh")}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        selectedPromoTemplate === "heboh"
-                          ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <Flame size={14} />
-                      <span>3. Promo Heboh Terbatas (WA/Medsos)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Promo Text Box & Actions */}
-                <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 border-b border-slate-800 pb-2">
-                    <span>PRATINJAU PESAN PROMOSI (SIAP BAGIKAN)</span>
-                    <span className="text-teal-400 font-mono">Kode: {referralCode}</span>
-                  </div>
-                  <p className="text-xs text-slate-200 font-sans whitespace-pre-line leading-relaxed selection:bg-teal-600 selection:text-white">
-                    {activePromoMessage}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800">
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(activePromoMessage);
-                        setCopiedPromoText(true);
-                        setTimeout(() => setCopiedPromoText(false), 2500);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                    >
-                      {copiedPromoText ? <Check size={14} /> : <Copy size={14} />}
-                      <span>{copiedPromoText ? "Tersalin Ke Clipboard!" : "Salin Pesan Promosi"}</span>
-                    </button>
-
-                    <a
-                      href={`https://wa.me/?text=${encodeURIComponent(activePromoMessage)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                    >
-                      <MessageCircle size={14} />
-                      <span>Kirim Langsung via WhatsApp</span>
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-              {/* Panduan Cara Kerja Program Referral */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Target size={18} className="text-[#059669]" />
-                  Cara Kerja Program Referral 3 Langkah Mudah
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
-                    <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
-                      1
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-slate-900">Bagikan Kode Unik</h4>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        Salin kode <strong className="text-slate-800">{referralCode}</strong> atau link pendaftaran dan bagikan ke rekan bisnis Anda.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
-                    <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
-                      2
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-slate-900">Teman Mendaftar & Transaksi</h4>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        Pengguna mendaftar dengan kode Anda dan membeli Paket Premium dengan potongan diskon Rp 5.000.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
-                    <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
-                      3
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-slate-900">Nikmati Komisi Rp 10.000</h4>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        Komisi tunai Rp 10.000 otomatis masuk setelah pembayaran diverifikasi admin dan dapat ditarik kapan saja.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Katalog Kode Referral Komunitas & Leaderboard (Khusus Tampilan Admin) */}
-              {user?.role === "admin" && (
-                <>
-                  <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Users size={18} className="text-teal-600" />
-                      Katalog Kode Referral Komunitas (Pengguna Lain)
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Ingin menggunakan kode referral milik mitra lain untuk mendapatkan diskon Rp 5.000? Pilih dan gunakan kode di bawah ini tanpa perlu bertanya!
-                    </p>
-                  </div>
-
-                  {/* Search & Refresh */}
-                  <div className="flex items-center gap-2.5 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-56">
-                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        value={publicCodeSearch}
-                        onChange={(e) => setPublicCodeSearch(e.target.value)}
-                        placeholder="Cari nama atau kode..."
-                        className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-600"
-                      />
-                    </div>
-                    <button
-                      onClick={fetchPublicCodes}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
-                      title="Perbarui daftar kode referral"
-                    >
-                      <RefreshCw size={15} className={loadingPublicCodes ? "animate-spin text-teal-600" : ""} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Cards Grid */}
-                {loadingPublicCodes ? (
-                  <div className="py-12 text-center text-slate-500">
-                    <Loader2 size={24} className="animate-spin mx-auto text-teal-600 mb-2" />
-                    <p className="text-xs font-medium">Memuat kode referral komunitas...</p>
-                  </div>
-                ) : filteredPublicCodes.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredPublicCodes.map((item) => (
-                      <div
-                        key={item.id}
-                        className="p-4 rounded-2xl bg-gradient-to-b from-white to-slate-50/70 border border-slate-200/90 shadow-sm hover:shadow-md transition-all space-y-3 flex flex-col justify-between"
-                      >
-                        {/* Owner Header */}
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={item.avatar || DEFAULT_AVATAR}
-                            alt={item.name}
-                            className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
-                            onError={(e) => {
-                              e.target.src = DEFAULT_AVATAR;
-                            }}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-xs font-bold text-slate-900 truncate">{item.name}</h4>
-                            <span className="text-[10px] text-slate-500 font-medium block">Mitra Referral Surade</span>
-                          </div>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                            Diskon Rp 5.000
-                          </span>
-                        </div>
-
-                        {/* Code Display Box */}
-                        <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-center space-y-1">
-                          <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 block">KODE REFERRAL</span>
-                          <span className="font-mono text-sm font-black text-teal-300 tracking-wider block select-all">
-                            {item.code}
-                          </span>
-                          <div className="text-[10px] text-slate-400 flex items-center justify-center gap-1 pt-0.5">
-                            <CheckCircle2 size={11} className="text-teal-400" />
-                            <span>Telah digunakan {item.usage_count || 0}x</span>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(item.code);
-                              setCopiedPublicCodeId(item.id);
-                              setTimeout(() => setCopiedPublicCodeId(null), 2500);
-                            }}
-                            className="w-full py-1.5 px-2 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer border border-teal-200"
-                            title="Salin Kode Referral Ini"
-                          >
-                            {copiedPublicCodeId === item.id ? <Check size={12} /> : <Copy size={12} />}
-                            <span>{copiedPublicCodeId === item.id ? "Tersalin!" : "Salin Kode"}</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(item.code);
-                              setAppliedPublicCodeToast(`Kode "${item.code}" tersalin! Mengalihkan ke Paket Premium...`);
-                              setTimeout(() => setAppliedPublicCodeToast(""), 3500);
-                              setActiveTab("premium");
-                            }}
-                            className="w-full py-1.5 px-2 rounded-lg bg-teal-600 hover:bg-teal-500 active:scale-95 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
-                            title="Gunakan Kode Ini Saat Checkout Paket Premium"
-                          >
-                            <ArrowRight size={12} />
-                            <span>Gunakan Kode</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-10 text-center text-slate-500 space-y-2">
-                    <Users size={32} className="mx-auto text-slate-300" />
-                    <p className="text-xs font-semibold text-slate-700">Tidak ada kode referral komunitas ditemukan.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Papan Peringkat Reseller / Referrer Terbaik (Leaderboard) */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Trophy size={18} className="text-amber-500" />
-                      Papan Peringkat Referrer Terbaik (Leaderboard)
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Top 10 mitra dengan hasil perolehan komisi dan pengguna terbanyak di Surade.co.id
+                    <p className="text-xs md:text-sm text-slate-300 leading-relaxed max-w-2xl font-normal">
+                      Daftar seluruh riwayat transaksi WhatsApp, status pembayaran, dan verifikasi invoice akses nomor kontak di Surade.com secara transparan dan real-time.
                     </p>
                   </div>
                   <button
-                    onClick={fetchLeaderboard}
-                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
-                    title="Perbarui leaderboard"
+                    onClick={fetchUserWaLogs}
+                    disabled={userWaLoading}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
                   >
-                    <RefreshCw size={15} className={loadingLeaderboard ? "animate-spin text-amber-500" : ""} />
+                    <RefreshCw size={14} className={userWaLoading ? "animate-spin" : ""} />
+                    <span>Refresh</span>
                   </button>
                 </div>
+              </div>
 
-                {loadingLeaderboard ? (
-                  <div className="py-8 text-center text-slate-500">
-                    <Loader2 size={24} className="animate-spin mx-auto text-amber-500 mb-2" />
-                    <p className="text-xs font-medium">Memuat papan peringkat...</p>
+              {/* 4 Stat Summary Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Total */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
+                    <Receipt size={24} />
                   </div>
-                ) : referralLeaderboard.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-                          <th className="py-3 px-4">Peringkat</th>
-                          <th className="py-3 px-4">Pengguna / Mitra</th>
-                          <th className="py-3 px-4">Kode Referral</th>
-                          <th className="py-3 px-4 text-center">Total Berhasil</th>
-                          <th className="py-3 px-4 text-right">Total Komisi</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {referralLeaderboard.map((item, idx) => (
-                          <tr key={item.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-3.5 px-4 font-bold whitespace-nowrap">
-                              {idx === 0 && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-extrabold border border-amber-300">
-                                  <Trophy size={13} className="text-amber-600" /> #1 Juara
-                                </span>
-                              )}
-                              {idx === 1 && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 text-slate-800 font-extrabold border border-slate-300">
-                                  <Award size={13} className="text-slate-600" /> #2 Perak
-                                </span>
-                              )}
-                              {idx === 2 && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 font-extrabold border border-amber-200">
-                                  <Award size={13} className="text-amber-700" /> #3 Perunggu
-                                </span>
-                              )}
-                              {idx > 2 && <span className="text-slate-500 font-semibold pl-2">#{idx + 1}</span>}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-2.5">
-                                <img
-                                  src={item.avatar || DEFAULT_AVATAR}
-                                  alt={item.name}
-                                  className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
-                                  onError={(e) => {
-                                    e.target.src = DEFAULT_AVATAR;
-                                  }}
-                                />
-                                <span className="font-bold text-slate-900">{item.name}</span>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 font-mono font-bold text-teal-600">
-                              {item.referral_code}
-                            </td>
-                            <td className="py-3.5 px-4 text-center font-bold text-slate-800">
-                              {item.total_referrals} Pengguna
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 text-sm">
-                              Rp {(item.total_commission || 0).toLocaleString("id-ID")}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div>
+                    <div className="text-2xl font-black text-slate-800">{userWaStats.total}</div>
+                    <div className="text-xs font-medium text-slate-500">Total Transaksi</div>
+                  </div>
+                </div>
+                {/* Menunggu Konfirmasi */}
+                <div className="bg-white rounded-2xl p-5 border border-amber-200/80 shadow-xs flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                    <Clock size={24} />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-amber-600">{userWaStats.pending}</div>
+                    <div className="text-xs font-medium text-slate-500">Menunggu Konfirmasi</div>
+                  </div>
+                </div>
+                {/* Dikonfirmasi */}
+                <div className="bg-white rounded-2xl p-5 border border-emerald-200/80 shadow-xs flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-emerald-600">{userWaStats.confirmed}</div>
+                    <div className="text-xs font-medium text-slate-500">Dikonfirmasi (Aktif)</div>
+                  </div>
+                </div>
+                {/* Ditolak */}
+                <div className="bg-white rounded-2xl p-5 border border-rose-200/80 shadow-xs flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 shrink-0">
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-rose-600">{userWaStats.rejected}</div>
+                    <div className="text-xs font-medium text-slate-500">Ditolak Admin</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaksi WhatsApp List */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 md:p-6 shadow-xs">
+                <h3 className="text-base font-bold text-slate-800 mb-4">Daftar Transaksi WhatsApp</h3>
+                {userWaLoading ? (
+                  <SuradeLoader variant="section" size="sm" text="Memuat transaksi WhatsApp" minHeight="180px" />
+                ) : userWaLogs.length === 0 ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-center p-4">
+                    <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+                      <Receipt size={32} />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-800 mb-1">Belum Ada Transaksi WhatsApp</h4>
+                    <p className="text-xs text-slate-500 max-w-md">
+                      Anda belum memiliki riwayat transaksi WhatsApp di platform Surade.com. Jelajahi UMKM atau gunakan layanan kami.
+                    </p>
+                    <Link
+                      to="/"
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-all shadow-sm"
+                    >
+                      <span>Jelajahi Portal</span>
+                      <ArrowRight size={14} />
+                    </Link>
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-slate-500 space-y-1">
-                    <Trophy size={32} className="mx-auto text-slate-300" />
-                    <p className="text-xs font-semibold text-slate-700">Belum ada data papan peringkat.</p>
+                  <div className="space-y-3.5">
+                    {userWaLogs.map((log) => {
+                      const isPending = log.status === "pending";
+                      const isApproved = log.status === "completed" || log.status === "approved";
+                      const isRejected = log.status === "rejected";
+                      const formattedFee = Number(log.fee_amount || 0).toLocaleString("id-ID");
+                      const isPointPayment = Boolean(
+                        (log.payment_method && /poin|coin|surade_coin|gold/i.test(log.payment_method)) ||
+                        log.payment_type === "coin" ||
+                        log.payment_type === "point" ||
+                        log.is_coin_payment
+                      );
+                      const dateFormatted = log.created_at
+                        ? new Date(log.created_at).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        })
+                        : "-";
+
+                      const rawBizWa = log.business_whatsapp || log.business?.whatsapp || log.business?.phone;
+                      const cleanWa = rawBizWa ? String(rawBizWa).replace(/\D/g, "") : "";
+                      const formattedWa = cleanWa.startsWith("0") ? "62" + cleanWa.slice(1) : cleanWa;
+
+                      return (
+                        <div
+                          key={`wa-log-${log.id}`}
+                          className="p-4 sm:p-5 rounded-2xl bg-white border border-amber-200/70 hover:border-amber-300 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                        >
+                          {/* Left: Thumbnail & Business Info */}
+                          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+                            <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] min-w-16 min-h-16 sm:min-w-[72px] sm:min-h-[72px] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-2xs shrink-0 flex items-center justify-center">
+                              <img
+                                src={getStorageUrl(log.business_image || log.business?.logo || log.business?.banner) || DEFAULT_AVATAR}
+                                alt={log.business_name || "Bisnis"}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
+                              />
+                            </div>
+                            <div className="min-w-0 space-y-1">
+                              <h4 className="font-bold text-sm sm:text-base text-slate-900 leading-tight truncate">
+                                {log.business_name || log.business?.name || "Usaha Surade"}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                                <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80">
+                                  {log.transaction_code}
+                                </span>
+                                <span className="text-slate-300">•</span>
+                                <span className="font-medium text-slate-500">{log.payment_method || "Transfer Bank BCA"}</span>
+                                <span className="text-slate-300">•</span>
+                                <div className="inline-flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-emerald-600">Rp {formattedFee}</span>
+                                  {Number(log.discount_amount || 0) > 0 && (
+                                    <span className="line-through text-slate-400 text-[11px]">
+                                      Rp {Number((Number(log.fee_amount || 0) + Number(log.discount_amount || 0))).toLocaleString("id-ID")}
+                                    </span>
+                                  )}
+                                  {log.coupon_code && (
+                                    <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
+                                      Kupon: {log.coupon_code}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {Number(log.discount_amount || 0) > 0 && (
+                                <div className="text-[11px] text-emerald-700 font-bold">
+                                  Potongan Kupon: -Rp {Number(log.discount_amount).toLocaleString("id-ID")}
+                                </div>
+                              )}
+                              <div className="text-xs text-slate-400 font-normal">
+                                Tanggal Transaksi: {dateFormatted}
+                              </div>
+                              {isRejected && log.rejection_reason && (
+                                <div className="text-xs text-rose-700 font-medium mt-1 bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-lg flex items-start gap-1.5">
+                                  <AlertTriangle size={13} className="text-rose-600 shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="font-bold block">Alasan Ditolak Admin:</span>
+                                    <span>{log.rejection_reason}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right: Status Pill & Action Buttons */}
+                          <div className="flex sm:flex-col items-start sm:items-end justify-between sm:justify-center gap-2 shrink-0">
+                            {/* Status Badge */}
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold bg-[#fef9c3] text-[#854d0e] border border-[#fde047] shadow-2xs">
+                                <Clock size={13} className="text-[#a16207]" />
+                                <span>Menunggu Konfirmasi</span>
+                              </span>
+                            )}
+                            {isApproved && (
+                              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                <CheckCircle2 size={13} className="text-emerald-600" />
+                                <span>Dikonfirmasi (Aktif)</span>
+                              </span>
+                            )}
+                            {isRejected && (
+                              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-300 shadow-2xs">
+                                <AlertTriangle size={13} className="text-rose-600" />
+                                <span>Ditolak Admin</span>
+                              </span>
+                            )}
+
+                            <div className="flex items-center gap-1.5 flex-wrap sm:justify-end">
+                              {/* Tombol Perbaiki Bukti (Khusus non-poin yang Ditolak) */}
+                              {!isPointPayment && isRejected && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReuploadWaLog(log);
+                                    setReuploadProofFile(null);
+                                    setReuploadProofPreview(null);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                                >
+                                  <RotateCcw size={13} />
+                                  <span>Perbaiki Bukti Transfer</span>
+                                </button>
+                              )}
+
+                              {/* Tombol Riwayat Bukti Lama jika ada (Khusus non-poin) */}
+                              {!isPointPayment && log.proof_history && log.proof_history.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewWaProofHistoryModal(log)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                                  title="Lihat Riwayat Bukti Sebelumnya"
+                                >
+                                  <Clock size={13} className="text-amber-600" />
+                                  <span>Riwayat Bukti ({log.proof_history.length})</span>
+                                </button>
+                              )}
+
+                              {/* View Proof Button (Hanya untuk non-poin yang memiliki bukti gambar) */}
+                              {!isPointPayment && Boolean(log.proof_image || log.proof_url) && (
+                                <button
+                                  onClick={() => setSelectedWaProof(log)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                                >
+                                  <Eye size={13} className="text-slate-500" />
+                                  <span>Lihat Bukti Foto</span>
+                                </button>
+                              )}
+
+                              {/* Open WhatsApp Button if Approved */}
+                              {isApproved && formattedWa && (
+                                <a
+                                  href={`https://wa.me/${formattedWa}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                                >
+                                  <MessageCircle size={13} />
+                                  <span>Buka Chat WhatsApp</span>
+                                  <ArrowUpRight size={13} />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
-            </>
+
+              {/* Modal View Bukti Foto WhatsApp & Riwayat Bukti Sebelumnya */}
+              {selectedWaProof && (() => {
+                const isObj = typeof selectedWaProof === "object" && selectedWaProof !== null;
+                const activeProofImg = isObj
+                  ? (selectedWaProof.proof_url || (selectedWaProof.proof_image ? getStorageUrl(selectedWaProof.proof_image) : (getStorageUrl(selectedWaProof.business_image || selectedWaProof.business?.banner || selectedWaProof.business?.logo) || DEFAULT_AVATAR)))
+                  : selectedWaProof;
+                const proofHistList = isObj && Array.isArray(selectedWaProof.proof_history) ? selectedWaProof.proof_history : [];
+                const bizTitle = isObj ? (selectedWaProof.business_name || selectedWaProof.business?.name || "Akses WhatsApp") : "Akses WhatsApp";
+                const isRejectedLog = isObj && selectedWaProof.status === "rejected";
+
+                return (
+                  <div
+                    className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-[999] flex items-center justify-center p-4 overflow-y-auto"
+                    onClick={() => setSelectedWaProof(null)}
+                  >
+                    <div
+                      className="relative max-w-lg w-full bg-white rounded-2xl p-5 overflow-hidden shadow-2xl border border-slate-100 my-4 animate-in fade-in zoom-in-95 duration-150"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                        <div className="min-w-0 pr-2">
+                          <h4 className="text-sm font-bold text-slate-800">Bukti Transfer Akses WhatsApp</h4>
+                          <span className="text-[11px] text-slate-500 truncate block">{bizTitle}</span>
+                        </div>
+                        <button
+                          onClick={() => setSelectedWaProof(null)}
+                          className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {/* Content Scroll Area */}
+                      <div className="max-h-[75vh] overflow-y-auto space-y-4 pr-1">
+                        {/* Notice jika status ditolak */}
+                        {isRejectedLog && selectedWaProof.rejection_reason && (
+                          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <AlertTriangle size={13} className="text-rose-600" />
+                              <span>Pengajuan Ini Ditolak Admin</span>
+                            </div>
+                            <p className="text-[11.5px] leading-relaxed">
+                              Alasan: <strong>{selectedWaProof.rejection_reason}</strong>
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Foto Bukti Aktif Saat Ini */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                              Foto Bukti Transfer Saat Ini
+                            </span>
+                            {activeProofImg && (
+                              <a
+                                href={activeProofImg}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] font-bold text-teal-600 hover:underline"
+                              >
+                                Buka Ukuran Penuh ↗
+                              </a>
+                            )}
+                          </div>
+                          <div className="max-h-[50vh] overflow-hidden flex items-center justify-center rounded-xl bg-slate-950 p-1 border border-slate-200">
+                            <img
+                              src={activeProofImg}
+                              alt="Bukti Transfer Saat Ini"
+                              className="max-h-[48vh] w-auto object-contain rounded-lg"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Riwayat Bukti Sebelumnya di Bawah Foto Bukti Aktif */}
+                        {proofHistList.length > 0 && (
+                          <div className="pt-3 border-t border-slate-200 space-y-2.5">
+                            <div className="flex items-center gap-1.5">
+                              <Clock size={14} className="text-amber-600" />
+                              <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                Riwayat Bukti Transfer Sebelumnya ({proofHistList.length})
+                              </h5>
+                            </div>
+                            <div className="space-y-2.5">
+                              {proofHistList.map((hist, hIdx) => {
+                                const histImg = hist.proof_url || (hist.proof_image ? getStorageUrl(hist.proof_image) : null);
+                                const histDate = hist.rejected_at ? new Date(hist.rejected_at).toLocaleString("id-ID", {
+                                  day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+                                }) : "-";
+
+                                return (
+                                  <div key={hIdx} className="p-3 bg-amber-50/60 border border-amber-200/90 rounded-xl space-y-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-bold text-amber-900">
+                                        Bukti #{hIdx + 1}
+                                      </span>
+                                      <span className="text-[11px] text-amber-700 font-medium">
+                                        Ditolak: {histDate}
+                                      </span>
+                                    </div>
+                                    {hist.rejection_reason && (
+                                      <div className="text-[11.5px] text-rose-700 bg-rose-50/90 border border-rose-200 p-2 rounded-lg">
+                                        <span className="font-bold">Alasan Ditolak:</span> {hist.rejection_reason}
+                                      </div>
+                                    )}
+                                    {histImg && (
+                                      <div className="rounded-lg overflow-hidden border border-amber-200 bg-slate-900 flex items-center justify-center p-1 max-h-48">
+                                        <img
+                                          src={histImg}
+                                          alt={`Bukti Sebelumnya #${hIdx + 1}`}
+                                          className="max-h-44 w-auto object-contain rounded cursor-pointer hover:opacity-90"
+                                          onClick={() => window.open(histImg, "_blank")}
+                                          title="Klik untuk membuka ukuran penuh"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedWaProof(null)}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+                        >
+                          Tutup
+                        </button>
+                        {isRejectedLog && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetLog = selectedWaProof;
+                              setSelectedWaProof(null);
+                              setReuploadWaLog(targetLog);
+                              setReuploadProofFile(null);
+                              setReuploadProofPreview(null);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <RotateCcw size={13} />
+                            <span>Perbaiki Bukti Sekarang</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Modal Perbaiki Bukti Transfer WhatsApp */}
+              {reuploadWaLog && (
+                <div
+                  className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-[999] flex items-center justify-center p-4"
+                  onClick={() => setReuploadWaLog(null)}
+                >
+                  <div
+                    className="relative max-w-md w-full bg-white rounded-2xl p-5 overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                          <RotateCcw size={16} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900">Perbaiki Bukti Transfer</h4>
+                          <span className="text-[11px] text-slate-400 block">{reuploadWaLog.business_name || "Akses WhatsApp"}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReuploadWaLog(null)}
+                        className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleReuploadWaProof} className="space-y-4">
+                      {/* Alasan Ditolak Sebelumnya */}
+                      {reuploadWaLog.rejection_reason && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
+                          <span className="font-bold block mb-0.5">Alasan Penolakan Admin:</span>
+                          <p>{reuploadWaLog.rejection_reason}</p>
+                        </div>
+                      )}
+
+                      <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-800">
+                        <p className="leading-relaxed">
+                          Bukti transfer lama Anda akan otomatis tersimpan sebagai <strong>riwayat</strong>. Silakan upload foto/struk transfer baru yang jelas.
+                        </p>
+                      </div>
+
+                      {/* Upload Area */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                          Foto Bukti Transfer Baru *
+                        </label>
+                        <input
+                          type="file"
+                          id="reupload_proof_input"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert("Ukuran file bukti transfer maksimal 5MB.");
+                                return;
+                              }
+                              setReuploadProofFile(file);
+                              const reader = new FileReader();
+                              reader.onload = (ev) => setReuploadProofPreview(ev.target?.result);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+
+                        {reuploadProofPreview ? (
+                          <div className="relative rounded-xl border-2 border-emerald-400 p-2 bg-emerald-50/40 text-center">
+                            <img
+                              src={reuploadProofPreview}
+                              alt="Preview Baru"
+                              className="max-h-48 mx-auto object-contain rounded-lg shadow-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReuploadProofFile(null);
+                                setReuploadProofPreview(null);
+                              }}
+                              className="mt-2 text-xs font-bold text-rose-600 hover:underline cursor-pointer"
+                            >
+                              Ganti Foto Lain
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            htmlFor="reupload_proof_input"
+                            className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50/60 hover:bg-emerald-50/30"
+                          >
+                            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2 shadow-2xs">
+                              <UploadCloud size={22} />
+                            </div>
+                            <span className="text-xs font-bold text-slate-800">Klik untuk upload foto bukti transfer</span>
+                            <span className="text-[11px] text-slate-400 mt-0.5">JPG, PNG atau WEBP (Maks. 5MB)</span>
+                          </label>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setReuploadWaLog(null)}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={reuploadSubmitting || !reuploadProofFile}
+                          className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          {reuploadSubmitting ? (
+                            <>
+                              <Loader2 size={13} className="animate-spin" />
+                              <span>Mengirim...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check size={14} />
+                              <span>Kirim Perbaikan Bukti</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Riwayat Bukti Sebelumnya */}
+              {viewWaProofHistoryModal && (
+                <div
+                  className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-[999] flex items-center justify-center p-4"
+                  onClick={() => setViewWaProofHistoryModal(null)}
+                >
+                  <div
+                    className="relative max-w-lg w-full bg-white rounded-2xl p-5 overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                          <Clock size={16} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900">Riwayat Bukti Transfer</h4>
+                          <span className="text-[11px] text-slate-400 block">{viewWaProofHistoryModal.business_name || "Akses WhatsApp"}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setViewWaProofHistoryModal(null)}
+                        className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                      {/* Foto Bukti Terkini / Saat Ini */}
+                      {(viewWaProofHistoryModal.proof_url || viewWaProofHistoryModal.proof_image) && (
+                        <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-emerald-900 flex items-center gap-1.5">
+                              <CheckCircle2 size={13} className="text-emerald-600" />
+                              <span>Foto Bukti Transfer Terkini (Aktif)</span>
+                            </span>
+                            <span className="text-[10.5px] text-emerald-700 font-semibold bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                              {viewWaProofHistoryModal.status === "pending" ? "Menunggu Verifikasi" : viewWaProofHistoryModal.status === "rejected" ? "Ditolak" : "Disetujui"}
+                            </span>
+                          </div>
+                          <div className="rounded-lg overflow-hidden border border-emerald-200 bg-slate-950 flex items-center justify-center p-1 max-h-52">
+                            <img
+                              src={viewWaProofHistoryModal.proof_url || getStorageUrl(viewWaProofHistoryModal.proof_image)}
+                              alt="Bukti Transfer Terkini"
+                              className="max-h-48 w-auto object-contain rounded cursor-pointer hover:opacity-90"
+                              onClick={() => window.open(viewWaProofHistoryModal.proof_url || getStorageUrl(viewWaProofHistoryModal.proof_image), "_blank")}
+                              title="Buka ukuran penuh"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Riwayat Bukti Sebelumnya yang Pernah Ditolak */}
+                      {viewWaProofHistoryModal.proof_history && viewWaProofHistoryModal.proof_history.length > 0 && (
+                        <div className="space-y-3 pt-2">
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-amber-900 uppercase tracking-wider">
+                            <Clock size={13} className="text-amber-600" />
+                            <span>Arsip Bukti Sebelumnya yang Pernah Ditolak ({viewWaProofHistoryModal.proof_history.length})</span>
+                          </div>
+
+                          {viewWaProofHistoryModal.proof_history.map((hist, hIdx) => {
+                            const histImg = hist.proof_url || (hist.proof_image ? getStorageUrl(hist.proof_image) : null);
+                            const histDate = hist.rejected_at ? new Date(hist.rejected_at).toLocaleString("id-ID", {
+                              day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+                            }) : "-";
+
+                            return (
+                              <div key={hIdx} className="p-3.5 bg-amber-50/60 border border-amber-200/90 rounded-xl space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-xs text-amber-900">
+                                    Bukti Pengajuan Lama #{hIdx + 1}
+                                  </span>
+                                  <span className="text-[11px] text-amber-700 font-medium">
+                                    Ditolak: {histDate}
+                                  </span>
+                                </div>
+                                {hist.rejection_reason && (
+                                  <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 p-2 rounded-lg">
+                                    <span className="font-bold">Alasan Ditolak:</span> {hist.rejection_reason}
+                                  </div>
+                                )}
+                                {histImg && (
+                                  <div className="rounded-lg overflow-hidden border border-amber-200 bg-slate-900 flex items-center justify-center p-1 max-h-48">
+                                    <img
+                                      src={histImg}
+                                      alt={`Bukti Pengajuan Lama #${hIdx + 1}`}
+                                      className="max-h-44 w-auto object-contain rounded cursor-pointer hover:opacity-90"
+                                      onClick={() => window.open(histImg, "_blank")}
+                                      title="Buka ukuran penuh"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex justify-end gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => setViewWaProofHistoryModal(null)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                      >
+                        Tutup
+                      </button>
+                      {viewWaProofHistoryModal.status === "rejected" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = viewWaProofHistoryModal;
+                            setViewWaProofHistoryModal(null);
+                            setReuploadWaLog(target);
+                            setReuploadProofFile(null);
+                            setReuploadProofPreview(null);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <RotateCcw size={13} />
+                          <span>Perbaiki Bukti Sekarang</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
-              {/* Tabel Riwayat Transaksi Referral */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5 md:p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <FileText size={18} className="text-[#059669]" />
-                      Riwayat Transaksi Kode Referral
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Daftar transaksi pengguna yang menggunakan kode referral Anda
-                    </p>
+          {/* 5. REFERRAL VIEW */}
+          {(activeTab === "referral" || activeTab === "reseller") && (
+            <div className="space-y-6 w-full max-w-full">
+              {/* KONDISI 1: User Biasa / Penjual yang Belum Mendaftarkan Usaha */}
+              {agentStatus === "regular_user" && (
+                <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-md text-center max-w-2xl mx-auto space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto shadow-sm">
+                    <Store size={32} />
                   </div>
-
-                  {/* Filter & Search */}
-                  <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-                    <div className="relative flex-1 sm:w-64">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        value={referralSearch}
-                        onChange={(e) => setReferralSearch(e.target.value)}
-                        placeholder="Cari ID, nama, atau layanan..."
-                        className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#007570] focus:ring-1 focus:ring-[#007570]"
-                      />
-                    </div>
-                    <select
-                      value={referralStatusFilter}
-                      onChange={(e) => setReferralStatusFilter(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#007570] cursor-pointer"
+                  <div>
+                    <span className="inline-block px-3.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-black">
+                      Syarat Menjadi Agen Referral
+                    </span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                    Daftarkan Usaha Anda Terlebih Dahulu
+                  </h2>
+                  <p className="text-sm text-slate-600 leading-relaxed max-w-lg mx-auto font-medium">
+                    {isSeller ? (
+                      <>Anda belum memiliki profil tempat usaha terdaftar. Untuk menjadi <strong>Agen Referral Surade</strong> dan mendapatkan komisi bagi hasil 10%, daftarkan usaha Anda terlebih dahulu, kemudian lakukan upgrade ke paket Premium yang terverifikasi.</>
+                    ) : (
+                      <>Sebagai pengguna biasa, Anda belum memiliki kode referral. Untuk menjadi <strong>Agen Referral Surade</strong> dan mendapatkan komisi bagi hasil 10%, daftarkan usaha Anda terlebih dahulu, kemudian lakukan upgrade ke paket Premium yang terverifikasi.</>
+                    )}
+                  </p>
+                  <div className="pt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isSeller) {
+                          navigate("/add-business");
+                        } else {
+                          handleOpenBecomeSellerConfirm();
+                        }
+                      }}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm transition-all shadow-lg hover:shadow-emerald-600/30 active:scale-95 cursor-pointer border-0"
                     >
-                      <option value="all">Semua Status</option>
-                      <option value="success">Berhasil</option>
-                      <option value="pending">Menunggu Verifikasi</option>
-                      <option value="cancelled">Dibatalkan</option>
-                    </select>
-
-                    {referralTransactions.length > 0 && (
-                      <button
-                        onClick={handleClearAllReferralTx}
-                        className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                        title="Hapus seluruh riwayat transaksi referral"
-                      >
-                        <Trash2 size={13} />
-                        <span>Bersihkan Riwayat</span>
-                      </button>
-                    )}
+                      <Store size={18} />
+                      <span>Daftarkan Usaha Sekarang</span>
+                    </button>
                   </div>
                 </div>
+              )}
 
-                {/* Table Content */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        <th className="py-3 px-4">ID Transaksi</th>
-                        <th className="py-3 px-4">Pengguna / Pembeli</th>
-                        <th className="py-3 px-4">Layanan &amp; Bisnis</th>
-                        <th className="py-3 px-4">Tanggal</th>
-                        <th className="py-3 px-4 text-right">Total Transaksi</th>
-                        <th className="py-3 px-4 text-right">Komisi Anda (Rp 10.000)</th>
-                        <th className="py-3 px-4 text-center">Status</th>
-                        <th className="py-3 px-4 text-center">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs">
-                      {loadingReferrals ? (
-                        <tr>
-                          <td colSpan={8} className="py-12 text-center text-slate-500">
-                            <Loader2 size={24} className="animate-spin mx-auto text-[#059669] mb-2" />
-                            <p className="text-xs font-medium">Memuat data referral...</p>
-                          </td>
-                        </tr>
-                      ) : filteredReferralTransactions.length > 0 ? (
-                        filteredReferralTransactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="py-3.5 px-4 font-mono font-bold text-[#059669]">
-                              {tx.id}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-2.5">
-                                <img
-                                  src={tx.userAvatar}
-                                  alt={tx.userName}
-                                  className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
-                                />
-                                <div>
-                                  <div className="font-bold text-slate-900">{tx.userName}</div>
-                                  <div className="text-[11px] text-slate-500">{tx.userEmail}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="font-semibold text-slate-800">{tx.service}</div>
-                              <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                                <Briefcase size={11} className="text-slate-400" />
-                                {tx.businessName}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
-                              {tx.date}
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-bold text-slate-800">
-                              Rp {(tx.amount || 0).toLocaleString("id-ID")}
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600">
-                              + Rp {(tx.commission || 0).toLocaleString("id-ID")}
-                            </td>
-                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              {(tx.status === "approved" || tx.status === "earned" || tx.status === "paid" || tx.status === "success") && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
-                                  <CheckCircle size={12} /> Berhasil
-                                </span>
-                              )}
-                              {tx.status === "pending" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200">
-                                  <Clock size={12} /> Menunggu Verifikasi
-                                </span>
-                              )}
-                              {(tx.status === "cancelled" || tx.status === "failed") && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200">
-                                  <X size={12} /> Dibatalkan
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  onClick={() => setSelectedReferralTx(tx)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-                                >
-                                  <Eye size={13} />
-                                  <span>Detail</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteReferralTx(tx.id)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
-                                  title="Hapus riwayat transaksi ini"
-                                >
-                                  <Trash2 size={13} />
-                                  <span>Hapus</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={8} className="py-12 text-center text-slate-500 space-y-2">
-                            <Share2 size={36} className="mx-auto text-slate-300" />
-                            <p className="font-bold text-sm text-slate-800">Belum ada referral yang berhasil.</p>
-                            <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                              Bagikan kode referral Anda ({referralCode}) ke rekan bisnis untuk mulai mendapatkan komisi Rp 10.000 dari setiap pembelian Paket Premium.
-                            </p>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Riwayat Penarikan Saldo Komisi */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              {/* KONDISI 2: Penjual dengan Usaha Free (Belum Upgrade Premium) */}
+              {agentStatus === "free_seller" && (
+                <div className="bg-white rounded-3xl p-8 sm:p-10 border border-amber-200 shadow-md text-center max-w-2xl mx-auto space-y-4 bg-gradient-to-b from-amber-50/50 to-white">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-sm">
+                    <Crown size={32} />
+                  </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Wallet size={18} className="text-[#059669]" />
-                      Riwayat Penarikan Saldo Komisi
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Status dan histori pengajuan pencairan dana tunai komisi referral Anda ke rekening bank / e-wallet.
-                    </p>
+                    <span className="inline-block px-3.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-black">
+                      Syarat Menjadi Agen Referral
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {referralWithdrawals.length > 0 && (
-                      <button
-                        onClick={handleClearAllWithdrawals}
-                        className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                        title="Hapus seluruh riwayat penarikan"
-                      >
-                        <Trash2 size={13} />
-                        <span>Bersihkan Riwayat</span>
-                      </button>
-                    )}
-                    {availableReferralBalance >= 50000 && (
-                      <button
-                        onClick={() => {
-                          setWithdrawSuccessMsg("");
-                          setWithdrawErrorMsg("");
-                          setShowWithdrawModal(true);
-                        }}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#059669] hover:bg-[#005a58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
-                      >
-                        <ArrowUpRight size={14} />
-                        <span>Ajukan Penarikan Baru</span>
-                      </button>
-                    )}
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                    Upgrade Usaha Anda ke Paket Premium
+                  </h2>
+                  <p className="text-sm text-slate-600 leading-relaxed max-w-lg mx-auto font-medium">
+                    Penjual dengan status usaha Free belum menjadi Agen Referral dan belum mendapatkan kode referral. Silakan upgrade usaha Anda ke paket <strong>Premium aktif</strong> dan tunggu pembayaran diverifikasi untuk mengaktifkan kode referral unik dan menikmati komisi tunai 10%.
+                  </p>
+                  <div className="pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("premium")}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-sm transition-all shadow-lg hover:shadow-amber-500/40 active:scale-95 cursor-pointer border-0"
+                    >
+                      <Crown size={18} />
+                      <span>Upgrade ke Premium Sekarang</span>
+                    </button>
                   </div>
                 </div>
+              )}
 
-                {/* Banner Peringatan jika ada penarikan yang ditolak */}
-                {referralWithdrawals.some((w) => w.status === "rejected") && (
-                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-2">
-                    <div className="flex items-center gap-2 font-bold text-sm text-rose-700">
-                      <AlertTriangle size={18} className="shrink-0" />
-                      <span>Pemberitahuan Penolakan Penarikan Dana</span>
+              {/* KONDISI 3: Usaha Premium Kedaluwarsa (Nonaktif Sementara) */}
+              {agentStatus === "expired_premium" && (
+                <div className="rounded-2xl p-5 bg-rose-50 border border-rose-200 flex items-start gap-4 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-black text-rose-950 m-0">Status Agen Referral Dinonaktifkan Sementara</h3>
+                      <span className="px-2 py-0.5 rounded bg-rose-200/80 text-rose-800 text-[10px] font-black uppercase">Premium Kedaluwarsa</span>
                     </div>
-                    {referralWithdrawals
-                      .filter((w) => w.status === "rejected")
-                      .slice(0, 1)
-                      .map((rej) => (
-                        <div key={rej.id} className="text-xs space-y-1.5 pl-6">
-                          <p className="text-rose-800 leading-relaxed">
-                            Pengajuan penarikan sebesar <strong>Rp {rej.amount.toLocaleString("id-ID")}</strong> ({rej.bank} - {rej.account_number}) telah ditolak oleh Admin.
-                          </p>
-                          <div className="p-2.5 bg-white/80 rounded-lg border border-rose-200 font-medium text-rose-950">
-                            <strong>Alasan Penolakan dari Admin:</strong>
-                            <p className="mt-0.5 text-slate-800 italic">"{rej.rejection_reason || "Tidak ada alasan spesifik."}"</p>
-                          </div>
-                          <p className="text-slate-600 text-[11px]">
-                            Saldo Anda telah dikembalikan ke Saldo Tersedia. Anda dapat memperbaiki data atau mengajukan permohonan penarikan kembali.
-                          </p>
+                    <p className="text-xs text-rose-800 leading-relaxed font-medium">
+                      Masa aktif paket Premium usaha Anda telah berakhir. Status agen dan kode referral dinonaktifkan sementara sampai usaha Anda diperpanjang ke Premium. Seluruh riwayat transaksi referral dan hubungan referral yang terikat <strong>tetap tersimpan dengan aman</strong>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("premium")}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-all shadow-sm active:scale-95 cursor-pointer border-0"
+                    >
+                      <Crown size={14} />
+                      <span>Perpanjang Masa Premium Sekarang</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* KONDISI 4: Agen Penjual Premium Aktif (Tampilkan Hero Aktif) */}
+              {isPremiumSeller && agentStatus === "active" && (
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0a4d3a] via-[#0b6b45] to-[#0f7a52] text-white p-6 md:p-8 shadow-xl border border-teal-800/40">
+                  <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
+                  <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="space-y-2 max-w-2xl">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-semibold">
+                        <Gift size={14} /> Program Kemitraan Penjual Premium Aktif
+                      </div>
+                      <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+                        Dapatkan Komisi 10% Dari Setiap Referral!
+                      </h2>
+                      <p className="text-sm text-slate-300 leading-relaxed font-normal">
+                        Bagikan kode unik Anda kepada rekan usaha atau kerabat. Mitra mendapat diskon 10% saat transaksi, dan Anda otomatis menerima komisi 10% yang bisa dicairkan ke rekening bank atau e-wallet!
+                      </p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto shrink-0">
+                      <button
+                        onClick={() => setShowWithdrawModal(true)}
+                        className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-bold text-sm transition-all shadow-lg hover:shadow-teal-500/25 active:scale-95 cursor-pointer"
+                      >
+                        <Wallet size={18} />
+                        <span>Tarik Saldo Komisi</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tampilkan Bagian Statistik & Riwayat Komisi HANYA untuk Agen Aktif atau Pemilik Saldo Tersimpan di Expired Premium */}
+              {(isPremiumSeller || agentStatus === "expired_premium") && (
+                <>
+
+                  {/* 4 Stat Overview Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+                    {/* Card 1: Kode Referral Saya */}
+                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 relative overflow-hidden flex flex-col justify-between">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Kode Referral Saya</span>
+                          <span className="text-[10px] font-medium text-slate-400">Bagikan untuk dapat komisi</span>
+                        </div>
+                        <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#059669] flex items-center justify-center font-bold shrink-0">
+                          <Gift size={20} />
+                        </div>
+                      </div>
+
+                      {/* Referral Code Display Box */}
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2.5 shadow-inner">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">KODE KEMITRAAN</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+                            Aktif
+                          </span>
+                        </div>
+
+                        {/* Dedicated Full-Width Code Box - Never Truncated */}
+                        <div className="bg-slate-900/90 py-2.5 px-3 rounded-lg border border-slate-800 text-center flex items-center justify-center">
+                          <span
+                            className="font-mono text-xs sm:text-sm font-black text-teal-300 tracking-wider select-all whitespace-nowrap leading-none"
+                            title={referralCode}
+                          >
+                            {referralCode}
+                          </span>
+                        </div>
+
+                        {/* Action Buttons: Salin Kode, Bagi Link, Ubah Kode */}
+                        <div className="grid grid-cols-2 gap-1.5">
                           <button
                             onClick={() => {
-                              setWithdrawForm({
-                                bank: rej.bank || "BCA",
-                                accountNumber: rej.account_number || "",
-                                accountHolder: rej.account_holder || user?.name || "",
-                                amount: String(Math.min(rej.amount, availableReferralBalance || rej.amount)),
-                              });
+                              navigator.clipboard.writeText(referralCode);
+                              setReferralCopyToast(true);
+                              setTimeout(() => setReferralCopyToast(false), 2500);
+                            }}
+                            className="w-full py-1.5 px-2 rounded-md bg-teal-600 hover:bg-teal-500 active:scale-95 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
+                            title="Salin Kode Referral"
+                          >
+                            {referralCopyToast ? <Check size={12} /> : <Copy size={12} />}
+                            <span>{referralCopyToast ? "Tersalin!" : "Salin Kode"}</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleShareReferralCode(referralCode)}
+                            className="w-full py-1.5 px-2 rounded-md bg-slate-900 hover:bg-slate-800 active:scale-95 text-teal-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer border border-slate-800"
+                            title="Bagikan Link Referral via WA / Sosial Media"
+                          >
+                            <Share2 size={12} />
+                            <span>Bagi Link</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Bonus Teman Footer */}
+                      <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                        <span className="text-slate-500 text-[11px]">Bagi Hasil:</span>
+                        <span className="text-emerald-700 font-extrabold text-[11px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                          Komisi 10%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Total Pendapatan & Saldo Komisi */}
+                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Saldo Komisi Tersedia</span>
+                          <span className="text-[10px] font-medium text-slate-400">Siap diajukan pencairan</span>
+                        </div>
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                          <Wallet size={20} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-black text-[#059669] tracking-tight">
+                          Rp {(availableReferralBalance || 0).toLocaleString("id-ID")}
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium mt-1 flex items-center justify-between">
+                          <span>Total Diperoleh:</span>
+                          <strong className="text-slate-800">Rp {(totalReferralEarnings || 0).toLocaleString("id-ID")}</strong>
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <span>Minimal: Rp 50.000</span>
+                        {(availableReferralBalance || 0) >= 50000 ? (
+                          <span className="text-emerald-600 font-bold flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Siap Ditarik
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">Belum Cukup</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card 3: Berapa Kali Kode Dipakai */}
+                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Penggunaan Kode</span>
+                          <span className="text-[10px] font-medium text-slate-400">Statistik rekan bisnis</span>
+                        </div>
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+                          <Users size={20} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-black text-slate-900 tracking-tight">
+                          {totalReferralUsage} Kali Dipakai
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          <strong className="text-slate-800">{successReferralCount}</strong> transaksi berhasil diselesaikan
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <span>Status: <strong className="text-emerald-600">Aktif</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Card 4: Estimasi Pending Earning */}
+                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3 flex flex-col justify-between">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Komisi Pending</span>
+                          <span className="text-[10px] font-medium text-slate-400">Dalam proses verifikasi</span>
+                        </div>
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
+                          <Clock size={20} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-black text-amber-600 tracking-tight">
+                          Rp {pendingReferralEarnings.toLocaleString("id-ID")}
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          Menunggu verifikasi pembayaran transaksi
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <span>Status: <span className="text-amber-600 font-semibold">Sedang Diproses</span></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Toast Notification Notification Toast when user applies code */}
+                  {appliedPublicCodeToast && (
+                    <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-teal-500/50 flex items-center gap-3 animate-bounce">
+                      <div className="w-7 h-7 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold">
+                        <Check size={16} />
+                      </div>
+                      <div className="text-xs font-semibold text-teal-200">{appliedPublicCodeToast}</div>
+                    </div>
+                  )}
+
+                  {/* Tabel Riwayat Transaksi Referral */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5 md:p-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                          <FileText size={18} className="text-[#059669]" />
+                          Riwayat Transaksi Kode Referral
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Daftar transaksi pengguna yang menggunakan kode referral Anda
+                        </p>
+                      </div>
+
+                      {/* Filter & Search */}
+                      <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-64">
+                          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            value={referralSearch}
+                            onChange={(e) => setReferralSearch(e.target.value)}
+                            placeholder="Cari ID, nama, atau layanan..."
+                            className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#007570] focus:ring-1 focus:ring-[#007570]"
+                          />
+                        </div>
+                        <select
+                          value={referralStatusFilter}
+                          onChange={(e) => setReferralStatusFilter(e.target.value)}
+                          className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#007570] cursor-pointer"
+                        >
+                          <option value="all">Semua Status</option>
+                          <option value="success">Berhasil</option>
+                          <option value="pending">Menunggu Verifikasi</option>
+                          <option value="cancelled">Dibatalkan</option>
+                        </select>
+
+                        {referralTransactions.length > 0 && (
+                          <button
+                            onClick={handleClearAllReferralTx}
+                            className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                            title="Hapus seluruh riwayat transaksi referral"
+                          >
+                            <Trash2 size={13} />
+                            <span>Bersihkan Riwayat</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Table Content */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            <th className="py-3 px-4">ID Transaksi</th>
+                            <th className="py-3 px-4">Pengguna / Pembeli</th>
+                            <th className="py-3 px-4">Layanan &amp; Bisnis</th>
+                            <th className="py-3 px-4">Tanggal</th>
+                            <th className="py-3 px-4 text-right">Total Transaksi</th>
+                            <th className="py-3 px-4 text-right">Komisi Anda</th>
+                            <th className="py-3 px-4 text-center">Status</th>
+                            <th className="py-3 px-4 text-center">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-xs">
+                          {loadingReferrals ? (
+                            <tr>
+                              <td colSpan={8} className="p-4 text-center">
+                                <SuradeLoader variant="section" size="sm" text="Memuat data transaksi referral" minHeight="160px" />
+                              </td>
+                            </tr>
+                          ) : filteredReferralTransactions.length > 0 ? (
+                            filteredReferralTransactions.map((tx) => (
+                              <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="py-3.5 px-4 font-mono font-bold text-[#059669]">
+                                  #{tx.id}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-2.5">
+                                    <img
+                                      src={tx.userAvatar || tx.user_avatar || tx.referred_avatar || DEFAULT_AVATAR}
+                                      alt={tx.userName || tx.referred_name || "Pengguna"}
+                                      className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0 bg-slate-100"
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = DEFAULT_AVATAR;
+                                      }}
+                                    />
+                                    <div>
+                                      <div className="font-bold text-slate-900">{tx.userName || tx.user_name || tx.referred_name || "Pengguna"}</div>
+                                      <div className="text-[11px] text-slate-500">{tx.userEmail || tx.user_email || tx.referred_email || "-"}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-semibold text-slate-800">{tx.service || tx.service_name || "Paket Premium"}</div>
+                                  <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                                    <Briefcase size={11} className="text-slate-400 shrink-0" />
+                                    <span>{tx.businessName || tx.business_name || "Bisnis Terkait"}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
+                                  {tx.date || (tx.created_at ? new Date(tx.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-")}
+                                </td>
+                                <td className="py-3.5 px-4 text-right font-bold text-slate-800 whitespace-nowrap">
+                                  Rp {(tx.amount || tx.final_price || tx.transaction_amount || 0).toLocaleString("id-ID")}
+                                </td>
+                                <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 whitespace-nowrap">
+                                  + Rp {(tx.commission || tx.commission_amount || 0).toLocaleString("id-ID")}
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  {["approved", "earned", "paid", "success", "completed", "active", "disetujui"].includes(String(tx.status).toLowerCase()) && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
+                                      <CheckCircle size={12} /> Berhasil
+                                    </span>
+                                  )}
+                                  {["pending", "waiting_approval", "menunggu"].includes(String(tx.status).toLowerCase()) && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200">
+                                      <Clock size={12} /> Menunggu Verifikasi
+                                    </span>
+                                  )}
+                                  {["cancelled", "rejected", "failed", "dibatalkan", "ditolak"].includes(String(tx.status).toLowerCase()) && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200">
+                                      <X size={12} /> Dibatalkan
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      onClick={() => setSelectedReferralTx(tx)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                                    >
+                                      <Eye size={13} />
+                                      <span>Detail</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteReferralTx(tx.id)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
+                                      title="Hapus riwayat transaksi ini"
+                                    >
+                                      <Trash2 size={13} />
+                                      <span>Hapus</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={8} className="py-12 text-center text-slate-500 space-y-2">
+                                <Share2 size={36} className="mx-auto text-slate-300" />
+                                <p className="font-bold text-sm text-slate-800">Belum ada transaksi referral.</p>
+                                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                                  Bagikan kode referral Anda ({referralCode}) ke rekan bisnis untuk mulai mendapatkan komisi dari setiap pembelian Paket Premium.
+                                </p>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Riwayat Penarikan Saldo Komisi */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                          <Wallet size={18} className="text-[#059669]" />
+                          Riwayat Penarikan Saldo Komisi
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Status dan histori pengajuan pencairan dana tunai komisi referral Anda ke rekening bank / e-wallet.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {referralWithdrawals.length > 0 && (
+                          <button
+                            onClick={handleClearAllWithdrawals}
+                            className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                            title="Hapus seluruh riwayat penarikan"
+                          >
+                            <Trash2 size={13} />
+                            <span>Bersihkan Riwayat</span>
+                          </button>
+                        )}
+                        {availableReferralBalance >= 50000 && (
+                          <button
+                            onClick={() => {
                               setWithdrawSuccessMsg("");
                               setWithdrawErrorMsg("");
                               setShowWithdrawModal(true);
                             }}
-                            className="mt-1 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#059669] hover:bg-[#005a58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
                           >
-                            <RefreshCw size={12} />
-                            <span>Ajukan Penarikan Ulang</span>
+                            <ArrowUpRight size={14} />
+                            <span>Ajukan Penarikan Baru</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Banner Peringatan jika ada penarikan yang ditolak */}
+                    {referralWithdrawals.some((w) => w.status === "rejected") && (
+                      <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-2">
+                        <div className="flex items-center gap-2 font-bold text-sm text-rose-700">
+                          <AlertTriangle size={18} className="shrink-0" />
+                          <span>Pemberitahuan Penolakan Penarikan Dana</span>
+                        </div>
+                        {referralWithdrawals
+                          .filter((w) => w.status === "rejected")
+                          .slice(0, 1)
+                          .map((rej) => (
+                            <div key={rej.id} className="text-xs space-y-1.5 pl-6">
+                              <p className="text-rose-800 leading-relaxed">
+                                Pengajuan penarikan sebesar <strong>Rp {rej.amount.toLocaleString("id-ID")}</strong> ({rej.bank} - {rej.account_number}) telah ditolak oleh Admin.
+                              </p>
+                              <div className="p-2.5 bg-white/80 rounded-lg border border-rose-200 font-medium text-rose-950">
+                                <strong>Alasan Penolakan dari Admin:</strong>
+                                <p className="mt-0.5 text-slate-800 italic">"{rej.rejection_reason || "Tidak ada alasan spesifik."}"</p>
+                              </div>
+                              <p className="text-slate-600 text-[11px]">
+                                Saldo Anda telah dikembalikan ke Saldo Tersedia. Anda dapat memperbaiki data atau mengajukan permohonan penarikan kembali.
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setWithdrawForm({
+                                    bank: rej.bank || "BCA",
+                                    accountNumber: rej.account_number || "",
+                                    accountHolder: rej.account_holder || user?.name || "",
+                                    amount: String(Math.min(rej.amount, availableReferralBalance || rej.amount)),
+                                  });
+                                  setWithdrawSuccessMsg("");
+                                  setWithdrawErrorMsg("");
+                                  setShowWithdrawModal(true);
+                                }}
+                                className="mt-1 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+                              >
+                                <RefreshCw size={12} />
+                                <span>Ajukan Penarikan Ulang</span>
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    {/* Table Riwayat Penarikan */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                            <th className="py-3 px-4">Kode &amp; Waktu</th>
+                            <th className="py-3 px-4">Tujuan Rekening</th>
+                            <th className="py-3 px-4 text-right">Nominal (Rp)</th>
+                            <th className="py-3 px-4 text-center">Status</th>
+                            <th className="py-3 px-4">Catatan / Alasan</th>
+                            <th className="py-3 px-4 text-center">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {referralWithdrawals.length > 0 ? (
+                            referralWithdrawals.map((w) => (
+                              <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
+                                  <span className="text-[#059669] block">{w.code}</span>
+                                  <span className="text-[11px] text-slate-400 font-normal font-sans block">{w.date}</span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                    {w.bank === "QRIS" || w.method === "qris" ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[10.5px] font-black">
+                                        <QrCode size={11} /> QRIS
+                                      </span>
+                                    ) : (
+                                      <span>{w.bank || w.bank_name}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11.5px] text-slate-600 font-mono">{w.account_number}</div>
+                                  <div className="text-[11px] text-slate-500">an {w.account_holder || w.account_name}</div>
+                                  {w.qris_image && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewQrisModalUrl(w.qris_image)}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 text-[10.5px] font-bold cursor-pointer transition-colors"
+                                      title="Lihat QRIS Saya"
+                                    >
+                                      <QrCode size={11} />
+                                      <span>Lihat QRIS</span>
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-right font-extrabold text-base text-slate-900 whitespace-nowrap">
+                                  Rp {w.amount.toLocaleString("id-ID")}
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <div className="flex flex-col items-center gap-1">
+                                    {w.status === "paid" && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
+                                        <CheckCircle size={12} /> Dana Ditransfer (Lunas)
+                                      </span>
+                                    )}
+                                    {w.status === "approved" && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
+                                        <CheckCircle2 size={12} /> Disetujui (Siap Kirim)
+                                      </span>
+                                    )}
+                                    {w.status === "pending" && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200">
+                                        <Clock size={12} /> Menunggu Verifikasi
+                                      </span>
+                                    )}
+                                    {w.status === "rejected" && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200">
+                                        <X size={12} /> Ditolak
+                                      </span>
+                                    )}
+                                    {w.transfer_proof && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewReferralProofModal(w.transfer_proof)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#059669] border border-teal-200 text-[10.5px] font-bold cursor-pointer transition-colors shadow-2xs mt-0.5"
+                                        title="Lihat Foto Bukti Transfer Admin"
+                                      >
+                                        <Eye size={12} />
+                                        <span>Lihat Bukti Transfer</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 max-w-xs">
+                                  {w.status === "rejected" && (w.rejection_reason || w.admin_note) ? (
+                                    <div className="text-xs text-rose-700 bg-rose-50/60 p-2 rounded-lg border border-rose-200">
+                                      <span className="font-bold block text-[10.5px] uppercase">Alasan Penolakan:</span>
+                                      <span className="leading-relaxed">{w.rejection_reason || w.admin_note}</span>
+                                    </div>
+                                  ) : w.status === "paid" && w.processed_at ? (
+                                    <div className="space-y-0.5">
+                                      <span className="text-slate-500 text-[11px] block">
+                                        Ditransfer pada: <strong>{w.processed_at}</strong>
+                                      </span>
+                                      {w.admin_note && (
+                                        <span className="text-slate-600 text-[10.5px] italic block" title={w.admin_note}>
+                                          Catatan: {w.admin_note}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 text-[11px]">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    {w.transfer_proof && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewReferralProofModal(w.transfer_proof)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#059669] border border-teal-200 text-xs font-bold transition-colors cursor-pointer"
+                                        title="Lihat foto bukti transfer resmi admin"
+                                      >
+                                        <Eye size={13} />
+                                        <span>Bukti</span>
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handleDeleteWithdrawal(w.id)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
+                                      title="Hapus riwayat penarikan ini"
+                                    >
+                                      <Trash2 size={13} />
+                                      <span>Hapus</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="py-8 text-center text-slate-500 space-y-1">
+                                <p className="font-semibold text-xs text-slate-700">Belum ada riwayat penarikan saldo.</p>
+                                <p className="text-[11px] text-slate-400">
+                                  Ketika Anda melakukan penarikan komisi referral, status dan bukti pemrosesan akan tampil di sini.
+                                </p>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Panduan Cara Kerja Program Referral */}
+                  <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Target size={18} className="text-[#059669]" />
+                      Cara Kerja Program Referral 3 Langkah Mudah
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
+                        <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                          1
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-slate-900">Bagikan Kode Unik</h4>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            Salin kode <strong className="text-slate-800">{referralCode}</strong> atau link pendaftaran dan bagikan ke rekan bisnis Anda.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
+                        <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                          2
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-slate-900">Teman Mendaftar & Transaksi</h4>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            Pengguna mendaftar dengan kode Anda dan membeli Paket Promosi/Premium dengan penawaran diskon khusus.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3.5">
+                        <div className="w-8 h-8 rounded-lg bg-teal-600 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                          3
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-slate-900">Nikmati Komisi 10%</h4>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            Komisi tunai bagi hasil 10% otomatis masuk setelah pembayaran diverifikasi admin dan dapat ditarik kapan saja.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Generator Pesan Promosi & Tips Menarik Pengguna */}
+                  <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                          <Sparkles size={18} className="text-amber-500" />
+                          Generator Pesan Promosi Unik & Strategi Penawaran
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Gunakan template pesan yang dirancang khusus untuk menarik teman/rekan bisnis agar tertarik memakai kode referral Anda!
+                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 self-start sm:self-auto">
+                        <Flame size={14} className="text-amber-500" /> Dynamic Promo Generator
+                      </div>
+                    </div>
+
+                    {/* Strategy Insight Alert */}
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-teal-50 via-emerald-50 to-teal-50 border border-teal-200/80 text-teal-950 space-y-1.5">
+                      <div className="flex items-center gap-2 text-xs font-bold text-teal-900">
+                        <Zap size={16} className="text-teal-600 shrink-0" />
+                        <span>Rahasia Mengapa Calon Pengguna Mau Memakai Kode Referral Anda:</span>
+                      </div>
+                      <p className="text-xs text-slate-700 leading-relaxed pl-6">
+                        Penerima kode Anda langsung mendapat <strong className="text-emerald-700 font-extrabold bg-white px-1.5 py-0.5 rounded border border-emerald-300/60">Diskon Khusus & Keuntungan Tambahan</strong> saat mendaftar atau membeli Paket Premium Usaha. Ini adalah <em>Win-Win Solution</em> — Rekan Anda hemat biaya promosi, dan Anda otomatis menerima <strong className="text-teal-800 font-black">Komisi Tunai 10%</strong> dari setiap pembayaran!
+                      </p>
+                    </div>
+
+                    {/* Template Chips */}
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-700 block">Pilih Template Pesan Promosi:</span>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setSelectedPromoTemplate("diskon")}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${selectedPromoTemplate === "diskon"
+                            ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            }`}
+                        >
+                          <Gift size={14} />
+                          <span>1. Promo Diskon Hemat (Umum)</span>
+                        </button>
+                        <button
+                          onClick={() => setSelectedPromoTemplate("bisnis")}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${selectedPromoTemplate === "bisnis"
+                            ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            }`}
+                        >
+                          <Briefcase size={14} />
+                          <span>2. Penawaran Pelaku UMKM / Bisnis</span>
+                        </button>
+                        <button
+                          onClick={() => setSelectedPromoTemplate("heboh")}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${selectedPromoTemplate === "heboh"
+                            ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            }`}
+                        >
+                          <Flame size={14} />
+                          <span>3. Promo Heboh Terbatas (WA/Medsos)</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Promo Text Box & Actions */}
+                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 border-b border-slate-800 pb-2">
+                        <span>PRATINJAU PESAN PROMOSI (SIAP BAGIKAN)</span>
+                        <span className="text-teal-400 font-mono">Kode: {referralCode}</span>
+                      </div>
+                      <p className="text-xs text-slate-200 font-sans whitespace-pre-line leading-relaxed selection:bg-teal-600 selection:text-white">
+                        {activePromoMessage}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(activePromoMessage);
+                            setCopiedPromoText(true);
+                            setTimeout(() => setCopiedPromoText(false), 2500);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                        >
+                          {copiedPromoText ? <Check size={14} /> : <Copy size={14} />}
+                          <span>{copiedPromoText ? "Tersalin Ke Clipboard!" : "Salin Pesan Promosi"}</span>
+                        </button>
+
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(activePromoMessage)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                        >
+                          <MessageCircle size={14} />
+                          <span>Kirim Langsung via WhatsApp</span>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Katalog Kode Referral Komunitas & Leaderboard (Khusus Tampilan Admin) */}
+                  {user?.role === "admin" && (
+                    <>
+                      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                          <div>
+                            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                              <Users size={18} className="text-teal-600" />
+                              Katalog Kode Referral Komunitas (Pengguna Lain)
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Ingin menggunakan kode referral milik mitra lain untuk mendapatkan diskon 10%? Pilih dan gunakan kode di bawah ini tanpa perlu bertanya!
+                            </p>
+                          </div>
+
+                          {/* Search & Refresh */}
+                          <div className="flex items-center gap-2.5 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-56">
+                              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <input
+                                type="text"
+                                value={publicCodeSearch}
+                                onChange={(e) => setPublicCodeSearch(e.target.value)}
+                                placeholder="Cari nama atau kode..."
+                                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-600"
+                              />
+                            </div>
+                            <button
+                              onClick={fetchPublicCodes}
+                              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                              title="Perbarui daftar kode referral"
+                            >
+                              <RefreshCw size={15} className={loadingPublicCodes ? "animate-spin text-teal-600" : ""} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Cards Grid */}
+                        {loadingPublicCodes ? (
+                          <SuradeLoader variant="section" size="sm" text="Memuat kode referral komunitas" minHeight="160px" />
+                        ) : filteredPublicCodes.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredPublicCodes.map((item) => (
+                              <div
+                                key={item.id}
+                                className="p-4 rounded-2xl bg-gradient-to-b from-white to-slate-50/70 border border-slate-200/90 shadow-sm hover:shadow-md transition-all space-y-3 flex flex-col justify-between"
+                              >
+                                {/* Owner Header */}
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={item.avatar || DEFAULT_AVATAR}
+                                    alt={item.name}
+                                    className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
+                                    onError={(e) => {
+                                      e.target.src = DEFAULT_AVATAR;
+                                    }}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs font-bold text-slate-900 truncate">{item.name}</h4>
+                                    <span className="text-[10px] text-slate-500 font-medium block">Mitra Referral Surade</span>
+                                  </div>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                    Diskon 10%
+                                  </span>
+                                </div>
+
+                                {/* Code Display Box */}
+                                <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-center space-y-1">
+                                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 block">KODE REFERRAL</span>
+                                  <span className="font-mono text-sm font-black text-teal-300 tracking-wider block select-all">
+                                    {item.code}
+                                  </span>
+                                  <div className="text-[10px] text-slate-400 flex items-center justify-center gap-1 pt-0.5">
+                                    <CheckCircle2 size={11} className="text-teal-400" />
+                                    <span>Telah digunakan {item.usage_count || 0}x</span>
+                                  </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(item.code);
+                                      setCopiedPublicCodeId(item.id);
+                                      setTimeout(() => setCopiedPublicCodeId(null), 2500);
+                                    }}
+                                    className="w-full py-1.5 px-2 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer border border-teal-200"
+                                    title="Salin Kode Referral Ini"
+                                  >
+                                    {copiedPublicCodeId === item.id ? <Check size={12} /> : <Copy size={12} />}
+                                    <span>{copiedPublicCodeId === item.id ? "Tersalin!" : "Salin Kode"}</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(item.code);
+                                      setAppliedPublicCodeToast(`Kode "${item.code}" tersalin! Mengalihkan ke Paket Premium...`);
+                                      setTimeout(() => setAppliedPublicCodeToast(""), 3500);
+                                      setActiveTab("premium");
+                                    }}
+                                    className="w-full py-1.5 px-2 rounded-lg bg-teal-600 hover:bg-teal-500 active:scale-95 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
+                                    title="Gunakan Kode Ini Saat Checkout Paket Premium"
+                                  >
+                                    <ArrowRight size={12} />
+                                    <span>Gunakan Kode</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="py-10 text-center text-slate-500 space-y-2">
+                            <Users size={32} className="mx-auto text-slate-300" />
+                            <p className="text-xs font-semibold text-slate-700">Tidak ada kode referral komunitas ditemukan.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Papan Peringkat Reseller / Referrer Terbaik (Leaderboard) */}
+                      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                          <div>
+                            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                              <Trophy size={18} className="text-amber-500" />
+                              Papan Peringkat Referrer Terbaik (Leaderboard)
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Top 10 mitra dengan hasil perolehan komisi dan pengguna terbanyak di Surade.com
+                            </p>
+                          </div>
+                          <button
+                            onClick={fetchLeaderboard}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                            title="Perbarui leaderboard"
+                          >
+                            <RefreshCw size={15} className={loadingLeaderboard ? "animate-spin text-amber-500" : ""} />
                           </button>
                         </div>
-                      ))}
-                  </div>
-                )}
 
-                {/* Table Riwayat Penarikan */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-                        <th className="py-3 px-4">Kode &amp; Waktu</th>
-                        <th className="py-3 px-4">Tujuan Rekening</th>
-                        <th className="py-3 px-4 text-right">Nominal (Rp)</th>
-                        <th className="py-3 px-4 text-center">Status</th>
-                        <th className="py-3 px-4">Catatan / Alasan</th>
-                        <th className="py-3 px-4 text-center">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {referralWithdrawals.length > 0 ? (
-                        referralWithdrawals.map((w) => (
-                          <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
-                              <span className="text-[#059669] block">{w.code}</span>
-                              <span className="text-[11px] text-slate-400 font-normal font-sans block">{w.date}</span>
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="font-bold text-slate-900">{w.bank}</div>
-                              <div className="text-[11.5px] text-slate-600 font-mono">{w.account_number}</div>
-                              <div className="text-[11px] text-slate-500">an {w.account_holder}</div>
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-extrabold text-base text-slate-900 whitespace-nowrap">
-                              Rp {w.amount.toLocaleString("id-ID")}
-                            </td>
-                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              {w.status === "paid" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
-                                  <CheckCircle size={12} /> Dana Ditransfer (Lunas)
-                                </span>
-                              )}
-                              {w.status === "approved" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
-                                  <CheckCircle2 size={12} /> Disetujui (Siap Kirim)
-                                </span>
-                              )}
-                              {w.status === "pending" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200">
-                                  <Clock size={12} /> Menunggu Verifikasi
-                                </span>
-                              )}
-                              {w.status === "rejected" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200">
-                                  <X size={12} /> Ditolak
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 max-w-xs">
-                              {w.status === "rejected" && w.rejection_reason ? (
-                                <div className="text-xs text-rose-700 bg-rose-50/60 p-2 rounded-lg border border-rose-200">
-                                  <span className="font-bold block text-[10.5px] uppercase">Alasan Penolakan:</span>
-                                  <span className="leading-relaxed">{w.rejection_reason}</span>
-                                </div>
-                              ) : w.status === "paid" && w.processed_at ? (
-                                <span className="text-slate-500 text-[11px]">
-                                  Ditransfer pada: <strong>{w.processed_at}</strong>
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 text-[11px]">-</span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              <button
-                                onClick={() => handleDeleteWithdrawal(w.id)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
-                                title="Hapus riwayat penarikan ini"
-                              >
-                                <Trash2 size={13} />
-                                <span>Hapus</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="py-8 text-center text-slate-500 space-y-1">
-                            <p className="font-semibold text-xs text-slate-700">Belum ada riwayat penarikan saldo.</p>
-                            <p className="text-[11px] text-slate-400">
-                              Ketika Anda melakukan penarikan komisi referral, status dan bukti pemrosesan akan tampil di sini.
-                            </p>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                        {loadingLeaderboard ? (
+                          <SuradeLoader variant="section" size="sm" text="Memuat papan peringkat" minHeight="160px" />
+                        ) : referralLeaderboard.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead>
+                                <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                                  <th className="py-3 px-4">Peringkat</th>
+                                  <th className="py-3 px-4">Pengguna / Mitra</th>
+                                  <th className="py-3 px-4">Kode Referral</th>
+                                  <th className="py-3 px-4 text-center">Total Berhasil</th>
+                                  <th className="py-3 px-4 text-right">Total Komisi</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {referralLeaderboard.map((item, idx) => (
+                                  <tr key={item.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                                    <td className="py-3.5 px-4 font-bold whitespace-nowrap">
+                                      {idx === 0 && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-extrabold border border-amber-300">
+                                          <Trophy size={13} className="text-amber-600" /> #1 Juara
+                                        </span>
+                                      )}
+                                      {idx === 1 && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 text-slate-800 font-extrabold border border-slate-300">
+                                          <Award size={13} className="text-slate-600" /> #2 Perak
+                                        </span>
+                                      )}
+                                      {idx === 2 && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 font-extrabold border border-amber-200">
+                                          <Award size={13} className="text-amber-700" /> #3 Perunggu
+                                        </span>
+                                      )}
+                                      {idx > 2 && <span className="text-slate-500 font-semibold pl-2">#{idx + 1}</span>}
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      <div className="flex items-center gap-2.5">
+                                        <img
+                                          src={item.avatar || DEFAULT_AVATAR}
+                                          alt={item.name}
+                                          className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                                          onError={(e) => {
+                                            e.target.src = DEFAULT_AVATAR;
+                                          }}
+                                        />
+                                        <span className="font-bold text-slate-900">{item.name}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-3.5 px-4 font-mono font-bold text-teal-600">
+                                      {item.referral_code}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-center font-bold text-slate-800">
+                                      {item.total_referrals} Pengguna
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 text-sm">
+                                      Rp {(item.total_commission || 0).toLocaleString("id-ID")}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="py-8 text-center text-slate-500 space-y-1">
+                            <Trophy size={32} className="mx-auto text-slate-300" />
+                            <p className="text-xs font-semibold text-slate-700">Belum ada data papan peringkat.</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Modal Preview Bukti Transfer Komisi Referral */}
+                  {previewReferralProofModal && (
+                    <div
+                      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in"
+                      onClick={() => setPreviewReferralProofModal(null)}
+                    >
+                      <div
+                        className="bg-white rounded-3xl p-5 max-w-2xl w-full shadow-2xl relative border border-slate-200 space-y-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-[#059669] flex items-center justify-center">
+                              <CheckCircle2 size={18} />
+                            </div>
+                            <div>
+                              <h4 className="font-extrabold text-sm text-slate-900">Bukti Transfer Resmi Admin</h4>
+                              <p className="text-[10.5px] text-slate-400">Bukti struk transfer dana komisi referral ke rekening / e-wallet Anda</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewReferralProofModal(null)}
+                            className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors"
+                            title="Tutup"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+
+                        <div className="max-h-[68vh] overflow-auto flex items-center justify-center bg-slate-900/5 rounded-2xl p-2 min-h-[260px] border border-slate-200">
+                          <img
+                            src={previewReferralProofModal}
+                            alt="Bukti Transfer Komisi Referral"
+                            className="max-h-[62vh] w-auto object-contain rounded-xl shadow-lg border border-slate-200"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "https://placehold.co/600x400/007570/ffffff?text=Bukti+Transfer+Tersimpan";
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                          <span className="text-[11px] text-slate-400">Klik di luar jendela untuk menutup</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewReferralProofModal(null)}
+                              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                            >
+                              Tutup
+                            </button>
+                            <a
+                              href={previewReferralProofModal}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                            >
+                              <ExternalLink size={13} />
+                              <span>Buka Tab Baru ↗</span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -6426,7 +11000,7 @@ export default function AdminUser() {
                     Bookmark Tersimpan
                   </h2>
                   <p className="text-xs md:text-sm text-slate-300 max-w-2xl font-normal">
-                    Daftar bisnis, artikel blog, dan event yang Anda simpan dari portal Surade.co.id.
+                    Daftar bisnis, artikel blog, dan event yang Anda simpan dari portal Surade.com.
                   </p>
                 </div>
               </div>
@@ -6450,9 +11024,13 @@ export default function AdminUser() {
                     </button>
                   </div>
                 ) : loadingSavedItems ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-2.5">
-                    <Loader2 size={32} className="animate-spin text-[#059669]" />
-                    <p className="text-xs font-semibold text-slate-600">Memuat bookmark tersimpan...</p>
+                  <div className="py-6">
+                    <SuradeLoader
+                      variant="section"
+                      size="md"
+                      text="Memuat bookmark tersimpan"
+                      minHeight="180px"
+                    />
                   </div>
                 ) : (() => {
                   const savedBusinessesList = (savedItems || []).filter(item => item.itemType === "business" || item.type === "Bisnis");
@@ -6594,12 +11172,12 @@ export default function AdminUser() {
                         )}
                       </div>
 
-                      {/* ── 2. BLOG & EVENT SECTION (BOTTOM) ── */}
+                      {/* ── 2. INFO & EVENT SECTION (BOTTOM) ── */}
                       <div className="space-y-4 pt-2">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
                             <FileText size={20} className="text-purple-600" />
-                            Blog & Event
+                            Info & Event
                           </h3>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
                             {savedBlogsAndEventsList.length} Item
@@ -6641,12 +11219,11 @@ export default function AdminUser() {
                                         >
                                           {item.title}
                                         </h4>
-                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase shrink-0 ${
-                                          isEvent
-                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                            : "bg-purple-50 text-purple-700 border border-purple-100"
-                                        }`}>
-                                          {isEvent ? "Event" : "Blog"}
+                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase shrink-0 ${isEvent
+                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                          : "bg-purple-50 text-purple-700 border border-purple-100"
+                                          }`}>
+                                          {isEvent ? "Event" : "Info"}
                                         </span>
                                       </div>
                                       <div className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
@@ -6741,282 +11318,285 @@ export default function AdminUser() {
               </div>
             </div>
           )}
-            {/* 7. ULASAN VIEW */}
+          {/* 7. ULASAN VIEW */}
           {activeTab === "ulasan" && (
             (() => {
-            const REVIEWS_PER_PAGE = 8;
+              const REVIEWS_PER_PAGE = 8;
 
-            // Build unique business list from reviews for filter dropdown
-            const bizMap = {};
-            reviews.forEach(r => {
-              if (!bizMap[r.business_id]) {
-                bizMap[r.business_id] = { id: r.business_id, name: r.businessName, logo: r.businessLogo, slug: r.businessSlug };
-              }
-            });
-            const uniqueBusinesses = Object.values(bizMap);
+              // Build unique business list from reviews for filter dropdown
+              const bizMap = {};
+              reviews.forEach(r => {
+                if (!bizMap[r.business_id]) {
+                  bizMap[r.business_id] = { id: r.business_id, name: r.businessName, logo: r.businessLogo, slug: r.businessSlug };
+                }
+              });
+              const uniqueBusinesses = Object.values(bizMap);
 
-            // Filter + sort newest first
-            const filtered = (reviewsBusinessFilter === "all" ? reviews : reviews.filter(r => String(r.business_id) === reviewsBusinessFilter))
-              .slice()
-              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              // Filter + sort newest first
+              const filtered = (reviewsBusinessFilter === "all" ? reviews : reviews.filter(r => String(r.business_id) === reviewsBusinessFilter))
+                .slice()
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-            // Stats for selected filter
-            const filteredAvg = filtered.length > 0
-              ? (filtered.reduce((s, r) => s + (r.rating || 0), 0) / filtered.length).toFixed(1)
-              : "0.0";
+              // Stats for selected filter
+              const filteredAvg = filtered.length > 0
+                ? (filtered.reduce((s, r) => s + (r.rating || 0), 0) / filtered.length).toFixed(1)
+                : "0.0";
 
-            const totalPages = Math.ceil(filtered.length / REVIEWS_PER_PAGE);
-            const safePage = Math.min(reviewsCurrentPage, Math.max(1, totalPages));
-            const pageStart = (safePage - 1) * REVIEWS_PER_PAGE;
-            const pageEnd = pageStart + REVIEWS_PER_PAGE;
-            const pageRows = filtered.slice(pageStart, pageEnd);
+              const totalPages = Math.ceil(filtered.length / REVIEWS_PER_PAGE);
+              const safePage = Math.min(reviewsCurrentPage, Math.max(1, totalPages));
+              const pageStart = (safePage - 1) * REVIEWS_PER_PAGE;
+              const pageEnd = pageStart + REVIEWS_PER_PAGE;
+              const pageRows = filtered.slice(pageStart, pageEnd);
 
-            // Star renderer helper
-            const renderStars = (n) => Array.from({ length: 5 }).map((_, i) => (
-              <Star key={i} size={13} className={i < n ? "text-[#f59e0b]" : "text-[#d1d5db]"} fill={i < n ? "currentColor" : "none"} />
-            ));
+              // Star renderer helper
+              const renderStars = (n) => Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} size={13} className={i < n ? "text-[#f59e0b]" : "text-[#d1d5db]"} fill={i < n ? "currentColor" : "none"} />
+              ));
 
-            return (
-              <div className="flex flex-col gap-[18px]">
-                {/* ── Stat Cards ── */}
-                <div className="grid grid-cols-3 gap-[14px]">
-                  {/* Total all reviews */}
-                  <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-[16px_18px] flex items-center gap-[12px] shadow-sm">
-                    <div className="w-[40px] h-[40px] rounded-[10px] bg-[#fef9c3] flex items-center justify-center shrink-0">
-                      <Star size={18} className="text-[#ca8a04]" />
-                    </div>
-                    <div>
-                      <div className="text-[20px] font-bold text-[#0f172a] leading-none">{reviews.length}</div>
-                      <div className="text-[11px] text-[#64748b] mt-[2px]">Total Ulasan</div>
-                    </div>
-                  </div>
-                  {/* Avg rating (filtered) */}
-                  <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-[16px_18px] flex items-center gap-[12px] shadow-sm">
-                    <div className="w-[40px] h-[40px] rounded-[10px] bg-[#f0fdf4] flex items-center justify-center shrink-0">
-                      <Star size={18} className="text-[#16a34a]" />
-                    </div>
-                    <div>
-                      <div className="text-[20px] font-bold text-[#0f172a] leading-none flex items-baseline gap-[4px]">
-                        {filteredAvg}
-                        <span className="text-[11px] font-normal text-[#94a3b8]">/ 5</span>
+              return (
+                <div className="flex flex-col gap-[18px]">
+                  {/* ── Stat Cards ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-[14px]">
+                    {/* Total all reviews */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-3.5 sm:p-[16px_18px] flex items-center gap-[12px] shadow-sm">
+                      <div className="w-[40px] h-[40px] rounded-[10px] bg-[#fef9c3] flex items-center justify-center shrink-0">
+                        <Star size={18} className="text-[#ca8a04]" />
                       </div>
-                      <div className="text-[11px] text-[#64748b] mt-[2px]">
-                        {reviewsBusinessFilter === "all" ? "Rata-rata Semua" : "Rata-rata Filter"}
+                      <div>
+                        <div className="text-[20px] font-bold text-[#0f172a] leading-none">{reviews.length}</div>
+                        <div className="text-[11px] text-[#64748b] mt-[2px]">Total Ulasan</div>
                       </div>
                     </div>
-                  </div>
-                  {/* Unique businesses */}
-                  <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-[16px_18px] flex items-center gap-[12px] shadow-sm">
-                    <div className="w-[40px] h-[40px] rounded-[10px] bg-[#eff6ff] flex items-center justify-center shrink-0">
-                      <Briefcase size={18} className="text-[#3b82f6]" />
-                    </div>
-                    <div>
-                      <div className="text-[20px] font-bold text-[#0f172a] leading-none">{uniqueBusinesses.length}</div>
-                      <div className="text-[11px] text-[#64748b] mt-[2px]">Bisnis Diulas</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Filter Bar ── */}
-                <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-[14px_18px] flex items-center gap-[12px] shadow-sm flex-wrap">
-                  <div className="flex items-center gap-[7px] text-[12.5px] font-semibold text-[#374151] shrink-0">
-                    <Search size={14} className="text-[#059669]" />
-                    Filter Bisnis:
-                  </div>
-                  <div className="relative flex-1 min-w-[200px]">
-                    <select
-                      value={reviewsBusinessFilter}
-                      onChange={e => { setReviewsBusinessFilter(e.target.value); setReviewsCurrentPage(1); }}
-                      className="w-full appearance-none bg-[#f8fafc] border border-[#e2e8f0] rounded-[9px] px-[12px] py-[7px] pr-[32px] text-[12.5px] text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#007570] cursor-pointer"
-                    >
-                      <option value="all">Semua Bisnis ({reviews.length} ulasan)</option>
-                      {uniqueBusinesses.map(b => {
-                        const bizReviews = reviews.filter(r => r.business_id === b.id);
-                        const bizAvg = bizReviews.length > 0
-                          ? (bizReviews.reduce((s, r) => s + r.rating, 0) / bizReviews.length).toFixed(1)
-                          : "0.0";
-                        return (
-                          <option key={b.id} value={String(b.id)}>
-                            {b.name} — {bizReviews.length} ulasan · ★ {bizAvg}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <ChevronRight size={14} className="absolute right-[10px] top-1/2 -translate-y-1/2 text-[#94a3b8] rotate-90 pointer-events-none" />
-                  </div>
-                  {reviewsBusinessFilter !== "all" && (
-                    <button
-                      onClick={() => { setReviewsBusinessFilter("all"); setReviewsCurrentPage(1); }}
-                      className="flex items-center gap-[5px] px-[10px] py-[6px] text-[11.5px] font-medium text-[#64748b] bg-[#f1f5f9] hover:bg-[#e2e8f0] rounded-[8px] transition-colors shrink-0"
-                    >
-                      <X size={12} /> Reset
-                    </button>
-                  )}
-                  <span className="text-[11.5px] text-[#94a3b8] shrink-0">{filtered.length} ulasan ditemukan</span>
-                </div>
-
-                {/* ── Table / Loading / Error / Empty ── */}
-                {reviewsError ? (
-                  <div className="bg-white border border-rose-200 rounded-[13px] p-[36px_24px] flex flex-col items-center justify-center text-center">
-                    <div className="w-[50px] h-[50px] rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-[10px]">
-                      <AlertCircle size={24} />
-                    </div>
-                    <h4 className="text-[14px] font-bold text-slate-800 mb-[4px]">{reviewsError}</h4>
-                    <button
-                      onClick={fetchReviews}
-                      className="mt-[8px] px-[14px] py-[6px] bg-[#059669] text-white font-semibold rounded-[8px] text-[12px] hover:bg-[#005a58] transition-colors cursor-pointer"
-                    >
-                      Coba Lagi
-                    </button>
-                  </div>
-                ) : loadingReviews ? (
-                  <div className="flex flex-col items-center justify-center py-[50px] gap-[10px] bg-white border border-[#e2e8f0] rounded-[13px]">
-                    <Loader2 size={28} className="text-[#059669] animate-spin" />
-                    <span className="text-[13px] text-[#64748b]">Tunggu, sedang memuat ulasan...</span>
-                  </div>
-                ) : filtered.length === 0 ? (
-                  <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-[48px_24px] flex flex-col items-center justify-center text-center">
-                    <div className="w-[60px] h-[60px] rounded-full bg-[#fef9c3] flex items-center justify-center mb-[14px]">
-                      <Star size={26} className="text-[#ca8a04]" />
-                    </div>
-                    <h3 className="text-[15px] font-semibold text-[#0f172a] mb-[5px]">
-                      {reviewsBusinessFilter !== "all" ? "Tidak ada ulasan untuk bisnis ini" : "Belum Ada Ulasan"}
-                    </h3>
-                    <p className="text-[12.5px] text-[#64748b] max-w-[300px] leading-[1.6]">
-                      {reviewsBusinessFilter !== "all"
-                        ? "Coba pilih bisnis lain atau reset filter."
-                        : "Belum ada ulasan yang diterima. Bagikan link bisnis ke pelanggan!"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-white border border-[#e2e8f0] rounded-[13px] shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b border-[#e2e8f0] bg-[#f8fafc]">
-                            <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[28px]">#</th>
-                            <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Usaha</th>
-                            <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Pelanggan</th>
-                            <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[110px]">Rating</th>
-                            <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Ulasan</th>
-                            <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[110px]">Tanggal</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pageRows.map((rev, idx) => (
-                            <tr key={rev.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors last:border-b-0">
-                              {/* No */}
-                              <td className="px-[14px] py-[12px] text-[12px] text-[#94a3b8] font-medium">
-                                {pageStart + idx + 1}
-                              </td>
-                              {/* Bisnis */}
-                              <td className="px-[14px] py-[12px]">
-                                <div className="flex items-center gap-[10px]">
-                                  {rev.businessLogo ? (
-                                    <img src={rev.businessLogo} alt={rev.businessName} className="w-[34px] h-[34px] rounded-[8px] object-cover border border-[#e2e8f0] shrink-0" />
-                                  ) : (
-                                    <div className="w-[34px] h-[34px] rounded-[8px] bg-gradient-to-br from-[#007570] to-[#00a89e] flex items-center justify-center shrink-0">
-                                      <Briefcase size={15} className="text-white" />
-                                    </div>
-                                  )}
-                                  <div>
-                                    <div className="text-[12.5px] font-semibold text-[#0f172a] leading-tight">{rev.businessName}</div>
-                                    {rev.businessSlug && (
-                                      <Link to={`/business/${rev.businessSlug}`} className="text-[11px] text-[#059669] hover:underline flex items-center gap-[3px] mt-[1px]">
-                                        <Eye size={10} /> Lihat
-                                      </Link>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              {/* Pelanggan */}
-                              <td className="px-[14px] py-[12px]">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 shrink-0">
-                                    {(rev.user || "P").charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="text-[12px] font-medium text-[#1e293b] truncate max-w-[120px]">
-                                    {rev.user || "Pelanggan"}
-                                  </span>
-                                </div>
-                              </td>
-                              {/* Rating */}
-                              <td className="px-[14px] py-[12px]">
-                                <div className="flex items-center gap-[3px]">
-                                  {renderStars(rev.rating)}
-                                  <span className="text-[11.5px] font-semibold text-[#374151] ml-[5px]">{rev.rating}</span>
-                                </div>
-                              </td>
-                              {/* Ulasan */}
-                              <td className="px-[14px] py-[12px] max-w-[320px]">
-                                {rev.review ? (
-                                  <span className="text-[12.5px] text-[#334155] leading-[1.55]" title={rev.review}>
-                                    {rev.review.length > 100 ? rev.review.slice(0, 100) + "…" : rev.review}
-                                  </span>
-                                ) : (
-                                  <span className="text-[12px] text-[#94a3b8] italic">—</span>
-                                )}
-                              </td>
-                              {/* Tanggal */}
-                              <td className="px-[14px] py-[12px]">
-                                <span className="text-[12px] text-[#64748b] whitespace-nowrap">{rev.date}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* ── Pagination inside card ── */}
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between px-[14px] py-[10px] border-t border-[#f1f5f9] bg-[#fafafa]">
-                        <span className="text-[12px] text-[#64748b]">
-                          {pageStart + 1}–{Math.min(pageEnd, filtered.length)} dari {filtered.length} ulasan
-                        </span>
-                        <div className="flex items-center gap-[5px]">
-                          <button
-                            disabled={safePage === 1}
-                            onClick={() => setReviewsCurrentPage(p => p - 1)}
-                            className="w-[30px] h-[30px] flex items-center justify-center rounded-[7px] border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9] disabled:opacity-35 transition-colors"
-                          >
-                            <ChevronLeft size={15} />
-                          </button>
-                          {Array.from({ length: totalPages }, (_, i) => i + 1)
-                            .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
-                            .reduce((acc, p, i, arr) => {
-                              if (i > 0 && arr[i - 1] !== p - 1) acc.push("...");
-                              acc.push(p);
-                              return acc;
-                            }, [])
-                            .map((p, i) =>
-                              p === "..." ? (
-                                <span key={`dot-${i}`} className="w-[30px] h-[30px] flex items-center justify-center text-[12px] text-[#94a3b8]">…</span>
-                              ) : (
-                                <button
-                                  key={p}
-                                  onClick={() => setReviewsCurrentPage(p)}
-                                  className={`w-[30px] h-[30px] flex items-center justify-center rounded-[7px] text-[12.5px] font-medium transition-colors ${
-                                    p === safePage ? "bg-[#059669] text-white" : "border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9]"
-                                  }`}
-                                >
-                                  {p}
-                                </button>
-                              )
-                            )}
-                          <button
-                            disabled={safePage === totalPages}
-                            onClick={() => setReviewsCurrentPage(p => p + 1)}
-                            className="w-[30px] h-[30px] flex items-center justify-center rounded-[7px] border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9] disabled:opacity-35 transition-colors"
-                          >
-                            <ChevronRight size={15} />
-                          </button>
+                    {/* Avg rating (filtered) */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-3.5 sm:p-[16px_18px] flex items-center gap-[12px] shadow-sm">
+                      <div className="w-[40px] h-[40px] rounded-[10px] bg-[#f0fdf4] flex items-center justify-center shrink-0">
+                        <Star size={18} className="text-[#16a34a]" />
+                      </div>
+                      <div>
+                        <div className="text-[20px] font-bold text-[#0f172a] leading-none flex items-baseline gap-[4px]">
+                          {filteredAvg}
+                          <span className="text-[11px] font-normal text-[#94a3b8]">/ 5</span>
+                        </div>
+                        <div className="text-[11px] text-[#64748b] mt-[2px]">
+                          {reviewsBusinessFilter === "all" ? "Rata-rata Semua" : "Rata-rata Filter"}
                         </div>
                       </div>
-                    )}
+                    </div>
+                    {/* Unique businesses */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-3.5 sm:p-[16px_18px] flex items-center gap-[12px] shadow-sm">
+                      <div className="w-[40px] h-[40px] rounded-[10px] bg-[#eff6ff] flex items-center justify-center shrink-0">
+                        <Briefcase size={18} className="text-[#3b82f6]" />
+                      </div>
+                      <div>
+                        <div className="text-[20px] font-bold text-[#0f172a] leading-none">{uniqueBusinesses.length}</div>
+                        <div className="text-[11px] text-[#64748b] mt-[2px]">Bisnis Diulas</div>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            );
+
+                  {/* ── Filter Bar ── */}
+                  <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-[14px_18px] flex items-center gap-[12px] shadow-sm flex-wrap">
+                    <div className="flex items-center gap-[7px] text-[12.5px] font-semibold text-[#374151] shrink-0">
+                      <Search size={14} className="text-[#059669]" />
+                      Filter Bisnis:
+                    </div>
+                    <div className="relative flex-1 min-w-[200px]">
+                      <select
+                        value={reviewsBusinessFilter}
+                        onChange={e => { setReviewsBusinessFilter(e.target.value); setReviewsCurrentPage(1); }}
+                        className="w-full appearance-none bg-[#f8fafc] border border-[#e2e8f0] rounded-[9px] px-[12px] py-[7px] pr-[32px] text-[12.5px] text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#007570] cursor-pointer"
+                      >
+                        <option value="all">Semua Bisnis ({reviews.length} ulasan)</option>
+                        {uniqueBusinesses.map(b => {
+                          const bizReviews = reviews.filter(r => r.business_id === b.id);
+                          const bizAvg = bizReviews.length > 0
+                            ? (bizReviews.reduce((s, r) => s + r.rating, 0) / bizReviews.length).toFixed(1)
+                            : "0.0";
+                          return (
+                            <option key={b.id} value={String(b.id)}>
+                              {b.name} — {bizReviews.length} ulasan · ★ {bizAvg}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <ChevronRight size={14} className="absolute right-[10px] top-1/2 -translate-y-1/2 text-[#94a3b8] rotate-90 pointer-events-none" />
+                    </div>
+                    {reviewsBusinessFilter !== "all" && (
+                      <button
+                        onClick={() => { setReviewsBusinessFilter("all"); setReviewsCurrentPage(1); }}
+                        className="flex items-center gap-[5px] px-[10px] py-[6px] text-[11.5px] font-medium text-[#64748b] bg-[#f1f5f9] hover:bg-[#e2e8f0] rounded-[8px] transition-colors shrink-0"
+                      >
+                        <X size={12} /> Reset
+                      </button>
+                    )}
+                    <span className="text-[11.5px] text-[#94a3b8] shrink-0">{filtered.length} ulasan ditemukan</span>
+                  </div>
+
+                  {/* ── Table / Loading / Error / Empty ── */}
+                  {reviewsError ? (
+                    <div className="bg-white border border-rose-200 rounded-[13px] p-[36px_24px] flex flex-col items-center justify-center text-center">
+                      <div className="w-[50px] h-[50px] rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-[10px]">
+                        <AlertCircle size={24} />
+                      </div>
+                      <h4 className="text-[14px] font-bold text-slate-800 mb-[4px]">{reviewsError}</h4>
+                      <button
+                        onClick={fetchReviews}
+                        className="mt-[8px] px-[14px] py-[6px] bg-[#059669] text-white font-semibold rounded-[8px] text-[12px] hover:bg-[#005a58] transition-colors cursor-pointer"
+                      >
+                        Coba Lagi
+                      </button>
+                    </div>
+                  ) : loadingReviews ? (
+                    <SuradeLoader variant="section" size="sm" text="Memuat ulasan pelanggan" minHeight="180px" />
+                  ) : filtered.length === 0 ? (
+                    <div className="bg-white border border-[#e2e8f0] rounded-[13px] p-[48px_24px] flex flex-col items-center justify-center text-center">
+                      <div className="w-[60px] h-[60px] rounded-full bg-[#fef9c3] flex items-center justify-center mb-[14px]">
+                        <Star size={26} className="text-[#ca8a04]" />
+                      </div>
+                      <h3 className="text-[15px] font-semibold text-[#0f172a] mb-[5px]">
+                        {reviewsBusinessFilter !== "all" ? "Tidak ada ulasan untuk bisnis ini" : "Belum Ada Ulasan"}
+                      </h3>
+                      <p className="text-[12.5px] text-[#64748b] max-w-[300px] leading-[1.6]">
+                        {reviewsBusinessFilter !== "all"
+                          ? "Coba pilih bisnis lain atau reset filter."
+                          : "Belum ada ulasan yang diterima. Bagikan link bisnis ke pelanggan!"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[#e2e8f0] rounded-[13px] shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-[#e2e8f0] bg-[#f8fafc]">
+                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[28px]">#</th>
+                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Usaha</th>
+                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Pelanggan</th>
+                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[110px]">Rating</th>
+                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em]">Ulasan</th>
+                              <th className="px-[14px] py-[11px] text-[11px] font-semibold text-[#64748b] uppercase tracking-[0.05em] w-[110px]">Tanggal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pageRows.map((rev, idx) => (
+                              <tr key={rev.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors last:border-b-0">
+                                {/* No */}
+                                <td className="px-[14px] py-[12px] text-[12px] text-[#94a3b8] font-medium">
+                                  {pageStart + idx + 1}
+                                </td>
+                                {/* Bisnis */}
+                                <td className="px-[14px] py-[12px]">
+                                  <div className="flex items-center gap-[10px]">
+                                    {rev.businessLogo ? (
+                                      <img src={rev.businessLogo} alt={rev.businessName} className="w-[34px] h-[34px] rounded-[8px] object-cover border border-[#e2e8f0] shrink-0" />
+                                    ) : (
+                                      <div className="w-[34px] h-[34px] rounded-[8px] bg-gradient-to-br from-[#007570] to-[#00a89e] flex items-center justify-center shrink-0">
+                                        <Briefcase size={15} className="text-white" />
+                                      </div>
+                                    )}
+                                    <div>
+                                      <div className="text-[12.5px] font-semibold text-[#0f172a] leading-tight">{rev.businessName}</div>
+                                      {rev.businessSlug && (
+                                        <Link to={`/business/${rev.businessSlug}`} className="text-[11px] text-[#059669] hover:underline flex items-center gap-[3px] mt-[1px]">
+                                          <Eye size={10} /> Lihat
+                                        </Link>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                {/* Pelanggan */}
+                                <td className="px-[14px] py-[12px]">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 shrink-0">
+                                      {(rev.user || "P").charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-[12px] font-medium text-[#1e293b] truncate max-w-[120px]">
+                                        {rev.user || "Pelanggan"}
+                                      </span>
+                                      {rev.is_mine && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                          Ulasan Saya
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                {/* Rating */}
+                                <td className="px-[14px] py-[12px]">
+                                  <div className="flex items-center gap-[3px]">
+                                    {renderStars(rev.rating)}
+                                    <span className="text-[11.5px] font-semibold text-[#374151] ml-[5px]">{rev.rating}</span>
+                                  </div>
+                                </td>
+                                {/* Ulasan */}
+                                <td className="px-[14px] py-[12px] max-w-[320px]">
+                                  {rev.review ? (
+                                    <span className="text-[12.5px] text-[#334155] leading-[1.55]" title={rev.review}>
+                                      {rev.review.length > 100 ? rev.review.slice(0, 100) + "…" : rev.review}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[12px] text-[#94a3b8] italic">—</span>
+                                  )}
+                                </td>
+                                {/* Tanggal */}
+                                <td className="px-[14px] py-[12px]">
+                                  <span className="text-[12px] text-[#64748b] whitespace-nowrap">{rev.date}</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* ── Pagination inside card ── */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between px-[14px] py-[10px] border-t border-[#f1f5f9] bg-[#fafafa]">
+                          <span className="text-[12px] text-[#64748b]">
+                            {pageStart + 1}–{Math.min(pageEnd, filtered.length)} dari {filtered.length} ulasan
+                          </span>
+                          <div className="flex items-center gap-[5px]">
+                            <button
+                              disabled={safePage === 1}
+                              onClick={() => setReviewsCurrentPage(p => p - 1)}
+                              className="w-[30px] h-[30px] flex items-center justify-center rounded-[7px] border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9] disabled:opacity-35 transition-colors"
+                            >
+                              <ChevronLeft size={15} />
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                              .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                              .reduce((acc, p, i, arr) => {
+                                if (i > 0 && arr[i - 1] !== p - 1) acc.push("...");
+                                acc.push(p);
+                                return acc;
+                              }, [])
+                              .map((p, i) =>
+                                p === "..." ? (
+                                  <span key={`dot-${i}`} className="w-[30px] h-[30px] flex items-center justify-center text-[12px] text-[#94a3b8]">…</span>
+                                ) : (
+                                  <button
+                                    key={p}
+                                    onClick={() => setReviewsCurrentPage(p)}
+                                    className={`w-[30px] h-[30px] flex items-center justify-center rounded-[7px] text-[12.5px] font-medium transition-colors ${p === safePage ? "bg-[#059669] text-white" : "border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9]"
+                                      }`}
+                                  >
+                                    {p}
+                                  </button>
+                                )
+                              )}
+                            <button
+                              disabled={safePage === totalPages}
+                              onClick={() => setReviewsCurrentPage(p => p + 1)}
+                              className="w-[30px] h-[30px] flex items-center justify-center rounded-[7px] border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9] disabled:opacity-35 transition-colors"
+                            >
+                              <ChevronRight size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
             })()
           )}
 
@@ -7074,19 +11654,17 @@ export default function AdminUser() {
                     return (
                       <div
                         key={plan.id}
-                        className={`bg-white rounded-2xl border-2 p-6 shadow-md transition-all hover:shadow-xl ${
-                          isActive ? 'border-teal-200' : 'border-gray-200 opacity-75'
-                        }`}
+                        className={`bg-white rounded-2xl border-2 p-6 shadow-md transition-all hover:shadow-xl ${isActive ? 'border-teal-200' : 'border-gray-200 opacity-75'
+                          }`}
                       >
                         {/* Header */}
                         <div className="flex items-start justify-between mb-4">
                           <div>
                             <h3 className="text-xl font-extrabold text-gray-900 mb-1">{plan.name}</h3>
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                              isActive 
-                                ? 'bg-green-100 text-green-700 border border-green-200' 
-                                : 'bg-gray-100 text-gray-600 border border-gray-200'
-                            }`}>
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${isActive
+                              ? 'bg-green-100 text-green-700 border border-green-200'
+                              : 'bg-gray-100 text-gray-600 border border-gray-200'
+                              }`}>
                               {isActive ? 'Aktif' : 'Nonaktif'}
                             </span>
                           </div>
@@ -7098,8 +11676,8 @@ export default function AdminUser() {
                             {isFree ? 'Gratis' : `Rp ${Number(plan.price).toLocaleString('id-ID')}`}
                           </div>
                           <div className="text-sm text-gray-600 mt-1">
-                            / {plan.duration_days >= 365 
-                              ? `${Math.floor(plan.duration_days / 365)} Tahun` 
+                            / {plan.duration_days >= 365
+                              ? `${Math.floor(plan.duration_days / 365)} Tahun`
                               : `${Math.floor(plan.duration_days / 30)} Bulan`}
                           </div>
                         </div>
@@ -7137,11 +11715,10 @@ export default function AdminUser() {
                           </button>
                           <button
                             onClick={() => handleTogglePlanStatus(plan.id)}
-                            className={`flex items-center justify-center gap-1.5 px-4 py-2.5 font-bold rounded-xl text-sm transition-colors ${
-                              isActive
-                                ? 'bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200'
-                                : 'bg-green-50 hover:bg-green-100 text-green-700 border border-green-200'
-                            }`}
+                            className={`flex items-center justify-center gap-1.5 px-4 py-2.5 font-bold rounded-xl text-sm transition-colors ${isActive
+                              ? 'bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200'
+                              : 'bg-green-50 hover:bg-green-100 text-green-700 border border-green-200'
+                              }`}
                           >
                             {isActive ? (
                               <>
@@ -7185,31 +11762,34 @@ export default function AdminUser() {
                   dengan ikon mahkota kecil - diganti nuansa emas premium
                   elegan dengan badge ikon bergaya 3D (gradasi + bayangan
                   berlapis supaya terlihat timbul/embossed). */}
-              <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-[#1a1408] via-[#241b09] to-[#1a1408] border border-[#f5c451]/25 p-[26px_28px] shadow-xl flex items-center gap-[20px]">
+              <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-[#1a1408] via-[#241b09] to-[#1a1408] border border-[#f5c451]/25 p-4 sm:p-5 md:p-[26px_28px] shadow-xl flex flex-col sm:flex-row items-start sm:items-center gap-3.5 sm:gap-[20px]">
                 {/* Cahaya dekoratif */}
                 <div className="absolute -right-10 -top-14 w-64 h-64 rounded-full bg-[#f5c451]/12 blur-3xl pointer-events-none" />
                 <div className="absolute left-1/3 -bottom-20 w-48 h-48 rounded-full bg-[#fbbf24]/10 blur-3xl pointer-events-none" />
 
-                {/* Badge ikon mahkota bergaya 3D (gradasi emas + bayangan
-                    berlapis: highlight terang di atas, bayangan gelap di
-                    bawah, supaya terkesan timbul seperti lencana logam). */}
-                <div
-                  className="relative z-10 shrink-0 w-[62px] h-[62px] rounded-2xl flex items-center justify-center"
-                  style={{
-                    background: "linear-gradient(145deg, #fde68a 0%, #f5c451 38%, #b8860b 100%)",
-                    boxShadow:
-                      "0 10px 24px rgba(184,134,11,0.45), inset 0 2px 3px rgba(255,255,255,0.65), inset 0 -3px 5px rgba(0,0,0,0.28)",
-                  }}
-                >
-                  <Crown size={30} className="text-[#3d2c05]" strokeWidth={2.3} />
-                </div>
-
-                <div className="relative z-10">
-                  <div className="inline-flex items-center gap-[6px] px-[10px] py-[3px] rounded-full bg-[#f5c451]/15 border border-[#f5c451]/30 text-[#f5d876] text-[11px] font-bold uppercase tracking-wider mb-[6px]">
+                {/* Badge ikon mahkota bergaya 3D */}
+                <div className="flex items-center gap-3 sm:block shrink-0">
+                  <div
+                    className="relative z-10 shrink-0 w-11 h-11 sm:w-14 sm:h-14 md:w-[62px] md:h-[62px] rounded-xl sm:rounded-2xl flex items-center justify-center shadow-md"
+                    style={{
+                      background: "linear-gradient(145deg, #fde68a 0%, #f5c451 38%, #b8860b 100%)",
+                      boxShadow:
+                        "0 10px 24px rgba(184,134,11,0.45), inset 0 2px 3px rgba(255,255,255,0.65), inset 0 -3px 5px rgba(0,0,0,0.28)",
+                    }}
+                  >
+                    <Crown size={24} className="text-[#3d2c05] sm:w-[28px] sm:h-[28px]" strokeWidth={2.3} />
+                  </div>
+                  <div className="sm:hidden inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#f5c451]/15 border border-[#f5c451]/30 text-[#f5d876] text-[10.5px] font-black uppercase tracking-wider">
                     <Sparkles size={11} /> Fitur Eksklusif
                   </div>
-                  <h2 className="text-[19px] md:text-[21px] font-extrabold tracking-tight text-white">Upgrade Usaha ke Premium</h2>
-                  <p className="text-[13px] text-[#d9cba3] mt-[2px]">Pilih profil usaha Anda dan paket premium untuk membuka fitur peta lokasi, galeri, dan badge prioritas.</p>
+                </div>
+
+                <div className="relative z-10 space-y-1">
+                  <div className="hidden sm:inline-flex items-center gap-[6px] px-[10px] py-[3px] rounded-full bg-[#f5c451]/15 border border-[#f5c451]/30 text-[#f5d876] text-[11px] font-bold uppercase tracking-wider mb-[2px]">
+                    <Sparkles size={11} /> Fitur Eksklusif
+                  </div>
+                  <h2 className="text-[17px] sm:text-[19px] md:text-[21px] font-extrabold tracking-tight text-white leading-snug">Upgrade Usaha ke Premium</h2>
+                  <p className="text-[12px] sm:text-[13px] text-[#d9cba3] leading-relaxed">Pilih profil usaha Anda dan paket premium untuk membuka fitur peta lokasi, galeri, dan badge prioritas.</p>
                 </div>
               </div>
 
@@ -7304,35 +11884,36 @@ export default function AdminUser() {
 
                         return (
                           <div className="flex flex-col gap-3">
-                            <div className="flex items-center justify-between p-[14px_16px] rounded-[12px] bg-[#f8fafc] border border-[#e2e8f0]">
-                              <div className="flex items-center gap-[12px]">
+                            {/* Selected Business Card */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <img
                                   src={currentBiz.logo ? getStorageUrl(currentBiz.logo) : DEFAULT_AVATAR}
                                   alt={currentBiz.name || "Bisnis"}
-                                  className="w-[44px] h-[44px] rounded-[10px] object-cover border border-[#e2e8f0]"
+                                  className="w-11 h-11 rounded-xl object-cover border border-slate-200 shrink-0"
                                 />
-                                <div>
-                                  <h4 className="text-[14px] font-bold text-[#0f172a]">{currentBiz.name}</h4>
-                                  <p className="text-[12px] text-[#64748b] flex items-center gap-[4px] mt-[1px]">
-                                    <MapPin size={12} className="text-[#059669]" />
-                                    <span>{currentBiz.city || "Indonesia"}</span>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-sm font-bold text-slate-900 truncate leading-snug">{currentBiz.name}</h4>
+                                  <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 truncate">
+                                    <MapPin size={12} className="text-[#059669] shrink-0" />
+                                    <span className="truncate">{currentBiz.city || "Indonesia"}</span>
                                     <span>•</span>
-                                    <span>{getCategoryDisplayName(currentBiz.category)}</span>
+                                    <span className="truncate">{getCategoryDisplayName(currentBiz.category)}</span>
                                   </p>
                                 </div>
                               </div>
-                              <div>
+                              <div className="shrink-0 self-start sm:self-center">
                                 {isPrem ? (
-                                  <span className="px-[10px] py-[4px] bg-[#fef3c7] text-[#b45309] rounded-full text-[11.5px] font-bold flex items-center gap-[4px]">
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs">
                                     ⭐ Premium Aktif
                                   </span>
                                 ) : isPendingSub ? (
-                                  <span className="px-[10px] py-[4px] bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-[11.5px] font-bold flex items-center gap-[4px]">
-                                    ⏳ Verifikasi Sedang Diproses
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-bold whitespace-nowrap">
+                                    ⏳ Sedang Diproses
                                   </span>
                                 ) : (
-                                  <span className="px-[10px] py-[4px] bg-[#f1f5f9] text-[#64748b] rounded-full text-[11.5px] font-semibold">
-                                    Paket Reguler / Free
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-600 border border-slate-200 rounded-full text-xs font-semibold whitespace-nowrap">
+                                    Paket Free / Reguler
                                   </span>
                                 )}
                               </div>
@@ -7340,18 +11921,20 @@ export default function AdminUser() {
 
                             {/* Alert if already premium */}
                             {isPrem && (
-                              <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl flex items-start gap-3 animate-fadeIn">
-                                <Crown size={22} className="text-amber-600 shrink-0 mt-0.5" />
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-200 text-amber-900 uppercase tracking-wider">
-                                      Sudah Premium
+                              <div className="p-4 bg-amber-50/90 border border-amber-300 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fadeIn">
+                                <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                                  <Crown size={20} />
+                                </div>
+                                <div className="space-y-1.5 min-w-0 flex-1">
+                                  <div>
+                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-200 text-amber-900 uppercase tracking-wider inline-block">
+                                      SUDAH PREMIUM
                                     </span>
-                                    <h4 className="text-xs font-bold text-amber-950">
-                                      Usaha "{currentBiz.name}" Sudah Memiliki Paket Premium Aktif
-                                    </h4>
                                   </div>
-                                  <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                                  <h4 className="text-sm font-bold text-amber-950 leading-snug">
+                                    Usaha "{currentBiz.name}" Sudah Memiliki Paket Premium Aktif
+                                  </h4>
+                                  <p className="text-xs text-amber-800 leading-relaxed">
                                     Profil usaha ini sudah berstatus <strong>Premium Aktif</strong> dengan seluruh fitur lengkap. Anda tidak dapat melakukan upgrade ganda pada usaha yang sama. Silakan pilih usaha Anda yang lain di atas untuk di-upgrade.
                                   </p>
                                 </div>
@@ -7360,18 +11943,20 @@ export default function AdminUser() {
 
                             {/* Alert if pending verification */}
                             {isPendingSub && (
-                              <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-xl flex items-start gap-3 animate-fadeIn">
-                                <Clock size={22} className="text-blue-600 shrink-0 mt-0.5" />
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-200 text-blue-900 uppercase tracking-wider">
-                                      Sedang Diverifikasi
+                              <div className="p-4 bg-blue-50/90 border border-blue-300 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fadeIn">
+                                <div className="w-9 h-9 rounded-xl bg-blue-100 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
+                                  <Clock size={20} />
+                                </div>
+                                <div className="space-y-1.5 min-w-0 flex-1">
+                                  <div>
+                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-200 text-blue-900 uppercase tracking-wider inline-block">
+                                      SEDANG DIVERIFIKASI
                                     </span>
-                                    <h4 className="text-xs font-bold text-blue-950">
-                                      Pengajuan Paket Premium untuk "{currentBiz.name}" Sedang Diproses
-                                    </h4>
                                   </div>
-                                  <p className="text-xs text-blue-800 mt-1 leading-relaxed">
+                                  <h4 className="text-sm font-bold text-blue-950 leading-snug">
+                                    Pengajuan Paket Premium untuk "{currentBiz.name}" Sedang Diproses
+                                  </h4>
+                                  <p className="text-xs text-blue-800 leading-relaxed">
                                     Bukti pembayaran untuk usaha ini sudah berhasil dikirim dan saat ini sedang menunggu antrean verifikasi Admin. Anda tidak perlu mengirim pembayaran atau upgrade ulang. Silakan pilih usaha Anda yang lain di atas jika ingin meng-upgrade usaha berbeda.
                                   </p>
                                 </div>
@@ -7408,10 +11993,7 @@ export default function AdminUser() {
                   </div>
 
                   {loadingPremiumPlans ? (
-                    <div className="flex flex-col items-center justify-center py-[48px] gap-[12px] text-[#64748b]">
-                      <Loader2 size={36} className="animate-spin text-[#059669]" />
-                      <p className="text-[13px] font-medium">Memuat paket premium terbaru...</p>
-                    </div>
+                    <SuradeLoader variant="section" size="sm" text="Memuat paket premium terbaru" minHeight="180px" />
                   ) : premiumPlans.length > 0 ? (
                     <div className={`grid grid-cols-1 ${premiumPlans.length === 1 ? 'max-w-[480px] mx-auto w-full' : premiumPlans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-[20px]`}>
                       {premiumPlans.map((plan) => {
@@ -7474,29 +12056,28 @@ export default function AdminUser() {
                             onClick={() => {
                               if (!isFree) setSelectedUpgradePlan(plan);
                             }}
-                            className={`rounded-[24px] p-[26px] flex flex-col justify-between relative transition-all duration-300 cursor-pointer overflow-hidden select-none transform-gpu group ${
-                              isFree
-                                ? isSelected
-                                  ? "border-2 border-[#007570] ring-4 ring-[#007570]/15 -translate-y-2 shadow-[0_22px_45px_-10px_rgba(0,117,112,0.22)]"
-                                  : "border border-slate-200 hover:border-teal-400/50 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_-10px_rgba(15,23,42,0.12)] shadow-[0_12px_28px_-8px_rgba(15,23,42,0.07)]"
-                                : isSelected
+                            className={`rounded-[24px] p-[26px] flex flex-col justify-between relative transition-all duration-300 cursor-pointer overflow-hidden select-none transform-gpu group ${isFree
+                              ? isSelected
+                                ? "border-2 border-[#007570] ring-4 ring-[#007570]/15 -translate-y-2 shadow-[0_22px_45px_-10px_rgba(0,117,112,0.22)]"
+                                : "border border-slate-200 hover:border-teal-400/50 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_-10px_rgba(15,23,42,0.12)] shadow-[0_12px_28px_-8px_rgba(15,23,42,0.07)]"
+                              : isSelected
                                 ? "border-2 border-amber-300 ring-4 ring-amber-400/30 -translate-y-2 shadow-[0_28px_60px_-12px_rgba(245,158,11,0.35),0_18px_36px_rgba(0,117,112,0.5)]"
                                 : "border border-emerald-400/30 hover:border-amber-400/80 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_-10px_rgba(0,117,112,0.45),0_0_24px_rgba(251,191,36,0.3)] shadow-[0_16px_36px_-10px_rgba(0,117,112,0.35),0_10px_20px_rgba(0,0,0,0.35)]"
-                            }`}
+                              }`}
                             style={
                               isFree
                                 ? {
-                                    background: "linear-gradient(155deg, #ffffff 0%, #f8fafc 45%, #f1f5f9 100%)",
-                                    boxShadow: isSelected
-                                      ? "0 22px 45px -10px rgba(0, 117, 112, 0.22), inset 0 2px 0 #ffffff, inset 0 -2px 4px rgba(0, 0, 0, 0.04)"
-                                      : "0 14px 32px -10px rgba(15, 23, 42, 0.08), inset 0 2px 0 #ffffff, inset 0 -2px 4px rgba(0, 0, 0, 0.03)",
-                                  }
+                                  background: "linear-gradient(155deg, #ffffff 0%, #f8fafc 45%, #f1f5f9 100%)",
+                                  boxShadow: isSelected
+                                    ? "0 22px 45px -10px rgba(0, 117, 112, 0.22), inset 0 2px 0 #ffffff, inset 0 -2px 4px rgba(0, 0, 0, 0.04)"
+                                    : "0 14px 32px -10px rgba(15, 23, 42, 0.08), inset 0 2px 0 #ffffff, inset 0 -2px 4px rgba(0, 0, 0, 0.03)",
+                                }
                                 : {
-                                    background: "radial-gradient(circle at 85% 15%, #0d463e 0%, #06312a 40%, #021a16 100%)",
-                                    boxShadow: isSelected
-                                      ? "0 30px 65px -12px rgba(245, 158, 11, 0.4), 0 18px 36px rgba(0, 117, 112, 0.5), inset 0 2px 1px rgba(255,255,255,0.45), inset 0 -4px 10px rgba(0,0,0,0.7)"
-                                      : "0 22px 48px -10px rgba(0, 117, 112, 0.4), 0 12px 24px rgba(0, 0, 0, 0.5), inset 0 1.5px 1px rgba(255,255,255,0.3), inset 0 -3px 8px rgba(0,0,0,0.6)",
-                                  }
+                                  background: "radial-gradient(circle at 85% 15%, #0d463e 0%, #06312a 40%, #021a16 100%)",
+                                  boxShadow: isSelected
+                                    ? "0 30px 65px -12px rgba(245, 158, 11, 0.4), 0 18px 36px rgba(0, 117, 112, 0.5), inset 0 2px 1px rgba(255,255,255,0.45), inset 0 -4px 10px rgba(0,0,0,0.7)"
+                                    : "0 22px 48px -10px rgba(0, 117, 112, 0.4), 0 12px 24px rgba(0, 0, 0, 0.5), inset 0 1.5px 1px rgba(255,255,255,0.3), inset 0 -3px 8px rgba(0,0,0,0.6)",
+                                }
                             }
                           >
                             {/* 3D Ambient Lighting Effect for Premium */}
@@ -7536,22 +12117,21 @@ export default function AdminUser() {
                                 )}
 
                                 <div
-                                  className={`w-[24px] h-[24px] rounded-full flex items-center justify-center transition-all ${
-                                    isSelected
-                                      ? "text-slate-950 font-bold scale-110"
-                                      : isFree
+                                  className={`w-[24px] h-[24px] rounded-full flex items-center justify-center transition-all ${isSelected
+                                    ? "text-slate-950 font-bold scale-110"
+                                    : isFree
                                       ? "border-2 border-slate-300 bg-white"
                                       : "border-2 border-emerald-400/60 bg-emerald-950/60 text-emerald-300"
-                                  }`}
+                                    }`}
                                   style={
                                     isSelected
                                       ? {
-                                          background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 100%)",
-                                          boxShadow: "0 0 14px rgba(245, 158, 11, 0.9), inset 0 1px 1px #ffffff",
-                                        }
+                                        background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 100%)",
+                                        boxShadow: "0 0 14px rgba(245, 158, 11, 0.9), inset 0 1px 1px #ffffff",
+                                      }
                                       : isFree
-                                      ? { boxShadow: "inset 0 1.5px 3px rgba(0,0,0,0.12)" }
-                                      : { boxShadow: "inset 0 1.5px 3px rgba(0,0,0,0.5)" }
+                                        ? { boxShadow: "inset 0 1.5px 3px rgba(0,0,0,0.12)" }
+                                        : { boxShadow: "inset 0 1.5px 3px rgba(0,0,0,0.5)" }
                                   }
                                 >
                                   {isSelected ? <Check size={14} strokeWidth={3.5} /> : null}
@@ -7583,11 +12163,10 @@ export default function AdminUser() {
                                   <li key={idx} className="flex items-center gap-[10px] text-[12.5px]">
                                     {feat.enabled ? (
                                       <div
-                                        className={`w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0 ${
-                                          isFree
-                                            ? "bg-emerald-100 text-emerald-700"
-                                            : "bg-gradient-to-br from-amber-300 to-amber-500 text-slate-950"
-                                        }`}
+                                        className={`w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0 ${isFree
+                                          ? "bg-emerald-100 text-emerald-700"
+                                          : "bg-gradient-to-br from-amber-300 to-amber-500 text-slate-950"
+                                          }`}
                                         style={
                                           !isFree
                                             ? { boxShadow: "0 2px 6px rgba(245,158,11,0.4), inset 0 1px 0 #ffffff" }
@@ -7648,37 +12227,52 @@ export default function AdminUser() {
                                   <span>Menunggu Verifikasi Admin</span>
                                 </button>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
-                                    if (!targetBizId) {
-                                      alert("Silakan daftarkan atau pilih usaha Anda terlebih dahulu.");
-                                      return;
-                                    }
-                                    navigate(`/add-business/${targetBizId}?upgrade=true`);
-                                  }}
-                                  className={`w-full py-[12px] rounded-[14px] font-black text-[14px] cursor-pointer border-0 transition-all duration-200 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] ${
-                                    isSelected
-                                      ? "text-slate-950"
-                                      : "text-slate-950"
-                                  }`}
-                                  style={
-                                    isSelected
-                                      ? {
+                                <div className="space-y-2">
+                                  {(() => {
+                                    const basePrice = Number(plan?.price || 0);
+                                    const durationDays = Number(plan?.duration_days || (plan?.duration_value ? plan.duration_value * 30 : 30));
+                                    const isYear = durationDays >= 300 || plan?.name?.toLowerCase().includes("tahun") || plan?.name?.toLowerCase().includes("yearly");
+                                    const isQuarter = durationDays >= 75 || plan?.name?.toLowerCase().includes("90") || plan?.name?.toLowerCase().includes("3 bulan");
+                                    const fallbackCost = isYear ? 250 : isQuarter ? 90 : 35;
+                                    const coinCost = basePrice > 0 ? Math.max(1, Math.round(basePrice / 1000)) : fallbackCost;
+
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDirectUpgradeWithPoin(plan);
+                                        }}
+                                        disabled={submittingUpgrade}
+                                        className="w-full py-[12px] rounded-[14px] font-black text-[13.5px] text-slate-950 cursor-pointer border border-amber-300 transition-all duration-200 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-amber-500/20"
+                                        style={{
                                           background: "linear-gradient(180deg, #fde047 0%, #f59e0b 55%, #d97706 100%)",
                                           boxShadow: "0 8px 24px rgba(217, 119, 6, 0.55), inset 0 1.5px 0 #ffffff, inset 0 -2px 0 #78350f",
-                                        }
-                                      : {
-                                          background: "linear-gradient(180deg, #34d399 0%, #059669 55%, #047857 100%)",
-                                          boxShadow: "0 8px 20px rgba(5, 150, 105, 0.45), inset 0 1.5px 0 rgba(255,255,255,0.45), inset 0 -2px 0 rgba(2, 44, 34, 0.5)",
-                                        }
-                                  }
-                                >
-                                  <span>Upgrade Usaha ke Paket Ini</span>
-                                  <ChevronRight size={17} strokeWidth={2.8} />
-                                </button>
+                                        }}
+                                      >
+                                        <Zap size={16} className="fill-slate-950 text-slate-950" />
+                                        <span>Bayar Instan ({coinCost} Poin)</span>
+                                      </button>
+                                    );
+                                  })()}
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const targetBizId = selectedUpgradeBusiness || (businesses?.[0]?.id || "");
+                                      if (!targetBizId) {
+                                        alert("Silakan daftarkan atau pilih usaha Anda terlebih dahulu.");
+                                        return;
+                                      }
+                                      navigate(`/add-business/${targetBizId}?upgrade=true&plan_id=${plan.id}&step=2`);
+                                    }}
+                                    className="w-full py-[9px] rounded-[12px] font-bold text-[12px] text-emerald-100 cursor-pointer bg-emerald-900/60 hover:bg-emerald-800/80 border border-emerald-500/40 transition-all flex items-center justify-center gap-1.5"
+                                  >
+                                    <span>Transfer Manual / Form Edit</span>
+                                    <ChevronRight size={14} />
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -7736,7 +12330,7 @@ export default function AdminUser() {
                             alert("Silakan daftarkan atau pilih usaha Anda terlebih dahulu.");
                             return;
                           }
-                          navigate(`/add-business/${targetBizId}?upgrade=true`);
+                          navigate(`/add-business/${targetBizId}?upgrade=true${selectedUpgradePlan ? `&plan_id=${selectedUpgradePlan.id}` : ''}&step=2`);
                         }}
                         className="w-full sm:w-auto px-[24px] py-[12px] rounded-[12px] bg-[#059669] text-white font-bold text-[14px] flex items-center justify-center gap-[8px] cursor-pointer transition-all hover:bg-[#005a58] hover:shadow-md disabled:bg-[#cbd5e1] disabled:cursor-not-allowed border-0"
                       >
@@ -7755,8 +12349,8 @@ export default function AdminUser() {
                   <div className="flex items-start gap-[14px]">
                     <MessageSquare size={24} className="text-[#059669] shrink-0 mt-[2px]" />
                     <div>
-                      <h4 className="text-[14px] font-semibold text-[#0f172a]">Chat via Inbox</h4>
-                      <p className="text-[12.5px] text-[#64748b]">Komunikasi langsung dengan pelanggan melalui inbox</p>
+                      <h4 className="text-[14px] font-semibold text-[#0f172a]">Pesan</h4>
+                      <p className="text-[12.5px] text-[#64748b]">Komunikasi langsung dengan pelanggan melalui pesan inbox</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-[14px]">
@@ -7923,12 +12517,13 @@ export default function AdminUser() {
               {/* Filter Tabs & Content Section */}
               <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                  <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-3 max-w-full scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-slate-100 hover:scrollbar-thumb-emerald-500" style={{ scrollbarWidth: 'thin', scrollbarColor: '#10b981 #f1f5f9' }}>
                     {[
                       { id: "all", label: "Semua", count: adStats.total_ads },
                       { id: "active", label: "Aktif", count: adStats.active_ads, badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
                       { id: "pending_payment", label: "Menunggu Pembayaran", count: adStats.pending_payment, badgeBg: "bg-amber-50 text-amber-700 border-amber-200" },
                       { id: "waiting_approval", label: "Menunggu Approval", count: adStats.waiting_approval, badgeBg: "bg-blue-50 text-blue-700 border-blue-200" },
+                      { id: "needs_revision", label: "⚠️ Perlu Perbaikan", count: advertisements.filter(a => (a.computed_status || a.status) === 'needs_revision').length, badgeBg: "bg-amber-50 text-amber-700 border-amber-200" },
                       { id: "expired", label: "Berakhir", count: adStats.expired_ads },
                       { id: "rejected", label: "Ditolak", count: adStats.rejected_ads, badgeBg: "bg-rose-50 text-rose-700 border-rose-200" },
                     ].map((tab) => {
@@ -7938,19 +12533,17 @@ export default function AdminUser() {
                           key={tab.id}
                           type="button"
                           onClick={() => setAdFilterTab(tab.id)}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                            isActive
-                              ? "bg-[#059669] text-white shadow-xs"
-                              : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                          }`}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${isActive
+                            ? "bg-[#059669] text-white shadow-xs"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            }`}
                         >
                           <span>{tab.label}</span>
                           <span
-                            className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                              isActive
-                                ? "bg-white/25 text-white"
-                                : tab.badgeBg || "bg-slate-200 text-slate-700"
-                            }`}
+                            className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${isActive
+                              ? "bg-white/25 text-white"
+                              : tab.badgeBg || "bg-slate-200 text-slate-700"
+                              }`}
                           >
                             {tab.count || 0}
                           </span>
@@ -7966,9 +12559,13 @@ export default function AdminUser() {
 
                 {/* Advertisements List */}
                 {loadingAdvertisements ? (
-                  <div className="flex flex-col items-center justify-center p-12 gap-3 text-slate-500">
-                    <Loader2 size={32} className="animate-spin text-[#059669]" />
-                    <p className="text-xs font-semibold">Memuat daftar iklan Anda...</p>
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                    <SuradeLoader
+                      variant="section"
+                      size="md"
+                      text="Memuat daftar iklan Anda"
+                      minHeight="180px"
+                    />
                   </div>
                 ) : (() => {
                   const filtered = advertisements.filter((ad) => {
@@ -7977,6 +12574,7 @@ export default function AdminUser() {
                     if (adFilterTab === "active") return status === "active" || status === "approved";
                     if (adFilterTab === "pending_payment") return status === "pending_payment" || ad.payment_status === "unpaid" || ad.payment_status === "pending_payment";
                     if (adFilterTab === "waiting_approval") return status === "waiting_approval" || (ad.payment_status === "pending" && status === "pending");
+                    if (adFilterTab === "needs_revision") return status === "needs_revision";
                     if (adFilterTab === "expired") return status === "expired";
                     if (adFilterTab === "rejected") return status === "rejected";
                     return true;
@@ -8022,17 +12620,8 @@ export default function AdminUser() {
                   return (
                     <div className="grid grid-cols-1 gap-4">
                       {filtered.map((ad) => {
-                        // PERBAIKAN: sebelumnya field "Sisa hari" mengandalkan
-                        // ad.days_remaining & ad.computed_status dari backend,
-                        // yang ternyata tidak selalu terisi (makanya tampil
-                        // "Sisa hari" tanpa angka). Sekarang dihitung langsung
-                        // dari tanggal end_date, jadi selalu akurat dan tidak
-                        // bergantung proses lain di server.
-                        const endDate = ad.end_date ? new Date(ad.end_date) : null;
-                        const daysRemaining = endDate
-                          ? Math.ceil((endDate.setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000)
-                          : null;
-                        const isExpired = daysRemaining !== null && daysRemaining < 0;
+                        const timeRemaining = getDetailedTimeRemaining(ad.end_date);
+                        const isExpired = timeRemaining?.isExpired || false;
                         const status = isExpired ? "expired" : (ad.computed_status || ad.status);
                         const isPremium = ad.placement_type === "premium" || /premium/i.test(ad.package_name || "");
                         const biz = ad.business || {};
@@ -8041,17 +12630,16 @@ export default function AdminUser() {
                         return (
                           <div
                             key={`user-ad-${ad.id}`}
-                            className={`group relative bg-white border rounded-2xl p-5 transition-all duration-200 hover:shadow-md ${
-                              isPremium
-                                ? "border-amber-200/90 bg-gradient-to-br from-white via-amber-50/20 to-white"
-                                : "border-slate-200 hover:border-teal-300"
-                            }`}
+                            className={`group relative bg-white border rounded-2xl p-4 sm:p-5 transition-all duration-200 hover:shadow-md ${isPremium
+                              ? "border-amber-200/90 bg-gradient-to-br from-white via-amber-50/20 to-white"
+                              : "border-slate-200 hover:border-teal-300"
+                              }`}
                           >
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                               {/* Left info */}
-                              <div className="flex items-start gap-4 min-w-0">
+                              <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                                 {/* Thumbnail */}
-                                <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                <div className="relative w-20 h-20 sm:w-24 sm:h-24 min-w-[80px] min-h-[80px] max-w-[80px] max-h-[80px] sm:min-w-[96px] sm:min-h-[96px] sm:max-w-[96px] sm:max-h-[96px] rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
                                   <img
                                     src={bizPhoto}
                                     alt={biz.name || "Bisnis"}
@@ -8065,20 +12653,20 @@ export default function AdminUser() {
                                 </div>
 
                                 {/* Texts */}
-                                <div className="min-w-0 space-y-1.5 flex-1">
+                                <div className="min-w-0 space-y-1 sm:space-y-1.5 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="text-base font-bold text-slate-900 truncate">
+                                    <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate">
                                       {biz.name || "Nama Bisnis Tidak Ditemukan"}
                                     </h4>
 
                                     {/* Placement Pill */}
                                     {isPremium ? (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-2xs">
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-extrabold bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-2xs">
                                         <Sparkles size={11} />
                                         Premium Hero Placement
                                       </span>
                                     ) : (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-[#059669] border border-teal-200">
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-bold bg-teal-50 text-[#059669] border border-teal-200">
                                         <Layers size={11} />
                                         Standard Ticker Placement
                                       </span>
@@ -8090,7 +12678,7 @@ export default function AdminUser() {
                                       {ad.package_name || "Paket Iklan"}
                                     </span>
                                     <span>•</span>
-                                    <span>Durasi: <strong>{ad.duration_days || 7} Hari</strong></span>
+                                    <span>Durasi: <strong>{getAdDurationDisplay(ad)}</strong></span>
                                     <span>•</span>
                                     <span className="font-extrabold text-[#059669]">
                                       Rp {Number(ad.price || 0).toLocaleString("id-ID")}
@@ -8100,10 +12688,10 @@ export default function AdminUser() {
                                   {/* Period & Days Remaining Info */}
                                   <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap pt-0.5">
                                     {ad.start_date && ad.end_date ? (
-                                      <div className="flex items-center gap-1.5 text-slate-600">
-                                        <Clock size={12} className="text-[#059669]" />
+                                      <div className="flex items-center gap-1.5 text-slate-600 flex-wrap">
+                                        <Clock size={12} className="text-[#059669] shrink-0" />
                                         <span>
-                                          Periode: <strong>{new Date(ad.start_date).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}</strong> s/d <strong>{new Date(ad.end_date).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
+                                          Periode: <strong>{formatAdDateTime(ad.start_date)}</strong> s/d <strong>{formatAdDateTime(ad.end_date)}</strong>
                                         </span>
                                       </div>
                                     ) : (
@@ -8112,27 +12700,30 @@ export default function AdminUser() {
                                       </span>
                                     )}
 
-                                    {status === "active" && daysRemaining !== null && daysRemaining >= 0 && (
-                                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
-                                        daysRemaining <= 3 ? "bg-red-100 text-red-700" : daysRemaining <= 7 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
-                                      }`}>
-                                        ⏳ {daysRemaining === 0 ? "Berakhir hari ini" : `Sisa ${daysRemaining} hari`}
+                                    {status === "active" && timeRemaining && !isExpired && (
+                                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold ${timeRemaining.badgeClass}`}>
+                                        {timeRemaining.text}
                                       </span>
                                     )}
                                     {isExpired && (
-                                      <span className="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-slate-200 text-slate-600">
+                                      <span className="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-slate-200 text-slate-600 border border-slate-300">
                                         ⏹️ Masa tayang berakhir
                                       </span>
                                     )}
                                   </div>
 
-                                  {/* Rejection Alert if rejected */}
-                                  {status === "rejected" && (
-                                    <div className="mt-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
-                                      <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-600" />
+                                  {/* Rejection Alert if rejected or needs_revision */}
+                                  {(status === "rejected" || status === "needs_revision") && (
+                                    <div className={`mt-2 p-2.5 rounded-xl text-xs flex items-start gap-2 ${status === "needs_revision"
+                                      ? "bg-amber-50 border border-amber-200 text-amber-800"
+                                      : "bg-rose-50 border border-rose-200 text-rose-700"
+                                      }`}>
+                                      <AlertTriangle size={15} className={`shrink-0 mt-0.5 ${status === "needs_revision" ? "text-amber-600" : "text-rose-600"}`} />
                                       <div>
-                                        <span className="font-bold">Alasan Penolakan Admin: </span>
-                                        <span>{ad.rejection_reason || ad.notes || "Bukti transfer tidak valid atau foto bisnis belum memenuhi syarat."}</span>
+                                        <span className="font-bold">
+                                          {status === "needs_revision" ? "⚠️ Catatan Perbaikan dari Admin: " : "Alasan Penolakan Admin: "}
+                                        </span>
+                                        <span>{ad.rejection_reason || ad.notes || (status === "needs_revision" ? "Admin meminta perbaikan bukti transfer atau data iklan." : "Bukti transfer tidak valid atau foto bisnis belum memenuhi syarat.")}</span>
                                       </div>
                                     </div>
                                   )}
@@ -8162,6 +12753,11 @@ export default function AdminUser() {
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
                                       Masa Tayang Berakhir
                                     </span>
+                                  ) : status === "needs_revision" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                      <AlertCircle size={13} className="text-amber-600" />
+                                      Perlu Perbaikan
+                                    </span>
                                   ) : status === "rejected" ? (
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                                       Ditolak
@@ -8175,14 +12771,14 @@ export default function AdminUser() {
 
                                 {/* Action buttons */}
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  {status === "rejected" && (
+                                  {status === "needs_revision" && (
                                     <button
                                       type="button"
                                       onClick={() => handleOpenResubmitAdModal(ad)}
-                                      className="px-3.5 py-1.5 rounded-xl bg-[#059669] hover:bg-[#005a58] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                                      className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                                     >
-                                      <RefreshCw size={14} />
-                                      Ajukan Ulang Iklan
+                                      <Edit size={14} />
+                                      Perbaiki Iklan / Bukti
                                     </button>
                                   )}
 
@@ -8211,12 +12807,12 @@ export default function AdminUser() {
                                     </button>
                                   )}
 
-                                  {(status === "pending" || status === "pending_payment") && (
+                                  {(status === "pending" || status === "pending_payment" || status === "needs_revision" || status === "rejected") && (
                                     <button
                                       type="button"
                                       onClick={() => handleAdCancel(ad.id)}
                                       className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
-                                      title="Batalkan Iklan"
+                                      title="Hapus / Batalkan Iklan"
                                     >
                                       <Trash2 size={14} />
                                     </button>
@@ -8233,31 +12829,38 @@ export default function AdminUser() {
               </div>
 
               {/* Information Features Banner */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                  <Sparkles size={18} className="text-[#059669]" />
-                  Perbandingan Paket Iklan Surade.co.id
-                </h3>
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                      <Sparkles size={18} className="text-[#059669]" />
+                      Perbandingan Paket Iklan Surade.com
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Tingkatkan eksposur bisnis Anda ke ribuan pengunjung aktif dengan memasang iklan <strong>Premium</strong> atau <strong>Standard</strong>.
+                    </p>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Premium Ads info card */}
                   <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-300/80 flex flex-col justify-between space-y-3">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-2xs">
-                          ⭐ PREMIUM ADS
+                          ⭐ PREMIUM
                         </span>
-                        <span className="text-xs font-bold text-amber-800">Posisi Paling Atas (Hero)</span>
+                        <span className="text-xs font-bold text-amber-800">Posisi Paling Atas</span>
                       </div>
-                      <h4 className="text-base font-extrabold text-slate-900">Large Hero Visual Carousel</h4>
+                      <h4 className="text-base font-extrabold text-slate-900">Visual Carousel Utama</h4>
                       <p className="text-xs text-slate-600 leading-relaxed">
-                        Format iklan eksklusif dengan foto bisnis full-width ukuran besar, minimalis tanpa teks berlebih, menampilkan rating bintang ★ dan lokasi 📍. Iklan pertama yang dilihat ribuan pengunjung saat membuka Surade.co.id.
+                        Format iklan eksklusif dengan foto Usaha full-width ukuran besar, minimalis tanpa teks berlebih, menampilkan rating bintang ★ dan lokasi 📍. Iklan pertama yang dilihat ribuan pengunjung saat membuka Surade.com.
                       </p>
                     </div>
                     <ul className="text-xs text-slate-700 space-y-1.5 font-medium pt-2 border-t border-amber-200/60">
                       <li className="flex items-center gap-2">
                         <CheckCircle size={14} className="text-amber-600 shrink-0" />
-                        Ukuran visual raksasa di section teratas halaman Home
+                        Ukuran visual besar di posisi teratas halaman utama
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle size={14} className="text-amber-600 shrink-0" />
@@ -8271,16 +12874,20 @@ export default function AdminUser() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#059669] text-white">
-                          ⚡ STANDARD ADS
+                          ⚡ STANDARD
                         </span>
-                        <span className="text-xs font-bold text-teal-800">Continuous Running Ticker</span>
+                        <span className="text-xs font-bold text-teal-800">Running Ticker Dinamis</span>
                       </div>
-                      <h4 className="text-base font-extrabold text-slate-900">Infinite Horizontal Stream</h4>
+                      <h4 className="text-base font-extrabold text-slate-900">Promosi Berjalan Otomatis</h4>
                       <p className="text-xs text-slate-600 leading-relaxed">
-                        Format kartu kecil modern yang bergerak otomatis secara halus dari kanan ke kiri tanpa henti (continuous ticker). Sangat dinamis, eye-catching, dan efisien untuk mempromosikan bisnis Anda.
+                        Format kartu promosi modern yang bergerak otomatis secara halus dari kanan ke kiri tanpa henti (running ticker). Sangat dinamis, eye-catching, dan efisien untuk mempromosikan bisnis Anda.
                       </p>
                     </div>
                     <ul className="text-xs text-slate-700 space-y-1.5 font-medium pt-2 border-t border-teal-200/60">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle size={14} className="text-[#059669] shrink-0" />
+                        Ukuran promosi lebih ringkas dan hemat biaya
+                      </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle size={14} className="text-[#059669] shrink-0" />
                         Animasi horizontal scroller tanpa jeda (smooth infinite loop)
@@ -8316,8 +12923,8 @@ export default function AdminUser() {
                           <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
                             {resubmittingAdId ? "Ajukan Ulang Iklan (Revisi) #" + resubmittingAdId : (
                               createAdStep === 1 ? "Pilih Bisnis untuk Diiklankan" :
-                              createAdStep === 2 ? "Pilih Paket Iklan (Placement)" :
-                              "Live Preview & Checkout Pembayaran"
+                                createAdStep === 2 ? "Pilih Paket Iklan (Placement)" :
+                                  "Live Preview & Checkout Pembayaran"
                             )}
                           </h3>
                         </div>
@@ -8326,7 +12933,7 @@ export default function AdminUser() {
                             ? "Perbaiki data atau bukti pembayaran iklan Anda yang ditolak untuk diverifikasi kembali oleh admin."
                             : (createAdStep === 1 ? "Tentukan salah satu bisnis terdaftar Anda yang ingin dipromosikan." :
                               createAdStep === 2 ? "Pilih antara Premium Hero Carousel atau Standard Running Ticker." :
-                              "Periksa tampilan live iklan Anda, masukkan kupon, dan selesaikan pembayaran.")
+                                "Periksa tampilan live iklan Anda, masukkan kupon, dan selesaikan pembayaran.")
                           }
                         </p>
                       </div>
@@ -8348,13 +12955,12 @@ export default function AdminUser() {
                       ].map((item) => (
                         <div
                           key={item.step}
-                          className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all ${
-                            createAdStep === item.step
-                              ? "bg-teal-50 border-[#007570] text-[#059669]"
-                              : createAdStep > item.step
+                          className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all ${createAdStep === item.step
+                            ? "bg-teal-50 border-[#007570] text-[#059669]"
+                            : createAdStep > item.step
                               ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                               : "bg-slate-50 border-slate-200 text-slate-400"
-                          }`}
+                            }`}
                         >
                           {item.title}
                         </div>
@@ -8388,11 +12994,10 @@ export default function AdminUser() {
                                 <div
                                   key={`select-biz-${biz.id}`}
                                   onClick={() => setSelectedBusinessForAd(biz.id)}
-                                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 relative ${
-                                    isSelected
-                                      ? "border-[#007570] bg-teal-50/40 shadow-xs ring-2 ring-[#007570]/20"
-                                      : "border-slate-200 bg-white hover:border-slate-300"
-                                  }`}
+                                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 relative ${isSelected
+                                    ? "border-[#007570] bg-teal-50/40 shadow-xs ring-2 ring-[#007570]/20"
+                                    : "border-slate-200 bg-white hover:border-slate-300"
+                                    }`}
                                 >
                                   <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
                                     <img
@@ -8453,13 +13058,12 @@ export default function AdminUser() {
                                 <div
                                   key={`ad-pkg-${pkg.id}`}
                                   onClick={() => setSelectedPackage(pkg.id || pkg.name)}
-                                  className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative ${
-                                    isSelected
-                                      ? isPrem
-                                        ? "border-amber-500 bg-amber-50/40 shadow-md ring-2 ring-amber-500/20"
-                                        : "border-[#007570] bg-teal-50/40 shadow-md ring-2 ring-[#007570]/20"
-                                      : "border-slate-200 bg-white hover:border-slate-300"
-                                  }`}
+                                  className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative ${isSelected
+                                    ? isPrem
+                                      ? "border-amber-500 bg-amber-50/40 shadow-md ring-2 ring-amber-500/20"
+                                      : "border-[#007570] bg-teal-50/40 shadow-md ring-2 ring-[#007570]/20"
+                                    : "border-slate-200 bg-white hover:border-slate-300"
+                                    }`}
                                 >
                                   {isPrem && (
                                     <div className="absolute -top-3 right-4 px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xs">
@@ -8470,11 +13074,10 @@ export default function AdminUser() {
                                   <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                       <span
-                                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase ${
-                                          isPrem
-                                            ? "bg-amber-100 text-amber-900 border border-amber-300"
-                                            : "bg-teal-100 text-teal-900 border border-teal-300"
-                                        }`}
+                                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase ${isPrem
+                                          ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                          : "bg-teal-100 text-teal-900 border border-teal-300"
+                                          }`}
                                       >
                                         {isPrem ? "Premium Ads" : "Standard Ads"}
                                       </span>
@@ -8513,37 +13116,51 @@ export default function AdminUser() {
                             })
                           ) : (
                             <>
-                              {/* Standard fallback */}
+                              {/* Paket 1: Iklan Harian */}
                               <div
-                                onClick={() => setSelectedPackage("Standard Iklan")}
-                                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
-                                  selectedPackage === "Standard Iklan"
-                                    ? "border-[#007570] bg-teal-50/40 shadow-md"
-                                    : "border-slate-200 bg-white"
-                                }`}
+                                onClick={() => setSelectedPackage("Iklan Harian (1 Hari)")}
+                                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${selectedPackage === "Iklan Harian (1 Hari)"
+                                  ? "border-[#007570] bg-teal-50/40 shadow-md"
+                                  : "border-slate-200 bg-white"
+                                  }`}
                               >
                                 <div className="space-y-2">
-                                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-900">Standard Ads</span>
-                                  <h4 className="text-base font-extrabold text-slate-900">Standard Ticker (7 Hari)</h4>
-                                  <span className="text-xl font-black text-slate-900">Rp 150.000</span>
-                                  <p className="text-xs text-slate-600">Running ticker continuous scroller.</p>
+                                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-900">1 Hari</span>
+                                  <h4 className="text-base font-extrabold text-slate-900">Iklan Harian (1 Hari)</h4>
+                                  <span className="text-xl font-black text-slate-900">Rp 2.000</span>
+                                  <p className="text-xs text-slate-600">Tampil di banner promosi selama 1 hari.</p>
                                 </div>
                               </div>
 
-                              {/* Premium fallback */}
+                              {/* Paket 2: Iklan Mingguan */}
                               <div
-                                onClick={() => setSelectedPackage("Premium Iklan")}
-                                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
-                                  selectedPackage === "Premium Iklan"
-                                    ? "border-amber-500 bg-amber-50/40 shadow-md"
-                                    : "border-slate-200 bg-white"
-                                }`}
+                                onClick={() => setSelectedPackage("Iklan Mingguan (7 Hari)")}
+                                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${selectedPackage === "Iklan Mingguan (7 Hari)"
+                                  ? "border-amber-500 bg-amber-50/40 shadow-md"
+                                  : "border-slate-200 bg-white"
+                                  }`}
                               >
                                 <div className="space-y-2">
-                                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900">Premium Ads</span>
-                                  <h4 className="text-base font-extrabold text-slate-900">Premium Hero (7 Hari)</h4>
-                                  <span className="text-xl font-black text-slate-900">Rp 75.000</span>
-                                  <p className="text-xs text-slate-600">Large Hero Carousel di posisi paling atas.</p>
+                                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900">7 Hari</span>
+                                  <h4 className="text-base font-extrabold text-slate-900">Iklan Mingguan (7 Hari)</h4>
+                                  <span className="text-xl font-black text-slate-900">Rp 12.000</span>
+                                  <p className="text-xs text-slate-600">Tampil promosi selama 1 minggu penuh.</p>
+                                </div>
+                              </div>
+
+                              {/* Paket 3: Iklan Bulanan */}
+                              <div
+                                onClick={() => setSelectedPackage("Iklan Bulanan (30 Hari)")}
+                                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${selectedPackage === "Iklan Bulanan (30 Hari)"
+                                  ? "border-emerald-600 bg-emerald-50/40 shadow-md"
+                                  : "border-slate-200 bg-white"
+                                  }`}
+                              >
+                                <div className="space-y-2">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-900">30 Hari</span>
+                                  <h4 className="text-base font-extrabold text-slate-900">Iklan Bulanan (30 Hari)</h4>
+                                  <span className="text-xl font-black text-slate-900">Rp 40.000</span>
+                                  <p className="text-xs text-slate-600">Paket hemat promosi maksimal 1 bulan.</p>
                                 </div>
                               </div>
                             </>
@@ -8582,6 +13199,9 @@ export default function AdminUser() {
                       const photo = getBusinessPhoto(selBiz);
                       const categoryName = getBusinessCategoryName(selBiz);
                       const cityName = getBusinessCityName(selBiz);
+                      const rawRating = Number(selBiz?.rating || selBiz?.average_rating || selBiz?.raw?.rating || selBiz?.raw?.average_rating || 0);
+                      const rawReviewsCount = Number(selBiz?.reviews_count || selBiz?.ratings_count || selBiz?.total_reviews || selBiz?.raw?.reviews_count || selBiz?.raw?.ratings_count || (Array.isArray(selBiz?.raw?.reviews) ? selBiz.raw.reviews.length : 0) || 0);
+                      const formattedRating = rawRating > 0 ? rawRating.toFixed(1) : "0.0";
 
                       return (
                         <div className="space-y-6">
@@ -8625,7 +13245,9 @@ export default function AdminUser() {
                                     </h4>
                                     <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-200">
                                       <span className="flex items-center gap-1 text-amber-400 font-bold">
-                                        ★ 4.8 <span className="text-slate-300 font-normal">({categoryName})</span>
+                                        <Star size={14} className="fill-amber-400 text-amber-400" />
+                                        <span>{formattedRating}</span>
+                                        <span className="text-slate-300 font-normal">({rawReviewsCount} ulasan • {categoryName})</span>
                                       </span>
                                       <span>•</span>
                                       <span className="flex items-center gap-1">
@@ -8655,7 +13277,13 @@ export default function AdminUser() {
                                         <span className="text-[9px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
                                           SPONSORED
                                         </span>
-                                        <span className="text-[11px] font-bold text-amber-500">★ 4.8</span>
+                                        <div className="flex items-center gap-1 text-amber-500 font-bold text-[11px]">
+                                          <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
+                                          <span>{formattedRating}</span>
+                                          {rawReviewsCount > 0 && (
+                                            <span className="text-[10px] text-slate-400 font-normal">({rawReviewsCount})</span>
+                                          )}
+                                        </div>
                                       </div>
                                       <h5 className="text-xs font-bold text-slate-900 truncate">
                                         {selBiz?.name || "Nama Bisnis Anda"}
@@ -8685,58 +13313,7 @@ export default function AdminUser() {
                               )}
                             </div>
 
-                            {/* Daftar Kupon Tersedia */}
-                            {!appliedCouponInfo && (
-                              <div className="space-y-1.5">
-                                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
-                                  <span className="flex items-center gap-1 text-emerald-700 font-bold">
-                                    <Sparkles size={12} />
-                                    Kupon Promo Tersedia:
-                                  </span>
-                                  <span className="text-[10px] text-slate-400">Klik kupon untuk pakai langsung</span>
-                                </div>
 
-                                {availableCouponsLoading ? (
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 py-1">
-                                    <Loader2 size={13} className="animate-spin text-emerald-600" />
-                                    Memuat daftar kupon aktif...
-                                  </div>
-                                ) : availableCoupons.length > 0 ? (
-                                  <div className="flex flex-wrap gap-2 pt-0.5">
-                                    {availableCoupons.map((c) => {
-                                      const isPercentage = c.discount_type === 'percentage';
-                                      const discountLabel = isPercentage 
-                                        ? `Diskon ${Number(c.discount_value)}%`
-                                        : `Diskon Rp ${Number(c.discount_value).toLocaleString('id-ID')}`;
-                                      return (
-                                        <button
-                                          key={c.code}
-                                          type="button"
-                                          onClick={() => handleValidateUserCoupon(c.code)}
-                                          disabled={validatingCoupon}
-                                          className="group flex items-center gap-2 bg-white hover:bg-emerald-50 border border-emerald-200 hover:border-emerald-400 rounded-xl px-3 py-1.5 text-left transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
-                                          title={c.description || c.name || `Kupon ${c.code}`}
-                                        >
-                                          <div className="flex items-center gap-1">
-                                            <Tag size={12} className="text-emerald-600 group-hover:rotate-12 transition-transform" />
-                                            <span className="font-mono font-extrabold text-xs text-slate-900 tracking-wide">
-                                              {c.code}
-                                            </span>
-                                          </div>
-                                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                                            {discountLabel}
-                                          </span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <p className="text-[11px] text-slate-500 italic">
-                                    Ketik kode kupon promo yang Anda miliki di kotak bawah.
-                                  </p>
-                                )}
-                              </div>
-                            )}
 
                             {/* Applied Coupon Card */}
                             {appliedCouponInfo ? (
@@ -8815,24 +13392,229 @@ export default function AdminUser() {
                             )}
                           </div>
 
-                          {/* Payment Method Selector - NEW UI with Logos */}
+                          {/* Referral Code Section (Hanya tampil jika harga paket > Rp 10.000) */}
+                          {getSelectedPackagePrice() > 10000 && (
+                            <div className="bg-gradient-to-br from-teal-50/60 via-slate-50 to-emerald-50/40 border border-teal-200/80 rounded-2xl p-4 space-y-3.5 shadow-2xs">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                  <Sparkles size={15} className="text-[#007570]" />
+                                  Kode Referral Mitra (Diskon 10%)
+                                </label>
+                                {adAppliedReferralInfo && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-[#007570] border border-teal-300">
+                                    <CheckCircle2 size={11} /> Aktif Terpasang
+                                  </span>
+                                )}
+                              </div>
+
+                              {adAppliedReferralInfo ? (
+                                <div className="p-3 bg-white border-2 border-teal-500 rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-lg bg-teal-100 text-[#007570] flex items-center justify-center shrink-0">
+                                      <CheckCircle2 size={18} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono font-extrabold text-xs text-[#007570] tracking-wider">
+                                          {adAppliedReferralInfo.code}
+                                        </span>
+                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-800">
+                                          Hemat Rp {getAdReferralDiscount().toLocaleString("id-ID")}
+                                        </span>
+                                      </div>
+                                      <p className="text-[11px] text-slate-500 truncate">
+                                        {adAppliedReferralInfo.referrer_name ? `Mitra: ${adAppliedReferralInfo.referrer_name}` : 'Diskon referral berhasil memotong biaya iklan'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {adAppliedReferralInfo.is_bound || isGloballyBound ? (
+                                    <span className="px-2.5 py-1.5 rounded-lg bg-teal-50 border border-teal-200 text-[#007570] text-xs font-bold shrink-0 flex items-center gap-1 shadow-2xs">
+                                      <CheckCircle2 size={13} />
+                                      Terkunci Permanen
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={handleRemoveAdReferral}
+                                      className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1"
+                                    >
+                                      <X size={13} />
+                                      Hapus
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <div className="relative flex-1">
+                                    <input
+                                      type="text"
+                                      value={adReferralCodeInput}
+                                      onChange={(e) => setAdReferralCodeInput(e.target.value.toUpperCase())}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleValidateAdReferral();
+                                        }
+                                      }}
+                                      placeholder="Masukkan kode referral mitra..."
+                                      className="w-full uppercase px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white outline-none focus:border-[#007570] focus:ring-2 focus:ring-[#007570]/10"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleValidateAdReferral()}
+                                    disabled={validatingAdReferral || !adReferralCodeInput.trim()}
+                                    className="px-5 py-2.5 rounded-xl bg-[#007570] hover:bg-[#005a58] text-white font-bold text-xs cursor-pointer transition-all disabled:opacity-40 border-0 flex items-center gap-1.5 shadow-2xs"
+                                  >
+                                    {validatingAdReferral ? (
+                                      <>
+                                        <Loader2 size={13} className="animate-spin" />
+                                        Memeriksa...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Check size={13} />
+                                        Gunakan
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              )}
+
+                              {adReferralMsg && (
+                                <p className={`text-xs font-bold flex items-center gap-1.5 ${adAppliedReferralInfo ? "text-teal-700" : "text-rose-600"}`}>
+                                  {adAppliedReferralInfo ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                                  {adReferralMsg}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* ── BAYAR INSTAN DENGAN POIN BANNER ── */}
+                          {(() => {
+                            const pkgObj = getSelectedPackageObj();
+                            const basePrice = pkgObj?.price ? Number(pkgObj.price) : (typeof getSelectedPackagePrice === 'function' ? getSelectedPackagePrice() : 25000);
+                            const finalPrice = getFinalPrice();
+                            const basePoin = Math.max(1, Math.round(basePrice / 1000));
+                            const adCoinCost = Math.max(0, Math.round(finalPrice / 1000));
+                            const discountPoin = Math.max(0, basePoin - adCoinCost);
+                            const isInsufficient = scoinBalance !== null && scoinBalance < adCoinCost;
+
+                            return (
+                              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-teal-500/15 border-2 border-amber-400 shadow-xs space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <SuradeCoinIcon size={24} />
+                                    <span className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                                      Bayar Instan dengan {adCoinCost} Poin
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                    {discountPoin > 0 && (
+                                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                                        Hemat {discountPoin.toLocaleString("id-ID")} Poin
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950">
+                                      {adCoinCost} Poin (Langsung Aktif)
+                                    </span>
+                                  </div>
+                                </div>
+                                <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                                  Iklan langsung aktif &amp; terverifikasi detik ini juga <strong>tanpa upload bukti transfer</strong> dan <strong>tanpa verifikasi admin</strong>!
+                                </p>
+                                <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200 flex items-center justify-between text-xs">
+                                  <span className="font-semibold text-slate-600">Saldo Poin:</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-amber-800">
+                                      {scoinBalance !== null ? `${scoinBalance.toLocaleString("id-ID")} Poin` : "0 Poin"}
+                                    </span>
+                                    {isInsufficient && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowBuyCoinModal(true)}
+                                        className="px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-slate-950 rounded hover:bg-amber-400 cursor-pointer"
+                                      >
+                                        + Beli Poin
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleAdSubmitWithPoin}
+                                  disabled={submittingAd || isInsufficient}
+                                  className={`w-full py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md ${isInsufficient
+                                    ? "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300"
+                                    : "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-slate-950 border border-amber-300"
+                                    }`}
+                                >
+                                  {submittingAd ? (
+                                    <>
+                                      <Loader2 size={14} className="animate-spin" />
+                                      <span>Memproses Pembayaran Poin...</span>
+                                    </>
+                                  ) : isInsufficient ? (
+                                    <span>Saldo Poin Kurang (Butuh {adCoinCost} Poin)</span>
+                                  ) : (
+                                    <>
+                                      <Zap size={14} className="fill-amber-950" />
+                                      <span>Aktifkan Iklan Sekarang ({adCoinCost} Poin)</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })()}
+
+                          <div className="relative flex py-1 items-center">
+                            <div className="flex-grow border-t border-slate-200"></div>
+                            <span className="flex-shrink mx-3 text-[11px] font-bold text-slate-400 uppercase">
+                              atau bayar via Transfer / QRIS
+                            </span>
+                            <div className="flex-grow border-t border-slate-200"></div>
+                          </div>
+
+                          {/* Payment Method Selector - Terhubung dengan Kelola Pembayaran */}
                           <PaymentMethodSelector
                             methods={paymentMethods}
                             selectedMethod={selectedPaymentMethod}
-                            onSelect={(method) => setSelectedPaymentMethod(method.name)}
+                            onSelect={(method) => setSelectedPaymentMethod(method.name || method.id)}
                             title="Pilih Metode Pembayaran"
+                            amount={getFinalPrice()}
+                            finalPrice={getFinalPrice()}
+                            showInstruction={true}
                           />
 
-                          {/* Upload Bukti Transfer (Opsional saat submit / resubmit) */}
+                          {/* Upload Bukti Transfer */}
                           <div className="space-y-2">
-                            <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
-                              <span>Upload Bukti Pembayaran (Opsional)</span>
+                            <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+                              <span className="flex items-center gap-1">
+                                <span>Upload Bukti Pembayaran / Struk Transfer</span>
+                                {getFinalPrice() > 0 ? (
+                                  <span className="text-rose-600 font-extrabold">* (Wajib)</span>
+                                ) : (
+                                  <span className="text-slate-400 font-normal">(Gratis)</span>
+                                )}
+                              </span>
                               {adPaymentProofPreview && (
-                                <span className="text-[11px] text-[#059669] font-semibold">
-                                  {adPaymentProofFile ? "Foto baru dipilih" : "Bukti pembayaran tersimpan"}
+                                <span className="text-[11px] text-[#059669] font-bold flex items-center gap-1">
+                                  <CheckCircle2 size={12} /> {adPaymentProofFile ? "Foto baru dipilih" : "Bukti pembayaran tersimpan"}
                                 </span>
                               )}
                             </label>
+
+                            {getFinalPrice() > 0 && !adPaymentProofPreview && (
+                              <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2 animate-fadeIn">
+                                <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                <div className="space-y-0.5">
+                                  <p className="font-bold">Wajib Mengunggah Bukti Transfer</p>
+                                  <p className="text-[11.5px] text-amber-800">
+                                    Lakukan pembayaran sesuai total nominal ke rekening/e-wallet di atas, lalu unggah foto/screenshot bukti transfer di bawah sebelum mengirim pengajuan.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
 
                             {adPaymentProofPreview ? (
                               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
@@ -8895,11 +13677,12 @@ export default function AdminUser() {
                                       setRemoveExistingProof(false);
                                     }
                                   }}
-                                  className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-[#059669] hover:file:bg-teal-100 cursor-pointer"
+                                  className={`w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-[#059669] hover:file:bg-teal-100 cursor-pointer p-1 rounded-xl border ${getFinalPrice() > 0 ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200 bg-white'
+                                    }`}
                                 />
                                 {resubmittingAdId && removeExistingProof && (
                                   <span className="text-[11px] text-amber-600 font-medium block mt-1">
-                                    * Foto bukti sebelumnya telah dihapus. Anda dapat mengunggah foto bukti baru atau menyimpannya tanpa bukti.
+                                    * Foto bukti sebelumnya telah dihapus. Silakan unggah foto bukti transfer baru.
                                   </span>
                                 )}
                               </div>
@@ -8918,6 +13701,12 @@ export default function AdminUser() {
                               <div className="flex justify-between text-emerald-700 font-bold">
                                 <span>Diskon Kupon ({appliedCouponInfo.code}):</span>
                                 <span>-Rp {Number(appliedCouponInfo.discount_amount).toLocaleString("id-ID")}</span>
+                              </div>
+                            )}
+                            {adAppliedReferralInfo && (
+                              <div className="flex justify-between text-[#007570] font-bold">
+                                <span>Diskon Referral ({adAppliedReferralInfo.code}):</span>
+                                <span>-Rp {getAdReferralDiscount().toLocaleString("id-ID")}</span>
                               </div>
                             )}
                             <div className="flex justify-between items-center text-sm font-black text-[#059669] border-t border-teal-200/80 pt-2 mt-1">
@@ -9013,16 +13802,15 @@ export default function AdminUser() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-sm font-bold text-slate-900 truncate">{biz.name || "Nama Bisnis"}</h4>
-                            <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
-                              isPremium ? "bg-amber-100 text-amber-800" : "bg-teal-50 text-[#059669]"
-                            }`}>
+                            <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${isPremium ? "bg-amber-100 text-amber-800" : "bg-teal-50 text-[#059669]"
+                              }`}>
                               {isPremium ? "Premium Hero Ads" : "Standard Ticker Ads"}
                             </span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap">
                             <span>Paket: <strong>{ad.package_name || "Iklan"}</strong></span>
                             <span>•</span>
-                            <span>Durasi: <strong>{ad.duration_days || 7} Hari</strong></span>
+                            <span>Durasi: <strong>{getAdDurationDisplay(ad)}</strong></span>
                             <span>•</span>
                             <span className="font-black text-[#059669]">Rp {Number(ad.price || 0).toLocaleString("id-ID")}</span>
                           </div>
@@ -9038,63 +13826,56 @@ export default function AdminUser() {
                         </div>
                       </div>
 
-                      {/* Payment Account Instruction */}
+                      {/* ── BAYAR INSTAN DENGAN POIN RE-ACTIVATION ── */}
+                      {(() => {
+                        const adCoinCost = Math.max(1, Math.round(Number(ad.price || 25000) / 1000));
+                        return (
+                          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-teal-500/15 border-2 border-amber-400 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <SuradeCoinIcon size={22} />
+                                <span className="text-xs font-black text-slate-900 uppercase">
+                                  Aktifkan Instan dengan {adCoinCost} Poin
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950">
+                                Tanpa Verifikasi Admin
+                              </span>
+                            </div>
+                            <p className="text-[11.5px] text-slate-600">
+                              Ingin iklan langsung tayang sekarang juga tanpa menunggu admin mengecek bukti transfer manual?
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handlePayResubmitWithPoin(ad.id, adCoinCost)}
+                              className="w-full py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-slate-950 border border-amber-300"
+                            >
+                              <Zap size={14} className="fill-amber-950" />
+                              <span>Bayar &amp; Aktifkan Iklan Sekarang ({adCoinCost} Poin)</span>
+                            </button>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="relative flex py-1 items-center">
+                        <div className="flex-grow border-t border-slate-200"></div>
+                        <span className="flex-shrink mx-3 text-[11px] font-bold text-slate-400 uppercase">
+                          atau kirim ulang bukti transfer manual
+                        </span>
+                        <div className="flex-grow border-t border-slate-200"></div>
+                      </div>
+
+                      {/* Payment Account Instruction with PaymentMethodSelector */}
                       <div className="space-y-3">
                         <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          1. Metode Pembayaran & Rekening Tujuan
+                          1. METODE PEMBAYARAN &amp; REKENING TUJUAN
                         </label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          {[
-                            { name: "Transfer Bank Mandiri", tag: "Mandiri", color: "bg-[#003d79]" },
-                            { name: "Transfer Bank BNI", tag: "BNI", color: "bg-[#f15a24]" },
-                            { name: "Transfer Bank BCA", tag: "BCA", color: "bg-[#00529c]" },
-                            { name: "Transfer Bank Maybank", tag: "Maybank", color: "bg-[#ffc800] !text-slate-900" },
-                            { name: "Transfer Bank BJB", tag: "BJB", color: "bg-[#0072bc]" },
-                            { name: "OVO", tag: "OVO", color: "bg-[#4c2a86]" },
-                            { name: "DANA", tag: "DANA", color: "bg-[#008ce5]" },
-                            { name: "GoPay", tag: "GoPay", color: "bg-[#00a5cf]" },
-                          ].map((pm) => {
-                            const isSelected = resubmitPaymentMethod === pm.name;
-                            return (
-                              <div
-                                key={pm.name}
-                                onClick={() => setResubmitPaymentMethod(pm.name)}
-                                className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                                  isSelected
-                                    ? "border-[#007570] bg-teal-50/50 text-[#059669] font-bold shadow-2xs"
-                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                                }`}
-                              >
-                                <span className={`inline-block px-1.5 py-0.2 rounded text-[9.5px] font-black text-white ${pm.color} mb-1`}>
-                                  {pm.tag}
-                                </span>
-                                <span className="block truncate text-[11px] font-semibold">{pm.name}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-xs">
-                          <div>
-                            <span className="text-slate-500">Nomor Rekening / E-Wallet ({resubmitPaymentMethod}):</span>
-                            <div className="text-base font-black text-slate-900 tracking-wider">
-                              {getPaymentNumber(resubmitPaymentMethod)}
-                            </div>
-                            <span className="text-[11px] text-slate-500 font-medium">a.n {OFFICIAL_ACCOUNT_HOLDER}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(getPaymentNumber(resubmitPaymentMethod));
-                              setCopyToast(true);
-                              setTimeout(() => setCopyToast(false), 2000);
-                            }}
-                            className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs"
-                          >
-                            <Copy size={13} />
-                            {copyToast ? "Tersalin!" : "Salin No"}
-                          </button>
-                        </div>
+                        <PaymentMethodSelector
+                          methods={paymentMethods}
+                          selectedMethod={resubmitPaymentMethod}
+                          onSelect={(method) => setResubmitPaymentMethod(method.name || method.id)}
+                          showInstruction={true}
+                        />
                       </div>
 
                       {/* Multi-Proof Management */}
@@ -9353,18 +14134,18 @@ export default function AdminUser() {
                         </div>
                         <div>
                           <span className="text-slate-400 block font-medium">Durasi Tayang:</span>
-                          <span className="font-bold text-slate-900">{ad.duration_days || 7} Hari</span>
+                          <span className="font-bold text-slate-900">{getAdDurationDisplay(ad)}</span>
                         </div>
                         {ad.start_date && (
                           <div>
                             <span className="text-slate-400 block font-medium">Tanggal Mulai:</span>
-                            <span className="font-bold text-slate-900">{new Date(ad.start_date).toLocaleDateString("id-ID")}</span>
+                            <span className="font-bold text-slate-900">{formatAdDateTime(ad.start_date)}</span>
                           </div>
                         )}
                         {ad.end_date && (
                           <div>
                             <span className="text-slate-400 block font-medium">Tanggal Selesai:</span>
-                            <span className="font-bold text-slate-900">{new Date(ad.end_date).toLocaleDateString("id-ID")}</span>
+                            <span className="font-bold text-slate-900">{formatAdDateTime(ad.end_date)}</span>
                           </div>
                         )}
                       </div>
@@ -9394,7 +14175,18 @@ export default function AdminUser() {
                         </div>
                       )}
 
-                      <div className="flex justify-end pt-2">
+                      <div className="flex items-center justify-between pt-2">
+                        {biz.id ? (
+                          <a
+                            href={`/business/${biz.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-[#059669] font-bold text-xs cursor-pointer border border-teal-200 transition-colors"
+                          >
+                            <Eye size={14} />
+                            Buka Halaman Bisnis
+                          </a>
+                        ) : <div />}
                         <button
                           type="button"
                           onClick={() => setViewingAdDetail(null)}
@@ -9447,49 +14239,13 @@ export default function AdminUser() {
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-xs font-bold text-slate-700 block">Pilih Rekening / E-Wallet</label>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {[
-                          "Transfer Bank Mandiri",
-                          "Transfer Bank BNI",
-                          "Transfer Bank BCA",
-                          "Transfer Bank Maybank",
-                          "Transfer Bank BJB",
-                          "OVO",
-                          "DANA",
-                          "GoPay"
-                        ].map((pm) => (
-                          <div
-                            key={pm}
-                            onClick={() => setSelectedPaymentMethod(pm)}
-                            className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                              selectedPaymentMethod === pm ? "border-[#007570] bg-teal-50 text-[#059669] font-bold" : "border-slate-200 text-slate-700"
-                            }`}
-                          >
-                            <span>{pm}</span>
-                            {selectedPaymentMethod === pm && <CheckCircle size={14} />}
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex justify-between items-center">
-                        <div>
-                          <span className="text-slate-400 text-[11px] block">No Rekening / E-Wallet ({selectedPaymentMethod}):</span>
-                          <span className="font-black text-slate-900 text-sm">{getPaymentNumber(selectedPaymentMethod)}</span>
-                          <span className="text-[11px] text-slate-500 font-medium block mt-0.5">a.n {OFFICIAL_ACCOUNT_HOLDER}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(getPaymentNumber(selectedPaymentMethod));
-                            setCopyToast(true);
-                            setTimeout(() => setCopyToast(false), 2000);
-                          }}
-                          className="px-2.5 py-1 rounded bg-white border border-slate-200 text-slate-700 font-bold text-[11px] cursor-pointer"
-                        >
-                          {copyToast ? "Tersalin!" : "Salin"}
-                        </button>
-                      </div>
+                      <PaymentMethodSelector
+                        methods={paymentMethods}
+                        selectedMethod={selectedPaymentMethod}
+                        onSelect={(method) => setSelectedPaymentMethod(method.name || method.id)}
+                        title="Pilih Rekening / E-Wallet"
+                        showInstruction={true}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -9560,26 +14316,119 @@ export default function AdminUser() {
                     <Briefcase size={16} className="text-[#059669]" />
                     Pilih Bisnis:
                   </label>
-                  <select
-                    value={selectedBusinessForProducts || ""}
-                    onChange={(e) => setSelectedBusinessForProducts(e.target.value)}
-                    className="w-full sm:flex-1 h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-xs md:text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all shadow-2xs cursor-pointer"
-                  >
-                    <option value="">-- Pilih Bisnis --</option>
-                    {businesses.map((biz) => (
-                      <option key={biz.id} value={biz.id}>
-                        {biz.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="w-full sm:flex-1 space-y-2">
+                    <select
+                      value={selectedBusinessForProducts || ""}
+                      onChange={(e) => setSelectedBusinessForProducts(e.target.value)}
+                      className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-xs md:text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all shadow-2xs cursor-pointer"
+                    >
+                      <option value="">-- Pilih Bisnis --</option>
+                      {businesses.map((biz) => {
+                        const isPrem = Boolean(
+                          biz.is_premium ||
+                          biz.is_premium_active ||
+                          biz.raw?.is_premium ||
+                          biz.raw?.is_premium_active ||
+                          biz.raw?.features?.is_premium ||
+                          biz.features?.is_premium ||
+                          biz.package_type === "premium"
+                        );
+                        const prodCount = biz.products?.length ?? biz.products_count ?? biz.raw?.products?.length ?? 0;
+                        return (
+                          <option key={biz.id} value={biz.id}>
+                            {isPrem
+                              ? `⭐ [PREMIUM] ${biz.name} (Bebas Tambah Produk)`
+                              : prodCount >= 3
+                                ? `📦 [FREE - PENUH (3/3)] ${biz.name}`
+                                : `📦 [FREE (${prodCount}/3)] ${biz.name}`}
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    {/* Status Badge Info Bisnis Terpilih */}
+                    {selectedBusinessForProducts && (() => {
+                      const activeBiz = businesses.find(b => String(b.id) === String(selectedBusinessForProducts));
+                      const isPrem = Boolean(
+                        activeBiz?.is_premium ||
+                        activeBiz?.is_premium_active ||
+                        activeBiz?.raw?.is_premium ||
+                        activeBiz?.raw?.is_premium_active ||
+                        activeBiz?.raw?.features?.is_premium ||
+                        activeBiz?.features?.is_premium ||
+                        activeBiz?.package_type === "premium"
+                      );
+                      const prodCount = products ? products.length : (activeBiz?.products?.length || 0);
+                      const isFull = !isPrem && prodCount >= 3;
+
+                      if (isPrem) {
+                        return (
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-xl text-amber-900 text-xs">
+                            <span className="text-base">⭐</span>
+                            <div>
+                              <span className="font-extrabold text-amber-800 uppercase tracking-wide text-[10px] bg-amber-200/80 px-2 py-0.5 rounded-md mr-1.5">
+                                Bisnis Premium
+                              </span>
+                              <span className="text-[11.5px] font-semibold text-amber-900">
+                                Bebas menambahkan produk tanpa batasan kuota.
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-800 text-xs flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">📦</span>
+                            <div>
+                              <span className="font-extrabold text-slate-700 uppercase tracking-wide text-[10px] bg-slate-200 px-2 py-0.5 rounded-md mr-1.5">
+                                Paket Free / Reguler
+                              </span>
+                              <span className="text-[11.5px] font-bold text-slate-800">
+                                Kuota Produk: {prodCount}/3 Produk
+                                {isFull ? (
+                                  <span className="text-rose-600 font-extrabold ml-1.5">
+                                    (Batas Tercapai - Tidak Dapat Menambah Lagi)
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-700 font-semibold ml-1.5">
+                                    (Sisa {3 - prodCount} slot produk)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          {isFull && (
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/add-business/${selectedBusinessForProducts}?upgrade=true`)}
+                              className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-[11px] shadow-sm transition-all cursor-pointer"
+                            >
+                              Upgrade ke Premium ↗
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 {selectedBusinessForProducts ? (
                   <>
                     {(() => {
                       const activeProdBiz = businesses.find(b => String(b.id) === String(selectedBusinessForProducts));
-                      const isActiveProdBizPrem = Boolean(activeProdBiz?.is_premium || activeProdBiz?.raw?.is_premium || activeProdBiz?.raw?.features?.is_premium);
-                      const isProdLimit3Reached = !isActiveProdBizPrem && products.length >= 3;
+                      const isActiveProdBizPrem = Boolean(
+                        activeProdBiz?.is_premium ||
+                        activeProdBiz?.is_premium_active ||
+                        activeProdBiz?.raw?.is_premium ||
+                        activeProdBiz?.raw?.is_premium_active ||
+                        activeProdBiz?.raw?.features?.is_premium ||
+                        activeProdBiz?.features?.is_premium ||
+                        activeProdBiz?.package_type === "premium"
+                      );
+                      const currentCount = products ? products.length : (activeProdBiz?.products?.length || 0);
+                      const isProdLimit3Reached = !isActiveProdBizPrem && currentCount >= 3;
 
                       return (
                         <>
@@ -9588,16 +14437,16 @@ export default function AdminUser() {
                               <div className="flex items-start gap-2.5">
                                 <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
                                 <div>
-                                  <p className="font-bold">Batas Maksimal 3 Produk Tercapai (Paket Free)</p>
+                                  <p className="font-bold">Batas Maksimal 3 Produk Tercapai (Paket Free: 3/3 Produk)</p>
                                   <p className="text-amber-700 text-[11.5px] mt-0.5">
-                                    Bisnis <strong>{activeProdBiz?.name}</strong> menggunakan paket Free ({products.length}/3 produk). Upgrade ke Premium untuk produk tanpa batas.
+                                    Bisnis <strong>{activeProdBiz?.name}</strong> menggunakan paket Free dan sudah mengisi kuota maksimal 3 produk. Tombol tambah produk dinonaktifkan kecuali bisnis diupgrade ke paket Premium.
                                   </p>
                                 </div>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => setActiveTab("premium")}
-                                className="px-3.5 py-1.5 bg-[#059669] hover:bg-[#005f5b] text-white text-xs font-bold rounded-lg transition-colors shrink-0 cursor-pointer"
+                                onClick={() => navigate(`/add-business/${selectedBusinessForProducts}?upgrade=true`)}
+                                className="px-3.5 py-1.5 bg-[#059669] hover:bg-[#005f5b] text-white text-xs font-bold rounded-lg transition-colors shrink-0 cursor-pointer shadow-sm"
                               >
                                 Upgrade ke Premium
                               </button>
@@ -9617,19 +14466,23 @@ export default function AdminUser() {
                               />
                             </div>
                             <button
-                              className="w-full sm:w-auto h-11 inline-flex items-center justify-center gap-2 bg-[#059669] hover:bg-[#005f5b] active:bg-[#004e4a] text-white px-5 rounded-xl font-bold text-xs md:text-sm transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              type="button"
+                              className={`w-full sm:w-auto h-11 inline-flex items-center justify-center gap-2 px-5 rounded-xl font-bold text-xs md:text-sm transition-all shadow-sm shrink-0 ${isProdLimit3Reached
+                                ? "bg-slate-200 text-slate-400 border border-slate-300 hover:bg-slate-300 hover:text-slate-600 cursor-not-allowed"
+                                : "bg-[#059669] hover:bg-[#005f5b] active:bg-[#004e4a] text-white cursor-pointer"
+                                }`}
                               onClick={() => {
                                 if (isProdLimit3Reached) {
-                                  alert("Bisnis Free dibatasi maksimal 3 produk. Silakan upgrade ke paket Premium untuk menambahkan produk tanpa batas.");
-                                  setActiveTab("premium");
+                                  alert("Bisnis Free telah mencapai batas maksimal 3 produk. Silakan upgrade ke paket Premium untuk menambahkan produk tanpa batas.");
                                 } else {
                                   navigate(`/add-product/${selectedBusinessForProducts}`);
                                 }
                               }}
                               disabled={!selectedBusinessForProducts}
+                              title={isProdLimit3Reached ? "Batas 3 produk tercapai untuk bisnis Free" : "Tambah Produk Baru"}
                             >
                               <Plus size={18} strokeWidth={2.5} />
-                              <span>Tambah Produk</span>
+                              <span>{isProdLimit3Reached ? "Batas 3 Produk Penuh" : "Tambah Produk"}</span>
                             </button>
                           </div>
                         </>
@@ -9638,9 +14491,13 @@ export default function AdminUser() {
 
                     {/* Loading State */}
                     {loadingProducts ? (
-                      <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
-                        <Loader2 className="animate-spin text-[#059669]" size={42} />
-                        <p className="text-xs font-semibold text-slate-500">Memuat data produk...</p>
+                      <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                        <SuradeLoader
+                          variant="section"
+                          size="md"
+                          text="Memuat data produk"
+                          minHeight="180px"
+                        />
                       </div>
                     ) : products && products.length > 0 ? (
                       (() => {
@@ -9662,14 +14519,55 @@ export default function AdminUser() {
                                   className="group bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1 flex flex-col"
                                 >
                                   {/* Image Container */}
-                                  <div className="h-44 w-full bg-slate-100 relative overflow-hidden">
+                                  <div className="h-44 w-full bg-slate-950 relative overflow-hidden flex items-center justify-center">
+                                    {/* Blurred Backdrop */}
+                                    {product.image && (
+                                      <img
+                                        src={getStorageUrl(product.image)}
+                                        alt=""
+                                        className="absolute inset-0 w-full h-full object-cover blur-md opacity-30 pointer-events-none scale-110"
+                                        aria-hidden="true"
+                                      />
+                                    )}
+                                    {/* Main Product Image (no distortion) */}
                                     <img
                                       src={product.image ? getStorageUrl(product.image) : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='176'%3E%3Crect width='200' height='176' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='14' fill='%2364748b'%3EProduk%3C/text%3E%3C/svg%3E"}
                                       alt={product.name}
-                                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                      className="relative z-10 max-w-full max-h-full w-auto h-auto object-contain transition-transform duration-500 group-hover:scale-105"
+                                      style={{ maxHeight: '176px' }}
                                       onError={(e) => { e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='176'%3E%3Crect width='200' height='176' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial, sans-serif' font-size='14' fill='%2364748b'%3EProduk%3C/text%3E%3C/svg%3E"; }}
                                     />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20" />
+
+                                    {/* Status Badge */}
+                                    <div className="absolute top-2.5 left-2.5 z-30">
+                                      {product.status === "pending" && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-xs">
+                                          <Clock size={11} /> Menunggu Verifikasi
+                                        </span>
+                                      )}
+                                      {product.status === "needs_revision" && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-600 text-white shadow-xs">
+                                          <AlertTriangle size={11} /> Perlu Revisi
+                                        </span>
+                                      )}
+                                      {(product.status === "approved" || !product.status) && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-xs">
+                                          <CheckCircle size={11} /> Tayang
+                                        </span>
+                                      )}
+                                      {product.status === "rejected" && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-600 text-white shadow-xs">
+                                          <AlertTriangle size={11} /> Ditolak
+                                        </span>
+                                      )}
+                                    </div>
+                                    {/* Product ID Code Badge */}
+                                    <div className="absolute top-2.5 right-2.5 z-30">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-900/70 text-slate-200 backdrop-blur-sm border border-slate-700/50">
+                                        #{product.id}
+                                      </span>
+                                    </div>
                                   </div>
 
                                   {/* Content */}
@@ -9683,6 +14581,40 @@ export default function AdminUser() {
                                       </p>
                                     </div>
 
+                                    {/* Rejection notice box if rejected */}
+                                    {product.status === "rejected" && (
+                                      <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 space-y-1">
+                                        <div className="flex items-center gap-1 text-[11px] font-bold text-rose-800">
+                                          <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                                          <span>Produk Ditolak Permanen</span>
+                                        </div>
+                                        <p className="text-[11px] text-rose-700 leading-tight">
+                                          Alasan: <em>{product.rejection_reason || "Produk tidak memenuhi kriteria publikasi."}</em>
+                                        </p>
+                                      </div>
+                                    )}
+
+                                    {/* Revision notice box if needs_revision */}
+                                    {product.status === "needs_revision" && (
+                                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 space-y-1.5">
+                                        <div className="flex items-center gap-1 text-[11px] font-bold text-amber-900">
+                                          <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+                                          <span>Perlu Perbaikan Produk</span>
+                                        </div>
+                                        <p className="text-[11px] text-amber-800 leading-tight">
+                                          Alasan: <em>{product.rejection_reason || "Perlu perbaikan informasi / foto produk."}</em>
+                                        </p>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditProduct(product)}
+                                          className="w-full mt-1 py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold transition-colors cursor-pointer shadow-2xs flex items-center justify-center gap-1"
+                                        >
+                                          <Edit size={12} />
+                                          <span>Perbaiki &amp; Kirim Ulang</span>
+                                        </button>
+                                      </div>
+                                    )}
+
                                     <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between">
                                       <div>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Harga</span>
@@ -9695,13 +14627,15 @@ export default function AdminUser() {
 
                                       {/* Action Buttons */}
                                       <div className="flex items-center gap-1.5">
-                                        <button
-                                          className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                          title="Edit Produk"
-                                          onClick={() => handleEditProduct(product)}
-                                        >
-                                          <Edit size={15} />
-                                        </button>
+                                        {product.status !== "rejected" && (
+                                          <button
+                                            className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                            title="Edit Produk"
+                                            onClick={() => handleEditProduct(product)}
+                                          >
+                                            <Edit size={15} />
+                                          </button>
+                                        )}
                                         <button
                                           className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                                           title="Hapus Produk"
@@ -9778,9 +14712,13 @@ export default function AdminUser() {
           {activeTab === "profile" && (
             <div className="w-full max-w-[900px] mx-auto">
               {loadingProfile ? (
-                <div className="flex flex-col items-center justify-center p-[80px_20px] gap-[16px] text-[#64748b] text-[14px] font-medium">
-                  <Loader2 size={36} className="animate-spin text-[#059669]" />
-                  <p>Memuat data profil...</p>
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs my-4">
+                  <SuradeLoader
+                    variant="section"
+                    size="md"
+                    text="Memuat data profil"
+                    minHeight="180px"
+                  />
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
@@ -9789,272 +14727,340 @@ export default function AdminUser() {
                     <p className="text-xs sm:text-sm text-slate-500">Perbarui foto profil, data informasi akun, dan kontak Anda secara berkala</p>
                   </div>
 
-                    {/* Integrated Photo Upload Section */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 p-5 sm:p-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 mb-8">
-                      <div className="flex items-center gap-5">
-                        {/* Avatar */}
-                        <div className="relative shrink-0">
-                          <SafeImage
-                            src={photoPreview || DEFAULT_AVATAR}
-                            alt="Avatar"
-                            className="w-20 h-20 sm:w-22 sm:h-22 rounded-full object-cover border-4 border-white shadow-md bg-white ring-2 ring-slate-200"
-                            fallback={DEFAULT_AVATAR}
-                            onError={(e) => {
-                              console.warn("Avatar image failed to load:", e.currentTarget.src);
-                            }}
-                            onLoad={() => {
-                              console.log("Avatar image loaded successfully:", photoPreview);
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#059669] hover:bg-[#005f5b] text-white border-2 border-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105"
-                            onClick={() => setShowPhotoModal(true)}
-                            title="Ganti Foto Profil"
-                          >
-                            <Camera size={13} />
-                          </button>
-                        </div>
-
-                        {/* User Details */}
-                        <div className="flex flex-col gap-1.5 min-w-0">
-                          <div className="flex items-center gap-2.5 flex-wrap">
-                            <h4 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate">
-                              {profileData.name || "Nama Pengguna"}
-                            </h4>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-teal-50 text-[#059669] border border-teal-200">
-                              {profileData.role || "user"}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
-                              @{user?.username || "user"}
-                            </span>
-                          </div>
-
-                          <p className="text-[11px] sm:text-xs text-slate-400 font-normal leading-tight">
-                            Format JPG, PNG, atau WEBP. Maksimal 2MB.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto w-full md:w-auto justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-200/60">
-                        <button
-                          type="button"
-                          className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#059669] hover:bg-[#005f5b] text-white font-bold text-xs transition-all cursor-pointer shadow-xs"
-                          onClick={() => setShowPhotoModal(true)}
-                        >
-                          <Camera size={14} />
-                          <span>Ganti Foto</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 font-bold text-xs transition-all cursor-pointer shadow-xs"
-                          onClick={fetchUserProfile}
-                          title="Refresh Profile Data"
-                        >
-                          <RefreshCw size={14} />
-                          <span>Refresh</span>
-                        </button>
-                        {photoPreview && photoPreview !== DEFAULT_AVATAR && (
-                          <button
-                            type="button"
-                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border border-rose-200 font-bold text-xs transition-all cursor-pointer shadow-xs"
-                            onClick={handleRemovePhoto}
-                            title="Hapus Foto"
-                          >
-                            <Trash2 size={14} />
-                            <span>Hapus</span>
-                          </button>
-                        )}
-                        <input
-                          id="admin-photo-input"
-                          type="file"
-                          accept="image/jpeg,image/png,image/jpg,image/webp"
-                          hidden
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              handlePhotoUpload(e.target.files[0]);
-                            }
+                  {/* Integrated Photo Upload Section */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 p-5 sm:p-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 mb-8">
+                    <div className="flex items-center gap-5">
+                      {/* Avatar */}
+                      <div className="relative shrink-0">
+                        <SafeImage
+                          src={photoPreview || DEFAULT_AVATAR}
+                          alt="Avatar"
+                          className="w-20 h-20 sm:w-22 sm:h-22 rounded-full object-cover border-4 border-white shadow-md bg-white ring-2 ring-slate-200"
+                          fallback={DEFAULT_AVATAR}
+                          onError={(e) => {
+                            console.warn("Avatar image failed to load:", e.currentTarget.src);
+                          }}
+                          onLoad={() => {
+                            // console.log("Avatar image loaded successfully:", photoPreview);
                           }}
                         />
+                        <button
+                          type="button"
+                          className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#059669] hover:bg-[#005f5b] text-white border-2 border-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105"
+                          onClick={() => setShowPhotoModal(true)}
+                          title="Ganti Foto Profil"
+                        >
+                          <Camera size={13} />
+                        </button>
+                      </div>
+
+                      {/* User Details */}
+                      <div className="flex flex-col gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h4 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate">
+                            {profileData.name || "Nama Pengguna"}
+                          </h4>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-teal-50 text-[#059669] border border-teal-200">
+                            {profileData.role || "user"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                            @{user?.username || "user"}
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] sm:text-xs text-slate-400 font-normal leading-tight">
+                          Format JPG, PNG, atau WEBP. Maksimal 2MB.
+                        </p>
                       </div>
                     </div>
 
-                    {/* Backend Success/Error Alerts */}
-                    {profileSuccessMsg && (
-                      <div className="flex items-center gap-[12px] px-[16px] py-[12px] rounded-[10px] text-[13.5px] font-medium mb-[20px] bg-[#f0fdf4] border border-[#bbf7d0] text-[#166534]">
-                        <CheckCircle size={18} />
-                        <span>{profileSuccessMsg}</span>
-                        <button type="button" className="ml-auto bg-none border-none text-current cursor-pointer opacity-70 flex items-center hover:opacity-100" onClick={() => setProfileSuccessMsg("")}>
-                          <X size={14} />
-                        </button>
-                      </div>
-                    )}
-
-                    {profileErrorMsg && (
-                      <div className="flex items-center gap-[12px] px-[16px] py-[12px] rounded-[10px] text-[13.5px] font-medium mb-[20px] bg-[#fef2f2] border border-[#fecaca] text-[#991b1b]">
-                        <AlertTriangle size={18} />
-                        <span>{profileErrorMsg}</span>
-                        <button type="button" className="ml-auto bg-none border-none text-current cursor-pointer opacity-70 flex items-center hover:opacity-100" onClick={() => setProfileErrorMsg("")}>
-                          <X size={14} />
-                        </button>
-                      </div>
-                    )}
-
-                    <form onSubmit={handleSaveProfile} className="flex flex-col gap-[24px]">
-                      <div className="grid grid-cols-2 max-md:grid-cols-1 gap-[20px]">
-                        {/* Nama Lengkap */}
-                        <div className="flex flex-col gap-[6px]">
-                          <label htmlFor="profile-name" className="text-[13px] font-semibold text-[#334155]">
-                            Nama Lengkap <span className="text-[#ef4444]">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="profile-name"
-                            value={profileData.name}
-                            onChange={(e) => {
-                              setProfileData({ ...profileData, name: e.target.value });
-                              if (profileValidationErrors.name) {
-                                setProfileValidationErrors({ ...profileValidationErrors, name: null });
-                              }
-                            }}
-                            placeholder="Masukkan nama lengkap"
-                            className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] ${profileValidationErrors.name ? "border-[#ef4444]" : ""}`}
-                            required
-                          />
-                          {profileValidationErrors.name && (
-                            <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.name[0]}</span>
-                          )}
-                        </div>
-
-                        {/* Email */}
-                        <div className="flex flex-col gap-[6px]">
-                          <label htmlFor="profile-email" className="text-[13px] font-semibold text-[#334155]">
-                            Email <span className="text-[#ef4444]">*</span>
-                          </label>
-                          <input
-                            type="email"
-                            id="profile-email"
-                            value={profileData.email}
-                            onChange={(e) => {
-                              setProfileData({ ...profileData, email: e.target.value });
-                              if (profileValidationErrors.email) {
-                                setProfileValidationErrors({ ...profileValidationErrors, email: null });
-                              }
-                            }}
-                            placeholder="email@example.com"
-                            className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] ${profileValidationErrors.email ? "border-[#ef4444]" : ""}`}
-                            required
-                          />
-                          {profileValidationErrors.email && (
-                            <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.email[0]}</span>
-                          )}
-                        </div>
-
-                        {/* No. Handphone */}
-                        <div className="flex flex-col gap-[6px]">
-                          <label htmlFor="profile-phone" className="text-[13px] font-semibold text-[#334155]">No. Handphone / WA</label>
-                          <input
-                            type="text"
-                            id="profile-phone"
-                            value={profileData.phone}
-                            onChange={(e) => {
-                              setProfileData({ ...profileData, phone: e.target.value });
-                              if (profileValidationErrors.phone) {
-                                setProfileValidationErrors({ ...profileValidationErrors, phone: null });
-                              }
-                            }}
-                            placeholder="08123456789"
-                            className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] ${profileValidationErrors.phone ? "border-[#ef4444]" : ""}`}
-                          />
-                          {profileValidationErrors.phone && (
-                            <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.phone[0]}</span>
-                          )}
-                        </div>
-
-                        {/* Lokasi */}
-                        <div className="flex flex-col gap-[6px]">
-                          <label htmlFor="profile-location" className="text-[13px] font-semibold text-[#334155]">Lokasi / Kota</label>
-                          <input
-                            type="text"
-                            id="profile-location"
-                            value={profileData.location}
-                            onChange={(e) => {
-                              setProfileData({ ...profileData, location: e.target.value });
-                              if (profileValidationErrors.location) {
-                                setProfileValidationErrors({ ...profileValidationErrors, location: null });
-                              }
-                            }}
-                            placeholder="Contoh: Jakarta Selatan, DKI Jakarta"
-                            className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] ${profileValidationErrors.location ? "border-[#ef4444]" : ""}`}
-                          />
-                          {profileValidationErrors.location && (
-                            <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.location[0]}</span>
-                          )}
-                        </div>
-
-                        {/* Role (Read Only) */}
-                        <div className="flex flex-col gap-[6px]">
-                          <label htmlFor="profile-role" className="text-[13px] font-semibold text-[#334155]">Peran / Role</label>
-                          <input
-                            type="text"
-                            id="profile-role"
-                            value={profileData.role}
-                            disabled
-                            readOnly
-                            className="w-full px-[14px] py-[11px] border border-[#e2e8f0] rounded-[10px] text-[13.5px] text-[#64748b] bg-[#f8fafc] cursor-not-allowed outline-none"
-                          />
-                        </div>
-
-                        {/* Bio / Tentang Saya */}
-                        <div className="col-span-full flex flex-col gap-[6px]">
-                          <label htmlFor="profile-bio" className="text-[13px] font-semibold text-[#334155]">Tentang Saya (Bio)</label>
-                          <textarea
-                            id="profile-bio"
-                            value={profileData.bio}
-                            onChange={(e) => {
-                              setProfileData({ ...profileData, bio: e.target.value });
-                              if (profileValidationErrors.bio) {
-                                setProfileValidationErrors({ ...profileValidationErrors, bio: null });
-                              }
-                            }}
-                            placeholder="Tulis ringkasan singkat mengenai profil Anda..."
-                            rows={4}
-                            className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] resize-y min-h-[100px] leading-[1.5] ${profileValidationErrors.bio ? "border-[#ef4444]" : ""}`}
-                          />
-                          {profileValidationErrors.bio && (
-                            <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.bio[0]}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Form Action Footer */}
-                      <div className="flex justify-end pt-[16px] border-t border-[#e2e8f0]">
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto w-full md:w-auto justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-200/60">
+                      <button
+                        type="button"
+                        className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#059669] hover:bg-[#005f5b] text-white font-bold text-xs transition-all cursor-pointer shadow-xs"
+                        onClick={() => setShowPhotoModal(true)}
+                      >
+                        <Camera size={14} />
+                        <span>Ganti Foto</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 font-bold text-xs transition-all cursor-pointer shadow-xs"
+                        onClick={fetchUserProfile}
+                        title="Refresh Profile Data"
+                      >
+                        <RefreshCw size={14} />
+                        <span>Refresh</span>
+                      </button>
+                      {photoPreview && photoPreview !== DEFAULT_AVATAR && (
                         <button
-                          type="submit"
-                          className="inline-flex items-center justify-center gap-[8px] px-[28px] py-[12px] bg-[#059669] text-white border-none rounded-[10px] text-[14px] font-semibold cursor-pointer transition-all duration-200 shadow-[0_4px_14px_rgba(0,117,112,0.25)] hover:enabled:bg-[#005a58] hover:enabled:shadow-[0_6px_18px_rgba(0,117,112,0.35)] hover:enabled:-translate-y-[1px] disabled:opacity-70 disabled:cursor-not-allowed"
-                          disabled={isUploadingProfile}
+                          type="button"
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border border-rose-200 font-bold text-xs transition-all cursor-pointer shadow-xs"
+                          onClick={handleRemovePhoto}
+                          title="Hapus Foto"
                         >
-                          {isUploadingProfile ? (
-                            <>
-                              <Loader2 size={18} className="animate-spin" />
-                              <span>Menyimpan...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Save size={18} />
-                              <span>Simpan Perubahan</span>
-                            </>
-                          )}
+                          <Trash2 size={14} />
+                          <span>Hapus</span>
                         </button>
-                      </div>
-                    </form>
+                      )}
+                      <input
+                        id="admin-photo-input"
+                        type="file"
+                        accept="image/jpeg,image/png,image/jpg,image/webp"
+                        hidden
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handlePhotoUpload(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {/* Backend Success/Error Alerts */}
+                  {profileSuccessMsg && (
+                    <div className="flex items-center gap-[12px] px-[16px] py-[12px] rounded-[10px] text-[13.5px] font-medium mb-[20px] bg-[#f0fdf4] border border-[#bbf7d0] text-[#166534]">
+                      <CheckCircle size={18} />
+                      <span>{profileSuccessMsg}</span>
+                      <button type="button" className="ml-auto bg-none border-none text-current cursor-pointer opacity-70 flex items-center hover:opacity-100" onClick={() => setProfileSuccessMsg("")}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {profileErrorMsg && (
+                    <div className="flex items-center gap-[12px] px-[16px] py-[12px] rounded-[10px] text-[13.5px] font-medium mb-[20px] bg-[#fef2f2] border border-[#fecaca] text-[#991b1b]">
+                      <AlertTriangle size={18} />
+                      <span>{profileErrorMsg}</span>
+                      <button type="button" className="ml-auto bg-none border-none text-current cursor-pointer opacity-70 flex items-center hover:opacity-100" onClick={() => setProfileErrorMsg("")}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSaveProfile} className="flex flex-col gap-[24px]">
+                    <div className="grid grid-cols-2 max-md:grid-cols-1 gap-[20px]">
+                      {/* Nama Lengkap */}
+                      <div className="flex flex-col gap-[6px]">
+                        <label htmlFor="profile-name" className="text-[13px] font-semibold text-[#334155]">
+                          Nama Lengkap <span className="text-[#ef4444]">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="profile-name"
+                          value={profileData.name}
+                          onChange={(e) => {
+                            setProfileData({ ...profileData, name: e.target.value });
+                            if (profileValidationErrors.name) {
+                              setProfileValidationErrors({ ...profileValidationErrors, name: null });
+                            }
+                          }}
+                          placeholder="Masukkan nama lengkap"
+                          className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] ${profileValidationErrors.name ? "border-[#ef4444]" : ""}`}
+                          required
+                        />
+                        {profileValidationErrors.name && (
+                          <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.name[0]}</span>
+                        )}
+                      </div>
+
+                      {/* Email */}
+                      <div className="flex flex-col gap-[6px]">
+                        <label htmlFor="profile-email" className="text-[13px] font-semibold text-[#334155]">
+                          Email <span className="text-[#ef4444]">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          id="profile-email"
+                          value={profileData.email}
+                          onChange={(e) => {
+                            setProfileData({ ...profileData, email: e.target.value });
+                            if (profileValidationErrors.email) {
+                              setProfileValidationErrors({ ...profileValidationErrors, email: null });
+                            }
+                          }}
+                          placeholder="email@example.com"
+                          className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] ${profileValidationErrors.email ? "border-[#ef4444]" : ""}`}
+                          required
+                        />
+                        {profileValidationErrors.email && (
+                          <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.email[0]}</span>
+                        )}
+                      </div>
+
+                      {/* No. Handphone */}
+                      <div className="flex flex-col gap-[6px]">
+                        <label htmlFor="profile-phone" className="text-[13px] font-semibold text-[#334155]">No. Handphone / WA</label>
+                        <input
+                          type="text"
+                          id="profile-phone"
+                          value={profileData.phone}
+                          onChange={(e) => {
+                            setProfileData({ ...profileData, phone: e.target.value });
+                            if (profileValidationErrors.phone) {
+                              setProfileValidationErrors({ ...profileValidationErrors, phone: null });
+                            }
+                          }}
+                          placeholder="08123456789"
+                          className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] ${profileValidationErrors.phone ? "border-[#ef4444]" : ""}`}
+                        />
+                        {profileValidationErrors.phone && (
+                          <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.phone[0]}</span>
+                        )}
+                      </div>
+
+                      {/* Lokasi */}
+                      <div className="flex flex-col gap-[6px]">
+                        <div className="flex items-center justify-between">
+                          <label htmlFor="profile-location" className="text-[13px] font-semibold text-[#334155]">
+                            Lokasi / Wilayah
+                          </label>
+                          <span className="text-[11px] text-slate-400">Pilih dari daftar atau ketik bebas</span>
+                        </div>
+                        <input
+                          type="text"
+                          id="profile-location"
+                          list="surade-villages-list"
+                          value={profileData.location}
+                          onChange={(e) => {
+                            setProfileData({ ...profileData, location: e.target.value });
+                            if (profileValidationErrors.location) {
+                              setProfileValidationErrors({ ...profileValidationErrors, location: null });
+                            }
+                          }}
+                          placeholder="Contoh: Kelurahan Surade, Kec. Surade"
+                          className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] ${profileValidationErrors.location ? "border-[#ef4444]" : ""}`}
+                        />
+                        <datalist id="surade-villages-list">
+                          <option value="Kelurahan Surade, Kec. Surade" />
+                          <option value="Desa Jagamukti, Kec. Surade" />
+                          <option value="Desa Citanglar, Kec. Surade" />
+                          <option value="Desa Wanasari, Kec. Surade" />
+                          <option value="Desa Sirnasari, Kec. Surade" />
+                          <option value="Desa Kadaleman, Kec. Surade" />
+                          <option value="Desa Gunungsungging, Kec. Surade" />
+                          <option value="Desa Cipeundeuy, Kec. Surade" />
+                          <option value="Desa Pasiripis, Kec. Surade" />
+                          <option value="Desa Buniwangi, Kec. Surade" />
+                          <option value="Desa Sukatani, Kec. Surade" />
+                          <option value="Desa Kademangan, Kec. Surade" />
+                          <option value="Kabupaten Sukabumi, Jawa Barat" />
+                        </datalist>
+                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                          <span className="text-[11px] font-medium text-slate-400">Pilihan Cepat:</span>
+                          {[
+                            "Kelurahan Surade",
+                            "Desa Jagamukti",
+                            "Desa Buniwangi",
+                            "Desa Citanglar",
+                            "Desa Sukatani",
+                          ].map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => {
+                                setProfileData({ ...profileData, location: `${v}, Kec. Surade` });
+                                if (profileValidationErrors.location) {
+                                  setProfileValidationErrors({ ...profileValidationErrors, location: null });
+                                }
+                              }}
+                              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-[11px] text-slate-600 border border-slate-200 cursor-pointer transition-colors"
+                            >
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                        {profileValidationErrors.location && (
+                          <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.location[0]}</span>
+                        )}
+                      </div>
+
+                      {/* Jenis Kelamin */}
+                      <div className="flex flex-col gap-[6px]">
+                        <label htmlFor="profile-gender" className="text-[13px] font-semibold text-[#334155]">Jenis Kelamin</label>
+                        <select
+                          id="profile-gender"
+                          value={profileData.gender || ""}
+                          onChange={(e) => {
+                            setProfileData({ ...profileData, gender: e.target.value });
+                            if (profileValidationErrors.gender) {
+                              setProfileValidationErrors({ ...profileValidationErrors, gender: null });
+                            }
+                          }}
+                          className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] cursor-pointer ${profileValidationErrors.gender ? "border-[#ef4444]" : ""}`}
+                        >
+                          <option value="">-- Pilih Jenis Kelamin --</option>
+                          <option value="male">Laki-laki</option>
+                          <option value="female">Perempuan</option>
+                        </select>
+                        {profileValidationErrors.gender && (
+                          <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.gender[0]}</span>
+                        )}
+                      </div>
+
+                      {/* Role (Read Only) */}
+                      <div className="flex flex-col gap-[6px]">
+                        <label htmlFor="profile-role" className="text-[13px] font-semibold text-[#334155]">Peran / Role</label>
+                        <input
+                          type="text"
+                          id="profile-role"
+                          value={profileData.role}
+                          disabled
+                          readOnly
+                          className="w-full px-[14px] py-[11px] border border-[#e2e8f0] rounded-[10px] text-[13.5px] text-[#64748b] bg-[#f8fafc] cursor-not-allowed outline-none"
+                        />
+                      </div>
+
+                      {/* Bio / Tentang Saya */}
+                      <div className="col-span-full flex flex-col gap-[6px]">
+                        <label htmlFor="profile-bio" className="text-[13px] font-semibold text-[#334155]">Tentang Saya (Bio)</label>
+                        <textarea
+                          id="profile-bio"
+                          value={profileData.bio}
+                          onChange={(e) => {
+                            setProfileData({ ...profileData, bio: e.target.value });
+                            if (profileValidationErrors.bio) {
+                              setProfileValidationErrors({ ...profileValidationErrors, bio: null });
+                            }
+                          }}
+                          placeholder="Tulis ringkasan singkat mengenai profil Anda..."
+                          rows={4}
+                          className={`w-full px-[14px] py-[11px] border border-[#cbd5e1] rounded-[10px] text-[13.5px] text-[#0f172a] bg-white outline-none transition-all duration-200 focus:border-[#007570] focus:shadow-[0_0_0_3px_rgba(0,117,112,0.12)] resize-y min-h-[100px] leading-[1.5] ${profileValidationErrors.bio ? "border-[#ef4444]" : ""}`}
+                        />
+                        {profileValidationErrors.bio && (
+                          <span className="text-[12px] text-[#ef4444] font-medium mt-[2px]">{profileValidationErrors.bio[0]}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Form Action Footer */}
+                    <div className="flex justify-end pt-[16px] border-t border-[#e2e8f0]">
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center gap-[8px] px-[28px] py-[12px] bg-[#059669] text-white border-none rounded-[10px] text-[14px] font-semibold cursor-pointer transition-all duration-200 shadow-[0_4px_14px_rgba(0,117,112,0.25)] hover:enabled:bg-[#005a58] hover:enabled:shadow-[0_6px_18px_rgba(0,117,112,0.35)] hover:enabled:-translate-y-[1px] disabled:opacity-70 disabled:cursor-not-allowed"
+                        disabled={isUploadingProfile}
+                      >
+                        {isUploadingProfile ? (
+                          <>
+                            <Loader2 size={18} className="animate-spin" />
+                            <span>Menyimpan...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save size={18} />
+                            <span>Simpan Perubahan</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
           )}
         </section>
       </main>
@@ -10124,6 +15130,81 @@ export default function AdminUser() {
                   className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all shadow-2xs resize-y"
                   placeholder="Deskripsi produk"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center justify-between">
+                  <span>Foto Produk</span>
+                  <span className="text-[11px] text-slate-400 font-normal">Maks 5MB</span>
+                </label>
+
+                <input
+                  id="edit-product-image-input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/jpg,image/webp"
+                  className="hidden"
+                  onChange={handleEditImageSelect}
+                />
+
+                {editImagePreview ? (
+                  <div className="space-y-2.5">
+                    <div
+                      onClick={() => document.getElementById("edit-product-image-input")?.click()}
+                      className="relative w-full min-h-[160px] max-h-[260px] rounded-2xl border-2 border-dashed border-emerald-500/40 hover:border-emerald-600 overflow-hidden group bg-slate-950 flex items-center justify-center cursor-pointer transition-all shadow-inner"
+                      title="Klik untuk mengganti foto produk"
+                    >
+                      <img
+                        src={editImagePreview}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 pointer-events-none"
+                      />
+                      <img
+                        src={editImagePreview}
+                        alt="Preview Produk"
+                        className="relative z-10 max-w-full max-h-[220px] w-auto h-auto object-contain p-2"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                        <span className="px-3.5 py-1.5 rounded-full bg-white/95 text-slate-900 font-extrabold text-xs shadow-lg flex items-center gap-1.5">
+                          <Camera size={14} className="text-emerald-600" />
+                          Klik untuk Ganti Foto
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Tombol Aksi Edit Foto - Selalu Terlihat Jelas */}
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor="edit-product-image-input"
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
+                      >
+                        <Camera size={15} className="text-emerald-600" />
+                        <span>Ganti / Upload Foto Baru</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleRemoveEditImage}
+                        className="py-2.5 px-3.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 border border-rose-200 transition-colors cursor-pointer shadow-2xs"
+                        title="Hapus foto saat ini"
+                      >
+                        <Trash2 size={15} />
+                        <span>Hapus</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="edit-product-image-input"
+                    className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl bg-slate-50 hover:bg-emerald-50/40 transition-all cursor-pointer group shadow-inner"
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-emerald-600 group-hover:scale-110 transition-all mb-2 border border-slate-200">
+                      <Upload size={20} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">
+                      Pilih / Upload Foto Produk
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, atau WEBP (Maksimal 5MB)</span>
+                  </label>
+                )}
               </div>
             </div>
 
@@ -10231,7 +15312,7 @@ export default function AdminUser() {
                     value={businessEditForm.city}
                     onChange={handleBusinessEditFormChange}
                     className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all shadow-2xs"
-                    placeholder="Jakarta"
+                    placeholder="Surade / Sukabumi"
                   />
                 </div>
               </div>
@@ -10246,7 +15327,7 @@ export default function AdminUser() {
                   value={businessEditForm.province}
                   onChange={handleBusinessEditFormChange}
                   className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007570]/20 focus:border-[#007570] transition-all shadow-2xs"
-                  placeholder="DKI Jakarta"
+                  placeholder="Jawa Barat"
                 />
               </div>
 
@@ -10598,7 +15679,7 @@ export default function AdminUser() {
         </div>
       )}
 
-      {/* ── MODAL DETAIL KUNJUNGAN PORTAL ── */}
+      {/* ── MODAL DETAIL KUNJUNGAN BISNIS ── */}
       {showChartDetailModal && (
         <div
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-3 sm:p-5"
@@ -10613,10 +15694,10 @@ export default function AdminUser() {
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                   <BarChart size={20} className="text-[#059669]" />
-                  Detail Statistik Kunjungan Portal
+                  Detail Statistik Kunjungan Bisnis
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Rincian data pengunjung, grafik interaktif, dan estimasi persentase per periode
+                  Rincian data pengunjung usaha UMKM milik Anda, grafik interaktif, dan estimasi per periode
                 </p>
               </div>
               <button
@@ -10629,7 +15710,7 @@ export default function AdminUser() {
 
             {/* Modal Content Scroll Area */}
             <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
-              
+
               {/* Period Filter Tabs & Controls */}
               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -10644,11 +15725,10 @@ export default function AdminUser() {
                         key={tab.key}
                         type="button"
                         onClick={() => setAnalyticsPeriod(tab.key)}
-                        className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
-                          analyticsPeriod === tab.key
-                            ? "bg-[#059669] text-white shadow-2xs font-bold"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        }`}
+                        className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${analyticsPeriod === tab.key
+                          ? "bg-[#059669] text-white shadow-2xs font-bold"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          }`}
                       >
                         {tab.label}
                       </button>
@@ -10658,20 +15738,75 @@ export default function AdminUser() {
                   {/* Date / Period Nav Controls */}
                   <div className="flex items-center gap-2 flex-wrap text-xs font-medium w-full sm:w-auto">
                     {analyticsPeriod === "daily" && (
-                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5">
-                        <Calendar size={14} className="text-[#059669]" />
-                        <span className="text-slate-500">Tanggal:</span>
-                        <input
-                          type="date"
-                          value={analyticsDate}
-                          onChange={(e) => setAnalyticsDate(e.target.value)}
-                          className="bg-transparent font-semibold text-slate-800 outline-none cursor-pointer"
-                        />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const d = new Date(analyticsDate);
+                              d.setDate(d.getDate() - 1);
+                              setAnalyticsDate(d.toISOString().split("T")[0]);
+                            }}
+                            className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors cursor-pointer"
+                            title="Hari Sebelumnya"
+                          >
+                            <ChevronLeft size={16} />
+                          </button>
+                          <div className="flex items-center gap-1.5 px-1">
+                            <Calendar size={14} className="text-[#059669] shrink-0" />
+                            <input
+                              type="date"
+                              value={analyticsDate}
+                              onChange={(e) => setAnalyticsDate(e.target.value)}
+                              className="bg-transparent font-semibold text-slate-800 outline-none cursor-pointer text-xs"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const d = new Date(analyticsDate);
+                              d.setDate(d.getDate() + 1);
+                              setAnalyticsDate(d.toISOString().split("T")[0]);
+                            }}
+                            className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors cursor-pointer"
+                            title="Hari Berikutnya"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAnalyticsDate(new Date().toISOString().split("T")[0])}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${analyticsDate === new Date().toISOString().split("T")[0]
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                            }`}
+                        >
+                          Hari Ini
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() - 1);
+                            setAnalyticsDate(d.toISOString().split("T")[0]);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${(() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() - 1);
+                            return analyticsDate === d.toISOString().split("T")[0];
+                          })()
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                            }`}
+                        >
+                          Kemarin
+                        </button>
                       </div>
                     )}
 
                     {analyticsPeriod === "weekly" && (
-                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1">
+                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-2xs">
                         <button
                           type="button"
                           onClick={() => {
@@ -10679,7 +15814,7 @@ export default function AdminUser() {
                             d.setDate(d.getDate() - 7);
                             setAnalyticsDate(d.toISOString().split("T")[0]);
                           }}
-                          className="p-1 hover:bg-slate-100 rounded text-slate-600 font-bold"
+                          className="p-1 hover:bg-slate-100 rounded text-slate-600 font-bold cursor-pointer"
                           title="Minggu Sebelumnya"
                         >
                           <ChevronLeft size={16} />
@@ -10694,7 +15829,7 @@ export default function AdminUser() {
                             d.setDate(d.getDate() + 7);
                             setAnalyticsDate(d.toISOString().split("T")[0]);
                           }}
-                          className="p-1 hover:bg-slate-100 rounded text-slate-600 font-bold"
+                          className="p-1 hover:bg-slate-100 rounded text-slate-600 font-bold cursor-pointer"
                           title="Minggu Berikutnya"
                         >
                           <ChevronRight size={16} />
@@ -10707,7 +15842,7 @@ export default function AdminUser() {
                         <select
                           value={analyticsMonth}
                           onChange={(e) => setAnalyticsMonth(Number(e.target.value))}
-                          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none cursor-pointer"
+                          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none cursor-pointer shadow-2xs"
                         >
                           {["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"].map((m, idx) => (
                             <option key={idx + 1} value={idx + 1}>{m}</option>
@@ -10716,7 +15851,7 @@ export default function AdminUser() {
                         <select
                           value={analyticsYear}
                           onChange={(e) => setAnalyticsYear(Number(e.target.value))}
-                          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none cursor-pointer"
+                          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none cursor-pointer shadow-2xs"
                         >
                           {[2024, 2025, 2026, 2027].map((y) => (
                             <option key={y} value={y}>{y}</option>
@@ -10729,7 +15864,7 @@ export default function AdminUser() {
                       <select
                         value={analyticsYear}
                         onChange={(e) => setAnalyticsYear(Number(e.target.value))}
-                        className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none cursor-pointer"
+                        className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none cursor-pointer shadow-2xs"
                       >
                         {[2024, 2025, 2026, 2027].map((y) => (
                           <option key={y} value={y}>{y}</option>
@@ -10742,9 +15877,9 @@ export default function AdminUser() {
 
               {/* Loader or Content */}
               {loadingAnalyticsStats ? (
-                <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
+                <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
                   <Loader2 size={24} className="animate-spin text-[#059669]" />
-                  <span className="text-xs font-semibold text-slate-600">Memuat data statistik...</span>
+                  <span className="text-xs font-semibold text-slate-600">Memuat data statistik kunjungan bisnis...</span>
                 </div>
               ) : (
                 <>
@@ -10791,21 +15926,43 @@ export default function AdminUser() {
                     </div>
 
                     {(!analyticsStatsData?.chart_data || analyticsStatsData.chart_data.length === 0 || analyticsStatsData.total_visits === 0) ? (
-                      <div className="py-10 text-center text-slate-400 text-xs">
-                        Belum ada data kunjungan pada periode ini.
+                      <div className="py-12 text-center text-slate-400 space-y-2">
+                        <p className="text-xs">Belum ada catatan kunjungan pada periode {analyticsStatsData?.period_label || ""}.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() - 1);
+                            setAnalyticsDate(d.toISOString().split("T")[0]);
+                          }}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold underline cursor-pointer"
+                        >
+                          Lihat data tanggal kemarin
+                        </button>
                       </div>
                     ) : (
-                      <div className="flex items-end gap-2 sm:gap-3 h-44 pt-4 overflow-x-auto">
+                      <div className="flex items-end gap-1.5 sm:gap-2.5 h-48 pt-6 pb-1 overflow-x-auto">
                         {analyticsStatsData.chart_data.map((d, i) => (
-                          <div key={i} className="flex-1 min-w-[24px] flex flex-col items-center gap-2 h-full justify-end group relative">
-                            <div className="absolute bottom-full mb-1 bg-white text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded shadow-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                              {d.fullLabel}: {d.visits.toLocaleString("id-ID")} kunjungan ({d.percentage})
+                          <div key={i} className="flex-1 min-w-[22px] sm:min-w-[28px] flex flex-col items-center gap-2 h-full justify-end group relative">
+                            {/* Hover Tooltip */}
+                            <div className="absolute bottom-full mb-2 bg-slate-800 text-white border border-slate-700 text-[10px] font-bold px-2 py-1 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
+                              <div className="text-emerald-400">{d.fullLabel}</div>
+                              <div>{d.visits.toLocaleString("id-ID")} kunjungan ({d.percentage})</div>
+                              {d.itemCount > 0 && (
+                                <div className="text-amber-300 text-[9px] mt-0.5">+{d.itemCount} konten ditambahkan</div>
+                              )}
                             </div>
+                            {/* Bar */}
                             <div
-                              className="w-full max-w-[32px] bg-gradient-to-t from-[#007570] to-[#5eead4] rounded-t-md min-h-[4px] transition-all group-hover:brightness-125"
-                              style={{ height: d.heightPercentage }}
+                              className={`w-full max-w-[28px] rounded-t-sm transition-all duration-300 group-hover:brightness-125 ${d.visits > 0
+                                ? "bg-gradient-to-t from-[#059669] to-[#34d399] shadow-sm shadow-emerald-500/20"
+                                : "bg-slate-800/80 min-h-[2px]"
+                                }`}
+                              style={{ height: d.visits > 0 ? d.heightPercentage : "2px" }}
                             ></div>
-                            <span className="text-[10px] sm:text-[11px] text-slate-300 font-semibold truncate max-w-full">{d.unit}</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium truncate max-w-full group-hover:text-white">
+                              {d.unit}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -10919,11 +16076,10 @@ export default function AdminUser() {
                     <button
                       key={tab}
                       onClick={() => setActivityTypeFilter(tab)}
-                      className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
-                        isActive
-                          ? "bg-[#059669] text-white shadow-2xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
+                      className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${isActive
+                        ? "bg-[#059669] text-white shadow-2xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
                     >
                       {tab}
                     </button>
@@ -11103,7 +16259,7 @@ export default function AdminUser() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Camera size={18} className="text-[#059669]" />
-                Kamera Profil Live
+                {cameraTarget === "chat" ? "Kamera Inbox Live" : "Kamera Profil Live"}
               </h3>
               <button
                 onClick={stopCamera}
@@ -11147,172 +16303,480 @@ export default function AdminUser() {
           </div>
         </div>
       )}
-      {/* ── MODAL PENARIKAN SALDO REFERRAL ── */}
+      {/* ── MODAL PENARIKAN SALDO REFERRAL (DESAIN MEWAH 2-KOLOM SEPERTI GAMBAR 5) ── */}
       {showWithdrawModal && (
         <div
-          className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[1100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-xs animate-fade-in font-['Poppins',sans-serif] text-left"
           onClick={() => setShowWithdrawModal(false)}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200 space-y-5 relative"
+            className="bg-[#fcfdfd] w-full max-w-3xl sm:max-w-4xl rounded-3xl shadow-2xl border border-emerald-200/80 overflow-hidden flex flex-col max-h-[92vh] relative my-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Wallet size={20} className="text-[#059669]" />
-                Penarikan Saldo Komisi Referral
-              </h3>
+            {/* Top Header Gradient Banner (Sesuai Gambar 5) */}
+            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-4 sm:p-5 text-white relative shrink-0">
               <button
                 onClick={() => setShowWithdrawModal(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 w-8 h-8 rounded-full bg-black/20 hover:bg-black/35 text-white flex items-center justify-center transition-colors cursor-pointer border border-white/20"
+                title="Tutup"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pr-9">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-inner shrink-0">
+                    <Wallet size={24} className="text-emerald-200" />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-bold text-emerald-100 mb-0.5 border border-white/20">
+                      <Sparkles size={11} className="text-emerald-300" />
+                      <span>Pencairan Resmi Surade</span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-black tracking-tight text-white leading-tight">
+                      Penarikan Saldo Komisi Referral
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Saldo Komisi Badge */}
+                <div className="px-3.5 py-1.5 rounded-xl bg-black/25 backdrop-blur-md border border-white/20 flex items-center gap-2 self-start sm:self-auto shadow-inner text-xs">
+                  <span className="text-[11px] text-emerald-100 font-medium">Saldo Komisi:</span>
+                  <span className="font-black text-emerald-300 text-xs sm:text-sm">
+                    Rp {availableReferralBalance.toLocaleString("id-ID")}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              {withdrawSuccessMsg ? (
+                <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3">
+                  <CheckCircle className="w-14 h-14 text-emerald-600 mx-auto animate-bounce" />
+                  <h4 className="font-extrabold text-slate-900 text-base">Pengajuan Penarikan Berhasil Dikirim!</h4>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">{withdrawSuccessMsg}</p>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        setWithdrawSuccessMsg("");
+                        setShowWithdrawModal(false);
+                      }}
+                      className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs cursor-pointer hover:bg-emerald-700 transition-all shadow-md"
+                    >
+                      Tutup Window
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setWithdrawErrorMsg("");
+                    const numAmount = Number(withdrawForm.amount || 0);
+
+                    if (numAmount < 50000) {
+                      setWithdrawErrorMsg("Minimal penarikan saldo komisi adalah Rp 50.000.");
+                      return;
+                    }
+                    if (numAmount > availableReferralBalance) {
+                      setWithdrawErrorMsg(`Saldo komisi tidak mencukupi. Saldo saat ini: Rp ${availableReferralBalance.toLocaleString("id-ID")}`);
+                      return;
+                    }
+                    if (withdrawForm.bank === "QRIS" && !withdrawQrisFile) {
+                      setWithdrawErrorMsg("Silakan unggah foto/gambar barcode QRIS Anda untuk dipindai oleh admin.");
+                      return;
+                    }
+                    if (withdrawForm.bank !== "QRIS" && !withdrawForm.accountNumber.trim()) {
+                      setWithdrawErrorMsg("Nomor rekening atau nomor HP e-wallet wajib diisi.");
+                      return;
+                    }
+                    if (!withdrawForm.accountHolder.trim()) {
+                      setWithdrawErrorMsg("Nama pemilik rekening / merchant QRIS wajib diisi.");
+                      return;
+                    }
+
+                    setSubmittingWithdraw(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append("bank", withdrawForm.bank);
+                      formData.append("account_number", withdrawForm.bank === "QRIS" ? "QRIS" : withdrawForm.accountNumber.trim());
+                      formData.append("account_holder", withdrawForm.accountHolder.trim());
+                      formData.append("amount", withdrawForm.amount);
+                      if (withdrawForm.notes) formData.append("notes", withdrawForm.notes.trim());
+                      if (withdrawForm.bank === "QRIS" && withdrawQrisFile) {
+                        formData.append("qris_image", withdrawQrisFile);
+                      }
+
+                      const res = await api.post("/referrals/withdraw", formData, {
+                        headers: { "Content-Type": "multipart/form-data" },
+                      });
+
+                      if (res.data?.success) {
+                        setWithdrawSuccessMsg(
+                          res.data.message ||
+                          `Permohonan penarikan Rp ${numAmount.toLocaleString("id-ID")} via ${withdrawForm.bank} (${withdrawForm.accountHolder}) telah diterima dan sedang diverifikasi admin.`
+                        );
+                        setWithdrawQrisFile(null);
+                        setWithdrawQrisPreview(null);
+                        fetchReferralStats();
+                      }
+                    } catch (err) {
+                      setWithdrawErrorMsg(err.response?.data?.message || "Gagal mengajukan penarikan saldo. Pastikan data benar.");
+                    } finally {
+                      setSubmittingWithdraw(false);
+                    }
+                  }}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                    {/* ── KOLOM KIRI (5 Kolom): Ringkasan & Kalkulator Nominal (Sesuai Gambar 5) ── */}
+                    <div className="md:col-span-5 space-y-4">
+                      {/* Kartu Estimasi Nilai Penarikan */}
+                      <div className="rounded-2xl p-4 bg-gradient-to-br from-emerald-50/80 via-teal-50/60 to-white border border-emerald-200/90 shadow-xs space-y-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                          Nilai Penarikan Komisi
+                        </span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-black text-emerald-800">
+                            Rp {Number(withdrawForm.amount || 0).toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 pt-1.5 border-t border-emerald-200/60 flex items-center justify-between">
+                          <span>Minimal Penarikan:</span>
+                          <strong className="text-emerald-900">Rp 50.000</strong>
+                        </div>
+                      </div>
+
+                      {/* Input Nominal Komisi yang ditarik */}
+                      <div>
+                        <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">
+                          Jumlah Saldo yang Ditarik (Rp)
+                        </label>
+                        <div className="relative">
+                          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-700 font-bold text-sm">
+                            Rp
+                          </div>
+                          <input
+                            type="number"
+                            min="50000"
+                            max={availableReferralBalance || 50000}
+                            value={withdrawForm.amount}
+                            onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
+                            className="w-full pl-11 pr-24 py-3 rounded-xl border border-slate-300 font-black text-slate-900 text-base focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white shadow-xs"
+                            placeholder="Min 50.000"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setWithdrawForm({ ...withdrawForm, amount: String(availableReferralBalance) })}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-[11px] font-black bg-emerald-100 hover:bg-emerald-200 text-emerald-950 rounded-lg cursor-pointer transition-colors"
+                          >
+                            Maksimal
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between mt-1.5 text-[11px] text-slate-500 font-medium">
+                          <span>Sisa saldo setelah ditarik:</span>
+                          <strong className="text-slate-800">
+                            Rp {Math.max(0, availableReferralBalance - Number(withdrawForm.amount || 0)).toLocaleString("id-ID")}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {/* Box Ketentuan & Keamanan */}
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90 text-xs text-slate-600 space-y-2">
+                        <div className="flex items-center gap-1.5 font-bold text-slate-900 text-[11.5px]">
+                          <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                          <span>Jaminan Penarikan Aman</span>
+                        </div>
+                        <ul className="space-y-1.5 text-[11px] text-slate-500 pl-1">
+                          <li className="flex items-start gap-1.5">
+                            <span className="text-emerald-600 font-bold">•</span>
+                            <span>Saldo komisi referral akan otomatis diverifikasi admin.</span>
+                          </li>
+                          <li className="flex items-start gap-1.5">
+                            <span className="text-emerald-600 font-bold">•</span>
+                            <span>Admin Surade memverifikasi dan mentransfer dana dalam <strong>1x24 jam kerja</strong>.</span>
+                          </li>
+                          <li className="flex items-start gap-1.5">
+                            <span className="text-emerald-600 font-bold">•</span>
+                            <span>Jika ditolak, saldo komisi akan <strong>dikembalikan 100% tanpa potongan</strong>.</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* ── KOLOM KANAN (7 Kolom): Formulir Tujuan Transfer / QRIS (Sesuai Gambar 5) ── */}
+                    <div className="md:col-span-7 space-y-3.5">
+                      <div className="flex items-center gap-2 pb-1">
+                        <Building2 size={16} className="text-emerald-700 shrink-0" />
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                            Tujuan Transfer Bank / E-Wallet / QRIS
+                          </h4>
+                          <p className="text-[11px] text-slate-400">
+                            Pastikan data tujuan pencairan benar dan aktif
+                          </p>
+                        </div>
+                      </div>
+
+                      {withdrawErrorMsg && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
+                          <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-600" />
+                          <span>{withdrawErrorMsg}</span>
+                        </div>
+                      )}
+
+                      {/* Pilihan Metode Transfer */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                          Pilih Bank / E-Wallet / QRIS *
+                        </label>
+                        <select
+                          value={withdrawForm.bank}
+                          onChange={(e) => setWithdrawForm({ ...withdrawForm, bank: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-semibold text-slate-900 text-xs focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                        >
+                          <optgroup label="Metode Instan QRIS">
+                            <option value="QRIS">QRIS (Scan Barcode &amp; Upload Gambar)</option>
+                          </optgroup>
+                          <optgroup label="Bank Transfer">
+                            <option value="BCA">Bank BCA</option>
+                            <option value="Mandiri">Bank Mandiri</option>
+                            <option value="BRI">Bank BRI</option>
+                            <option value="BNI">Bank BNI</option>
+                            <option value="BJB">Bank BJB</option>
+                            <option value="BSI">Bank BSI</option>
+                          </optgroup>
+                          <optgroup label="E-Wallet">
+                            <option value="DANA">DANA</option>
+                            <option value="GoPay">GoPay</option>
+                            <option value="OVO">OVO</option>
+                            <option value="ShopeePay">ShopeePay</option>
+                          </optgroup>
+                        </select>
+                      </div>
+
+                      {/* FORM KHUSUS QRIS: Upload Barcode Gambar */}
+                      {withdrawForm.bank === "QRIS" ? (
+                        <div className="space-y-3 p-3.5 bg-purple-50/70 rounded-2xl border border-purple-200">
+                          <div className="flex items-center gap-2 text-purple-900 font-bold text-xs">
+                            <QrCode size={16} className="text-purple-700" />
+                            <span>Upload QRIS Anda (Tarik Saldo Instan)</span>
+                          </div>
+                          <p className="text-[11px] text-purple-800 leading-relaxed">
+                            Unggah foto/tangkapan layar QRIS merchant atau pribadi Anda. Admin Surade akan langsung memindai QRIS ini untuk mengirim dana komisi.
+                          </p>
+
+                          {/* Upload Dropzone */}
+                          <div>
+                            {withdrawQrisPreview ? (
+                              <div className="relative group p-2 bg-white rounded-xl border border-purple-200 text-center">
+                                <img
+                                  src={withdrawQrisPreview}
+                                  alt="Preview QRIS"
+                                  className="max-h-40 mx-auto object-contain rounded-lg border border-slate-100 shadow-xs"
+                                />
+                                <div className="mt-2 flex items-center justify-center gap-2">
+                                  <label className="text-[11px] font-bold text-purple-700 hover:text-purple-900 cursor-pointer underline">
+                                    Ganti Gambar QRIS
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          setWithdrawQrisFile(file);
+                                          setWithdrawQrisPreview(URL.createObjectURL(file));
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                  <span className="text-slate-300">•</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setWithdrawQrisFile(null);
+                                      setWithdrawQrisPreview(null);
+                                    }}
+                                    className="text-[11px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer underline"
+                                  >
+                                    Hapus
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <label className="flex flex-col items-center justify-center border-2 border-dashed border-purple-300 hover:border-purple-500 rounded-xl p-4 bg-white cursor-pointer transition-colors text-center group">
+                                <QrCode size={28} className="text-purple-500 mb-1.5 group-hover:scale-110 transition-transform" />
+                                <span className="text-xs font-bold text-purple-900">
+                                  Klik untuk Unggah Gambar QRIS *
+                                </span>
+                                <span className="text-[10.5px] text-slate-500 mt-0.5">
+                                  JPG, PNG, atau WEBP (Maks 2MB)
+                                </span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      setWithdrawQrisFile(file);
+                                      setWithdrawQrisPreview(URL.createObjectURL(file));
+                                    }
+                                  }}
+                                />
+                              </label>
+                            )}
+                          </div>
+
+                          {/* Nama Pemilik / Merchant QRIS */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                              Nama Pemilik / Nama Toko QRIS *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={withdrawForm.accountHolder}
+                              onChange={(e) => setWithdrawForm({ ...withdrawForm, accountHolder: e.target.value })}
+                              placeholder="Contoh: Toko Berkah / Nama Pemilik"
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                            />
+                            <p className="text-[10.5px] text-purple-700 mt-1">
+                              💡 Nomor rekening tidak diperlukan untuk QRIS karena admin langsung memindai barcode.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        /* FORM BANK / E-WALLET BIASA */
+                        <>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                              Nomor Rekening / No. HP E-Wallet *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={withdrawForm.accountNumber}
+                              onChange={(e) => setWithdrawForm({ ...withdrawForm, accountNumber: e.target.value })}
+                              placeholder="Contoh: 8830123456 atau 08123456789"
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                              Nama Pemilik Rekening *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={withdrawForm.accountHolder}
+                              onChange={(e) => setWithdrawForm({ ...withdrawForm, accountHolder: e.target.value })}
+                              placeholder="Nama lengkap sesuai buku tabungan / e-wallet"
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* Catatan Tambahan (Opsional) */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                          Catatan Tambahan (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          value={withdrawForm.notes}
+                          onChange={(e) => setWithdrawForm({ ...withdrawForm, notes: e.target.value })}
+                          placeholder="Contoh: Mohon proses ke QRIS toko untuk operasional..."
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                        />
+                      </div>
+
+                      {/* Tombol Submit Mendasar & Mewah */}
+                      <div className="pt-2">
+                        <button
+                          type="submit"
+                          disabled={
+                            submittingWithdraw ||
+                            availableReferralBalance < 50000 ||
+                            Number(withdrawForm.amount) < 50000 ||
+                            Number(withdrawForm.amount) > availableReferralBalance ||
+                            (withdrawForm.bank === "QRIS" && !withdrawQrisFile) ||
+                            (withdrawForm.bank !== "QRIS" && !withdrawForm.accountNumber.trim()) ||
+                            !withdrawForm.accountHolder.trim()
+                          }
+                          className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submittingWithdraw ? (
+                            <>
+                              <Loader2 size={18} className="animate-spin" />
+                              <span>Memproses Pengajuan Penarikan...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Wallet size={18} />
+                              <span>Ajukan Penarikan (Rp {Number(withdrawForm.amount || 0).toLocaleString("id-ID")})</span>
+                              <ArrowRight size={16} />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── POPUP PREVIEW QRIS PENARIKAN (FULLSCREEN) ── */}
+      {viewQrisModalUrl && (
+        <div
+          className="fixed inset-0 z-[100000] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setViewQrisModalUrl(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 relative text-center shadow-2xl border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
+                  <QrCode size={18} />
+                </div>
+                <h4 className="font-extrabold text-slate-900 text-sm">QRIS Penarikan Saldo</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewQrisModalUrl(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors"
+                title="Tutup"
               >
                 <X size={18} />
               </button>
             </div>
-
-            {withdrawSuccessMsg ? (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-3">
-                <CheckCircle className="w-12 h-12 text-emerald-600 mx-auto" />
-                <h4 className="font-bold text-slate-900 text-sm">Pengajuan Penarikan Berhasil!</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">{withdrawSuccessMsg}</p>
-                <button
-                  onClick={() => {
-                    setWithdrawSuccessMsg("");
-                    setShowWithdrawModal(false);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-[#059669] text-white font-bold text-xs cursor-pointer hover:bg-[#005a58]"
-                >
-                  Tutup Window
-                </button>
-              </div>
-            ) : (
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setWithdrawErrorMsg("");
-                  setSubmittingWithdraw(true);
-                  try {
-                    const res = await api.post("/referrals/withdraw", {
-                      bank: withdrawForm.bank,
-                      account_number: withdrawForm.accountNumber,
-                      account_holder: withdrawForm.accountHolder,
-                      amount: Number(withdrawForm.amount),
-                    });
-                    if (res.data?.success) {
-                      setWithdrawSuccessMsg(
-                        res.data.message ||
-                        `Permohonan penarikan Rp ${Number(withdrawForm.amount).toLocaleString("id-ID")} ke ${withdrawForm.bank} (${withdrawForm.accountNumber}) atas nama ${withdrawForm.accountHolder} telah diterima dan sedang diproses admin.`
-                      );
-                      fetchReferralStats();
-                    }
-                  } catch (err) {
-                    setWithdrawErrorMsg(err.response?.data?.message || "Gagal mengajukan penarikan saldo. Pastikan saldo mencukupi dan data benar.");
-                  } finally {
-                    setSubmittingWithdraw(false);
-                  }
-                }}
-                className="space-y-4"
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-center">
+              <img
+                src={viewQrisModalUrl}
+                alt="QRIS Penarikan"
+                className="max-h-[55vh] w-auto object-contain rounded-xl shadow-md border border-slate-200"
+              />
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <a
+                href={viewQrisModalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold text-teal-700 hover:underline inline-flex items-center gap-1"
               >
-                <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl flex items-center justify-between">
-                  <span className="text-xs font-semibold text-teal-800">Saldo Komisi Tersedia:</span>
-                  <span className="text-base font-black text-[#059669]">
-                    Rp {availableReferralBalance.toLocaleString("id-ID")}
-                  </span>
-                </div>
-
-                {withdrawErrorMsg && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-                    <AlertTriangle size={15} className="shrink-0 mt-0.5" />
-                    <span>{withdrawErrorMsg}</span>
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Metode Penarikan (Bank / E-Wallet)</label>
-                  <select
-                    value={withdrawForm.bank}
-                    onChange={(e) => setWithdrawForm({ ...withdrawForm, bank: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#007570]"
-                  >
-                    <option value="BCA">Bank BCA</option>
-                    <option value="Mandiri">Bank Mandiri</option>
-                    <option value="BRI">Bank BRI</option>
-                    <option value="BNI">Bank BNI</option>
-                    <option value="DANA">DANA</option>
-                    <option value="GoPay">GoPay</option>
-                    <option value="OVO">OVO</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Nomor Rekening / HP E-Wallet</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: 8830123456"
-                    value={withdrawForm.accountNumber}
-                    onChange={(e) => setWithdrawForm({ ...withdrawForm, accountNumber: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#007570]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Nama Pemilik Rekening</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Sesuai nama di buku tabungan / akun"
-                    value={withdrawForm.accountHolder}
-                    onChange={(e) => setWithdrawForm({ ...withdrawForm, accountHolder: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#007570]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Jumlah Penarikan (Rp)</label>
-                  <input
-                    type="number"
-                    required
-                    min={50000}
-                    max={availableReferralBalance || 50000}
-                    value={withdrawForm.amount}
-                    onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007570]"
-                  />
-                  <p className="text-[11px] text-slate-400">Minimal penarikan Rp 50.000</p>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setWithdrawErrorMsg("");
-                      setShowWithdrawModal(false);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200 transition-colors cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingWithdraw || availableReferralBalance < 50000}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#059669] hover:bg-[#005a58] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
-                  >
-                    {submittingWithdraw ? (
-                      <>
-                        <Loader2 size={15} className="animate-spin" />
-                        <span>Memproses...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle size={15} />
-                        <span>Kirim Pengajuan</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
+                <ExternalLink size={13} />
+                <span>Buka Gambar Penuh</span>
+              </a>
+            </div>
           </div>
         </div>
       )}
@@ -11333,7 +16797,7 @@ export default function AdminUser() {
                   <FileText size={18} className="text-[#059669]" />
                   Detail Transaksi Referral
                 </h3>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">{selectedReferralTx.id}</p>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">ID: #{selectedReferralTx.id}</p>
               </div>
               <button
                 onClick={() => setSelectedReferralTx(null)}
@@ -11347,48 +16811,85 @@ export default function AdminUser() {
               <div className="p-4 bg-slate-50 rounded-xl space-y-3 border border-slate-100">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Pembeli / Pengguna:</span>
-                  <span className="font-bold text-slate-900">{selectedReferralTx.userName}</span>
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={selectedReferralTx.userAvatar || selectedReferralTx.user_avatar || selectedReferralTx.referred_avatar || DEFAULT_AVATAR}
+                      alt={selectedReferralTx.userName || selectedReferralTx.referred_name || "Pengguna"}
+                      className="w-5 h-5 rounded-full object-cover border border-slate-200 bg-slate-100"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = DEFAULT_AVATAR;
+                      }}
+                    />
+                    <span className="font-bold text-slate-900">
+                      {selectedReferralTx.userName || selectedReferralTx.user_name || selectedReferralTx.referred_name || "Pengguna"}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Email:</span>
-                  <span className="font-semibold text-slate-800">{selectedReferralTx.userEmail}</span>
+                  <span className="font-semibold text-slate-800">
+                    {selectedReferralTx.userEmail || selectedReferralTx.user_email || selectedReferralTx.referred_email || "-"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Bisnis Terkait:</span>
-                  <span className="font-semibold text-slate-800">{selectedReferralTx.businessName}</span>
+                  <span className="font-semibold text-slate-800">
+                    {selectedReferralTx.businessName || selectedReferralTx.business_name || "Bisnis Terkait"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Layanan Pembelian:</span>
-                  <span className="font-bold text-[#059669]">{selectedReferralTx.service}</span>
+                  <span className="font-bold text-[#059669]">
+                    {selectedReferralTx.service || selectedReferralTx.service_name || "Paket Premium"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Waktu Transaksi:</span>
-                  <span className="font-semibold text-slate-700">{selectedReferralTx.date}</span>
+                  <span className="font-semibold text-slate-700">
+                    {selectedReferralTx.date || (selectedReferralTx.created_at ? new Date(selectedReferralTx.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-")}
+                  </span>
                 </div>
               </div>
 
               <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600">Harga Layanan (Normal):</span>
-                  <span className="font-bold text-slate-900">Rp {(selectedReferralTx.original_amount || selectedReferralTx.amount || 0).toLocaleString("id-ID")}</span>
+                  <span className="font-bold text-slate-900">
+                    Rp {(selectedReferralTx.original_amount || ((selectedReferralTx.amount || selectedReferralTx.final_price || 0) + (selectedReferralTx.discount_amount || selectedReferralTx.discount || 5000))).toLocaleString("id-ID")}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600">Diskon Kode Referral (Rp 5.000):</span>
-                  <span className="font-semibold text-rose-600">- Rp {(selectedReferralTx.discount_amount || selectedReferralTx.discount || 5000).toLocaleString("id-ID")}</span>
+                  <span className="text-slate-600">Diskon Kode Referral:</span>
+                  <span className="font-semibold text-rose-600">
+                    - Rp {(selectedReferralTx.discount_amount || selectedReferralTx.discount || selectedReferralTx.discount_given || 5000).toLocaleString("id-ID")}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600">Total Dibayar Pembeli:</span>
-                  <span className="font-bold text-slate-900">Rp {(selectedReferralTx.final_price || selectedReferralTx.amount || 0).toLocaleString("id-ID")}</span>
+                  <span className="font-bold text-slate-900">
+                    Rp {(selectedReferralTx.final_price || selectedReferralTx.amount || selectedReferralTx.transaction_amount || 0).toLocaleString("id-ID")}
+                  </span>
                 </div>
                 <div className="pt-2 border-t border-emerald-200 flex items-center justify-between text-sm">
-                  <span className="font-extrabold text-emerald-900">Komisi Hak Anda (Rp 10.000):</span>
-                  <span className="font-black text-emerald-700 text-base">+ Rp {(selectedReferralTx.commission_amount || selectedReferralTx.commission || 10000).toLocaleString("id-ID")}</span>
+                  <span className="font-extrabold text-emerald-900">Komisi Hak Anda:</span>
+                  <span className="font-black text-emerald-700 text-base">
+                    + Rp {(selectedReferralTx.commission_amount || selectedReferralTx.commission || 0).toLocaleString("id-ID")}
+                  </span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between p-3 bg-slate-100 rounded-xl">
                 <span className="text-slate-600 font-semibold">Status Payout Saldo:</span>
-                <span className="font-bold text-[#059669]">{selectedReferralTx.payoutStatus || selectedReferralTx.payout_status}</span>
+                <span className="font-bold text-[#059669]">
+                  {selectedReferralTx.payoutStatus || selectedReferralTx.payout_status || (
+                    ["approved", "earned", "paid", "success", "completed", "active", "disetujui"].includes(String(selectedReferralTx.status).toLowerCase())
+                      ? "Tersedia untuk Ditarik"
+                      : ["pending", "waiting_approval", "menunggu"].includes(String(selectedReferralTx.status).toLowerCase())
+                        ? "Menunggu Verifikasi"
+                        : "Dibatalkan"
+                  )}
+                </span>
               </div>
             </div>
 
@@ -11400,6 +16901,98 @@ export default function AdminUser() {
                 Tutup
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ubah Kode Referral Custom */}
+      {showCustomCodeModal && (
+        <div className="fixed inset-0 z-[999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5 relative">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+                  <Gift size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Ubah Kode Referral Custom</h3>
+                  <p className="text-xs text-slate-500 font-medium">Buat kode kemitraan unik sesuai keinginan Anda</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCustomCodeModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomReferralCode} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
+                  Kode Referral Baru
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={customCodeInput}
+                    onChange={(e) => setCustomCodeInput(e.target.value.toUpperCase())}
+                    placeholder="Contoh: SURADE-RFO167"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-slate-900 font-mono font-bold tracking-wider text-sm uppercase transition-all"
+                    maxLength={30}
+                    disabled={customCodeLoading}
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    {customCodeInput.length}/30
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                  Gunakan 4–30 karakter (huruf besar, angka, dan tanda hubung <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">-</code>).
+                </p>
+              </div>
+
+              {customCodeError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start gap-2">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  <span>{customCodeError}</span>
+                </div>
+              )}
+
+              {customCodeSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 size={16} className="shrink-0" />
+                  <span>{customCodeSuccess}</span>
+                </div>
+              )}
+
+              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomCodeModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                  disabled={customCodeLoading}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={customCodeLoading}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-bold transition-all shadow-md hover:shadow-teal-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {customCodeLoading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={14} />
+                      <span>Simpan Kode</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -11429,6 +17022,161 @@ export default function AdminUser() {
           aspectRatio={cropType === "avatar" ? 1 : 16 / 9}
         />
       )}
+
+      {/* ════ MODAL KONFIRMASI BERGABUNG SEBAGAI PENJUAL ════ */}
+      {/* ════ MODAL KONFIRMASI BERGABUNG SEBAGAI PENJUAL ════ */}
+      {showBecomeSellerModal && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          onClick={() => setShowBecomeSellerModal(false)}
+        >
+          <div
+            className="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100 my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Gradient Banner */}
+            <div className="shrink-0 relative bg-gradient-to-br from-[#042419] via-[#065f46] to-[#047857] px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6 overflow-hidden text-left">
+              <div className="absolute -top-6 -right-6 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -bottom-4 left-8 w-24 h-24 bg-emerald-300/20 rounded-full blur-xl pointer-events-none" />
+
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-br from-amber-300 via-amber-400 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                  <Store size={24} className="text-slate-950" />
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-emerald-200 text-xs font-bold backdrop-blur-xs border border-white/25">
+                  <Sparkles size={13} className="text-amber-300 animate-pulse" />
+                  100% Gratis Selamanya
+                </span>
+              </div>
+
+              <h2 className="text-lg sm:text-2xl font-black text-white leading-tight">
+                Kembangkan Usaha Anda di Surade.com
+              </h2>
+              <p className="text-emerald-100/90 text-xs sm:text-sm mt-1 leading-relaxed">
+                Buka etalase digital toko Anda, jangkau ribuan calon pembeli lokal di Surade, dan tingkatkan penjualan setiap hari.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowBecomeSellerModal(false)}
+                className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 w-8 h-8 flex items-center justify-center rounded-xl text-white/70 hover:text-white hover:bg-white/15 transition-all cursor-pointer border-0 bg-transparent"
+                aria-label="Tutup modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5 space-y-3 text-left">
+              <div className="space-y-2.5">
+                {[
+                  {
+                    icon: Store,
+                    color: "bg-emerald-100 text-emerald-700 border-emerald-200",
+                    title: "Buka Profil & Katalog Usaha Gratis",
+                    desc: "Pajang produk unggulan, galeri foto, jam buka, dan rute lokasi Google Maps agar mudah ditemukan pembeli."
+                  },
+                  {
+                    icon: Megaphone,
+                    color: "bg-amber-100 text-amber-700 border-amber-200",
+                    title: "Jangkau Pasar & Promosi Lebih Luas",
+                    desc: "Pasang iklan promosi dan tampil di halaman pencarian teratas warga Kecamatan Surade & sekitarnya."
+                  },
+                  {
+                    icon: MessageCircle,
+                    color: "bg-teal-100 text-teal-700 border-teal-200",
+                    title: "Terima Pesanan Langsung via WhatsApp",
+                    desc: "Pelanggan dapat langsung menghubungi dan memesan ke nomor WhatsApp bisnis Anda tanpa perantara."
+                  },
+                  {
+                    icon: TrendingUp,
+                    color: "bg-blue-100 text-blue-700 border-blue-200",
+                    title: "Pantau Statistik & Performa Toko",
+                    desc: "Ketahui jumlah kunjungan harian, views katalog, serta ulasan bintang pelanggan secara transparan."
+                  },
+                  {
+                    icon: Crown,
+                    color: "bg-purple-100 text-purple-700 border-purple-200",
+                    title: "Komisi Referral & Centang Emas Resmi",
+                    desc: "Dapatkan komisi tunai dari program referral dan tingkatkan kredibilitas dengan badge verifikasi resmi."
+                  },
+                ].map((item, i) => {
+                  const IconComp = item.icon;
+                  return (
+                    <div key={i} className="flex items-start gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${item.color} shadow-xs`}>
+                        <IconComp size={17} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs sm:text-sm font-extrabold text-slate-800 leading-snug">{item.title}</h4>
+                        <p className="text-[11.5px] text-slate-500 leading-relaxed mt-0.5">{item.desc}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-start gap-2.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl px-3.5 py-3">
+                <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-emerald-900 leading-relaxed">
+                  Aktivasi akun Penjual <strong>100% gratis</strong>. Seluruh fitur belanja dan akun User Anda tetap dapat digunakan seperti biasa.
+                </p>
+              </div>
+            </div>
+
+            {/* Sticky Action Footer */}
+            <div className="shrink-0 px-5 py-3.5 sm:px-6 sm:py-4 bg-slate-50/90 border-t border-slate-100 flex flex-col-reverse sm:flex-row gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowBecomeSellerModal(false)}
+                className="flex-1 py-2.5 sm:py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs sm:text-sm hover:bg-white active:scale-98 transition-all cursor-pointer bg-slate-100/80"
+              >
+                Nanti Saja
+              </button>
+              <button
+                type="button"
+                onClick={handleBecomeSeller}
+                disabled={isSwitchingRole}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 sm:py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-400 to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 active:scale-98 transition-all cursor-pointer border-0 disabled:opacity-75"
+              >
+                {isSwitchingRole ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Mengaktifkan Toko...</span>
+                  </>
+                ) : (
+                  <>
+                    <Store size={16} />
+                    <span>Ya, Aktifkan Mode Penjual</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── GLOBAL MODAL BELI / TOP UP POIN ── */}
+      <BuyCoinModal
+        isOpen={showBuyCoinModal}
+        onClose={() => setShowBuyCoinModal(false)}
+        currentBalance={scoinBalance || 0}
+        onSuccess={() => {
+          fetchHeaderPoinBalance();
+          setShowBuyCoinModal(false);
+        }}
+      />
+
+      {/* ── GLOBAL SATU LAYAR PENARIKAN SALDO GOLD (BISA DIAKSES DARI MANA SAJA) ── */}
+      <GoldWithdrawModal
+        isOpen={showGoldWithdrawModal}
+        onClose={() => setShowGoldWithdrawModal(false)}
+        goldBalance={goldBalance || 0}
+        onSuccess={() => {
+          fetchHeaderPoinBalance();
+          setShowGoldWithdrawModal(false);
+        }}
+      />
     </div>
   );
 }

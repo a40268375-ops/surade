@@ -34,7 +34,7 @@ class GeocodeController extends Controller
                 $response = Http::withHeaders([
                     // Wajib diisi sesuai kebijakan penggunaan Nominatim -
                     // request tanpa User-Agent yang jelas sering ditolak.
-                    'User-Agent' => 'Surade.co.id/1.0 (contact: support@surade.co.id)',
+                    'User-Agent' => 'Surade.com/1.0 (contact: support@surade.com)',
                 ])
                     ->timeout(6)
                     ->get('https://nominatim.openstreetmap.org/search', [

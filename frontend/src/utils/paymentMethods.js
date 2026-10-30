@@ -232,3 +232,51 @@ export function formatAccountNumber(accountNumber) {
 export function getPaymentMethodById(methods, id) {
   return methods.find(m => m.id === id || m.name === id);
 }
+
+/**
+ * Filter payment methods according to amount and admin rules:
+ * - Amount < Rp 10.000: Hide Transfer Bank, show QRIS & E-Wallet & Points only
+ * - Amount >= Rp 10.000: Show Transfer Bank, QRIS, E-Wallet & Points
+ * - If disabled by admin, don't show method
+ */
+export function filterPaymentMethodsByAmount(methods, amount = 0, rules = null) {
+  if (!Array.isArray(methods)) return [];
+
+  const defaultRules = {
+    bank_transfer_enabled: true,
+    bank_transfer_min_amount: 10000,
+    qris_enabled: true,
+    points_enabled: true,
+  };
+  const activeRules = { ...defaultRules, ...(rules || {}) };
+  const numericAmount = Number(amount || 0);
+
+  return methods.filter((m) => {
+    if (m.isActive === false || m.isActive === "false" || m.isActive === 0 || m.isActive === "0") {
+      return false;
+    }
+
+    const name = String(m.name || m.id || "").toLowerCase();
+    const cat = String(m.category || m.type || "").toLowerCase();
+    const isQris = m.isQRIS || name.includes("qris") || cat === "qris";
+    const isBank = !isQris && (cat === "bank" || name.includes("bank") || name.includes("transfer") || name.includes("bca") || name.includes("mandiri") || name.includes("bni") || name.includes("bjb") || name.includes("maybank"));
+
+    // Check QRIS
+    if (isQris) {
+      return activeRules.qris_enabled !== false;
+    }
+
+    // Check Bank Transfer
+    if (isBank) {
+      if (activeRules.bank_transfer_enabled === false) {
+        return false;
+      }
+      if (numericAmount < Number(activeRules.bank_transfer_min_amount || 10000)) {
+        return false;
+      }
+      return true;
+    }
+
+    return true;
+  });
+}

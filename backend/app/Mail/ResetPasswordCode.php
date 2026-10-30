@@ -24,7 +24,7 @@ class ResetPasswordCode extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Kode Reset Password - Surade.co.id',
+            subject: 'Kode Reset Password - Surade.com',
         );
     }
 

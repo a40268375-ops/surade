@@ -19,11 +19,24 @@ class MessageController extends Controller
             'business_id' => 'required|exists:businesses,id',
             'sender_name' => 'required|string|max:255',
             'sender_contact' => 'nullable|string|max:255',
-            'message' => 'required|string',
+            'message' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if (!$request->message && !$request->hasFile('image')) {
+            return response()->json(['message' => 'Pesan atau foto harus diisi.'], 422);
+        }
+
+        $imageUrl = null;
+        $messageType = 'text';
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('message-images', 'public');
+            $imageUrl = asset('storage/' . $path);
+            $messageType = 'image';
         }
 
         $user = $request->user();
@@ -35,7 +48,9 @@ class MessageController extends Controller
             'sender_role' => 'customer',
             'sender_name' => $request->sender_name,
             'sender_contact' => $request->sender_contact,
-            'message' => $request->message,
+            'message' => $request->message ?: ($imageUrl ? '📷 Foto' : ''),
+            'image_url' => $imageUrl,
+            'message_type' => $messageType,
         ]);
 
         $this->notifyBusinessOwner($message);
@@ -80,11 +95,24 @@ class MessageController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'message' => 'required|string|max:1000',
+            'message' => 'nullable|string|max:1000',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if (!$request->message && !$request->hasFile('image')) {
+            return response()->json(['message' => 'Pesan atau foto harus diisi.'], 422);
+        }
+
+        $imageUrl = null;
+        $messageType = 'text';
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('message-images', 'public');
+            $imageUrl = asset('storage/' . $path);
+            $messageType = 'image';
         }
 
         $message = Message::create([
@@ -94,7 +122,9 @@ class MessageController extends Controller
             'sender_role' => 'seller',
             'sender_name' => $user->name,
             'sender_contact' => $user->email,
-            'message' => $request->message,
+            'message' => $request->message ?: ($imageUrl ? '📷 Foto' : ''),
+            'image_url' => $imageUrl,
+            'message_type' => $messageType,
         ]);
 
         NotificationController::createNotification(

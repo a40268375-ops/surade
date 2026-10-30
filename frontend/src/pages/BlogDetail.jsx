@@ -1,7 +1,9 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import PromoAdsSlider from "../components/PromoAdsSlider";
+import SuradeLoader from "../components/SuradeLoader";
 import api from "../services/api";
 import { requireAuth } from "../utils/authCheck";
 import logoImg from "../assets/logo-surade.png";
@@ -23,12 +25,13 @@ import {
   CheckCircle,
 } from "lucide-react";
 import "./BlogDetail.css";
-import { DEFAULT_AVATAR } from "../utils/constants";
+import { DEFAULT_AVATAR, getStorageUrl } from "../utils/constants";
 
 const defaultImg = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&h=600&fit=crop";
 
 export default function BlogDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,10 +40,62 @@ export default function BlogDetail() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
+  // Realtime Waktu Baca Countdown & Auto-Exit State (5 Menit)
+  const [readTimerSeconds, setReadTimerSeconds] = useState(300);
+  const [isReadCompleted, setIsReadCompleted] = useState(false);
+  const [isWidgetHidden, setIsWidgetHidden] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
   useEffect(() => {
     window.scrollTo(0, 0);
     fetchBlog();
   }, [id]);
+
+  useEffect(() => {
+    if (!blog?.content) {
+      setReadTimerSeconds(300); // 5 menit = 300 detik
+      return;
+    }
+    const textOnly = blog.content.replace(/<[^>]*>/g, " ");
+    const words = textOnly.split(/\s+/).filter(Boolean).length;
+    // Waktu baca 5 menit (300 detik) penuh!
+    const secs = Math.max(300, Math.ceil((words / 200) * 60));
+    setReadTimerSeconds(secs);
+    setIsReadCompleted(false);
+    setIsWidgetHidden(false);
+    setIsRedirecting(false);
+  }, [blog]);
+
+  const finishReadTime = () => {
+    if (isReadCompleted || isRedirecting) return;
+    setIsReadCompleted(true);
+    setIsRedirecting(true);
+
+    // Setelah 5 menit / selesai dibaca, otomatis keluar dari artikel ke halaman /blog
+    setTimeout(() => {
+      setIsWidgetHidden(true);
+      navigate("/blog");
+    }, 1800);
+  };
+
+  useEffect(() => {
+    if (isReadCompleted || isWidgetHidden || !blog) return;
+
+    const interval = setInterval(() => {
+      setReadTimerSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          finishReadTime();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [blog, isReadCompleted, isWidgetHidden]);
 
   const fetchBlog = async () => {
     setLoading(true);
@@ -50,6 +105,9 @@ export default function BlogDetail() {
       const data = res.data?.data || res.data;
       if (!data || !data.id) throw new Error("Blog tidak ditemukan");
       setBlog(data);
+      if (data?.title) {
+        document.title = `${data.title} - Surade.com`;
+      }
       
       const userStr = localStorage.getItem("user");
       const user = userStr ? JSON.parse(userStr) : null;
@@ -134,8 +192,21 @@ export default function BlogDetail() {
   };
 
   const getCategoryLabel = (cat) => {
-    const labels = { budaya: "Budaya", kuliner: "Kuliner", wisata: "Wisata", teknologi: "Teknologi" };
-    return labels[cat] || cat || "Umum";
+    if (!cat) return "Umum";
+    if (typeof cat === "object") return cat.name || cat.title || "Umum";
+    const labels = {
+      budaya: "Budaya",
+      kuliner: "Kuliner",
+      wisata: "Wisata",
+      teknologi: "Teknologi",
+      "seni & budaya": "Seni & Budaya",
+      "travel & wisata": "Travel & Wisata",
+      "kuliner & kafe": "Kuliner & Kafe",
+      "bisnis & umkm": "Bisnis & UMKM",
+      "event & festival": "Event & Festival",
+    };
+    const key = String(cat).toLowerCase();
+    return labels[key] || String(cat) || "Umum";
   };
 
   const formatDate = (dateStr) => {
@@ -145,27 +216,37 @@ export default function BlogDetail() {
   };
 
   const getReadTime = (content) => {
-    if (!content) return "1 min";
+    if (!content) return "5 min";
     const words = content.split(/\s+/).length;
-    const min = Math.ceil(words / 200);
+    const min = Math.max(5, Math.ceil(words / 200));
     return min + " min";
   };
 
-  const getStorageUrl = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http")) return path;
-    const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:8000/api").replace(/\/api$/i, "");
-    return `${baseUrl}/storage/${path}`;
+  const formatReadTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins > 0) {
+      return `${mins}m ${secs < 10 ? "0" + secs : secs}s`;
+    }
+    return `${secs}s`;
   };
 
   const getThumbnailUrl = () => {
     if (!blog?.thumbnail) return defaultImg;
-    return getStorageUrl(blog.thumbnail);
+    if (typeof blog.thumbnail === "string" && (blog.thumbnail.includes("real_images") || blog.thumbnail.includes("real_blogs"))) {
+      const fn = blog.thumbnail.split("/").pop();
+      return `/images/real_blogs/${fn}`;
+    }
+    return getStorageUrl(blog.thumbnail) || defaultImg;
   };
 
   const getImageUrl = (img) => {
-    if (!img) return "";
-    return getStorageUrl(img);
+    if (!img) return defaultImg;
+    if (typeof img === "string" && (img.includes("real_images") || img.includes("real_blogs"))) {
+      const fn = img.split("/").pop();
+      return `/images/real_blogs/${fn}`;
+    }
+    return getStorageUrl(img) || defaultImg;
   };
 
   const getUserAvatar = () => {
@@ -179,10 +260,15 @@ export default function BlogDetail() {
     return (
       <div className="blog-detail-page">
         <Navbar />
-        <div className="blog-detail__not-found">
-          <Loader2 size={40} className="spin" style={{ marginBottom: "16px", color: "#007570" }} />
-          <h2>Memuat artikel...</h2>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+          <SuradeLoader
+            variant="section"
+            text="Memuat artikel"
+            subtext="Mengambil informasi dan ulasan berita terkini di Surade"
+            showBrand
+          />
         </div>
+        <Footer />
       </div>
     );
   }
@@ -192,9 +278,9 @@ export default function BlogDetail() {
       <div className="blog-detail-page">
         <Navbar />
         <div className="blog-detail__not-found">
-          <h2>Blog tidak ditemukan</h2>
+          <h2>Info & Event tidak ditemukan</h2>
           <p style={{ color: "#64748b", marginBottom: "20px" }}>{error}</p>
-          <Link to="/blog" className="blog-detail__back-link">Kembali ke Blog</Link>
+          <Link to="/blog" className="blog-detail__back-link">Kembali ke Info & Event</Link>
         </div>
       </div>
     );
@@ -219,10 +305,29 @@ export default function BlogDetail() {
     <div className="blog-detail-page">
       <Navbar />
 
+      {blog.status && blog.status !== "published" && (
+        <div className="relative z-30 mt-[68px] bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-white px-4 py-2.5 text-center text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-md border-b border-amber-600/40">
+          <span>⚠️ <strong>Mode Pratinjau:</strong> Konten ini berstatus <strong>{blog.status === "pending" ? "Menunggu Verifikasi Admin" : blog.status === "needs_revision" ? "Perlu Perbaikan" : blog.status === "rejected" ? "Ditolak" : blog.status}</strong> dan belum dipublikasikan untuk publik.</span>
+        </div>
+      )}
+
       {/* ── HERO ── */}
       <section className="bdg-hero">
         <div className="bdg-hero__bg">
-          <img src={getThumbnailUrl()} alt={blog.title} className="bdg-hero__img" />
+          <img
+            src={getThumbnailUrl()}
+            alt={blog.title}
+            className="bdg-hero__img"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              const fn = blog?.thumbnail ? blog.thumbnail.split("/").pop() : "";
+              if (fn && (fn.startsWith("blog_") || fn.startsWith("event_"))) {
+                e.currentTarget.src = `/images/real_blogs/${fn}`;
+              } else {
+                e.currentTarget.src = defaultImg;
+              }
+            }}
+          />
         </div>
         <div className="bdg-hero__overlay" />
         <div className="bdg-hero__content">
@@ -230,14 +335,14 @@ export default function BlogDetail() {
             <div className="bdg-hero__breadcrumb">
               <Link to="/">Home</Link>
               <span>/</span>
-              <Link to="/blog">{blog.type === "event" ? "Event" : "Blog"}</Link>
+              <Link to="/blog">{blog.type === "event" ? "Event" : "Info"}</Link>
               <span>/</span>
               <span>{blog.title}</span>
             </div>
 
             <div style={{ marginBottom: "12px" }}>
               <span className={`blog-badge-tag ${blog.type === "event" ? "blog-badge-tag--event" : "blog-badge-tag--blog"}`}>
-                {blog.type === "event" ? "ACARA / EVENT" : "ARTIKEL / BLOG"}
+                {blog.type === "event" ? "ACARA / EVENT" : "INFO / BERITA"}
               </span>
             </div>
 
@@ -247,7 +352,7 @@ export default function BlogDetail() {
             <div className="bdg-hero__meta">
               <span className="bdg-hero__meta-item">
                 <User size={15} />
-                <span>{blog.user?.name || "Penulis"}</span>
+                <span>{blog.user?.name || blog.author || "Tim Redaksi Surade"}</span>
               </span>
               {blog.type === "event" && blog.event_date ? (
                 <span className="bdg-hero__meta-item">
@@ -271,15 +376,11 @@ export default function BlogDetail() {
                   <span>{blog.event_location}</span>
                 </span>
               )}
-              <span className="bdg-hero__meta-item">
-                <Clock size={15} />
-                <span>{getReadTime(blog.content)}</span>
-              </span>
             </div>
 
             <Link to="/blog" className="bdg-hero__back">
               <ArrowLeft size={16} />
-              <span>Kembali ke Blog</span>
+              <span>Kembali ke Info & Event</span>
             </Link>
           </div>
         </div>
@@ -305,10 +406,24 @@ export default function BlogDetail() {
                   <Calendar size={14} />
                   {formatDate(blog.published_at || blog.created_at)}
                 </span>
-                <span className="bdg-meta-bar__stat">
-                  <Clock size={14} />
-                  {getReadTime(blog.content)}
-                </span>
+                {!isWidgetHidden && (
+                  <span className={`bdg-meta-bar__stat bdg-meta-bar__stat--readtime ${isReadCompleted ? "is-completed" : ""}`}>
+                    {isReadCompleted ? (
+                      <CheckCircle size={14} className="text-emerald-500 shrink-0" />
+                    ) : (
+                      <Clock size={14} className="text-[#007570] shrink-0 animate-pulse" />
+                    )}
+                    <span>
+                      {isReadCompleted ? (
+                        <strong className="text-emerald-600 font-semibold">Selesai (Otomatis Keluar...)</strong>
+                      ) : (
+                        <span>
+                          {Math.ceil(readTimerSeconds / 60)} min ({formatReadTimer(readTimerSeconds)})
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                )}
                 <span className="bdg-meta-bar__stat">
                   <Eye size={14} />
                   {(blog.views || 0).toLocaleString()} dilihat
@@ -363,6 +478,7 @@ export default function BlogDetail() {
                 </div>
               </div>
             )}
+
 
             {/* Share & Save Actions */}
             <div className="bdg-actions">
@@ -435,13 +551,29 @@ export default function BlogDetail() {
                     <span className="bdg-info-value">{formatDate(blog.published_at || blog.created_at)}</span>
                   </div>
                 </div>
-                <div className="bdg-info-item">
-                  <Clock size={16} />
-                  <div>
-                    <span className="bdg-info-label">Waktu Baca</span>
-                    <span className="bdg-info-value">{getReadTime(blog.content)}</span>
+                {!isWidgetHidden && (
+                  <div className={`bdg-info-item bdg-info-item--readtime ${isReadCompleted ? "is-completed" : ""}`}>
+                    {isReadCompleted ? (
+                      <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+                    ) : (
+                      <Clock size={16} className="text-[#007570] shrink-0 animate-pulse" />
+                    )}
+                    <div>
+                      <span className="bdg-info-label">Waktu Baca</span>
+                      <span className="bdg-info-value">
+                        {isReadCompleted ? (
+                          <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
+                            Selesai (Otomatis Keluar...)
+                          </span>
+                        ) : (
+                          <span>
+                            {Math.ceil(readTimerSeconds / 60)} min <span className="text-xs text-slate-400 font-normal">({formatReadTimer(readTimerSeconds)})</span>
+                          </span>
+                        )}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="bdg-info-item">
                   <Eye size={16} />
                   <div>
@@ -475,6 +607,9 @@ export default function BlogDetail() {
                 ))}
               </div>
             </div>
+
+            {/* Promo Call-To-Action Auto-Slider */}
+            <PromoAdsSlider className="mt-2" />
           </aside>
         </div>
       </section>
@@ -525,6 +660,16 @@ export default function BlogDetail() {
               className="bdg-lightbox__img"
             />
           </div>
+        </div>
+      )}
+
+      {/* FLOATING REDIRECT NOTIFICATION WHEN READ TIME EXPIRES */}
+      {isRedirecting && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[99999] bg-slate-900/95 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-500/50 backdrop-blur-md animate-bounce">
+          <CheckCircle size={20} className="text-emerald-400 shrink-0" />
+          <span className="text-xs sm:text-sm font-bold tracking-tight">
+            Waktu membaca 5 menit telah selesai! Otomatis keluar dari artikel...
+          </span>
         </div>
       )}
     </div>

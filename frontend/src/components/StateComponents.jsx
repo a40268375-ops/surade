@@ -1,24 +1,56 @@
 import React from 'react';
 import { RefreshCw, AlertTriangle, Search, Package, Users, FileText, MessageCircle, Calendar, Building2, User, Zap } from 'lucide-react';
+import SuradeLoader from './SuradeLoader';
+import ArcDotsLoader from './ArcDotsLoader';
 import './StateComponents.css';
 
-// Enhanced Loading Component
-export const LoadingSpinner = ({ size = 'md', text = '', inline = false, overlay = false }) => {
-  const sizeClasses = {
-    sm: 'loading-spinner--sm',
-    md: 'loading-spinner--md', 
-    lg: 'loading-spinner--lg',
-    xl: 'loading-spinner--xl'
-  };
+export { default as ArcDotsLoader } from './ArcDotsLoader';
+
+// Enhanced Loading Component powered by SuradeLoader & ArcDotsLoader
+export const LoadingSpinner = ({
+  size = 'md',
+  text = '',
+  inline = false,
+  overlay = false,
+  subtext = '',
+  variant,
+  preset = 'emerald',
+  ...props
+}) => {
+  if (variant === 'arc' || props.arc) {
+    if (overlay) {
+      return (
+        <SuradeLoader
+          variant="screen"
+          text={text || 'Memuat data...'}
+          subtext={subtext}
+          {...props}
+        />
+      );
+    }
+
+    return (
+      <SuradeLoader
+        variant={inline ? 'inline' : 'section'}
+        size={size || (inline ? 'sm' : 'md')}
+        text={text || 'Memuat data...'}
+        subtext={subtext}
+        {...props}
+      />
+    );
+  }
 
   if (overlay) {
     return (
       <div className="loading-overlay">
-        <div className="loading-overlay-content">
-          <div className={`loading-spinner ${sizeClasses[size]}`}>
-            <div className="loading-spinner-ring"></div>
-          </div>
-          {text && <p className="loading-text">{text}</p>}
+        <div className="loading-overlay-content p-6">
+          <SuradeLoader
+            variant="section"
+            size={size}
+            text={text || "Memuat..."}
+            subtext={subtext}
+            minHeight="180px"
+          />
         </div>
       </div>
     );
@@ -26,21 +58,23 @@ export const LoadingSpinner = ({ size = 'md', text = '', inline = false, overlay
 
   if (inline) {
     return (
-      <div className="loading-inline">
-        <div className={`loading-spinner ${sizeClasses[size]}`}>
-          <div className="loading-spinner-ring"></div>
-        </div>
-        {text && <span className="loading-text-inline">{text}</span>}
-      </div>
+      <SuradeLoader
+        variant="inline"
+        size={size === 'lg' || size === 'xl' ? 'md' : 'sm'}
+        text={text}
+      />
     );
   }
 
   return (
-    <div className="loading-container">
-      <div className={`loading-spinner ${sizeClasses[size]}`}>
-        <div className="loading-spinner-ring"></div>
-      </div>
-      {text && <p className="loading-text">{text}</p>}
+    <div className="loading-container w-full">
+      <SuradeLoader
+        variant="section"
+        size={size}
+        text={text || "Memuat data..."}
+        subtext={subtext}
+        minHeight="180px"
+      />
     </div>
   );
 };

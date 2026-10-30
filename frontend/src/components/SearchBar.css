@@ -216,19 +216,80 @@
   flex-shrink: 0;
   width: 38px; height: 38px;
   border-radius: 50%; border: none;
-  background: #111827; color: #fff;
+  background: #007570; color: #fff;
   display: inline-flex; align-items: center; justify-content: center;
   cursor: pointer; margin-left: 4px;
-  transition: background 0.18s, transform 0.18s;
+  transition: all 0.2s ease;
 }
-.home-search__button:hover { background: #10b981; transform: scale(1.06); }
+.home-search__button:hover {
+  background: #059669;
+  transform: scale(1.06);
+}
 
 @media (max-width: 640px) {
-  .home-search { flex-direction: column; border-radius: 16px; height: auto; padding: 14px; gap: 10px; align-items: stretch; }
-  .home-search__group { padding: 0; }
-  .home-search__group--lokasi { flex: unset; }
-  .home-search__divider { width: 100%; height: 1px; margin: 0; }
-  .home-search__button { width: 100%; border-radius: 8px; height: 40px; margin-left: 0; }
+  .home-search {
+    flex-direction: column;
+    border-radius: 20px;
+    height: auto;
+    padding: 16px;
+    gap: 10px;
+    align-items: stretch;
+    background: #ffffff;
+    box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(0, 0, 0, 0.12);
+    border: 1.5px solid rgba(255, 255, 255, 0.95);
+  }
+  .home-search__group {
+    padding: 2px 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .home-search__group--keyword {
+    width: 100%;
+  }
+  .home-search__group--lokasi {
+    flex: unset;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .home-search__label {
+    color: #007570;
+    font-weight: 700;
+    font-size: 0.82rem;
+  }
+  .home-search__divider {
+    width: 100%;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 2px 0;
+  }
+  .home-search__button {
+    width: 100%;
+    border-radius: 14px;
+    height: 46px;
+    margin-left: 0;
+    background: linear-gradient(135deg, #007570 0%, #059669 100%);
+    box-shadow: 0 8px 20px rgba(0, 117, 112, 0.35);
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #ffffff;
+  }
+  .home-search__button:hover {
+    background: linear-gradient(135deg, #005a56 0%, #047857 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(0, 117, 112, 0.45);
+  }
   .home-kota-dropdown,
-  .home-keyword-dropdown { left: 0; right: 0; width: auto; }
+  .home-keyword-dropdown {
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+  }
 }

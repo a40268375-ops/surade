@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Password - Surade.co.id</title>
+    <title>Reset Password - Surade.com</title>
     <style>
         * {
             margin: 0;
@@ -171,11 +171,30 @@
 </head>
 <body>
     <div class="email-wrapper">
+        @php
+            $logoSrc = null;
+            $logoPath = public_path('logo-surade.png');
+            if (isset($message) && is_object($message) && method_exists($message, 'embed') && file_exists($logoPath)) {
+                try {
+                    $logoSrc = $message->embed($logoPath);
+                } catch (\Throwable $e) {
+                    $logoSrc = null;
+                }
+            }
+            if (!$logoSrc && file_exists($logoPath)) {
+                $logoSrc = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+            }
+        @endphp
+
         <!-- Header dengan Logo dan Brand -->
         <div class="header-banner">
             <div class="logo-container">
-                <div class="logo">S</div>
-                <div class="brand-name">Surade.co.id</div>
+                @if($logoSrc)
+                    <img src="{{ $logoSrc }}" alt="Logo Surade.com" style="width: 48px; height: 48px; border-radius: 12px; display: block; object-fit: contain; background: white; padding: 2px;" />
+                @else
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: white; color: #007570; font-weight: 900; font-size: 24px; text-align: center; line-height: 48px; display: inline-block;">S</div>
+                @endif
+                <div class="brand-name">Surade.com</div>
             </div>
             <div class="tagline">Platform UMKM Digital Kecamatan Surade</div>
         </div>
@@ -187,14 +206,24 @@
             </div>
             
             <div class="message-text">
-                Kami menerima permintaan untuk <strong>mereset password</strong> akun Surade.co.id Anda. Gunakan kode verifikasi berikut untuk melanjutkan proses reset password:
+                Kami menerima permintaan untuk <strong>mereset password</strong> akun Surade.com Anda. Gunakan kode verifikasi berikut untuk melanjutkan proses reset password:
             </div>
             
             <!-- OTP Code Box -->
-            <div class="otp-container">
-                <div class="otp-label">🔐 Kode Reset Password</div>
-                <div class="otp-code">{{ $code }}</div>
-                <div class="otp-expiry">⏱️ Berlaku selama 15 menit</div>
+            <div style="margin: 28px 0 24px 0; text-align: center;">
+                <div style="font-size: 11px; font-weight: 800; color: #dc2626; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 14px;">
+                    🔐 KODE RESET PASSWORD
+                </div>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto; border-collapse: separate; border-spacing: 8px;">
+                    <tr>
+                        @foreach(str_split((string)$code) as $digit)
+                        <td style="width: 48px; height: 56px; background-color: #fef2f2; border: 2px solid #ef4444; border-radius: 12px; text-align: center; vertical-align: middle; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);">
+                            <span style="font-size: 30px; font-weight: 900; color: #991b1b; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace; line-height: 56px; display: block;">{{ $digit }}</span>
+                        </td>
+                        @endforeach
+                    </tr>
+                </table>
+                <div style="font-size: 13px; color: #64748b; margin-top: 14px; font-weight: 500;">⏱️ Berlaku selama 15 menit</div>
             </div>
             
             <!-- Warning Box -->
@@ -204,7 +233,7 @@
                 </div>
                 <ul class="warning-list">
                     <li>Kode ini bersifat rahasia dan hanya berlaku selama <strong>15 menit</strong></li>
-                    <li>Jangan bagikan kode ini kepada siapa pun, termasuk pihak yang mengaku dari Surade.co.id</li>
+                    <li>Jangan bagikan kode ini kepada siapa pun, termasuk pihak yang mengaku dari Surade.com</li>
                     <li>Tim Surade tidak akan pernah meminta kode verifikasi melalui telepon atau media lainnya</li>
                     <li>Jika Anda mencurigai akun Anda telah diakses oleh orang lain, segera hubungi tim support kami</li>
                 </ul>
@@ -218,13 +247,13 @@
         <!-- Footer -->
         <div class="footer">
             <div class="footer-text">
-                Email ini dikirim secara otomatis dari sistem <span class="footer-brand">Surade.co.id</span>
+                Email ini dikirim secara otomatis dari sistem <span class="footer-brand">Surade.com</span>
             </div>
             <div class="footer-text">
-                Pertanyaan? Hubungi kami di <a href="mailto:support@surade.co.id" style="color: #007570; text-decoration: none;">support@surade.co.id</a>
+                Pertanyaan? Hubungi kami di <a href="mailto:support@surade.com" style="color: #007570; text-decoration: none;">support@surade.com</a>
             </div>
             <div class="footer-copyright">
-                © {{ date('Y') }} Surade.co.id - Platform UMKM Digital Kecamatan Surade. Semua hak dilindungi.
+                © {{ date('Y') }} Surade.com - Platform UMKM Digital Kecamatan Surade. Semua hak dilindungi.
             </div>
         </div>
     </div>

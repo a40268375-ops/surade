@@ -1,4 +1,4 @@
-const BASE_URL = 'http://127.0.0.1:8000/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://surade.com/api';
 const SERVER_ORIGIN = BASE_URL.replace(/\/api\/?$/, '');
 
 // Business/category images are stored on the Laravel backend and come back

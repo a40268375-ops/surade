@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SURADE.CO.ID - ENHANCED MOBILE MENU & NAVIGATION DRAWER
+   SURADE.COM - ENHANCED MOBILE MENU & NAVIGATION DRAWER
    Ultra-responsive, modern, touch-friendly mobile navigation experience
    ========================================================================== */
 
@@ -725,13 +725,18 @@
 /* ── Drawer Footer ── */
 .surade-mobile-footer {
   padding: 14px 20px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   background: #f8fafc;
   border-top: 1px solid #f1f5f9;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Prevent footer from being clipped */
+  position: relative;
+  z-index: 1;
 }
+
 
 .surade-mobile-logout-btn {
   display: flex;

@@ -11,24 +11,61 @@ export const DEFAULT_BANNER = "";
  */
 export const getStorageUrl = (path) => {
   if (!path || path === "null" || path === "undefined") return "";
+
+  // Handle authentic curated blog and event images directly from local static assets
+  if (typeof path === "string" && (path.includes("blogs/real_images/") || path.includes("real_blogs/"))) {
+    const filename = path.split("/").pop();
+    return `/images/real_blogs/${filename}`;
+  }
   
+  if (typeof path === "string" && (path.includes("ulastempat.com") || path.includes("lokasiterdekat.com"))) {
+    return "https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=600&auto=format&fit=crop&q=80";
+  }
+
+  // Determine base API / storage host
+  let baseUrl = (import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/i, "");
+  if (!baseUrl) {
+    if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+      baseUrl = "http://127.0.0.1:8000";
+    } else {
+      baseUrl = "https://surade.com";
+    }
+  }
+
+  // If path contains production domain (surade.com / surade.co.id) but running locally, rewrite to baseUrl
+  if (typeof path === "string" && (path.includes("surade.com/storage") || path.includes("surade.co.id/storage"))) {
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    if (isLocal) {
+      return path.replace(/^https?:\/\/(www\.)?surade\.(com|co\.id)/i, baseUrl);
+    }
+  }
+
   // If already a complete URL or data URL, return as-is
   if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
     return path;
   }
   
   // If it's a local asset path, return as-is  
-  if (path.startsWith("/images/") || path.startsWith("/assets/") || path.startsWith("/public/")) {
-    return path;
+  if (
+    path.startsWith("/images/") || path.startsWith("images/") ||
+    path.startsWith("/assets/") || path.startsWith("assets/") ||
+    path.startsWith("/public/") || path.startsWith("public/") ||
+    path.startsWith("/logos/") || path.startsWith("logos/")
+  ) {
+    return path.startsWith("/") ? path : `/${path}`;
   }
   
   // Build full storage URL
-  const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:8000/api").replace(/\/api$/i, "");
   const cleanPath = path.replace(/^\/?storage\//, "").replace(/^\/+/, "");
   
   // Ensure we have a valid path
   if (!cleanPath) return "";
   
+  const isLocalHost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  if (isLocalHost) {
+    return `/storage/${cleanPath}`;
+  }
+
   return `${baseUrl}/storage/${cleanPath}`;
 };
 
@@ -91,7 +128,23 @@ export const OFFICIAL_QRIS_ACCOUNT = {
   isReady: true,
 };
 
+export const OFFICIAL_MIDTRANS_ACCOUNT = {
+  id: "Midtrans",
+  name: "Midtrans (Pembayaran Otomatis Snap / QRIS / VA)",
+  accountNumber: "Pembayaran Instant & Otomatis",
+  accountName: "Midtrans Payment Gateway",
+  badgeColor: "bg-[#007570] text-white",
+  logoUrl: "/logos/midtrans.png",
+  logo: "⚡",
+  isMidtrans: true,
+  isReady: true,
+};
+
 export const OFFICIAL_PAYMENT_METHODS = [
+  {
+    category: "Payment Gateway (Otomatis & Instant)",
+    items: [OFFICIAL_MIDTRANS_ACCOUNT],
+  },
   {
     category: "Transfer Bank / Rekening Resmi",
     items: OFFICIAL_BANK_ACCOUNTS,
@@ -114,7 +167,7 @@ export const formatPaymentNumber = (accNum) => {
 };
 
 export const formatPaymentHolder = (holder) => {
-  if (!holder || holder === "0123456789" || holder === "Official Surade.co.id" || holder.toLowerCase().includes("belum")) {
+  if (!holder || holder === "0123456789" || holder === "Official Surade.com" || holder.toLowerCase().includes("belum")) {
     return "xxxx";
   }
   return holder;

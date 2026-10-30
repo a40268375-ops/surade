@@ -102,6 +102,10 @@ export default function Pricing() {
     }
   };
 
+  useEffect(() => {
+    document.title = "Paket & Layanan - Surade.com";
+  }, []);
+
   // Harga & durasi asli diambil dari backend (bukan dikarang di sini) supaya
   // kalau harga berubah di server, halaman ini otomatis ikut berubah.
   const fetchPlans = async () => {

@@ -15,6 +15,8 @@ class Category extends Model
         'description',
         'color',
         'status',
+        'order',
+        'is_active',
     ];
 
     public function parent(): \Illuminate\Database\Eloquent\Relations\BelongsTo

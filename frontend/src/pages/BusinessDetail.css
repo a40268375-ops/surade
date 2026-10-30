@@ -6,6 +6,7 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #1e293b;
   overflow-x: hidden;
+  overscroll-behavior-x: contain;
   box-sizing: border-box;
 }
 
@@ -69,10 +70,10 @@
   z-index: 15 !important;
 }
 
-/* Mobile Action Bar adjustments */
+/* Mobile Action Bar & Floating Button bottom clearance */
 @media (max-width: 768px) {
   .business-detail-page {
-    padding-bottom: 24px;
+    padding-bottom: 96px !important;
   }
 }
 

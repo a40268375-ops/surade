@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="steamBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="50%" stop-color="#0369a1"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="bubbleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="36" fill="url(#steamBg)"/>
+  <!-- Circular badge outline -->
+  <circle cx="100" cy="95" r="80" fill="none" stroke="#38bdf8" stroke-width="2.5" opacity="0.6"/>
+  <!-- Foam bubbles in background -->
+  <circle cx="55" cy="55" r="14" fill="url(#bubbleGrad)" opacity="0.35"/>
+  <circle cx="148" cy="62" r="18" fill="url(#bubbleGrad)" opacity="0.4"/>
+  <circle cx="135" cy="40" r="10" fill="url(#bubbleGrad)" opacity="0.5"/>
+  <circle cx="68" cy="40" r="8" fill="url(#bubbleGrad)" opacity="0.4"/>
+  <!-- Sparkles -->
+  <path d="M 40 85 Q 48 85 48 77 Q 48 85 56 85 Q 48 85 48 93 Q 48 85 40 85 Z" fill="#ffffff"/>
+  <path d="M 152 90 Q 158 90 158 84 Q 158 90 164 90 Q 158 90 158 96 Q 158 90 152 90 Z" fill="#ffffff"/>
+  <!-- Motorcycle silhouette with steam spray artwork -->
+  <g transform="translate(100, 88)">
+    <!-- Water spray gun nozzle spray line -->
+    <path d="M -45 -35 Q -10 -25 35 -15" stroke="#38bdf8" stroke-width="4" stroke-dasharray="6 3" stroke-linecap="round" fill="none"/>
+    <!-- Wheels -->
+    <circle cx="-35" cy="18" r="18" fill="none" stroke="#ffffff" stroke-width="5"/>
+    <circle cx="-35" cy="18" r="7" fill="#38bdf8"/>
+    <circle cx="35" cy="18" r="18" fill="none" stroke="#ffffff" stroke-width="5"/>
+    <circle cx="35" cy="18" r="7" fill="#38bdf8"/>
+    <!-- Body Frame -->
+    <path d="M -35 18 L -15 -2 L 15 -2 L 35 18 M -15 -2 L -5 -22 L 20 -22 L 10 -2 M 5 -22 L 12 -32 L -2 -32" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- Clean Snow Foam base -->
+    <path d="M -50 34 C -35 30, -25 38, 0 32 C 25 38, 35 30, 50 34" stroke="#ffffff" stroke-width="6" stroke-linecap="round" fill="none"/>
+  </g>
+  <!-- Banner Label -->
+  <rect x="22" y="146" width="156" height="34" rx="10" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="100" y="162" font-family="'Poppins', sans-serif" font-weight="900" font-size="12" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">STEAM SALJU</text>
+  <text x="100" y="174" font-family="'Poppins', sans-serif" font-weight="700" font-size="8" fill="#7dd3fc" text-anchor="middle" letter-spacing="1">CUCI MOTOR KADEMANGAN</text>
+</svg>

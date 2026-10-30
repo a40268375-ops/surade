@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -26,8 +27,15 @@ class AuthController extends Controller
             ], 429);
         }
 
-        // Generate unique referral code for new user
-        $referralCode = $this->generateUniqueReferralCode();
+        // Check referred_by referral code if provided (only valid from active premium agents)
+        $referredByUserId = null;
+        if ($request->filled('referral_code_used') || $request->filled('referral_code')) {
+            $codeUsed = strtoupper(trim((string) ($request->input('referral_code_used') ?: $request->input('referral_code'))));
+            $referrer = User::where('referral_code', $codeUsed)->first();
+            if ($referrer && $referrer->isReferralAgent()) {
+                $referredByUserId = $referrer->id;
+            }
+        }
 
         $user = User::create([
             'name' => SecurityHelper::sanitizeInput($request->name),
@@ -36,7 +44,10 @@ class AuthController extends Controller
             'phone' => $request->phone ? SecurityHelper::sanitizeInput($request->phone) : null,
             'role' => 'user',
             'status' => 'active',
-            'referral_code' => $referralCode,
+            'referral_code' => null,
+            'referral_code_status' => 0,
+            'referral_used' => $referredByUserId ? true : false,
+            'referred_by' => $referredByUserId,
             'is_active' => true,
             // Don't set email_verified_at yet - wait for OTP verification
         ]);
@@ -309,7 +320,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|string|email',
+            'email' => 'required|string',
             'password' => 'required|string',
         ]);
 
@@ -323,15 +334,32 @@ class AuthController extends Controller
         }
 
         // Sanitize input
-        $email = SecurityHelper::sanitizeInput($request->email);
-        $user = User::where('email', $email)->first();
+        $emailInput = trim(SecurityHelper::sanitizeInput($request->email));
+        $lower = strtolower($emailInput);
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        // Build list of candidate identifiers (surade.co.id, surade.com, username)
+        $candidates = [$lower];
+        if (str_ends_with($lower, '@surade.co.id')) {
+            $candidates[] = str_replace('@surade.co.id', '@surade.com', $lower);
+        } elseif (str_ends_with($lower, '@surade.com')) {
+            $candidates[] = str_replace('@surade.com', '@surade.co.id', $lower);
+        }
+        if (!str_contains($lower, '@')) {
+            $candidates[] = $lower . '@surade.com';
+            $candidates[] = $lower . '@surade.co.id';
+        }
+
+        $user = User::where(function ($q) use ($candidates, $lower) {
+            $q->whereIn(DB::raw('LOWER(email)'), $candidates)
+              ->orWhereRaw('LOWER(name) = ?', [$lower]);
+        })->first();
+
+        if (!$user || !Hash::check(trim($request->password), $user->password)) {
             // Record failed login attempt
             SecurityHelper::recordFailedLogin($request);
             
             return response()->json([
-                'message' => 'Email atau password salah.'
+                'message' => 'Email/Username atau kata sandi salah. Silakan coba lagi.'
             ], 401);
         }
 
@@ -380,6 +408,7 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => $user,
+            'token' => $token,
             'access_token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -462,11 +491,19 @@ class AuthController extends Controller
         return response()->json($user->fresh());
     }
 
-    private function generateUniqueReferralCode()
+    private function generateUniqueReferralCode($name = null)
     {
+        $words = preg_split('/\s+/', trim($name ?? ''));
+        $firstName = !empty($words[0]) ? $words[0] : 'SRD';
+        $clean = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $firstName));
+        $threeLetters = strtoupper(substr($clean, 0, 3));
+        if (strlen($threeLetters) < 3) {
+            $threeLetters = str_pad($threeLetters, 3, 'X');
+        }
+
         do {
-            // Generate 8-character code: REF + 5 random uppercase alphanumeric
-            $code = 'REF' . strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 5));
+            $randomSuffix = str_pad(random_int(0, 999), 3, '0', STR_PAD_LEFT);
+            $code = "{$threeLetters}{$randomSuffix}";
         } while (User::where('referral_code', $code)->exists());
 
         return $code;

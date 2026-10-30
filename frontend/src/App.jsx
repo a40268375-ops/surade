@@ -3,25 +3,40 @@ import { Toaster } from "react-hot-toast";
 import AppRouter from "./router/router-index.jsx";
 import LoadingScreen from "./components/LoadingScreen";
 import ErrorBoundary from "./components/ErrorBoundary";
-import WelcomeBannerModal from "./components/WelcomeBannerModal";
+import { usePresenceHeartbeat } from "./utils/userPresence";
+import { useGlobalNotifications } from "./hooks/useGlobalNotifications.jsx";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import { ReferralProvider } from "./context/ReferralContext.jsx";
 
 function App() {
-  const [pageLoading, setPageLoading] = useState(true);
+  usePresenceHeartbeat();
+  useGlobalNotifications();
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
-    // Initial load: biarkan progress bar berjalan dinamis dan tuntas 100%
+    // Memberikan transisi loading resmi Surade.com saat pertama kali masuk website
     const timer = setTimeout(() => {
-      setPageLoading(false);
-    }, 450);
+      setInitialLoading(false);
+    }, 700);
+
     return () => clearTimeout(timer);
   }, []);
 
   return (
     <ErrorBoundary>
       <Toaster position="top-center" containerStyle={{ zIndex: 99999 }} />
-      <LoadingScreen isLoading={pageLoading} text="Surade.co.id" />
-      <WelcomeBannerModal />
-      <AppRouter />
+      {initialLoading && (
+        <LoadingScreen
+          isLoading={initialLoading}
+          text="Surade.com"
+          subtext="Portal UMKM & Ekosistem Digital Surade"
+        />
+      )}
+      <AuthProvider>
+        <ReferralProvider>
+          <AppRouter />
+        </ReferralProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

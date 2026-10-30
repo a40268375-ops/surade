@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../utils/api";
 import Navbar from "../components/Navbar";
+import SuradeLoader from "../components/SuradeLoader";
 import { 
   ArrowLeft, 
   Check, 
@@ -26,7 +27,9 @@ export default function OrderWebsite() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   
-  // Form data
+  useEffect(() => {
+    document.title = "Pesan Pembuatan Website - Surade.com";
+  }, []);
   const [formData, setFormData] = useState({
     customer_name: user?.name || "",
     customer_email: user?.email || "",
@@ -125,11 +128,15 @@ export default function OrderWebsite() {
 
   if (loading) {
     return (
-      <div className="order-website-page">
+      <div className="order-website-page min-h-screen flex flex-col bg-[#f8fafc]">
         <Navbar />
-        <div className="order-loading">
-          <div className="spinner"></div>
-          <p>Memuat informasi paket...</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-6">
+          <SuradeLoader
+            variant="section"
+            text="Memuat informasi paket website"
+            subtext="Menyiapkan data pesanan dan rincian layanan"
+            showBrand
+          />
         </div>
       </div>
     );

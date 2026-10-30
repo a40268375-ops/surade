@@ -1,0 +1,140 @@
+/* ── Global Scroll to Top Button (Premium Modern Aesthetic) ── */
+.global-scroll-to-top-wrapper {
+  position: fixed;
+  bottom: 24px;
+  right: 35px;
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  animation: scrollButtonEntrance 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.global-scroll-to-top {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #007570 0%, #0d9488 50%, #059669 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 10px 22px -3px rgba(0, 117, 112, 0.45),
+    0 4px 10px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+  padding: 0;
+  backdrop-filter: blur(8px);
+}
+
+.global-scroll-to-top .scroll-arrow-icon {
+  color: #ffffff;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+/* Hover effects */
+.global-scroll-to-top:hover {
+  transform: translateY(-4px) scale(1.06);
+  box-shadow:
+    0 14px 28px -3px rgba(0, 117, 112, 0.58),
+    0 6px 14px rgba(0, 0, 0, 0.16);
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+.global-scroll-to-top:hover .scroll-arrow-icon {
+  transform: translateY(-2.5px);
+}
+
+/* Active click effect */
+.global-scroll-to-top:active {
+  transform: translateY(-1px) scale(0.96);
+}
+
+/* Floating Tooltip (Desktop only) */
+.scroll-tooltip {
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scroll-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent transparent transparent rgba(15, 23, 42, 0.88);
+}
+
+.global-scroll-to-top:hover .scroll-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* Smooth Entrance Animation */
+@keyframes scrollButtonEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive Positions for Tablets & Mobile */
+@media (max-width: 768px) {
+  .global-scroll-to-top-wrapper {
+    bottom: 68px;
+    right: 17px;
+  }
+
+  .global-scroll-to-top {
+    width: 40px;
+    height: 40px;
+  }
+
+  .scroll-tooltip {
+    display: none; /* Hide tooltip on touch devices */
+  }
+}
+
+@media (max-width: 480px) {
+  .global-scroll-to-top-wrapper {
+    bottom: 66px;
+    right: 15px;
+  }
+
+  .global-scroll-to-top {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+

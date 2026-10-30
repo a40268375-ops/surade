@@ -18,6 +18,7 @@ class HomeController extends Controller
      */
     public function feed(Request $request)
     {
+        \App\Services\AutoExpiryService::checkAndExpire();
         $feed = Cache::remember('home_feed_public', 300, function () {
             // 1. Categories
             $categories = Category::withCount('businesses')->orderBy('name')->get();

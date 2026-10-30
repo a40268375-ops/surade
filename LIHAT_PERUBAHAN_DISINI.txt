@@ -23,7 +23,7 @@ LANGKAH 3: Tekan ENTER
 
 LANGKAH 4: BOOM! 💥 Lihat email template yang baru dengan:
    ✅ Logo "S" dalam kotak putih di tengah
-   ✅ Text "Surade.co.id" di sebelah kanan logo
+   ✅ Text "Surade.com" di sebelah kanan logo
    ✅ Tagline: "Platform UMKM Digital Kecamatan Surade"
    ✅ Design gradient teal (#007570)
    ✅ OTP code besar dengan font monospace
@@ -37,12 +37,12 @@ LANGKAH 4: BOOM! 💥 Lihat email template yang baru dengan:
 
 LANGKAH 1: Buka terminal, jalankan backend:
 
-   cd c:\laragon\www\Surade.co.id\backend
+   cd c:\laragon\www\Surade.com\backend
    php artisan serve
 
 LANGKAH 2: Buka terminal baru, jalankan frontend:
 
-   cd c:\laragon\www\Surade.co.id\frontend
+   cd c:\laragon\www\Surade.com\frontend
    npm run dev
 
 LANGKAH 3: Buka browser:
@@ -116,7 +116,7 @@ Solution:
 
 EMAIL TEMPLATE BARU:
 ┌────────────────────────────────────┐
-│  [S] Surade.co.id                 │ ← LOGO + TEXT
+│  [S] Surade.com                 │ ← LOGO + TEXT
 │  Platform UMKM Digital             │
 ├────────────────────────────────────┤
 │  Halo! 👋                         │
@@ -196,4 +196,4 @@ PAYMENT SELECTOR BARU:
 
 ═══════════════════════════════════════════════════════════════
 
-© 2026 Surade.co.id - Platform UMKM Digital 🇮🇩
+© 2026 Surade.com - Platform UMKM Digital 🇮🇩

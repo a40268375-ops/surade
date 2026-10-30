@@ -1,4 +1,4 @@
-# Surade.co.id - Portal UMKM & Direktori Digital Kecamatan Surade
+# Surade.com - Portal UMKM & Direktori Digital Kecamatan Surade
 
 Platform direktori usaha mikro, kecil, dan menengah (UMKM), potensi wisata, budaya, serta agenda event di kawasan Kecamatan Surade, Kabupaten Sukabumi, Jawa Barat.
 

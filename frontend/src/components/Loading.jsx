@@ -1,46 +1,82 @@
-import "./Loading.css";
-import logo from "../assets/logo-color.png";
+import React from "react";
+import SuradeLoader from "./SuradeLoader";
+import ArcDotsLoader from "./ArcDotsLoader";
+
+export { default as ArcDotsLoader } from "./ArcDotsLoader";
 
 /**
  * Loading.jsx
- * -----------------------------------------------------------------------
- * <Loading />          -> full page loader: logo di tengah dengan cincin
- *                         gradasi warna brand yang berputar halus di
- *                         sekelilingnya, plus efek "napas" pelan-pelan dan
- *                         titik-titik kecil di bawah teks.
- * <Loading inline />   -> spinner kecil untuk dipakai di dalam section
- *                         (dipakai kalau butuh loading di dalam card, bukan
- *                         menutup seluruh layar)
- *
+ * Unified loader powered by SuradeLoader and ArcDotsLoader.
+ * 
  * Props:
  * - inline (boolean) default false
- * - text   (string)  teks di bawah logo, default "" (tidak ada teks)
+ * - text   (string)  default "Memuat..."
+ * - subtext (string)
+ * - fullscreen (boolean)
+ * - variant ("arc" | "screen" | "section" | "inline")
+ * - preset  ("emerald" | "chrome" | "gold" | "ocean" | "white")
  */
-function Loading({ inline = false, text = "" }) {
-  if (inline) {
+function Loading({
+  inline = false,
+  text = "Memuat...",
+  subtext,
+  fullscreen = false,
+  variant,
+  preset = "emerald",
+  size,
+  ...props
+}) {
+  if (variant === "arc" || props.arc) {
+    if (fullscreen) {
+      return (
+        <SuradeLoader
+          variant="screen"
+          brandTitle="Surade.com"
+          text={text}
+          subtext={subtext}
+          showBrand
+          {...props}
+        />
+      );
+    }
+
     return (
-      <div className="loading-inline">
-        <span className="loading-ring loading-ring--sm" />
-        {text && <span className="loading-inline__text">{text}</span>}
-      </div>
+      <SuradeLoader
+        variant={inline ? "inline" : "section"}
+        size={size || (inline ? "sm" : "md")}
+        text={text}
+        subtext={subtext}
+        {...props}
+      />
+    );
+  }
+
+  if (inline) {
+    return <SuradeLoader variant="inline" text={text} size={size} {...props} />;
+  }
+
+  if (fullscreen) {
+    return (
+      <SuradeLoader
+        variant="screen"
+        text={text}
+        subtext={subtext}
+        showBrand
+        size={size}
+        {...props}
+      />
     );
   }
 
   return (
-    <div className="loading-screen">
-      <div className="loading-screen__box">
-        <div className="loading-screen__orbit">
-          <span className="loading-screen__ring" />
-          <img src={logo} alt="Surade" className="loading-screen__logo" />
-        </div>
-        {text && <p className="loading-screen__text">{text}</p>}
-        <span className="loading-screen__dots">
-          <span />
-          <span />
-          <span />
-        </span>
-      </div>
-    </div>
+    <SuradeLoader
+      variant="section"
+      text={text}
+      subtext={subtext}
+      showBrand
+      size={size}
+      {...props}
+    />
   );
 }
 

@@ -4,10 +4,11 @@ import Navbar from "../components/Navbar";
 import MapView from "../components/MapView";
 import { InlineSpinner } from "../components/LoadingScreen";
 import { BusinessGridSkeleton } from "../components/BusinessCardSkeleton";
+import GooglePagination from "../components/GooglePagination";
 import { getStorageUrl } from "../utils/constants";
 import { requireAuth } from "../utils/authCheck";
 import api from "../services/api";
-import { getBusinessOpenStatus } from "../utils/businessHours";
+import { getBusinessOpenStatus, getScheduleForDay, getTodayName } from "../utils/businessHours";
 import { getSubcategoryIcon } from "../utils/subcategoryIcons";
 import {
   Search,
@@ -50,6 +51,10 @@ import {
   Utensils,
   Palette,
   ShoppingBag,
+  CircleDollarSign,
+  ThumbsUp,
+  TrendingUp,
+  Diamond,
 } from "lucide-react";
 import heroImg from "../assets/category_hero_illustration.png";
 import "./Category.css";
@@ -59,12 +64,12 @@ const HERO_IMAGE = heroImg;
 
 /* ── Price Range Options ── */
 const PRICE_RANGES = [
-  { id: "all", label: "Semua Rentang Harga", shortLabel: "Semua Harga", min: null, max: null },
-  { id: "0-50k", label: "Rp 0 - Rp 50.000", shortLabel: "< 50rb", min: 0, max: 50000, desc: "Ekonomis & Terjangkau" },
-  { id: "50k-150k", label: "Rp 50.000 - Rp 150.000", shortLabel: "50rb - 150rb", min: 50000, max: 150000, desc: "Menengah" },
-  { id: "150k-500k", label: "Rp 150.000 - Rp 500.000", shortLabel: "150rb - 500rb", min: 150000, max: 500000, desc: "Standar" },
-  { id: "500k-1m", label: "Rp 500.000 - Rp 1.000.000", shortLabel: "500rb - 1jt", min: 500000, max: 1000000, desc: "Premium" },
-  { id: "1m+", label: "> Rp 1.000.000", shortLabel: "> 1 Juta", min: 1000000, max: Infinity, desc: "1 Juta ke atas" },
+  { id: "all", label: "Semua Rentang Harga", shortLabel: "Semua Harga", min: null, max: null, desc: "" },
+  { id: "0-20k", label: "Rp 0 - Rp 20.000", shortLabel: "< 20rb", min: 0, max: 20000, desc: "Murah Banget", icon: CircleDollarSign },
+  { id: "20k-75k", label: "Rp 20.000 - Rp 75.000", shortLabel: "20rb - 75rb", min: 20000, max: 75000, desc: "Terjangkau", icon: ThumbsUp },
+  { id: "75k-300k", label: "Rp 75.000 - Rp 300.000", shortLabel: "75rb - 300rb", min: 75000, max: 300000, desc: "Sedang", icon: TrendingUp },
+  { id: "300k-1m", label: "Rp 300.000 - Rp 1.000.000", shortLabel: "300rb - 1jt", min: 300000, max: 1000000, desc: "Premium", icon: Star },
+  { id: "1m+", label: "> Rp 1.000.000", shortLabel: "> 1 Juta", min: 1000000, max: Infinity, desc: "Eksklusif", icon: Diamond },
 ];
 
 const SORT_OPTIONS = [
@@ -75,12 +80,13 @@ const SORT_OPTIONS = [
 ];
 
 const getPriceTierLabel = (price) => {
-  if (!price || price <= 0) return null;
-  if (price <= 50000) return "Ekonomis & Terjangkau";
-  if (price <= 150000) return "Menengah";
-  if (price <= 500000) return "Standar";
-  if (price <= 1000000) return "Premium";
-  return "1 Juta ke atas";
+  const p = Number(price || 0);
+  if (p <= 0) return null;
+  if (p <= 20000) return { label: "Murah", color: "#059669", bg: "#d1fae5" };
+  if (p <= 75000) return { label: "Terjangkau", color: "#0891b2", bg: "#cffafe" };
+  if (p <= 300000) return { label: "Sedang", color: "#d97706", bg: "#fef3c7" };
+  if (p <= 1000000) return { label: "Premium", color: "#7c3aed", bg: "#ede9fe" };
+  return { label: "Eksklusif", color: "#b91c1c", bg: "#fee2e2" };
 };
 
 /* ── Categories loaded dynamically from API ── */
@@ -199,7 +205,7 @@ const CITIES = [
 export default function Category() {
   const { categoryId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const queryQ = searchParams.get("q") || "";
+  const queryQ = searchParams.get("q") || searchParams.get("search") || searchParams.get("keyword") || "";
   const queryLocation = searchParams.get("location") || "";
 
   const [activeCategory, setActiveCategory] = useState(categoryId || "all");
@@ -212,6 +218,12 @@ export default function Category() {
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
   const cityDropdownRef = useRef(null);
 
+  const filteredCities = useMemo(() => {
+    if (!kotaSearch.trim()) return CITIES;
+    const q = kotaSearch.toLowerCase();
+    return CITIES.filter((city) => city.toLowerCase().includes(q));
+  }, [kotaSearch]);
+
   const [selectedPriceRange, setSelectedPriceRange] = useState("all");
   const [priceDropdownOpen, setPriceDropdownOpen] = useState(false);
   const priceDropdownRef = useRef(null);
@@ -220,16 +232,25 @@ export default function Category() {
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const sortDropdownRef = useRef(null);
 
+  const listTopRef = useRef(null);
+  const [gridHeight, setGridHeight] = useState(null);
   const tabsRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
-  const filteredCities = CITIES.filter((k) =>
-    k.toLowerCase().includes(kotaSearch.toLowerCase())
-  );
+  const checkScroll = () => {
+    if (tabsRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
 
   const scrollTabs = (direction) => {
     if (tabsRef.current) {
       const scrollAmount = direction === "left" ? -280 : 280;
       tabsRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+      setTimeout(checkScroll, 300);
     }
   };
 
@@ -243,9 +264,10 @@ export default function Category() {
 
       try {
         sessionStorage.removeItem("cached_public_categories");
+        sessionStorage.removeItem("cached_public_categories_raw");
       } catch (e) {}
 
-      const cachedCategories = sessionStorage.getItem("cached_public_categories_raw");
+      const cachedCategories = sessionStorage.getItem("cached_public_categories_raw_v3");
       if (cachedCategories) {
         try {
           const rawList = JSON.parse(cachedCategories);
@@ -270,7 +292,7 @@ export default function Category() {
           const list = Array.isArray(catData) ? catData : (Array.isArray(catData?.data) ? catData.data : []);
           if (list.length > 0) {
             try {
-              sessionStorage.setItem("cached_public_categories_raw", JSON.stringify(list));
+              sessionStorage.setItem("cached_public_categories_raw_v3", JSON.stringify(list));
             } catch (e) {}
             const cleanList = list.filter(c => (c.slug !== "all" && c.slug !== "semua" && c.name?.toLowerCase() !== "semua"));
             const mappedCategories = [
@@ -302,6 +324,17 @@ export default function Category() {
               const categoryName = mainCategory?.name || b.category?.name || "Umum";
               const subCategoryName = subCategory?.name || (b.sub_category?.name || null);
               const openStatus = getBusinessOpenStatus(b.opening_days);
+              const todaySchedule = getScheduleForDay(b.opening_days, getTodayName());
+              let hoursText = b.opening_hours || b.hours || "";
+              if (!hoursText && todaySchedule && todaySchedule.open && todaySchedule.close) {
+                hoursText = `${todaySchedule.open} - ${todaySchedule.close}`;
+              }
+              if (!hoursText && b.open_time && b.close_time) {
+                hoursText = `${b.open_time} - ${b.close_time}`;
+              }
+              if (!hoursText) {
+                hoursText = "09:00 - 21:00";
+              }
 
               let bTags = [];
               if (Array.isArray(b.tags) && b.tags.length > 0) {
@@ -314,9 +347,11 @@ export default function Category() {
                   bTags = b.tags.split(",").map((t) => t.trim()).filter(Boolean);
                 }
               }
-              if (bTags.length === 0) {
-                bTags = [categoryName, b.village || b.city].filter(Boolean);
-              }
+              // Filter out city/location noise tags seeded as tags
+              const cityLower = (b.city || "").toLowerCase();
+              bTags = bTags.map(t => typeof t === "object" ? (t?.name || String(t)) : String(t))
+                .filter(t => t && t.toLowerCase() !== cityLower && !t.toLowerCase().startsWith("desa/") && !t.toLowerCase().startsWith("kelurahan"));
+              // Do NOT add fallback tags — only real tags will be shown
 
               return {
                 id: b.id,
@@ -334,13 +369,15 @@ export default function Category() {
                 rating_count: b.rating_count || 0,
                 status: openStatus.label,
                 open: openStatus.open,
-                img: getStorageUrl(b.logo || b.banner) || "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=250&fit=crop",
+                opening_hours: hoursText,
+                img: getStorageUrl(b.banner || b.logo) || "/images/businesses/pasar.jpg",
                 lat: b.lat || b.latitude,
                 lng: b.lng || b.longitude,
                 latitude: b.latitude || b.lat,
                 longitude: b.longitude || b.lng,
                 address: b.address,
                 is_premium: Boolean(b.is_premium || b.premium_info?.status === "active" || b.user?.role === "premium" || b.user?.is_premium),
+                is_verified: Boolean(b.is_verified),
                 avg_price: avgPrice,
                 min_price: minPrice,
                 max_price: maxPrice,
@@ -358,18 +395,81 @@ export default function Category() {
   }, []);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-    if (categoryId) {
-      setActiveCategory(categoryId);
-      // Ganti kategori utama -> sub kategori sebelumnya jadi tidak relevan
-      setActiveSubcategory("");
+    checkScroll();
+    const el = tabsRef.current;
+    if (el) {
+      el.addEventListener("scroll", checkScroll, { passive: true });
+      window.addEventListener("resize", checkScroll);
+      return () => {
+        el.removeEventListener("scroll", checkScroll);
+        window.removeEventListener("resize", checkScroll);
+      };
     }
-  }, [categoryId]);
+  }, [categories]);
+
+  // Auto-scroll active category tab into view
+  useEffect(() => {
+    if (tabsRef.current && activeCategory) {
+      setTimeout(() => {
+        const activeEl = tabsRef.current?.querySelector(".reko-tab.active");
+        if (activeEl) {
+          activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+        checkScroll();
+      }, 100);
+    }
+  }, [activeCategory, categories]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    if (!categoryId) return;
+
+    // Check if categoryId is a subcategory belonging to a parent category
+    let matchedParent = null;
+    let matchedChild = null;
+
+    for (const cat of categories) {
+      if (cat.id === categoryId || (cat.id && cat.id.toLowerCase() === categoryId.toLowerCase())) {
+        matchedParent = cat;
+        break;
+      }
+      if (cat.children && Array.isArray(cat.children)) {
+        const found = cat.children.find(ch => 
+          ch.slug === categoryId || 
+          String(ch.id) === categoryId || 
+          (ch.slug && ch.slug.toLowerCase() === categoryId.toLowerCase()) ||
+          (ch.name && ch.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") === categoryId.toLowerCase())
+        );
+        if (found) {
+          matchedParent = cat;
+          matchedChild = found;
+          break;
+        }
+      }
+    }
+
+    if (matchedChild && matchedParent) {
+      setActiveCategory(matchedParent.id);
+      setActiveSubcategory(matchedChild.name);
+    } else if (matchedParent) {
+      setActiveCategory(matchedParent.id);
+      setActiveSubcategory(querySub || "");
+    } else {
+      setActiveCategory(categoryId);
+      setActiveSubcategory(querySub || "");
+    }
+  }, [categoryId, categories, querySub]);
 
   useEffect(() => {
     setSearchKeyword(queryQ);
     setSelectedCity(queryLocation || "Semua");
   }, [queryQ, queryLocation]);
+
+  useEffect(() => {
+    const currentCat = categories.find((c) => c.id === activeCategory);
+    const catLabel = currentCat?.label || (activeCategory !== "all" ? activeCategory : "Kategori Usaha");
+    document.title = `${catLabel} - Surade.com`;
+  }, [activeCategory, categories]);
 
   // Outside-click detection for dropdowns
   useEffect(() => {
@@ -422,10 +522,15 @@ export default function Category() {
     const matchesCity = !selectedCity || selectedCity === "Semua" ||
       b.location.toLowerCase().includes(selectedCity.toLowerCase());
 
-    // Sub kategori filter (misal: "Apotek", "Klinik Umum" di bawah Kesehatan)
+    // Sub kategori filter (misal: "Apotek", "Klinik Umum" di bawah Kesehatan, "Sedot WC" di bawah Jasa)
     const matchesSubcategory = !activeSubcategory ||
+      (b.subCategory || "").toLowerCase() === activeSubcategory.toLowerCase() ||
       (b.categorySlug || "").toLowerCase() === activeSubcategory.toLowerCase() ||
-      (b.category || "").toLowerCase() === activeSubcategory.toLowerCase();
+      (b.category || "").toLowerCase() === activeSubcategory.toLowerCase() ||
+      (b.subCategory && (
+        b.subCategory.toLowerCase().includes(activeSubcategory.toLowerCase()) ||
+        activeSubcategory.toLowerCase().includes(b.subCategory.toLowerCase())
+      ));
 
     // Keyword filter
     const matchesKeyword = !searchKeyword ||
@@ -439,12 +544,13 @@ export default function Category() {
     if (selectedPriceRange && selectedPriceRange !== "all") {
       const range = PRICE_RANGES.find(r => r.id === selectedPriceRange);
       if (range) {
-        const price = b.avg_price || 0;
+        // Use min_price if available, fall back to avg_price
+        const price = b.min_price > 0 ? b.min_price : (b.avg_price || 0);
         if (b.products_count === 0 && price === 0) {
           matchesPrice = false;
         } else {
           const isAboveMin = range.min === null || price >= range.min;
-          const isBelowMax = range.max === null || price <= range.max;
+          const isBelowMax = range.max === null || range.max === Infinity || price <= range.max;
           matchesPrice = isAboveMin && isBelowMax;
         }
       }
@@ -466,14 +572,16 @@ export default function Category() {
     if (sortOption === "views") {
       return (b.views || 0) - (a.views || 0);
     }
-    // Default / latest
-    return (b.id || 0) - (a.id || 0);
+    // Default / latest (stable numeric/string compare)
+    const numA = Number(a.id);
+    const numB = Number(b.id);
+    if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+    return String(b.id || "").localeCompare(String(a.id || ""));
   });
 
   // ── Pagination Setup (6 items per page) ──
   const ITEMS_PER_PAGE = 6;
   const [currentPage, setCurrentPage] = useState(1);
-  const listTopRef = useRef(null);
 
   // Reset to page 1 whenever search, category, city, price, or sort changes
   useEffect(() => {
@@ -485,6 +593,22 @@ export default function Category() {
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
   const paginatedBisnis = searchFilteredBisnis.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  useEffect(() => {
+    if (!listTopRef.current) return;
+    const updateHeight = () => {
+      if (listTopRef.current) {
+        const h = Math.round(listTopRef.current.getBoundingClientRect().height);
+        if (h > 0) {
+          setGridHeight((prev) => (prev === h ? prev : h));
+        }
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(listTopRef.current);
+    return () => observer.disconnect();
+  }, [paginatedBisnis, loadingData]);
 
   const pageNumbers = useMemo(() => {
     const pages = [];
@@ -546,22 +670,13 @@ export default function Category() {
       (Array.isArray(localBiz) ? localBiz : []).forEach(id => { bizSavedMap[id] = true; });
     } catch (e) {}
 
-    // PERBAIKAN: /my-favorites dibatasi backend cuma buat role "user" -
-    // dulu dipanggil untuk semua akun login termasuk admin, jadi admin
-    // selalu dapat error 403 di sini. Sekarang dilewati kalau bukan
-    // role "user".
-    let isRegularUser = false;
-    try {
-      isRegularUser = JSON.parse(localStorage.getItem("user") || "null")?.role === "user";
-    } catch (e) {}
-
-    if (token && isRegularUser) {
+    if (token) {
       try {
         const res = await api.get("/my-favorites");
         const data = res.data?.data || res.data || [];
         const list = Array.isArray(data) ? data : (data?.data || []);
         list.forEach(fav => {
-          const bId = fav.business_id || fav.business?.id;
+          const bId = fav.business_id || fav.business?.id || fav.id;
           if (bId) bizSavedMap[bId] = true;
         });
       } catch (err) {
@@ -809,17 +924,48 @@ export default function Category() {
       {/* CATEGORY HORIZONTAL PILLS */}
       <section className="category-tabs-section">
         <div className="category-tabs-inner">
-          <div className="reko-tabs" ref={tabsRef}>
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                to={`/category/${cat.id}?${searchParams.toString()}`}
-                className={`reko-tab reko-tab--link${activeCategory === cat.id ? " active" : ""}`}
+          <div className="category-tabs-wrapper">
+            {canScrollLeft && (
+              <button
+                type="button"
+                className="category-scroll-arrow category-scroll-arrow--left"
+                onClick={() => scrollTabs("left")}
+                aria-label="Geser Kiri"
+                title="Geser Kategori ke Kiri"
               >
-                <span className="reko-tab__icon">{cat.icon}</span>
-                <span className="reko-tab__label">{cat.label}</span>
-              </Link>
-            ))}
+                <ChevronLeft size={18} strokeWidth={2.5} />
+              </button>
+            )}
+
+            <div className="reko-tabs" ref={tabsRef}>
+              {categories.map((cat) => {
+                const isActive = activeCategory === cat.id;
+                return (
+                  <Link
+                    key={cat.id}
+                    to={`/category/${cat.id}?${searchParams.toString()}`}
+                    className={`reko-tab reko-tab--link${isActive ? " active" : ""}`}
+                  >
+                    <span className="reko-tab__icon-wrap">
+                      <span className="reko-tab__icon">{cat.icon}</span>
+                    </span>
+                    <span className="reko-tab__label">{cat.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {canScrollRight && (
+              <button
+                type="button"
+                className="category-scroll-arrow category-scroll-arrow--right"
+                onClick={() => scrollTabs("right")}
+                aria-label="Geser Kanan"
+                title="Geser Kategori ke Kanan"
+              >
+                <ChevronRight size={18} strokeWidth={2.5} />
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -924,7 +1070,12 @@ export default function Category() {
                         >
                           <div className="filter-item-info">
                             <span className="filter-item-label">{range.label}</span>
-                            {range.desc && <span className="filter-item-desc">{range.desc}</span>}
+                            {range.desc && (
+                              <span className="filter-item-desc" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {range.icon && <range.icon size={12} className="filter-item-icon" />}
+                                {range.desc}
+                              </span>
+                            )}
                           </div>
                           {selectedPriceRange === range.id && <Check size={15} className="filter-item-check" />}
                         </li>
@@ -991,13 +1142,16 @@ export default function Category() {
                             loading="lazy" 
                             onError={(e) => {
                               e.currentTarget.onerror = null;
-                              e.currentTarget.src = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&h=350&fit=crop&q=80";
+                              e.currentTarget.src = "/images/businesses/pasar.jpg";
                             }}
                           />
-                          {bisnis.is_premium && (
-                            <div className="biz-card__verified-badge biz-card__verified-badge--premium" title="Bisnis Terverifikasi - Mitra Resmi">
-                              <BadgeCheck size={14} className="biz-card__verified-icon" />
-                              <span>Terverifikasi</span>
+                          {/* Verified badge (Rosette icon only matching Image 3) */}
+                          {Boolean(bisnis.is_premium) && (
+                            <div className="biz-card__verified-badge" title="Bisnis Terverifikasi - Mitra Resmi">
+                              <svg className="w-5 h-5 sm:w-6 sm:h-6 drop-shadow-[0_2px_8px_rgba(16,185,129,0.5)]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 1L9.27 3.47L5.64 3.78L4.69 7.31L1.77 9.5L2.83 13L1.77 16.5L4.69 18.69L5.64 22.22L9.27 22.53L12 25L14.73 22.53L18.36 22.22L19.31 18.69L22.23 16.5L21.17 13L22.23 9.5L19.31 7.31L18.36 3.78L14.73 3.47L12 1Z" fill="#10B981" />
+                                <path d="M10.2 14.8L7.4 12L6 13.4L10.2 17.6L18 9.8L16.6 8.4L10.2 14.8Z" fill="white" />
+                              </svg>
                             </div>
                           )}
                           <div className="biz-card__img-overlay">
@@ -1040,6 +1194,31 @@ export default function Category() {
                               </p>
                             )}
                           </div>
+                          {/* Price Tag - only show if price data exists, show min-max range */}
+                          {(bisnis.min_price > 0 || bisnis.avg_price > 0) && (() => {
+                            const tier = getPriceTierLabel(bisnis.min_price || bisnis.avg_price);
+                            return (
+                              <div className="flex items-center gap-1.5 flex-wrap my-1.5">
+                                <div className="biz-card__price-tag flex items-center gap-1.5 text-[12px] font-bold text-emerald-800 bg-emerald-50/90 px-2.5 py-1 rounded-lg border border-emerald-200/90 w-fit">
+                                  <Tag size={12} className="text-emerald-600 shrink-0" />
+                                  <span>
+                                    {bisnis.min_price > 0 && bisnis.max_price > 0 && bisnis.min_price !== bisnis.max_price
+                                      ? `Rp ${Number(bisnis.min_price).toLocaleString("id-ID")} - Rp ${Number(bisnis.max_price).toLocaleString("id-ID")}`
+                                      : `Rp ${Number(bisnis.min_price || bisnis.avg_price).toLocaleString("id-ID")}`}
+                                  </span>
+                                </div>
+                                {tier && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+                                    style={{ color: tier.color, background: tier.bg, borderColor: tier.color + "40" }}>
+                                    {tier.label}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          {/* Tags - only show if tags exist */}
+                          {bisnis.tags && bisnis.tags.length > 0 && (
                           <div className="biz-card__tags">
                             {bisnis.tags.slice(0, 3).map((tag, idx) => (
                               <span key={idx} className="biz-card__tag">
@@ -1055,14 +1234,15 @@ export default function Category() {
                               </span>
                             )}
                           </div>
+                          )}
                           <div className="biz-card__footer">
                             <span className="biz-card__rating">
                               <Star size={13} className="fill-amber-400 text-amber-400" />
                               <span>{Number(bisnis.rating || 0).toFixed(1)}</span>
                               {bisnis.rating_count > 0 && <span className="text-slate-400">({bisnis.rating_count})</span>}
                             </span>
-                            <span className="biz-card__location">
-                              <MapPin size={12} />{bisnis.location}
+                            <span className="biz-card__location" title={bisnis.location}>
+                              <MapPin size={12} />{(bisnis.location || "Surade").split(",")[0].trim()}
                             </span>
                             <span className={`biz-card__cta${bisnis.open ? "" : " closed"}${bisnis.is_premium ? " biz-card__cta--premium" : ""}`}>
                               {bisnis.open ? "Buka Sekarang →" : "Tutup Sekarang!"}
@@ -1073,62 +1253,20 @@ export default function Category() {
                     ))}
                   </div>
 
-                  {/* ── Responsive Pagination Controls ── */}
-                  {totalPages > 1 && (
+                  {/* ── Responsive Pagination Controls (Google Style Gooooooogle) ── */}
+                  {!loadingData && searchFilteredBisnis.length > 0 && totalPages > 1 && (
                     <div className="category-pagination">
                       <div className="category-pagination__info">
-                        Menampilkan <strong>{startIndex + 1}</strong>–<strong>{Math.min(startIndex + ITEMS_PER_PAGE, totalItems)}</strong> dari <strong>{totalItems}</strong> bisnis
+                        Menampilkan <strong>{startIndex + 1}</strong>–<strong>{Math.min(startIndex + ITEMS_PER_PAGE, totalItems)}</strong> dari <strong>{totalItems}</strong> usaha
                       </div>
 
-                      <div className="category-pagination__controls">
-                        {/* Prev Button */}
-                        <button
-                          type="button"
-                          className="category-pagination__nav-btn"
-                          onClick={() => handlePageChange(safeCurrentPage - 1)}
-                          disabled={safeCurrentPage === 1}
-                          aria-label="Halaman Sebelumnya"
-                        >
-                          <ChevronLeft size={16} />
-                          <span className="category-pagination__nav-label">Sebelumnya</span>
-                        </button>
-
-                        {/* Numbered Pages */}
-                        <div className="category-pagination__pages">
-                          {pageNumbers.map((page, idx) =>
-                            page === "..." ? (
-                              <span key={`dots-${idx}`} className="category-pagination__dots">
-                                …
-                              </span>
-                            ) : (
-                              <button
-                                key={`page-${page}`}
-                                type="button"
-                                className={`category-pagination__page-btn ${
-                                  page === safeCurrentPage ? "active" : ""
-                                }`}
-                                onClick={() => handlePageChange(page)}
-                                aria-label={`Ke Halaman ${page}`}
-                                aria-current={page === safeCurrentPage ? "page" : undefined}
-                              >
-                                {page}
-                              </button>
-                            )
-                          )}
-                        </div>
-
-                        {/* Next Button */}
-                        <button
-                          type="button"
-                          className="category-pagination__nav-btn"
-                          onClick={() => handlePageChange(safeCurrentPage + 1)}
-                          disabled={safeCurrentPage === totalPages}
-                          aria-label="Halaman Selanjutnya"
-                        >
-                          <span className="category-pagination__nav-label">Selanjutnya</span>
-                          <ChevronRight size={16} />
-                        </button>
-                      </div>
+                      <GooglePagination
+                        currentPage={safeCurrentPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                        prevLabel="Sebelumnya"
+                        nextLabel="Berikutnya"
+                      />
                     </div>
                   )}
                 </>
@@ -1141,10 +1279,17 @@ export default function Category() {
             </div>
 
             {/* MAP LAYOUT */}
-            <div className="category-business-right">
+            <div 
+              className="category-business-right"
+              style={{
+                height: gridHeight ? `${gridHeight}px` : '100%',
+                minHeight: gridHeight ? `${gridHeight}px` : '450px',
+                maxHeight: gridHeight ? `${gridHeight}px` : 'none'
+              }}
+            >
               <MapView 
-                businesses={searchFilteredBisnis}
-                height="100%"
+                businesses={paginatedBisnis}
+                height={gridHeight ? `${gridHeight}px` : '100%'}
               />
             </div>
           </div>

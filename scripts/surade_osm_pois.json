@@ -1,0 +1,1620 @@
+[
+  {
+    "id": 1308656289,
+    "name": "Banyumurni",
+    "type": "other",
+    "lat": -7.3145364,
+    "lon": 106.6194373,
+    "tags": {
+      "admin_level": "7",
+      "name": "Banyumurni",
+      "place": "village",
+      "ref": "32.02.25.2002",
+      "wikidata": "Q11147937"
+    }
+  },
+  {
+    "id": 1308656894,
+    "name": "Cipeundeuy",
+    "type": "other",
+    "lat": -7.3811769,
+    "lon": 106.559166,
+    "tags": {
+      "name": "Cipeundeuy",
+      "place": "village"
+    }
+  },
+  {
+    "id": 1308661567,
+    "name": "Cidahu",
+    "type": "other",
+    "lat": -7.3500957,
+    "lon": 106.6072366,
+    "tags": {
+      "name": "Cidahu",
+      "place": "village"
+    }
+  },
+  {
+    "id": 1308665555,
+    "name": "Talagamurni",
+    "type": "other",
+    "lat": -7.315232,
+    "lon": 106.5889538,
+    "tags": {
+      "admin_level": "7",
+      "name": "Talagamurni",
+      "place": "village",
+      "ref": "32.02.25.2001",
+      "wikidata": "Q11147837"
+    }
+  },
+  {
+    "id": 1308665636,
+    "name": "Buniwangi",
+    "type": "other",
+    "lat": -7.3705475,
+    "lon": 106.5419411,
+    "tags": {
+      "name": "Buniwangi",
+      "place": "village"
+    }
+  },
+  {
+    "id": 1308671387,
+    "name": "Ciracap",
+    "type": "other",
+    "lat": -7.3304299,
+    "lon": 106.5199626,
+    "tags": {
+      "name": "Ciracap",
+      "place": "town"
+    }
+  },
+  {
+    "id": 1308675076,
+    "name": "Cibodas",
+    "type": "other",
+    "lat": -7.3213638,
+    "lon": 106.6291091,
+    "tags": {
+      "name": "Cibodas",
+      "place": "village"
+    }
+  },
+  {
+    "id": 1308684631,
+    "name": "Pasirpanjang",
+    "type": "other",
+    "lat": -7.3049199,
+    "lon": 106.5260177,
+    "tags": {
+      "name": "Pasirpanjang",
+      "place": "village"
+    }
+  },
+  {
+    "id": 1308687943,
+    "name": "Pasiripis",
+    "type": "other",
+    "lat": -7.3582645,
+    "lon": 106.5424507,
+    "tags": {
+      "name": "Pasiripis",
+      "place": "village"
+    }
+  },
+  {
+    "id": 1308689492,
+    "name": "Kademangan",
+    "type": "other",
+    "lat": -7.3421564,
+    "lon": 106.5944141,
+    "tags": {
+      "name": "Kademangan",
+      "place": "village"
+    }
+  },
+  {
+    "id": 1308703630,
+    "name": "Citanglar",
+    "type": "other",
+    "lat": -7.3196873,
+    "lon": 106.5834271,
+    "tags": {
+      "admin_level": "7",
+      "name": "Citanglar",
+      "place": "village",
+      "ref": "32.02.24.2002",
+      "wikidata": "Q12479337"
+    }
+  },
+  {
+    "id": 1308703936,
+    "name": "Jagamukti",
+    "type": "other",
+    "lat": -7.3485169,
+    "lon": 106.5758111,
+    "tags": {
+      "admin_level": "7",
+      "name": "Jagamukti",
+      "place": "village",
+      "ref": "32.02.24.2001",
+      "wikidata": "Q13199352"
+    }
+  },
+  {
+    "id": 1308706036,
+    "name": "Purwasedar",
+    "type": "other",
+    "lat": -7.3494817,
+    "lon": 106.5140029,
+    "tags": {
+      "admin_level": "7",
+      "name": "Purwasedar",
+      "place": "village",
+      "ref": "32.02.26.2004",
+      "wikidata": "Q11157693"
+    }
+  },
+  {
+    "id": 1308715061,
+    "name": "Banyuwangi",
+    "type": "other",
+    "lat": -7.3245148,
+    "lon": 106.6509222,
+    "tags": {
+      "name": "Banyuwangi",
+      "place": "village"
+    }
+  },
+  {
+    "id": 1921397284,
+    "name": "Air Terjun",
+    "type": "picnic_site",
+    "lat": -7.3607246,
+    "lon": 106.6177358,
+    "tags": {
+      "name": "Air Terjun",
+      "tourism": "picnic_site"
+    }
+  },
+  {
+    "id": 5989169058,
+    "name": "Curug Cikaso",
+    "type": "yes",
+    "lat": -7.3605359,
+    "lon": 106.6177486,
+    "tags": {
+      "image": "https://rishapratiwi.wordpress.com/wp-content/uploads/2013/05/img_0145.jpg",
+      "name": "Curug Cikaso",
+      "tourism": "yes",
+      "waterway": "waterfall"
+    }
+  },
+  {
+    "id": 12400158963,
+    "name": "Sukatani",
+    "type": "other",
+    "lat": -7.3903704,
+    "lon": 106.5701133,
+    "tags": {
+      "name": "Sukatani",
+      "place": "village"
+    }
+  },
+  {
+    "id": 12400158964,
+    "name": "Cibitung",
+    "type": "other",
+    "lat": -7.3258385,
+    "lon": 106.6215285,
+    "tags": {
+      "name": "Cibitung",
+      "place": "town"
+    }
+  },
+  {
+    "id": 12400162454,
+    "name": "Gunung Sungging",
+    "type": "other",
+    "lat": -7.3593811,
+    "lon": 106.5716958,
+    "tags": {
+      "name": "Gunung Sungging",
+      "place": "village"
+    }
+  },
+  {
+    "id": 12400200717,
+    "name": "Surade",
+    "type": "other",
+    "lat": -7.34159,
+    "lon": 106.562705,
+    "tags": {
+      "name": "Surade",
+      "place": "town"
+    }
+  },
+  {
+    "id": 12424656122,
+    "name": "Telkomsel",
+    "type": "other",
+    "lat": -7.3453768,
+    "lon": 106.5926854,
+    "tags": {
+      "man_made": "communications_tower",
+      "name": "Telkomsel",
+      "operator": "Telkomsel",
+      "tower:type": "communication"
+    }
+  },
+  {
+    "id": 12424656123,
+    "name": "Telkomsel",
+    "type": "other",
+    "lat": -7.3269292,
+    "lon": 106.6211437,
+    "tags": {
+      "man_made": "communications_tower",
+      "name": "Telkomsel",
+      "operator": "Telkomsel",
+      "tower:type": "communication"
+    }
+  },
+  {
+    "id": 12424656124,
+    "name": "Telkomsel",
+    "type": "other",
+    "lat": -7.3417549,
+    "lon": 106.5616456,
+    "tags": {
+      "man_made": "communications_tower",
+      "name": "Telkomsel",
+      "operator": "Telkomsel",
+      "tower:type": "communication"
+    }
+  },
+  {
+    "id": 12424656125,
+    "name": "Telkomsel",
+    "type": "other",
+    "lat": -7.330776,
+    "lon": 106.5820505,
+    "tags": {
+      "man_made": "communications_tower",
+      "name": "Telkomsel",
+      "operator": "Telkomsel",
+      "tower:type": "communication"
+    }
+  },
+  {
+    "id": 12424656126,
+    "name": "Telkomsel",
+    "type": "other",
+    "lat": -7.304066,
+    "lon": 106.6083106,
+    "tags": {
+      "man_made": "communications_tower",
+      "name": "Telkomsel",
+      "operator": "Telkomsel",
+      "tower:type": "communication"
+    }
+  },
+  {
+    "id": 12424656136,
+    "name": "Telkomsel",
+    "type": "other",
+    "lat": -7.3698353,
+    "lon": 106.5382326,
+    "tags": {
+      "man_made": "communications_tower",
+      "name": "Telkomsel",
+      "operator": "Telkomsel",
+      "tower:type": "communication"
+    }
+  },
+  {
+    "id": 12424656137,
+    "name": "Telkomsel",
+    "type": "other",
+    "lat": -7.3538135,
+    "lon": 106.6510235,
+    "tags": {
+      "man_made": "communications_tower",
+      "name": "Telkomsel",
+      "operator": "Telkomsel",
+      "tower:type": "communication"
+    }
+  },
+  {
+    "id": 12426505345,
+    "name": "Cilampah Dua",
+    "type": "other",
+    "lat": -7.3796401,
+    "lon": 106.663025,
+    "tags": {
+      "name": "Cilampah Dua",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505346,
+    "name": "Cilampah",
+    "type": "other",
+    "lat": -7.3776398,
+    "lon": 106.6636902,
+    "tags": {
+      "name": "Cilampah",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505347,
+    "name": "Kiaralawang",
+    "type": "other",
+    "lat": -7.3836407,
+    "lon": 106.6770852,
+    "tags": {
+      "name": "Kiaralawang",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505348,
+    "name": "Ciletak",
+    "type": "other",
+    "lat": -7.3903225,
+    "lon": 106.6646397,
+    "tags": {
+      "name": "Ciletak",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505349,
+    "name": "Cikepel",
+    "type": "other",
+    "lat": -7.3928441,
+    "lon": 106.6651976,
+    "tags": {
+      "name": "Cikepel",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505350,
+    "name": "Bantarpari",
+    "type": "other",
+    "lat": -7.3854708,
+    "lon": 106.651411,
+    "tags": {
+      "name": "Bantarpari",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505351,
+    "name": "Ciloma",
+    "type": "other",
+    "lat": -7.3934186,
+    "lon": 106.6594469,
+    "tags": {
+      "name": "Ciloma",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505352,
+    "name": "Kadudahung",
+    "type": "other",
+    "lat": -7.3923919,
+    "lon": 106.652264,
+    "tags": {
+      "name": "Kadudahung",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505353,
+    "name": "Ciroyom",
+    "type": "other",
+    "lat": -7.4151974,
+    "lon": 106.647023,
+    "tags": {
+      "name": "Ciroyom",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505354,
+    "name": "Cibadak",
+    "type": "other",
+    "lat": -7.4173997,
+    "lon": 106.6443193,
+    "tags": {
+      "name": "Cibadak",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505355,
+    "name": "Cipaku",
+    "type": "other",
+    "lat": -7.4154528,
+    "lon": 106.6347813,
+    "tags": {
+      "name": "Cipaku",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505356,
+    "name": "Ciawi",
+    "type": "other",
+    "lat": -7.4030261,
+    "lon": 106.6656697,
+    "tags": {
+      "name": "Ciawi",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505357,
+    "name": "Cilulut",
+    "type": "other",
+    "lat": -7.4086277,
+    "lon": 106.6785389,
+    "tags": {
+      "name": "Cilulut",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505359,
+    "name": "Sukarasa",
+    "type": "other",
+    "lat": -7.4163784,
+    "lon": 106.6784584,
+    "tags": {
+      "name": "Sukarasa",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 12426505360,
+    "name": "Cihampelas",
+    "type": "other",
+    "lat": -7.4193467,
+    "lon": 106.6783887,
+    "tags": {
+      "name": "Cihampelas",
+      "place": "hamlet"
+    }
+  },
+  {
+    "id": 51783879,
+    "name": "Cikaso",
+    "type": "other",
+    "lat": -7.2690094,
+    "lon": 106.7371577,
+    "tags": {
+      "name": "Cikaso",
+      "source": "Bing",
+      "waterway": "river"
+    }
+  },
+  {
+    "id": 151063188,
+    "name": "Jalan Haji Muhammad Dabang",
+    "type": "other",
+    "lat": -7.3446495,
+    "lon": 106.5572551,
+    "tags": {
+      "highway": "service",
+      "name": "Jalan Haji Muhammad Dabang",
+      "source": "Bing"
+    }
+  },
+  {
+    "id": 151600741,
+    "name": "Cikarang",
+    "type": "other",
+    "lat": -7.3760122,
+    "lon": 106.4953269,
+    "tags": {
+      "name": "Cikarang",
+      "source": "Bing",
+      "waterway": "river"
+    }
+  },
+  {
+    "id": 151600765,
+    "name": "Cikarang",
+    "type": "other",
+    "lat": -7.3604802,
+    "lon": 106.4940237,
+    "tags": {
+      "name": "Cikarang",
+      "source": "Bing",
+      "waterway": "river"
+    }
+  },
+  {
+    "id": 154060836,
+    "name": "Cikarang",
+    "type": "other",
+    "lat": -7.3043902,
+    "lon": 106.4995927,
+    "tags": {
+      "name": "Cikarang",
+      "waterway": "stream"
+    }
+  },
+  {
+    "id": 154168905,
+    "name": "Jalan Surade - Tegalbuleud",
+    "type": "other",
+    "lat": -7.3576522,
+    "lon": 106.6216026,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "bridge": "yes",
+      "highway": "trunk",
+      "lanes": "2",
+      "layer": "1",
+      "name": "Jalan Surade - Tegalbuleud",
+      "ref": "7",
+      "smoothness": "excellent",
+      "source": "Bing",
+      "surface": "asphalt",
+      "width": "4"
+    }
+  },
+  {
+    "id": 154168911,
+    "name": "Jalan Surade - Tegalbuleud",
+    "type": "other",
+    "lat": -7.3475973,
+    "lon": 106.597271,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "bridge": "yes",
+      "highway": "trunk",
+      "lanes": "2",
+      "layer": "1",
+      "name": "Jalan Surade - Tegalbuleud",
+      "ref": "7",
+      "smoothness": "good",
+      "source": "Bing",
+      "surface": "asphalt",
+      "width": "4"
+    }
+  },
+  {
+    "id": 178829756,
+    "name": "Jalan Surade",
+    "type": "other",
+    "lat": -7.3450749,
+    "lon": 106.5533049,
+    "tags": {
+      "highway": "primary",
+      "name": "Jalan Surade",
+      "source": "Bing"
+    }
+  },
+  {
+    "id": 547182505,
+    "name": "Jalan Ninajadulu",
+    "type": "other",
+    "lat": -7.3778353,
+    "lon": 106.5260277,
+    "tags": {
+      "highway": "residential",
+      "name": "Jalan Ninajadulu"
+    }
+  },
+  {
+    "id": 703798607,
+    "name": "Jalan Surade - Tegalbuleud",
+    "type": "other",
+    "lat": -7.3524571,
+    "lon": 106.609247,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "highway": "trunk",
+      "lanes": "2",
+      "name": "Jalan Surade - Tegalbuleud",
+      "ref": "7",
+      "smoothness": "good",
+      "source": "Bing",
+      "surface": "asphalt",
+      "width": "4"
+    }
+  },
+  {
+    "id": 705098470,
+    "name": "Jalan Surade - Tegalbuleud",
+    "type": "other",
+    "lat": -7.383646,
+    "lon": 106.6644897,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "highway": "trunk",
+      "lanes": "2",
+      "name": "Jalan Surade - Tegalbuleud",
+      "ref": "7",
+      "smoothness": "excellent",
+      "source": "Bing",
+      "surface": "asphalt",
+      "width": "4"
+    }
+  },
+  {
+    "id": 705359345,
+    "name": "Jalan Surade",
+    "type": "other",
+    "lat": -7.3667522,
+    "lon": 106.5237336,
+    "tags": {
+      "highway": "primary",
+      "lanes": "2",
+      "name": "Jalan Surade",
+      "source": "Bing",
+      "width": "5"
+    }
+  },
+  {
+    "id": 706328283,
+    "name": "Jalan Desa 4",
+    "type": "other",
+    "lat": -7.4118454,
+    "lon": 106.5818706,
+    "tags": {
+      "highway": "service",
+      "name": "Jalan Desa 4"
+    }
+  },
+  {
+    "id": 707595629,
+    "name": "Jalan Jampangkulon - Surade",
+    "type": "other",
+    "lat": -7.2846017,
+    "lon": 106.6140855,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "highway": "trunk",
+      "lanes": "2",
+      "name": "Jalan Jampangkulon - Surade",
+      "ref": "7",
+      "smoothness": "good",
+      "source": "Bing",
+      "surface": "asphalt",
+      "width": "5"
+    }
+  },
+  {
+    "id": 722704815,
+    "name": "SMPN 3 Jampangkulon",
+    "type": "school",
+    "lat": -7.3075512,
+    "lon": 106.6345453,
+    "phone": "+62 266 6493402",
+    "tags": {
+      "addr:city": "Sukabumi",
+      "addr:postcode": "43178",
+      "amenity": "school",
+      "internet_access": "wlan",
+      "name": "SMPN 3 Jampangkulon",
+      "phone": "+62 266 6493402",
+      "website": "http://jampangkulon3.blogspot.co.id/"
+    }
+  },
+  {
+    "id": 740102200,
+    "name": "Jalan Surade-Ujung Genteng",
+    "type": "other",
+    "lat": -7.3650437,
+    "lon": 106.4520706,
+    "tags": {
+      "highway": "primary",
+      "name": "Jalan Surade-Ujung Genteng",
+      "oneway": "no",
+      "source": "Bing"
+    }
+  },
+  {
+    "id": 800951032,
+    "name": "Jalan Jampangkulon - Surade",
+    "type": "other",
+    "lat": -7.3158678,
+    "lon": 106.5876734,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "bridge": "yes",
+      "highway": "trunk",
+      "lanes": "2",
+      "layer": "1",
+      "name": "Jalan Jampangkulon - Surade",
+      "ref": "7",
+      "width": "5"
+    }
+  },
+  {
+    "id": 800951033,
+    "name": "Jalan Surade - Tegalbuleud",
+    "type": "other",
+    "lat": -7.3408523,
+    "lon": 106.5848597,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "highway": "trunk",
+      "lanes": "2",
+      "name": "Jalan Surade - Tegalbuleud",
+      "ref": "7",
+      "smoothness": "good",
+      "source": "Bing",
+      "surface": "asphalt",
+      "width": "5"
+    }
+  },
+  {
+    "id": 800967429,
+    "name": "Jalan Jampangkulon - Surade",
+    "type": "other",
+    "lat": -7.3104317,
+    "lon": 106.5959537,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "highway": "trunk",
+      "lanes": "2",
+      "name": "Jalan Jampangkulon - Surade",
+      "ref": "7",
+      "source": "Bing",
+      "width": "5"
+    }
+  },
+  {
+    "id": 800967430,
+    "name": "Jalan Jampangkulon - Surade",
+    "type": "other",
+    "lat": -7.3134243,
+    "lon": 106.5896193,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "highway": "trunk",
+      "lanes": "2",
+      "name": "Jalan Jampangkulon - Surade",
+      "ref": "7",
+      "source": "Bing",
+      "width": "5"
+    }
+  },
+  {
+    "id": 1327474802,
+    "name": "rumah",
+    "type": "other",
+    "lat": -7.4168426,
+    "lon": 106.6472758,
+    "tags": {
+      "landuse": "residential",
+      "name": "rumah"
+    }
+  },
+  {
+    "id": 1346558848,
+    "name": "Perhutani",
+    "type": "other",
+    "lat": -7.3396849,
+    "lon": 106.6358435,
+    "tags": {
+      "boundary": "protected_area",
+      "name": "Perhutani",
+      "protect_class": "6"
+    }
+  },
+  {
+    "id": 1347952435,
+    "name": "Alfamart",
+    "type": "convenience",
+    "lat": -7.3181326,
+    "lon": 106.5843932,
+    "tags": {
+      "brand": "Alfamart",
+      "brand:wikidata": "Q23745600",
+      "building": "yes",
+      "name": "Alfamart",
+      "operator": "PT Sumber Alfaria Trijaya,Tbk",
+      "shop": "convenience",
+      "source": "microsoft/BuildingFootprints",
+      "toilets": "yes",
+      "toilets:access": "permissive",
+      "toilets:unisex": "yes",
+      "website": "https://alfamart.co.id"
+    }
+  },
+  {
+    "id": 1348005249,
+    "name": "School",
+    "type": "retail",
+    "lat": -7.3336695,
+    "lon": 106.5257885,
+    "tags": {
+      "building": "retail",
+      "name": "School"
+    }
+  },
+  {
+    "id": 1348005261,
+    "name": "Beau Cafe",
+    "type": "cafe",
+    "lat": -7.3334591,
+    "lon": 106.5258584,
+    "tags": {
+      "amenity": "cafe",
+      "building": "yes",
+      "name": "Beau Cafe"
+    }
+  },
+  {
+    "id": 1348006709,
+    "name": "Saint Church",
+    "type": "place_of_worship",
+    "lat": -7.333695,
+    "lon": 106.5255933,
+    "tags": {
+      "amenity": "place_of_worship",
+      "building": "yes",
+      "name": "Saint Church"
+    }
+  },
+  {
+    "id": 1348173201,
+    "name": "DESA KADEMANGAN",
+    "type": "yes",
+    "lat": -7.3413455,
+    "lon": 106.5936981,
+    "tags": {
+      "building": "yes",
+      "building:levels": "1",
+      "height": "4",
+      "name": "DESA KADEMANGAN"
+    }
+  },
+  {
+    "id": 1353038696,
+    "name": "SDN BAGASIH",
+    "type": "yes",
+    "lat": -7.339311,
+    "lon": 106.5930862,
+    "tags": {
+      "building": "yes",
+      "building:levels": "1",
+      "height": "4",
+      "name": "SDN BAGASIH",
+      "source": "microsoft/BuildingFootprints"
+    }
+  },
+  {
+    "id": 1353038699,
+    "name": "SMPN 6 SURADE",
+    "type": "yes",
+    "lat": -7.3391842,
+    "lon": 106.5931859,
+    "tags": {
+      "building": "yes",
+      "building:levels": "1",
+      "height": "4",
+      "name": "SMPN 6 SURADE",
+      "source": "microsoft/BuildingFootprints"
+    }
+  },
+  {
+    "id": 1353038700,
+    "name": "LAB SMPN 6 SURADE",
+    "type": "yes",
+    "lat": -7.3389995,
+    "lon": 106.5931526,
+    "tags": {
+      "building": "yes",
+      "building:levels": "1",
+      "height": "4",
+      "name": "LAB SMPN 6 SURADE",
+      "source": "microsoft/BuildingFootprints"
+    }
+  },
+  {
+    "id": 1353038702,
+    "name": "PERPUSTAKAAN SMPN 6 SURADE",
+    "type": "yes",
+    "lat": -7.3393066,
+    "lon": 106.5935595,
+    "tags": {
+      "building": "yes",
+      "building:levels": "1",
+      "height": "4",
+      "name": "PERPUSTAKAAN SMPN 6 SURADE",
+      "source": "microsoft/BuildingFootprints"
+    }
+  },
+  {
+    "id": 1353038703,
+    "name": "SMP NEGERI 6 SURADE",
+    "type": "yes",
+    "lat": -7.3390781,
+    "lon": 106.5936073,
+    "street": "jalan cipancur",
+    "tags": {
+      "addr:city": "Kabupaten Sukabumi",
+      "addr:district": "Surade",
+      "addr:housename": "SMPN 6 Surade",
+      "addr:postcode": "43179",
+      "addr:province": "Jawa Barat",
+      "addr:street": "jalan cipancur",
+      "addr:subdistrict": "Kademangan",
+      "addr:unit": "SEKOLAH",
+      "building": "yes",
+      "building:levels": "1",
+      "height": "4",
+      "name": "SMP NEGERI 6 SURADE",
+      "source": "microsoft/BuildingFootprints"
+    }
+  },
+  {
+    "id": 1353039734,
+    "name": "MESJID CIBAYUR",
+    "type": "yes",
+    "lat": -7.3401428,
+    "lon": 106.5959244,
+    "tags": {
+      "building": "yes",
+      "building:levels": "1",
+      "height": "4",
+      "name": "MESJID CIBAYUR",
+      "source": "microsoft/BuildingFootprints"
+    }
+  },
+  {
+    "id": 1354489791,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3007339,
+    "lon": 106.6127158,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489792,
+    "name": "House",
+    "type": "house",
+    "lat": -7.300937,
+    "lon": 106.6125933,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489793,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3003173,
+    "lon": 106.6127245,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489794,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3010194,
+    "lon": 106.6128015,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489795,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3012858,
+    "lon": 106.6123526,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489796,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3005099,
+    "lon": 106.6124585,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489797,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3005534,
+    "lon": 106.6126509,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489798,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3002045,
+    "lon": 106.6128169,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489799,
+    "name": "House",
+    "type": "house",
+    "lat": -7.300667,
+    "lon": 106.6125853,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489800,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3008823,
+    "lon": 106.6128496,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489801,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3009222,
+    "lon": 106.6130001,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489802,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3003512,
+    "lon": 106.6125653,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489803,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3006054,
+    "lon": 106.6125372,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1354489804,
+    "name": "House",
+    "type": "house",
+    "lat": -7.3011774,
+    "lon": 106.6128758,
+    "tags": {
+      "building": "house",
+      "name": "House"
+    }
+  },
+  {
+    "id": 1355034044,
+    "name": "deer farm",
+    "type": "other",
+    "lat": -7.3329028,
+    "lon": 106.5254849,
+    "tags": {
+      "landuse": "farmland",
+      "name": "deer farm"
+    }
+  },
+  {
+    "id": 1355034045,
+    "name": "Residental Neighbourhood",
+    "type": "other",
+    "lat": -7.3334878,
+    "lon": 106.5253762,
+    "tags": {
+      "landuse": "residential",
+      "name": "Residental Neighbourhood"
+    }
+  },
+  {
+    "id": 1355436280,
+    "name": "DTA syafaatul Ikhwan",
+    "type": "school",
+    "lat": -7.3040899,
+    "lon": 106.6361378,
+    "phone": "+628562258389",
+    "tags": {
+      "amenity": "school",
+      "name": "DTA syafaatul Ikhwan",
+      "phone": "+628562258389"
+    }
+  },
+  {
+    "id": 1355817860,
+    "name": "house",
+    "type": "yes",
+    "lat": -7.3324904,
+    "lon": 106.6289643,
+    "tags": {
+      "building": "yes",
+      "name": "house"
+    }
+  },
+  {
+    "id": 1355817861,
+    "name": "house",
+    "type": "yes",
+    "lat": -7.3325815,
+    "lon": 106.6289297,
+    "tags": {
+      "building": "yes",
+      "name": "house"
+    }
+  },
+  {
+    "id": 1355817862,
+    "name": "hourse",
+    "type": "yes",
+    "lat": -7.3325554,
+    "lon": 106.6295564,
+    "tags": {
+      "building": "yes",
+      "name": "hourse"
+    }
+  },
+  {
+    "id": 1355817863,
+    "name": "house",
+    "type": "yes",
+    "lat": -7.3326553,
+    "lon": 106.6297191,
+    "tags": {
+      "building": "yes",
+      "name": "house"
+    }
+  },
+  {
+    "id": 1366026998,
+    "name": "Fields",
+    "type": "other",
+    "lat": -7.3230737,
+    "lon": 106.6199405,
+    "tags": {
+      "landuse": "farmland",
+      "name": "Fields"
+    }
+  },
+  {
+    "id": 1366027000,
+    "name": "Fields",
+    "type": "other",
+    "lat": -7.322484,
+    "lon": 106.6203421,
+    "tags": {
+      "landuse": "farmland",
+      "name": "Fields"
+    }
+  },
+  {
+    "id": 1366027005,
+    "name": "Trees",
+    "type": "other",
+    "lat": -7.3217747,
+    "lon": 106.6193162,
+    "tags": {
+      "name": "Trees",
+      "natural": "wood"
+    }
+  },
+  {
+    "id": 1366027007,
+    "name": "Fields",
+    "type": "other",
+    "lat": -7.3226545,
+    "lon": 106.6206872,
+    "tags": {
+      "landuse": "farmland",
+      "name": "Fields"
+    }
+  },
+  {
+    "id": 1419572894,
+    "name": "SMP Negeri 2 Tegalbuleud Satu Atap",
+    "type": "school",
+    "lat": -7.3567998,
+    "lon": 106.66015,
+    "tags": {
+      "amenity": "school",
+      "name": "SMP Negeri 2 Tegalbuleud Satu Atap"
+    }
+  },
+  {
+    "id": 1419646356,
+    "name": "SMA Negeri 1 Surade",
+    "type": "school",
+    "lat": -7.3370157,
+    "lon": 106.5822013,
+    "tags": {
+      "amenity": "school",
+      "name": "SMA Negeri 1 Surade"
+    }
+  },
+  {
+    "id": 1419884268,
+    "name": "Jalan Jampangkulon - Surade",
+    "type": "other",
+    "lat": -7.3248647,
+    "lon": 106.5800308,
+    "tags": {
+      "alt_name": "Jalan Lintas Jabar Selatan",
+      "highway": "trunk",
+      "lanes": "2",
+      "name": "Jalan Jampangkulon - Surade",
+      "ref": "7",
+      "smoothness": "good",
+      "source": "Bing",
+      "surface": "asphalt",
+      "width": "5"
+    }
+  },
+  {
+    "id": 1419953478,
+    "name": "SMK Plus Paradis",
+    "type": "school",
+    "lat": -7.348906,
+    "lon": 106.6038382,
+    "tags": {
+      "amenity": "school",
+      "landuse": "education",
+      "name": "SMK Plus Paradis"
+    }
+  },
+  {
+    "id": 1419953479,
+    "name": "Madrasah Tsanawiyah Cidahu",
+    "type": "school",
+    "lat": -7.3488177,
+    "lon": 106.6032,
+    "tags": {
+      "amenity": "school",
+      "landuse": "education",
+      "name": "Madrasah Tsanawiyah Cidahu"
+    }
+  },
+  {
+    "id": 1419953480,
+    "name": "SD Negeri 2 Cidahu",
+    "type": "school",
+    "lat": -7.3480031,
+    "lon": 106.6025674,
+    "tags": {
+      "amenity": "school",
+      "landuse": "education",
+      "name": "SD Negeri 2 Cidahu"
+    }
+  },
+  {
+    "id": 1419953484,
+    "name": "Masjid Jami Al Ikhlas",
+    "type": "place_of_worship",
+    "lat": -7.3478679,
+    "lon": 106.5984687,
+    "tags": {
+      "amenity": "place_of_worship",
+      "building": "yes",
+      "name": "Masjid Jami Al Ikhlas",
+      "religion": "muslim"
+    }
+  },
+  {
+    "id": 1419955931,
+    "name": "Masjid Jami Istikmal",
+    "type": "place_of_worship",
+    "lat": -7.349767,
+    "lon": 106.6072145,
+    "tags": {
+      "amenity": "place_of_worship",
+      "building": "mosque",
+      "name": "Masjid Jami Istikmal",
+      "religion": "muslim"
+    }
+  },
+  {
+    "id": 1419956666,
+    "name": "Alfamart",
+    "type": "convenience",
+    "lat": -7.3479415,
+    "lon": 106.6160142,
+    "tags": {
+      "brand": "Alfamart",
+      "brand:wikidata": "Q23745600",
+      "building": "yes",
+      "name": "Alfamart",
+      "operator": "PT Sumber Alfaria Trijaya,Tbk",
+      "shop": "convenience",
+      "toilets": "yes",
+      "toilets:access": "permissive",
+      "toilets:unisex": "yes",
+      "website": "https://alfamart.co.id"
+    }
+  },
+  {
+    "id": 1419958673,
+    "name": "SD Negeri Simpangdago",
+    "type": "school",
+    "lat": -7.3486355,
+    "lon": 106.6165122,
+    "tags": {
+      "amenity": "school",
+      "landuse": "education",
+      "name": "SD Negeri Simpangdago"
+    }
+  },
+  {
+    "id": 1419977775,
+    "name": "SD Negeri Cibarehong",
+    "type": "school",
+    "lat": -7.3325311,
+    "lon": 106.573691,
+    "tags": {
+      "amenity": "school",
+      "name": "SD Negeri Cibarehong"
+    }
+  },
+  {
+    "id": 1419977778,
+    "name": "Universitas Muhammadiyah Sukabumi",
+    "type": "college",
+    "lat": -7.3323717,
+    "lon": 106.5744806,
+    "tags": {
+      "alt_name": "UMMI",
+      "amenity": "college",
+      "name": "Universitas Muhammadiyah Sukabumi"
+    }
+  },
+  {
+    "id": 1419977789,
+    "name": "Masjid Jami Asy Syifaa",
+    "type": "place_of_worship",
+    "lat": -7.3327387,
+    "lon": 106.5744967,
+    "tags": {
+      "amenity": "place_of_worship",
+      "building": "mosque",
+      "name": "Masjid Jami Asy Syifaa",
+      "religion": "muslim"
+    }
+  },
+  {
+    "id": 1419979442,
+    "name": "Pertamina",
+    "type": "fuel",
+    "lat": -7.3329229,
+    "lon": 106.5756434,
+    "tags": {
+      "amenity": "fuel",
+      "brand:wikidata": "Q1641044",
+      "name": "Pertamina"
+    }
+  },
+  {
+    "id": 1419982057,
+    "name": "GOR Surade",
+    "type": "sports_centre",
+    "lat": -7.3322311,
+    "lon": 106.5752639,
+    "tags": {
+      "building": "yes",
+      "leisure": "sports_centre",
+      "name": "GOR Surade"
+    }
+  },
+  {
+    "id": 1419991334,
+    "name": "Indomaret",
+    "type": "convenience",
+    "lat": -7.3194802,
+    "lon": 106.5840457,
+    "tags": {
+      "air_conditioning": "yes",
+      "brand": "Indomaret",
+      "brand:wikidata": "Q4262825",
+      "brand:wikipedia": "id:Indomaret",
+      "building": "yes",
+      "name": "Indomaret",
+      "name:en": "Indomaret",
+      "name:id": "Indomaret",
+      "name:ja": "インドマレット",
+      "operator": "PT. Indomarco Prismatama",
+      "shop": "convenience",
+      "toilets": "yes",
+      "toilets:access": "permissive",
+      "website": "https://www.klikindomaret.com"
+    }
+  },
+  {
+    "id": 1419991338,
+    "name": "Kantor Desa Citaglar",
+    "type": "government",
+    "lat": -7.3193262,
+    "lon": 106.5836594,
+    "tags": {
+      "building": "yes",
+      "government": "administrative",
+      "name": "Kantor Desa Citaglar",
+      "office": "government"
+    }
+  },
+  {
+    "id": 1420104338,
+    "name": "Kantor Desa Talagamurni",
+    "type": "government",
+    "lat": -7.3107226,
+    "lon": 106.5977092,
+    "tags": {
+      "government": "administrative",
+      "name": "Kantor Desa Talagamurni",
+      "office": "government"
+    }
+  },
+  {
+    "id": 1420104340,
+    "name": "SD Negeri 3 Gunungbatu",
+    "type": "school",
+    "lat": -7.3106206,
+    "lon": 106.5979952,
+    "tags": {
+      "amenity": "school",
+      "name": "SD Negeri 3 Gunungbatu"
+    }
+  },
+  {
+    "id": 1420104341,
+    "name": "SMP Negeri 2 Cibitung",
+    "type": "school",
+    "lat": -7.3098368,
+    "lon": 106.598259,
+    "tags": {
+      "amenity": "school",
+      "name": "SMP Negeri 2 Cibitung"
+    }
+  },
+  {
+    "id": 1420120578,
+    "name": "Indomaret",
+    "type": "convenience",
+    "lat": -7.3106974,
+    "lon": 106.5996444,
+    "tags": {
+      "air_conditioning": "yes",
+      "brand": "Indomaret",
+      "brand:wikidata": "Q4262825",
+      "brand:wikipedia": "id:Indomaret",
+      "building": "yes",
+      "name": "Indomaret",
+      "name:en": "Indomaret",
+      "name:id": "Indomaret",
+      "name:ja": "インドマレット",
+      "operator": "PT. Indomarco Prismatama",
+      "shop": "convenience",
+      "toilets": "yes",
+      "toilets:access": "permissive",
+      "website": "https://www.klikindomaret.com"
+    }
+  },
+  {
+    "id": 1420123603,
+    "name": "Indomaret",
+    "type": "convenience",
+    "lat": -7.3337376,
+    "lon": 106.5724019,
+    "tags": {
+      "air_conditioning": "yes",
+      "brand": "Indomaret",
+      "brand:wikidata": "Q4262825",
+      "brand:wikipedia": "id:Indomaret",
+      "building": "yes",
+      "name": "Indomaret",
+      "name:en": "Indomaret",
+      "name:id": "Indomaret",
+      "name:ja": "インドマレット",
+      "operator": "PT. Indomarco Prismatama",
+      "shop": "convenience",
+      "toilets": "yes",
+      "toilets:access": "permissive",
+      "website": "https://www.klikindomaret.com"
+    }
+  },
+  {
+    "id": 1420290711,
+    "name": "SMP Terpadu NU",
+    "type": "school",
+    "lat": -7.3038378,
+    "lon": 106.6066991,
+    "tags": {
+      "alt_name": "Pondok Pesantren Yanpa'una",
+      "amenity": "school",
+      "name": "SMP Terpadu NU"
+    }
+  },
+  {
+    "id": 1420290814,
+    "name": "Alfamart",
+    "type": "convenience",
+    "lat": -7.3085777,
+    "lon": 106.6017486,
+    "tags": {
+      "brand": "Alfamart",
+      "brand:wikidata": "Q23745600",
+      "building": "yes",
+      "name": "Alfamart",
+      "operator": "PT Sumber Alfaria Trijaya,Tbk",
+      "shop": "convenience",
+      "toilets": "yes",
+      "toilets:access": "permissive",
+      "toilets:unisex": "yes",
+      "website": "https://alfamart.co.id"
+    }
+  },
+  {
+    "id": 1420291914,
+    "name": "Masjid Jami At Taqwa",
+    "type": "place_of_worship",
+    "lat": -7.3325855,
+    "lon": 106.5769605,
+    "tags": {
+      "amenity": "place_of_worship",
+      "building": "yes",
+      "name": "Masjid Jami At Taqwa",
+      "religion": "muslim"
+    }
+  },
+  {
+    "id": 1545753494,
+    "name": "Pertamina",
+    "type": "fuel",
+    "lat": -7.371679,
+    "lon": 106.5316052,
+    "tags": {
+      "amenity": "fuel",
+      "brand": "Pertamina",
+      "brand:wikidata": "Q1641044",
+      "name": "Pertamina"
+    }
+  }
+]

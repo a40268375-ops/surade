@@ -132,6 +132,15 @@ class PlatformCouponController extends Controller
             return response()->json(['message' => 'Kode kupon tidak ditemukan atau sudah tidak aktif'], 404);
         }
 
+        $user = $request->user('sanctum') ?? auth('sanctum')->user() ?? auth()->user();
+        if (!$user && $request->filled('user_id')) {
+            $user = \App\Models\User::find($request->input('user_id'));
+        }
+
+        if ($user && \App\Models\Coupon::hasUserUsed($user->id, $coupon->code)) {
+            return response()->json(['message' => 'Anda sudah pernah menggunakan kode kupon ini sebelumnya. Setiap kupon hanya dapat digunakan 1 kali per pengguna.'], 422);
+        }
+
         if ($coupon->applies_to !== 'semua' && $coupon->applies_to !== $request->context) {
             return response()->json(['message' => 'Kupon ini tidak berlaku untuk pembelian ini'], 422);
         }

@@ -1,51 +1,63 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { 
-  Mail, 
-  Phone, 
-  Send, 
-  CheckCircle, 
-  Loader2, 
-  AlertCircle, 
-  Headphones
+import contactBg from "../assets/contact-hero.jpg";
+import WhatsAppIcon from "../components/icons/WhatsAppIcon";
+import api from "../services/api";
+import {
+  Mail,
+  Phone,
+  Send,
+  CheckCircle,
+  Loader2,
+  AlertCircle,
+  Headphones,
+  MapPin,
+  Clock,
+  Sparkles,
+  HelpCircle,
+  MessageSquare,
+  Building2,
+  ArrowRight
 } from "lucide-react";
+import CaptchaInput from "../components/CaptchaInput";
 import "./Contact.css";
 
-// WhatsApp Icon Component
-const WhatsAppIcon = ({ size = 28, className = "" }) => (
-  <svg
-    viewBox="0 0 24 24"
-    width={size}
-    height={size}
-    fill="currentColor"
-    className={className}
-  >
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-  </svg>
-);
+const SUBJECT_OPTIONS = [
+  "Pendaftaran UMKM / Profil Usaha",
+  "Kerjasama & Kemitraan Bisnis",
+  "Pemasangan Banner / Paket Iklan",
+  "Kendala Akun & Verifikasi OTP",
+  "Laporan Informasi / Konten",
+  "Pertanyaan Umum Lainnya",
+];
 
 export default function Contact() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    subject: "",
+    phone: "",
+    subject: "Pendaftaran UMKM / Profil Usaha",
     message: "",
   });
+  const [userCaptcha, setUserCaptcha] = useState("");
+  const captchaRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.title = "Hubungi Kami - Surade.com";
   }, []);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -53,40 +65,52 @@ export default function Contact() {
     setError("");
     setSuccess(false);
 
-    if (!formData.name || !formData.email || !formData.message) {
-      setError("Nama, email, dan pesan wajib diisi.");
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+      setError("Mohon lengkapi Nama, Email, dan Pesan Anda.");
+      return;
+    }
+
+    if (!userCaptcha) {
+      setError("Silakan selesaikan verifikasi keamanan (CAPTCHA) terlebih dahulu.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/contact`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+      const response = await api.post("/contact", {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || null,
+        subject: formData.subject.trim() || "Pertanyaan Umum",
+        message: formData.message.trim(),
+        captcha_token: userCaptcha,
+        recaptcha_token: userCaptcha,
+        "g-recaptcha-response": userCaptcha,
       });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // Reset form
+      if (response.data && (response.data.success || response.status === 200)) {
         setFormData({
           name: "",
           email: "",
-          subject: "",
+          phone: "",
+          subject: "Pendaftaran UMKM / Profil Usaha",
           message: "",
         });
+        setUserCaptcha("");
+        if (captchaRef.current?.reset) captchaRef.current.reset();
         setSuccess(true);
-        
-        setTimeout(() => setSuccess(false), 5000);
       } else {
-        setError(data.message || "Terjadi kesalahan. Silakan coba lagi.");
+        setError(response.data?.message || "Terjadi kendala saat mengirim pesan. Silakan coba lagi.");
       }
     } catch (err) {
-      setError("Gagal mengirim pesan. Silakan coba lagi.");
+      const errorMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Gagal mengirim pesan. Silakan periksa koneksi internet Anda atau hubungi kami via WhatsApp.";
+      setError(errorMsg);
+      setUserCaptcha("");
+      if (captchaRef.current?.reset) captchaRef.current.reset();
     } finally {
       setLoading(false);
     }
@@ -94,200 +118,350 @@ export default function Contact() {
 
   return (
     <div className="contact-page">
+      {/* NAVBAR */}
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="contact-hero">
-        <div className="contact-hero__bg" />
+      {/* HERO SECTION WITH USER UPLOADED BACKGROUND & WAVE DIVIDER */}
+      <header className="contact-hero">
+        <div
+          className="contact-hero__bg"
+          style={{ backgroundImage: `url(${contactBg})` }}
+        />
         <div className="contact-hero__overlay" />
+        <div className="contact-hero__glow" />
+
         <div className="contact-hero__content">
+          <div className="contact-hero__badge">
+            <Sparkles size={14} className="contact-hero__badge-icon" />
+            <span>Pusat Layanan &amp; Informasi</span>
+          </div>
+
           <div className="contact-hero__breadcrumb">
             <Link to="/">Home</Link>
             <span className="separator">/</span>
             <span>Hubungi Kami</span>
           </div>
-          <h1 className="contact-hero__title">Hubungi Kami</h1>
+
+          <h1 className="contact-hero__title">
+            Hubungi <span>Kami</span>
+          </h1>
+
           <p className="contact-hero__subtitle">
-            Punya pertanyaan atau saran? Tim kami siap membantu Anda 24/7
+            Punya pertanyaan seputar direktori, ingin bermitra, atau butuh bantuan pendaftaran UMKM? Tim Surade.com siap membantu Anda dengan senang hati.
           </p>
         </div>
-      </section>
 
-      {/* Main Content */}
-      <section className="contact-main">
+        {/* ORGANIC WAVE DIVIDER (GELOMBANG) */}
+        <div className="contact-hero__wave">
+          <svg
+            viewBox="0 0 1440 120"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M0,32L48,42.7C96,53,192,75,288,80C384,85,480,75,576,58.7C672,43,768,21,864,21.3C960,21,1056,43,1152,53.3C1248,64,1344,64,1392,64L1440,64L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"
+              fill="#f8fafc"
+            />
+          </svg>
+        </div>
+      </header>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="contact-main">
         <div className="contact-container">
-          
-          {/* Contact Info Cards */}
-          <div className="contact-info-section">
-            <div className="contact-info-header">
-              <Headphones size={28} className="contact-info-header__icon" />
-              <h2 className="contact-info-header__title">Cara Menghubungi Kami</h2>
-              <p className="contact-info-header__subtitle">
-                Pilih metode komunikasi yang paling nyaman untuk Anda
+
+          {/* 3 TOP CONTACT METHOD CARDS */}
+          <section className="contact-channels-section">
+            <div className="contact-section-header">
+              <div className="contact-header-badge">
+                <Headphones size={15} />
+                <span>Saluran Komunikasi Cepat</span>
+              </div>
+              <h2 className="contact-section-title">Pilih Cara Tercepat Terhubung</h2>
+              <p className="contact-section-subtitle">
+                Kami menyediakan berbagai kemudahan akses saluran resmi agar pertanyaan dan kebutuhan Anda segera terjawab.
               </p>
             </div>
 
-            <div className="contact-info-grid">
-              <div className="contact-info-card">
-                <div className="contact-info-card__icon">
-                  <Mail size={28} />
+            <div className="contact-cards-grid">
+              {/* WHATSAPP CARD (FEATURED) */}
+              <div className="contact-card contact-card--whatsapp">
+                <div className="contact-card__badge">Respon Tercepat</div>
+                <div className="contact-card__icon-wrap contact-card__icon-wrap--wa">
+                  <WhatsAppIcon size={38} />
                 </div>
-                <h3 className="contact-info-card__title">Email Support</h3>
-                <p className="contact-info-card__text">support@surade.co.id</p>
-                <p className="contact-info-card__desc">Kirim email kapan saja, kami balas dalam 1x24 jam</p>
-                <a href="mailto:support@surade.co.id" className="contact-info-card__button">
+                <h3 className="contact-card__title">Chat WhatsApp Resmi</h3>
+                <p className="contact-card__value">+62 811-1919-711</p>
+                <p className="contact-card__desc">
+                  Konsultasi instan dengan customer service kami untuk bantuan cepat dan panduan pendaftaran.
+                </p>
+                <a
+                  href="https://wa.me/628111919711?text=Halo%20Admin%20Surade.com,%20saya%20ingin%20bertanya%20seputar%20layanan%20Surade.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="contact-card__btn contact-card__btn--wa"
+                >
+                  <WhatsAppIcon size={18} />
+                  <span>Chat WhatsApp Sekarang</span>
+                </a>
+              </div>
+
+              {/* EMAIL SUPPORT */}
+              <div className="contact-card">
+                <div className="contact-card__icon-wrap">
+                  <Mail size={34} />
+                </div>
+                <h3 className="contact-card__title">Email Dukungan</h3>
+                <p className="contact-card__value">admin@surade.com</p>
+                <p className="contact-card__desc">
+                  Kirimkan pertanyaan resmi, proposal kerjasama, penawaran sponsorship, atau berkas legalitas.
+                </p>
+                <a
+                  href="mailto:admin@surade.com"
+                  className="contact-card__btn contact-card__btn--outline"
+                >
                   <Mail size={16} />
                   <span>Kirim Email</span>
                 </a>
               </div>
 
-              <div className="contact-info-card contact-info-card--featured">
-                <div className="contact-info-card__badge">Paling Cepat</div>
-                <div className="contact-info-card__icon">
-                  <WhatsAppIcon size={32} />
+              {/* CALL CENTER */}
+              <div className="contact-card">
+                <div className="contact-card__icon-wrap">
+                  <Phone size={34} />
                 </div>
-                <h3 className="contact-info-card__title">WhatsApp</h3>
-                <p className="contact-info-card__text">+62 811-1919-711</p>
-                <p className="contact-info-card__desc">Chat langsung dengan tim support kami</p>
-                <a 
-                  href="https://wa.me/628111919711" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="contact-info-card__button contact-info-card__button--primary"
+                <h3 className="contact-card__title">Layanan Telepon</h3>
+                <p className="contact-card__value">0807 - 100 - 1500</p>
+                <p className="contact-card__desc">
+                  Hotline telepon untuk pengaduan layanan pelanggan dan verifikasi direktori bisnis.
+                </p>
+                <a
+                  href="tel:08071001500"
+                  className="contact-card__btn contact-card__btn--outline"
                 >
-                  <WhatsAppIcon size={16} />
-                  <span>Chat WhatsApp</span>
-                </a>
-              </div>
-
-              <div className="contact-info-card">
-                <div className="contact-info-card__icon">
-                  <Phone size={28} />
-                </div>
-                <h3 className="contact-info-card__title">Call Center</h3>
-                <p className="contact-info-card__text">0807 - 100 - 1500</p>
-                <p className="contact-info-card__desc">Layanan telepon tersedia 24/7</p>
-                <a href="tel:08071001500" className="contact-info-card__button">
                   <Phone size={16} />
-                  <span>Hubungi Sekarang</span>
+                  <span>Hubungi Hotline</span>
                 </a>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Contact Form */}
-          <div className="contact-form-wrapper">
-            <div className="contact-form-header">
-              <Send size={28} className="contact-form-header__icon" />
-              <h2 className="contact-form__title">Kirim Pesan</h2>
-              <p className="contact-form__subtitle">
-                Atau isi formulir di bawah ini dan kami akan menghubungi Anda sesegera mungkin
-              </p>
+          {/* TWO COLUMN SECTION: FORM & SIDEBAR INFO */}
+          <section className="contact-split-section">
+            {/* LEFT: FORM WRAPPER */}
+            <div className="contact-form-box">
+              <div className="contact-form-header">
+                <div className="contact-form-badge">
+                  <MessageSquare size={16} />
+                  <span>Formulir Pesan</span>
+                </div>
+                <h2 className="contact-form-title">Tinggalkan Pesan</h2>
+                <p className="contact-form-desc">
+                  Isi formulir berikut dan tim kami akan merespon melalui email atau WhatsApp Anda dalam 1x24 jam.
+                </p>
+              </div>
+
+              {/* ALERT SUCCESS */}
+              {success && (
+                <div className="contact-notification contact-notification--success">
+                  <div className="contact-notification__icon">
+                    <CheckCircle size={22} />
+                  </div>
+                  <div className="contact-notification__text">
+                    <strong>Pesan Anda Berhasil Terkirim!</strong>
+                    <p>Terima kasih telah menghubungi kami. Tim kami akan segera meninjau dan membalas pesan Anda.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ALERT ERROR */}
+              {error && (
+                <div className="contact-notification contact-notification--error">
+                  <div className="contact-notification__icon">
+                    <AlertCircle size={22} />
+                  </div>
+                  <div className="contact-notification__text">
+                    <strong>Gagal Mengirim Pesan</strong>
+                    <p>{error}</p>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="contact-form-inner">
+                <div className="contact-form-row">
+                  <div className="contact-input-group">
+                    <label htmlFor="name" className="contact-label">
+                      Nama Lengkap <span className="req">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      placeholder="Contoh: Budi Santoso"
+                      className="contact-input"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div className="contact-input-group">
+                    <label htmlFor="email" className="contact-label">
+                      Alamat Email <span className="req">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      placeholder="nama@email.com"
+                      className="contact-input"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="contact-form-row">
+                  <div className="contact-input-group">
+                    <label htmlFor="phone" className="contact-label">
+                      Nomor Telepon / WhatsApp <span className="opt">(Opsional)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      id="phone"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      placeholder="081234567890"
+                      className="contact-input"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div className="contact-input-group">
+                    <label htmlFor="subject" className="contact-label">
+                      Kategori / Subjek <span className="req">*</span>
+                    </label>
+                    <select
+                      id="subject"
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleChange}
+                      className="contact-input contact-select"
+                      disabled={loading}
+                    >
+                      {SUBJECT_OPTIONS.map((opt, i) => (
+                        <option key={i} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="contact-input-group">
+                  <label htmlFor="message" className="contact-label">
+                    Isi Pesan <span className="req">*</span>
+                  </label>
+                  <textarea
+                    id="message"
+                    name="message"
+                    rows="5"
+                    value={formData.message}
+                    onChange={handleChange}
+                    placeholder="Tuliskan detail pertanyaan, usulan, atau kebutuhan bantuan Anda secara lengkap..."
+                    className="contact-input contact-textarea"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* Google reCAPTCHA v2 Checkbox */}
+                <CaptchaInput
+                  ref={captchaRef}
+                  id="contact-captcha"
+                  label="Verifikasi Keamanan"
+                  value={userCaptcha}
+                  onChange={setUserCaptcha}
+                />
+
+                <div className="contact-form-action">
+                  <button
+                    type="submit"
+                    className="contact-submit-btn"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 size={18} className="contact-spin" />
+                        <span>Mengirimkan Pesan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={18} />
+                        <span>Kirim Pesan Sekarang</span>
+                      </>
+                    )}
+                  </button>
+
+                  <p className="contact-privacy-note">
+                    Data Anda aman dan tidak akan disebarluaskan sesuai Kebijakan Privasi kami.
+                  </p>
+                </div>
+              </form>
             </div>
 
-            {success && (
-              <div className="contact-alert contact-alert--success">
-                <CheckCircle size={20} />
-                <span>Pesan berhasil dikirim! Kami akan segera menghubungi Anda.</span>
-              </div>
-            )}
+            {/* RIGHT: SIDEBAR INFO & OFFICE DETAILS */}
+            <div className="contact-sidebar">
 
-            {error && (
-              <div className="contact-alert contact-alert--error">
-                <AlertCircle size={20} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="contact-form">
-              <div className="contact-form__row">
-                <div className="contact-form__group">
-                  <label htmlFor="name" className="contact-form__label">
-                    Nama Lengkap <span className="required">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="contact-form__input"
-                    placeholder="Masukkan nama lengkap Anda"
-                    disabled={loading}
-                  />
+              {/* FAQ TEASER CARD */}
+              <div className="contact-side-card contact-side-card--faq">
+                <div className="contact-side-card__header">
+                  <div className="contact-side-card__icon contact-side-card__icon--teal">
+                    <HelpCircle size={22} />
+                  </div>
+                  <div>
+                    <h3 className="contact-side-card__title">Pusat Bantuan &amp; FAQ</h3>
+                    <p className="contact-side-card__sub">Jawaban Cepat &amp; Praktis</p>
+                  </div>
                 </div>
-
-                <div className="contact-form__group">
-                  <label htmlFor="email" className="contact-form__label">
-                    Alamat Email <span className="required">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="contact-form__input"
-                    placeholder="nama@email.com"
-                    disabled={loading}
-                  />
+                <div className="contact-side-card__body">
+                  <p className="contact-faq-teaser-text">
+                    Mencari panduan verifikasi OTP, pendaftaran etalase UMKM, atau kebijakan iklan? Kunjungi halaman FAQ kami.
+                  </p>
+                  <Link to="/faq" className="contact-faq-link-btn">
+                    <span>Buka Halaman FAQ</span>
+                    <ArrowRight size={16} />
+                  </Link>
                 </div>
               </div>
 
-              <div className="contact-form__group">
-                <label htmlFor="subject" className="contact-form__label">
-                  Subjek Pesan
-                </label>
-                <input
-                  type="text"
-                  id="subject"
-                  name="subject"
-                  value={formData.subject}
-                  onChange={handleChange}
-                  className="contact-form__input"
-                  placeholder="Tentang apa pesan Anda?"
-                  disabled={loading}
-                />
+              {/* SMART VILLAGE COLLABORATION CALLOUT */}
+              <div className="contact-side-card contact-side-card--collab">
+                <div className="contact-side-card__header">
+                  <div className="contact-side-card__icon contact-side-card__icon--emerald">
+                    <Building2 size={22} />
+                  </div>
+                  <div>
+                    <h3 className="contact-side-card__title">Integrasi 12 Desa</h3>
+                    <p className="contact-side-card__sub">Kolaborasi Smart Village</p>
+                  </div>
+                </div>
+                <p className="contact-collab-text">
+                  Aparatur desa atau pengelola BUMDes se-Kecamatan Surade dapat menghubungi kami untuk sinkronisasi data produk unggulan dan potensi wisata desa.
+                </p>
               </div>
+            </div>
+          </section>
 
-              <div className="contact-form__group">
-                <label htmlFor="message" className="contact-form__label">
-                  Pesan Anda <span className="required">*</span>
-                </label>
-                <textarea
-                  id="message"
-                  name="message"
-                  value={formData.message}
-                  onChange={handleChange}
-                  className="contact-form__textarea"
-                  placeholder="Tulis pesan Anda di sini..."
-                  rows="6"
-                  disabled={loading}
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="contact-form__submit"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    <span>Mengirim Pesan...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send size={18} />
-                    <span>Kirim Pesan</span>
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
         </div>
-      </section>
+      </main>
 
+      {/* FOOTER */}
       <Footer />
     </div>
   );

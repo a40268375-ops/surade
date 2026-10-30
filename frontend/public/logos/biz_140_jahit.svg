@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="tailorBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#be185d"/>
+      <stop offset="50%" stop-color="#831843"/>
+      <stop offset="100%" stop-color="#4c0519"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="36" fill="url(#tailorBg)"/>
+  <!-- Gold circular embroidery ring border with stitch marks -->
+  <circle cx="100" cy="94" r="80" fill="none" stroke="#fbcfe8" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.6"/>
+  <!-- Sewing machine & tailor scissors illustration -->
+  <g transform="translate(100, 84)">
+    <!-- Measuring tape arc -->
+    <path d="M -50 -20 Q 0 -55 50 -20" stroke="#fde047" stroke-width="4" stroke-dasharray="4 3" fill="none" stroke-linecap="round"/>
+    <!-- Thread Spool & Needle -->
+    <path d="M 28 -35 L 36 -10" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="28" cy="-35" r="2" fill="#fde047"/>
+    <!-- Thread waving loop -->
+    <path d="M 28 -35 Q 0 -45 -20 -30 Q -35 -15 -10 -5" stroke="#f472b6" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- Vintage Sewing Machine Silhouette -->
+    <!-- Base -->
+    <rect x="-42" y="24" width="84" height="8" rx="3" fill="url(#goldGrad)"/>
+    <!-- Arm / Body -->
+    <path d="M -36 24 L -36 -12 C -36 -22, -26 -26, -10 -26 L 22 -26 C 30 -26, 36 -20, 36 -12 L 36 2 C 36 10, 28 14, 20 14 L -8 14" fill="none" stroke="url(#goldGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Needle Bar -->
+    <line x1="-12" y1="-2" x2="-12" y2="24" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+    <!-- Hand Wheel -->
+    <circle cx="34" cy="-10" r="10" fill="none" stroke="#ffffff" stroke-width="3"/>
+    <circle cx="34" cy="-10" r="3" fill="#fde047"/>
+  </g>
+  <!-- Brand text badge -->
+  <rect x="22" y="146" width="156" height="34" rx="10" fill="#500724" stroke="#fbcfe8" stroke-width="1.5"/>
+  <text x="100" y="162" font-family="'Poppins', sans-serif" font-weight="900" font-size="12" fill="#fde047" text-anchor="middle" letter-spacing="1.5">PENJAHIT</text>
+  <text x="100" y="174" font-family="'Poppins', sans-serif" font-weight="700" font-size="8" fill="#fbcfe8" text-anchor="middle" letter-spacing="1">BUSANA KADEMANGAN</text>
+</svg>

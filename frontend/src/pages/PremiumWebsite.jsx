@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../utils/api";
 import Navbar from "../components/Navbar";
+import SuradeLoader from "../components/SuradeLoader";
 import { 
   Check, 
   Star, 
@@ -25,6 +26,7 @@ export default function PremiumWebsite() {
   const [selectedPackage, setSelectedPackage] = useState(null);
 
   useEffect(() => {
+    document.title = "Layanan Buat Website - Surade.com";
     loadPackages();
   }, []);
 
@@ -125,10 +127,13 @@ export default function PremiumWebsite() {
           <h2 className="premium-packages__title">Pilih Paket yang Tepat untuk Anda</h2>
           
           {loading ? (
-            <div className="premium-loading">
-              <div className="spinner"></div>
-              <p>Memuat paket...</p>
-            </div>
+            <SuradeLoader
+              variant="section"
+              size="md"
+              text="Memuat pilihan paket website"
+              subtext="Menyiapkan penawaran paket pembuatan website profesional"
+              minHeight="220px"
+            />
           ) : packages.length > 0 ? (
             <div className="packages-grid">
               {packages.map((pkg, index) => (

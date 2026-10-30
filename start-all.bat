@@ -1,6 +1,6 @@
 @echo off
 echo ========================================================
-echo     MENJALANKAN SURADE.CO.ID (BACKEND + FRONTEND)
+echo     MENJALANKAN SURADE.COM (BACKEND + FRONTEND)
 echo ========================================================
 echo.
 
@@ -14,14 +14,13 @@ start "Frontend Surade (Vite)" cmd /k "npm run dev"
 
 echo [3/3] Membuka Website di Browser...
 timeout /t 3 /nobreak >nul
-start http://localhost:5173
+start http://surade.com
 
 echo.
 echo ========================================================
 echo   Backend & Frontend berhasil dijalankan!
-echo   - Frontend: http://localhost:5173
-echo   - Backend:  http://localhost:8000
-echo   - Admin:    admin@surade.co.id / password123
-echo   - User:     user@surade.co.id  / password123
+echo   - URL:   http://surade.com
+echo   - Admin: admin@surade.com / admin123
+echo   - User:  user@surade.com  / password123
 echo ========================================================
 pause

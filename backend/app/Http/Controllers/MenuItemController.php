@@ -36,6 +36,8 @@ class MenuItemController extends Controller
 
     public function store(Request $request)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, ['name', 'description'], ['image']);
+
         $validator = Validator::make($request->all(), [
             'business_id' => 'required|exists:businesses,id',
             'name' => 'required|string|max:255',
@@ -90,6 +92,8 @@ class MenuItemController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, ['name', 'description'], ['image']);
+
         $menuItem = MenuItem::with('business')->find($id);
 
         if (!$menuItem) {

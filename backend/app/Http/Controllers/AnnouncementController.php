@@ -17,6 +17,8 @@ class AnnouncementController extends Controller
     // Hanya admin (route ini ada di grup admin/) yang boleh membuat pengumuman.
     public function store(Request $request)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, ['title', 'body', 'description', 'category']);
+
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'body' => 'required|string',
@@ -43,6 +45,8 @@ class AnnouncementController extends Controller
 
     public function update(Request $request, $id)
     {
+        \App\Services\ContentModerationService::validateOrFail($request, ['title', 'body', 'description', 'category']);
+
         $announcement = Announcement::find($id);
 
         if (!$announcement) {

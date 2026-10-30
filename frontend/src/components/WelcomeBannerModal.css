@@ -1,64 +1,104 @@
+/* ==========================================================================
+   SURADE.COM - WELCOME BANNER MODAL STYLES
+   Crisp overlay (no blur), pixel-perfect hotspots, and modern micro-interactions
+   ========================================================================== */
+
 .welcome-banner-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(4px);
+  z-index: 99990;
+  /* Completely clear & crisp background - NO BLUR */
+  background: rgba(15, 23, 42, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  animation: welcome-banner-fade-in 0.25s ease;
+  animation: welcome-banner-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .welcome-banner-modal {
   position: relative;
   width: 100%;
-  max-width: 720px;
+  max-width: 660px;
   border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
-  animation: welcome-banner-pop-in 0.3s ease;
+  box-shadow: 0 25px 60px -12px rgba(15, 23, 42, 0.35),
+              0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+  animation: welcome-banner-pop-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: #ffffff;
 }
 
-.welcome-banner-modal__image-btn {
-  display: block;
+.welcome-banner-modal__container {
+  position: relative;
   width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
   line-height: 0;
+  cursor: pointer;
+  display: block;
 }
 
 .welcome-banner-modal__image {
   display: block;
   width: 100%;
   height: auto;
+  object-fit: cover;
+  border-radius: 20px;
 }
 
+/* Close Button */
 .welcome-banner-modal__close {
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0f172a;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.95);
+  color: #1e293b;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 2;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: transform 0.15s ease, background 0.15s ease;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .welcome-banner-modal__close:hover {
-  background: #ffffff;
-  transform: scale(1.08);
+  background: #0f6e46;
+  color: #ffffff;
+  border-color: #0f6e46;
+  transform: scale(1.1) rotate(90deg);
+}
+
+.welcome-banner-modal__close:active {
+  transform: scale(0.95);
+}
+
+/* Interactive 'Daftar Now' Hotspot Overlay - Exact fit to green pill graphic */
+.welcome-banner-modal__register-btn {
+  position: absolute;
+  top: 60.5%;
+  left: 5.6%;
+  width: 22.8%;
+  height: 12.2%;
+  border-radius: 9999px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 8;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: none;
+}
+
+.welcome-banner-modal__register-btn:hover {
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.9;
+}
+
+.welcome-banner-modal__register-btn:active {
+  opacity: 0.75;
 }
 
 @keyframes welcome-banner-fade-in {
@@ -67,12 +107,28 @@
 }
 
 @keyframes welcome-banner-pop-in {
-  from { opacity: 0; transform: scale(0.94) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @media (max-width: 640px) {
   .welcome-banner-modal {
     max-width: 100%;
+    border-radius: 16px;
+  }
+  .welcome-banner-modal__image {
+    border-radius: 16px;
+  }
+  .welcome-banner-modal__close {
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
   }
 }

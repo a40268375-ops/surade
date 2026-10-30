@@ -26,6 +26,20 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
+// Intercept and prevent sandbox CSP violation warnings from third-party payment scripts
+window.addEventListener("securitypolicyviolation", (event) => {
+  const uri = event?.blockedURI || "";
+  if (
+    uri.includes("midtrans") ||
+    uri.includes("alicdn") ||
+    uri.includes("gopayapi") ||
+    uri.includes("google")
+  ) {
+    event.stopImmediatePropagation();
+    event.preventDefault();
+  }
+});
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <App />

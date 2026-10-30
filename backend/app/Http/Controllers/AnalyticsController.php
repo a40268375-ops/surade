@@ -31,11 +31,20 @@ class AnalyticsController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        $userId = $request->user('sanctum')?->id ?? auth('sanctum')->id() ?? auth()->id();
+
         PageView::create([
             'business_id' => $request->business_id,
+            'user_id' => $userId,
             'path' => $request->path,
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
             'created_at' => Carbon::now(),
         ]);
+
+        if ($request->business_id) {
+            Business::where('id', $request->business_id)->increment('views');
+        }
 
         return response()->json(['message' => 'ok'], 201);
     }
@@ -150,8 +159,10 @@ class AnalyticsController extends Controller
 
             $query = PageView::whereIn('business_id', $businessIds);
 
-            // Total sepanjang waktu untuk user's businesses
-            $totalViews = (clone $query)->count();
+            // Total views calculated from highest of PageView count or business views sum
+            $dbViewsSum = (int) Business::where('user_id', $user->id)->sum('views');
+            $pageViewsCount = (clone $query)->count();
+            $totalViews = max($pageViewsCount, $dbViewsSum);
 
             // 7 hari terakhir
             $days = collect(range(6, 0))->map(fn ($i) => Carbon::now()->subDays($i)->startOfDay());

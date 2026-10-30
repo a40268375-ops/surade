@@ -113,17 +113,8 @@ class NotificationController extends Controller
      */
     public static function notifyAdminNewBusiness($business)
     {
-        $admins = \App\Models\User::where('role', 'admin')->get();
-        
-        foreach ($admins as $admin) {
-            self::createNotification(
-                $admin->id,
-                'business',
-                'Bisnis Baru Didaftarkan',
-                "Bisnis '{$business->title}' telah didaftarkan dan menunggu persetujuan.",
-                ['business_id' => $business->id]
-            );
-        }
+        // Gunakan method dari model Notification
+        \App\Models\Notification::notifyAdminBusinessVerification($business);
     }
 
     /**
@@ -223,6 +214,18 @@ class NotificationController extends Controller
         // Create a few test notifications
         $notifications = [
             [
+                'type' => 'business_verification',
+                'title' => '🔔 Bisnis Baru Perlu Verifikasi',
+                'message' => 'Bisnis "Warung Makan Sederhana" telah didaftarkan oleh John Doe dan menunggu verifikasi Anda.',
+                'data' => [
+                    'business_id' => 1,
+                    'business_title' => 'Warung Makan Sederhana',
+                    'user_name' => 'John Doe',
+                ],
+                'action_url' => '/admin/verification/businesses/1',
+                'priority' => 'high'
+            ],
+            [
                 'type' => 'business',
                 'title' => 'Bisnis Baru Disetujui',
                 'message' => 'Bisnis "Test Business" telah disetujui dan sekarang aktif.',
@@ -240,12 +243,16 @@ class NotificationController extends Controller
         ];
         
         foreach ($notifications as $notif) {
-            self::createNotification(
-                $user->id,
-                $notif['type'],
-                $notif['title'],
-                $notif['message']
-            );
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => $notif['type'],
+                'title' => $notif['title'],
+                'message' => $notif['message'],
+                'data' => $notif['data'] ?? null,
+                'action_url' => $notif['action_url'] ?? null,
+                'priority' => $notif['priority'] ?? 'normal',
+                'is_read' => false
+            ]);
         }
         
         return response()->json(['message' => 'Test notifications created']);
@@ -262,6 +269,96 @@ class NotificationController extends Controller
         return response()->json([
             'message' => 'Cleanup completed',
             'deleted_count' => $deletedCount
+        ]);
+    }
+
+    /**
+     * Get admin notifications (untuk panel admin)
+     */
+    public function adminIndex(Request $request)
+    {
+        $user = Auth::user();
+        
+        if ($user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+        $query = Notification::where('user_id', $user->id)
+            ->orderByRaw("FIELD(priority, 'urgent', 'high', 'normal', 'low')")
+            ->orderBy('created_at', 'desc');
+        
+        // Filter by type
+        if ($request->has('type') && $request->type !== 'all') {
+            $query->where('type', $request->type);
+        }
+        
+        // Filter by read status
+        if ($request->has('read_status')) {
+            $isRead = $request->read_status === 'read';
+            $query->where('is_read', $isRead);
+        }
+        
+        $perPage = $request->get('per_page', 20);
+        $notifications = $query->paginate($perPage);
+        
+        $unreadCount = Notification::where('user_id', $user->id)
+            ->where('is_read', false)
+            ->count();
+        
+        $pendingVerificationCount = Notification::where('user_id', $user->id)
+            ->where('type', 'business_verification')
+            ->where('is_read', false)
+            ->count();
+        
+        return response()->json([
+            'notifications' => $notifications,
+            'unread_count' => $unreadCount,
+            'pending_verification_count' => $pendingVerificationCount,
+            'notification_types' => Notification::getNotificationTypes()
+        ]);
+    }
+
+    /**
+     * Mark admin notification as read
+     */
+    public function adminMarkRead(Request $request, $id)
+    {
+        $user = Auth::user();
+        
+        if ($user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+        $notification = Notification::where('id', $id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+        
+        $notification->update(['is_read' => true]);
+        
+        return response()->json([
+            'message' => 'Notification marked as read',
+            'notification' => $notification
+        ]);
+    }
+
+    /**
+     * Mark all admin notifications as read
+     */
+    public function adminMarkAllRead(Request $request)
+    {
+        $user = Auth::user();
+        
+        if ($user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+        $updated = Notification::where('user_id', $user->id)
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
+        
+        return response()->json([
+            'message' => 'All notifications marked as read',
+            'updated_count' => $updated
         ]);
     }
 }

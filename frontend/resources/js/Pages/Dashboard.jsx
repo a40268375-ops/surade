@@ -4,7 +4,7 @@ export default function Dashboard() {
     const [view, setView] = useState('list');
     return (
         <div className="p-8 max-w-6xl mx-auto">
-            <h1 className="text-2xl font-bold mb-4">CRUD System - Surade.co.id</h1>
+            <h1 className="text-2xl font-bold mb-4">CRUD System - Surade.com</h1>
             <div className="flex gap-4 mb-6">
                 <button onClick={() => setView('list')} className="bg-teal-800 text-white px-4 py-2 rounded">Lihat Data</button>
                 <button onClick={() => setView('form')} className="bg-emerald-600 text-white px-4 py-2 rounded">+ Tambah</button>
