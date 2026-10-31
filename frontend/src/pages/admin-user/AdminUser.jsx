@@ -5094,10 +5094,6 @@ export default function AdminUser() {
         localStorage.removeItem('is_seller_mode');
       } catch (e) { }
       if (['blog-event', 'bisnis', 'produk', 'iklan', 'premium'].includes(activeTab)) {
-        toast(
-          "Fitur ini khusus untuk penjual/pemilik usaha. Silakan daftarkan usaha Anda terlebih dahulu.",
-          { icon: "🏪", duration: 4500 }
-        );
         navigate("/add-business");
         setActiveTab('dashboard');
       }

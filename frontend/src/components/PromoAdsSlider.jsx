@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ArrowRight,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 
 export default function PromoAdsSlider({
@@ -83,9 +82,6 @@ export default function PromoAdsSlider({
       ctaText: "Lihat Paket Centang Emas",
       targetTab: "premium",
       requiresSeller: true,
-      sellerAlertMessage:
-        "Fitur Paket Centang Emas / Premium khusus untuk pemilik usaha terdaftar. Daftarkan usaha Anda terlebih dahulu!",
-      alertIcon: "👑",
       gradient: "from-[#7c2d12] via-[#c2410c] to-[#431407]",
       accentColor: "text-amber-300",
     },
@@ -100,9 +96,6 @@ export default function PromoAdsSlider({
       ctaText: "Pasang Iklan Banner Sekarang",
       targetTab: "iklan",
       requiresSeller: true,
-      sellerAlertMessage:
-        "Fitur Pasang Iklan Banner khusus untuk pemilik usaha terdaftar. Daftarkan usaha Anda terlebih dahulu!",
-      alertIcon: "🔥",
       gradient: "from-[#831843] via-[#9f1239] to-[#4c0519]",
       accentColor: "text-pink-200",
     },
@@ -117,9 +110,6 @@ export default function PromoAdsSlider({
       ctaText: "Publikasikan Event Sekarang",
       targetTab: "blog-event",
       requiresSeller: true,
-      sellerAlertMessage:
-        "Fitur Publikasi Event & Info khusus untuk pemilik usaha terdaftar. Daftarkan usaha Anda terlebih dahulu!",
-      alertIcon: "📢",
       gradient: "from-[#0c4a6e] via-[#0369a1] to-[#082f49]",
       accentColor: "text-cyan-200",
     },
@@ -182,16 +172,8 @@ export default function PromoAdsSlider({
       return;
     }
 
-    // 3. Jika fitur memerlukan status Penjual (Seller)
+    // 3. Jika fitur memerlukan status Penjual (Seller) dan akun masih User Biasa, langsung arahkan menjadi penjual
     if (ad.requiresSeller && !isSeller) {
-      toast(
-        ad.sellerAlertMessage ||
-          "Fitur ini khusus untuk penjual/pemilik usaha. Silakan daftarkan usaha Anda terlebih dahulu.",
-        {
-          icon: ad.alertIcon || "🏪",
-          duration: 4500,
-        }
-      );
       navigate("/add-business");
       return;
     }
