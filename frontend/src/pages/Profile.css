@@ -352,15 +352,21 @@
 @media (max-width: 768px) {
   .profile-page {
     padding-top: 86px;
+    padding-bottom: 120px; /* Jarak aman di mobile agar tidak tertutup bottom nav & floating button */
+  }
+  .profile-container {
+    padding: 0 16px;
   }
   .profile-card-header {
-    padding: 24px 20px;
+    padding: 22px 16px;
+    border-radius: 20px;
+    margin-bottom: 20px;
   }
   .profile-card-header__top {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 20px;
+    gap: 16px;
   }
   .profile-details {
     align-items: center;
@@ -374,20 +380,70 @@
   .profile-card-header__bottom {
     flex-direction: column;
     align-items: stretch;
+    gap: 18px;
   }
   .profile-stats-grid {
+    display: flex;
     flex-direction: column;
     width: 100%;
+    gap: 10px;
   }
   .profile-stat-card {
     width: 100%;
+    padding: 12px 16px;
+    border-radius: 14px;
+    box-sizing: border-box;
   }
   .profile-actions-row {
     width: 100%;
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
   }
   .profile-action-btn {
     flex: 1;
+    min-width: 0;
     justify-content: center;
+    padding: 11px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 12px;
+    gap: 6px;
+  }
+  .profile-action-btn span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Mobile Tab Responsiveness */
+  .profile-tabs {
+    width: 100%;
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    margin-bottom: 24px;
+    border-radius: 14px;
+    box-sizing: border-box;
+  }
+  .profile-tab {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    padding: 12px 8px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 10px;
+    gap: 6px;
+  }
+  .profile-tab span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-tab-badge {
+    padding: 2px 6px;
+    font-size: 10.5px;
+    border-radius: 9999px;
   }
 }
 

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import "./Home.css";
 import "./Profile.css";
+import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import SuradeLoader from "../components/SuradeLoader";
@@ -70,7 +71,15 @@ export default function Profile() {
 
   const [seller, setSeller] = useState(initialSeller);
   const [activeTab, setActiveTab] = useState("ads");
-  const [followed, setFollowed] = useState(false);
+  const [followed, setFollowed] = useState(() => {
+    try {
+      const storedFollows = JSON.parse(localStorage.getItem("followed_sellers") || "[]");
+      const targetId = String(id || "");
+      return targetId ? storedFollows.includes(targetId) : false;
+    } catch {
+      return false;
+    }
+  });
   const [copied, setCopied] = useState(false);
   const [productSearch, setProductSearch] = useState("");
 
@@ -230,20 +239,53 @@ export default function Profile() {
     };
   }, [id]);
 
+  const handleToggleFollow = () => {
+    requireAuth(() => {
+      const targetId = String(id || seller?.id || "");
+      try {
+        const storedFollows = JSON.parse(localStorage.getItem("followed_sellers") || "[]");
+        let updated;
+        if (followed) {
+          updated = storedFollows.filter((fid) => fid !== targetId);
+          setFollowed(false);
+          toast("Berhenti mengikuti profil.", { icon: "🔕" });
+        } else {
+          updated = [...storedFollows, targetId];
+          setFollowed(true);
+          toast.success(`Berhasil mengikuti ${seller.name || "pengelola usaha"}!`, { icon: "🔔" });
+        }
+        localStorage.setItem("followed_sellers", JSON.stringify(updated));
+      } catch {
+        setFollowed(!followed);
+      }
+    });
+  };
+
   const handleShare = async () => {
     const url = window.location.href;
+    const title = `Profil ${seller.name || seller.username} - Surade.com`;
+    const text = `Kunjungi profil pengelola usaha ${seller.name || ""} di direktori UMKM Surade.com!`;
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `Profil ${seller.name || seller.username} - Surade.com`,
-          url: url,
-        });
+        await navigator.share({ title, text, url });
         return;
       } catch {}
     }
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast.success("Tautan profil berhasil disalin!", { icon: "📋" });
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      toast.error("Gagal menyalin tautan.");
+    }
+  };
+
+  const handleSendMessage = () => {
+    requireAuth(() => {
+      const targetId = id || seller?.id;
+      navigate(`/dashboard?tab=inbox${targetId ? `&seller=${targetId}` : ""}`);
+    });
   };
 
   const getMediaUrl = (url, fallback) => {
@@ -379,7 +421,7 @@ export default function Profile() {
                 <button
                   type="button"
                   className={`profile-action-btn ${followed ? "profile-action-btn--followed" : "profile-action-btn--follow"}`}
-                  onClick={() => requireAuth(() => setFollowed(!followed))}
+                  onClick={handleToggleFollow}
                 >
                   {followed ? <UserCheck size={16} /> : <UserPlus size={16} />}
                   <span>{followed ? "Mengikuti" : "Ikuti Profil"}</span>
@@ -408,7 +450,7 @@ export default function Profile() {
                 <button
                   type="button"
                   className="profile-action-btn profile-action-btn--chat"
-                  onClick={() => requireAuth(() => navigate(`/dashboard?tab=inbox`))}
+                  onClick={handleSendMessage}
                 >
                   <MessageCircle size={15} />
                   <span>Kirim Pesan</span>

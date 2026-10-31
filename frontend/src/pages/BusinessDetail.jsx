@@ -3987,12 +3987,7 @@ const handleWaPaymentConfirm = async () => {
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
                           <span>Poin Gold tanpa kode referral: Tidak ada bonus referral untuk siapa pun.</span>
                         </div>
-                      ) : (
-                        <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[10.5px] text-slate-600 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                          <span>Poin Silver: Tidak mendapatkan bonus referral, meskipun ada kode referral.</span>
-                        </div>
-                      )}
+                      ) : null}
                     </div>
 
                     <button

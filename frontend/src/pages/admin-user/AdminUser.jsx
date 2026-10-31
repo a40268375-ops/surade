@@ -5077,8 +5077,8 @@ export default function AdminUser() {
     user?.account_type === 'seller' ||
     user?.account_type === 'reseller' ||
     user?.account_type === 'business' ||
-    // 2. Or user actually owns businesses (verified by user ID or user.businesses)
-    (businesses && businesses.length > 0 && businesses.some(b => !user?.id || !b.user_id || String(b.user_id) === String(user.id))) ||
+    // 2. Or user actually owns businesses (verified strictly by user ID match)
+    (businesses && businesses.length > 0 && user?.id && businesses.some(b => b.user_id && String(b.user_id) === String(user.id))) ||
     (user?.businesses && user?.businesses?.length > 0)
   );
 

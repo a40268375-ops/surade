@@ -30,17 +30,17 @@ export default function PromoAdsSlider({
   const isSeller = Boolean(
     propIsSeller !== null
       ? propIsSeller
-      : user?.role === "seller" ||
-        user?.role === "reseller" ||
-        user?.role === "merchant" ||
-        user?.role === "admin" ||
-        user?.role === "super_admin" ||
-        user?.is_seller === true ||
-        user?.account_type === "seller" ||
-        user?.account_type === "reseller" ||
-        user?.account_type === "business" ||
-        (user?.businesses && user?.businesses.length > 0) ||
-        localStorage.getItem("is_seller") === "true"
+      : (user?.role === "seller" ||
+         user?.role === "reseller" ||
+         user?.role === "merchant" ||
+         user?.role === "admin" ||
+         user?.role === "super_admin" ||
+         user?.is_seller === true ||
+         user?.account_type === "seller" ||
+         user?.account_type === "reseller" ||
+         user?.account_type === "business" ||
+         (Array.isArray(user?.businesses) && user.businesses.length > 0)) &&
+        user?.account_type !== "personal"
   );
 
   const promoAds = [
