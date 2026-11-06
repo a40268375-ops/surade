@@ -32,7 +32,7 @@ export default function SuradeLoader({
   useEffect(() => {
     if (!isLoading) {
       setAnimatedProgress(100);
-      const timer = setTimeout(() => setShow(false), 350);
+      const timer = setTimeout(() => setShow(false), 300);
       return () => clearTimeout(timer);
     }
 

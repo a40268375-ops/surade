@@ -25,13 +25,11 @@ function App() {
   return (
     <ErrorBoundary>
       <Toaster position="top-center" containerStyle={{ zIndex: 99999 }} />
-      {initialLoading && (
-        <LoadingScreen
-          isLoading={initialLoading}
-          text="Surade.com"
-          subtext="Portal UMKM & Ekosistem Digital Surade"
-        />
-      )}
+      <LoadingScreen
+        isLoading={initialLoading}
+        text="Surade.com"
+        subtext="Portal UMKM & Ekosistem Digital Surade"
+      />
       <AuthProvider>
         <ReferralProvider>
           <AppRouter />

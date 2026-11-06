@@ -11,22 +11,24 @@
 .surade-loader-screen {
   position: fixed;
   inset: 0;
-  z-index: 999999;
+  z-index: 9999999;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 100% Solid Opaque Background: Putih bersih elegan dengan sentuhan hijau emerald */
-  background-color: #ffffff;
-  background: radial-gradient(120% 120% at 50% 15%, #ecfdf5 0%, #ffffff 50%, #f0fdf4 100%);
+  /* 100% Solid Opaque Background: Putih bersih solid tidak tembus pandang */
+  background-color: #ffffff !important;
+  background-image: radial-gradient(ellipse at 50% 20%, #ecfdf5 0%, #ffffff 65%, #f0fdf4 100%) !important;
   opacity: 1;
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  visibility: visible;
+  transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
   user-select: none;
   overflow: hidden;
 }
 
 .surade-loader-screen.is-hidden {
-  opacity: 0;
-  pointer-events: none;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* Dekorasi Latar Belakang (Ambient Glows & Grid Mesh) - 100% di dalam layar loading */
